@@ -80,12 +80,15 @@ struct CompanionPicker: View {
             Button {
                 store.companion = dot
             } label: {
-                HStack(spacing: 13) {
-                    MascotView(dot: dot, size: 42)
-                    Text(dot.title)
-                    Spacer()
+                HStack(spacing: 10) {
+                    MascotView(dot: dot, size: 36)
+                        .frame(width: 42, height: 42)
+                    Text(dot.title).font(.subheadline.weight(.semibold))
+                    Spacer(minLength: 4)
                     if store.companion == dot { Image(systemName: "checkmark.circle.fill").foregroundStyle(dot.color) }
                 }
+                .frame(minHeight: 49)
+                .contentShape(Rectangle())
             }
         }
         .navigationTitle("My Superdot")
