@@ -4,6 +4,7 @@ import Charts
 struct ContentView: View {
     @EnvironmentObject var store: WatchStore
     @StateObject private var themeSync = WatchThemeSync()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         NavigationStack {
@@ -39,6 +40,9 @@ struct ContentView: View {
             }
         }
         .task { await themeSync.refresh(store:store) }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await themeSync.refresh(store:store) } }
+        }
     }
 
     private func metric(_ title: String, value: String, unit: String) -> some View {
