@@ -65,7 +65,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  const [settingsPage,setSettingsPage]=useState<'main'|'themes'|'watch'|'health'|'notifications'|'privacy'|'help'|'voice'>('main');
  const [period,setPeriod]=useState<Period>('Day');
  const [mood,setMood]=useState<Mood|' '>(' ');
- useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data,error}=await supabase.from('mood_entries').select('mood').eq('user_id',user.id).order('recorded_at',{ascending:false}).limit(1).maybeSingle();if(error){console.warn('Loading mood failed:',error.message);return;}if(alive&&data&&['Calm','Okay','Anxious','Happy','Tired'].includes(data.mood))setMood(data.mood as Mood)})();return()=>{alive=false}},[]);
+ useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data,error}=await supabase.from('mood_entries').select('mood').eq('user_id',user.id).gte('recorded_at',new Date(new Date().setHours(0,0,0,0)).toISOString()).order('recorded_at',{ascending:false}).limit(1).maybeSingle();if(error){console.warn('Loading mood failed:',error.message);return;}if(alive&&data&&['Calm','Okay','Anxious','Happy','Tired'].includes(data.mood))setMood(data.mood as Mood)})();return()=>{alive=false}},[]);
  const [water,setWater]=useState(0);
  const [coffee,setCoffee]=useState(0);
  useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;
