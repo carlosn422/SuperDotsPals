@@ -1,14 +1,16 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { SafeAreaView, StatusBar, ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import Svg, { Circle, Line, Path, Rect, Defs, LinearGradient, Stop, Polygon } from 'react-native-svg';
+import {LifestyleOverview, ThemePicker} from './LifestyleFeatures';
 
 type Tab = 'Today' | 'Trends' | 'Habits' | 'You';
-type Period = 'Day' | 'Week' | 'Month';
+type Period = 'Day' | 'Week' | 'Month' | 'Year';
 type Mood = 'Calm' | 'Okay' | 'Anxious' | 'Happy' | 'Tired';
 const C = { ink:'#233A35', muted:'#82938B', green:'#60CFA3', deep:'#318D70', surface:'#FFFFFF', bg:'#F6FAF7', mint:'#E2F8EB', peach:'#FFF0DE', orange:'#F4A570', lilac:'#EDE9FA', purple:'#A69BE4', line:'#E7F0E8', red:'#EC7D8C' };
 const hrvDay = [40,48,44,58,53,64,48,74,62,55,67,58,78,71,57,60,82,69];
 const hrvWeek = [42,48,55,44,63,59,72,67,61,74,70,78,64,76];
 const hrvMonth = [41,46,44,49,54,50,61,58,55,66,63,72,67,73];
+const hrvYear = [38,42,40,49,45,54,57,53,60,63,61,69];
 const stressDay = [16,20,14,12,23,17,26,39,61,49,70,55,42,32,57,48,28,22,35,16,19,14,10,17];
 const tabs: {name:Tab; icon:string}[] = [{name:'Today',icon:'⌂'},{name:'Trends',icon:'▥'},{name:'Habits',icon:'♡'},{name:'You',icon:'☺'}];
 
@@ -58,7 +60,7 @@ function App() {
  const [breathing,setBreathing]=useState(false);
  const [seconds,setSeconds]=useState(60);
  useEffect(()=>{if(!breathing)return;const id=setInterval(()=>setSeconds(v=>{if(v<=1){setBreathing(false);return 60;}return v-1;}),1000);return()=>clearInterval(id);},[breathing]);
- const values=useMemo(()=>period==='Day'?hrvDay:period==='Week'?hrvWeek:hrvMonth,[period]);
+ const values=useMemo(()=>period==='Day'?hrvDay:period==='Week'?hrvWeek:period==='Month'?hrvMonth:hrvYear,[period]);
  const go=(t:Tab)=>{setTab(t);setPeriod('Day');};
  return <SafeAreaView style={s.safe}><StatusBar barStyle="dark-content" backgroundColor={C.bg}/>
   <View style={s.top}><View style={s.brand}><View style={s.logo}><Text style={s.logoText}>✳</Text></View><Text style={s.brandText}>wellnest<Text style={{color:C.green}}>.</Text></Text></View><TouchableOpacity accessibilityLabel="Open profile" onPress={()=>go('You')} style={s.avatar}><Text style={{fontSize:18}}>☺</Text></TouchableOpacity></View>
@@ -76,21 +78,24 @@ function App() {
   </>:null}
   {tab==='Trends'? <>
    <Text style={s.eyebrow}>YOUR WELLBEING JOURNEY</Text><Text style={s.mainTitle}>Progress, not perfection.</Text><Text style={s.intro}>See how your body responds over time.</Text>
-   <View style={s.period}>{(['Day','Week','Month'] as Period[]).map(p=><Chip key={p} label={p} active={period===p} onPress={()=>setPeriod(p)}/>)}</View>
+   <View style={s.period}>{(['Day','Week','Month','Year'] as Period[]).map(p=><Chip key={p} label={p} active={period===p} onPress={()=>setPeriod(p)}/>)}</View>
    <Card style={{marginTop:8}}><Heading title="HRV trend" detail="↗ +12%"/><Text style={s.bigValue}>61 <Text style={s.bigUnit}>ms average</Text></Text><Text style={s.bodyMuted}>A higher HRV can reflect improved recovery.</Text><Sparkline values={values} color={C.green} height={185} filled/><View style={s.axis}><Text style={s.axisText}>{period==='Day'?'Morning':'Start'}</Text><Text style={s.axisText}>Midpoint</Text><Text style={s.axisText}>{period==='Day'?'Evening':'Recent'}</Text></View></Card>
    <Card><Heading title="Stress balance"/><View style={s.balanceRow}><View style={[s.balanceBlock,{backgroundColor:C.mint}]}><Text style={s.balanceValue}>72%</Text><Text style={s.balanceLabel}>Restful</Text></View><View style={[s.balanceBlock,{backgroundColor:C.peach}]}><Text style={s.balanceValue}>28%</Text><Text style={s.balanceLabel}>Elevated</Text></View></View><Text style={s.bodyMuted}>Based on fictional readings for this demo.</Text></Card>
+   <LifestyleOverview/>
    <Card><Heading title="Your weekly highlights"/><Text style={s.listText}>✦   Your best recovery was on Saturday.</Text><Text style={s.listText}>☾   7h 42m average sleep this week.</Text><Text style={s.listText}>♡   Morning HRV is trending upward.</Text></Card>
   </>:null}
   {tab==='Habits'? <>
    <Text style={s.eyebrow}>SMALL STEPS, BIG CHANGES</Text><Text style={s.mainTitle}>Care for yourself.</Text><Text style={s.intro}>How are you feeling right now?</Text>
    <Card><Heading title="Mood check-in" detail={mood===' '?'Not logged':'Saved ✓'}/><View style={s.moods}>{([{name:'Calm',emoji:'😌'},{name:'Okay',emoji:'🙂'},{name:'Anxious',emoji:'😟'},{name:'Happy',emoji:'🥰'},{name:'Tired',emoji:'😴'}] as {name:Mood;emoji:string}[]).map(m=><TouchableOpacity key={m.name} onPress={()=>setMood(m.name)} style={[s.mood,mood===m.name&&s.moodActive]}><Text style={{fontSize:27}}>{m.emoji}</Text><Text style={s.moodLabel}>{m.name}</Text></TouchableOpacity>)}</View>{mood!==' '?<Text style={s.feedback}>Thanks for checking in. Your {mood.toLowerCase()} mood is logged for this session.</Text>:null}</Card>
    <Card><Heading title="Daily habits" detail="Today"/><View style={s.habitLine}><View><Text style={s.habitTitle}>💧  Water</Text><Text style={s.bodyMuted}>{water} glasses logged</Text></View><View style={s.counter}><TouchableOpacity onPress={()=>setWater(v=>Math.max(0,v-1))}><Text style={s.counterText}>−</Text></TouchableOpacity><Text style={s.counterNumber}>{water}</Text><TouchableOpacity onPress={()=>setWater(v=>v+1)}><Text style={s.counterText}>+</Text></TouchableOpacity></View></View><View style={s.habitLine}><View><Text style={s.habitTitle}>☕  Caffeine</Text><Text style={s.bodyMuted}>{coffee} cups logged</Text></View><View style={s.counter}><TouchableOpacity onPress={()=>setCoffee(v=>Math.max(0,v-1))}><Text style={s.counterText}>−</Text></TouchableOpacity><Text style={s.counterNumber}>{coffee}</Text><TouchableOpacity onPress={()=>setCoffee(v=>v+1)}><Text style={s.counterText}>+</Text></TouchableOpacity></View></View></Card>
+   <LifestyleOverview/>
    <View style={s.breathe}><Text style={s.breatheOver}>TAKE A MOMENT</Text><Text style={s.breatheTitle}>Just breathe.</Text><Text style={s.breatheBody}>A minute of mindful breathing may help you feel grounded.</Text><View style={s.breatheCircle}><Text style={s.breatheTimer}>{seconds}s</Text><Text style={s.breatheSmall}>{breathing?'Breathe gently':'Ready when you are'}</Text></View><TouchableOpacity style={s.breatheButton} onPress={()=>{setBreathing(v=>!v);if(seconds===0)setSeconds(60);}}><Text style={s.breatheButtonText}>{breathing?'Pause exercise':seconds<60?'Resume breathing':'Start 1-minute reset'}</Text></TouchableOpacity><TouchableOpacity onPress={()=>{setBreathing(false);setSeconds(60)}}><Text style={s.reset}>Reset timer</Text></TouchableOpacity></View>
   </>:null}
   {tab==='You'? <>
    <Text style={s.eyebrow}>YOUR PERSONAL SPACE</Text><Text style={s.mainTitle}>Your wellbeing.</Text><View style={s.profile}><View style={s.profileAvatar}><Text style={{fontSize:30}}>☺</Text></View><View><Text style={s.profileName}>Your demo profile</Text><Text style={s.bodyMuted}>Finding your balance, one day at a time</Text></View></View>
    <Card><Heading title="Your baseline"/><View style={s.baseline}><Metric label="30-DAY HRV" value="54" unit="ms" sub="Sample baseline"/><Metric label="RESTING HR" value="69" unit="bpm" sub="Sample baseline"/></View></Card>
    <Card><Heading title="Data source"/><View style={s.settingLine}><Text style={s.habitTitle}>♡  Apple Health</Text><Text style={s.settingValue}>Not connected</Text></View><Text style={s.bodyMuted}>This prototype uses sample readings only. It does not access Apple Health, detect medical conditions, or send notifications.</Text></Card>
+   <ThemePicker/>
    <Card><Heading title="About this demo"/><Text style={s.about}>Wellnest is an original educational prototype of a stress and recovery tracker for iPhone. The visualization is inspired by general wellness app conventions, not a clinical scoring system.</Text><Text style={[s.about,{marginTop:10}]}>All values are illustrative and should not be used for health decisions.</Text></Card>
   </>:null}
   <Text style={s.disclaimer}>DEMO DATA ONLY  ·  NOT MEDICAL ADVICE</Text>
