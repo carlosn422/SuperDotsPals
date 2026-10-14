@@ -61,8 +61,10 @@ function AppContent() {
  const [tab,setTab]=useState<Tab>('Today');
  const [period,setPeriod]=useState<Period>('Day');
  const [mood,setMood]=useState<Mood|' '>(' ');
+ useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data,error}=await supabase.from('mood_entries').select('mood').eq('user_id',user.id).order('recorded_at',{ascending:false}).limit(1).maybeSingle();if(error){console.warn('Loading mood failed:',error.message);return;}if(alive&&data&&['Calm','Okay','Anxious','Happy','Tired'].includes(data.mood))setMood(data.mood as Mood)})();return()=>{alive=false}},[]);
  const [water,setWater]=useState(4);
  const [coffee,setCoffee]=useState(1);
+ useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data,error}=await supabase.from('habit_entries').select('habit,amount').eq('user_id',user.id).in('habit',['water','caffeine']).order('recorded_at',{ascending:false}).limit(100);if(error){console.warn('Loading habits failed:',error.message);return;}if(alive&&data){const w=data.find(x=>x.habit==='water');const c=data.find(x=>x.habit==='caffeine');if(w)setWater(Number(w.amount));if(c)setCoffee(Number(c.amount));}})();return()=>{alive=false}},[]);
  const [breathing,setBreathing]=useState(false);
  const [companion,setCompanion]=useState<'happy'|'sleepy'>('happy');
  const [seconds,setSeconds]=useState(60);
