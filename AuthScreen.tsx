@@ -15,7 +15,7 @@ export default function AuthScreen(){
    if(password.length<8)throw Error('Use a password with at least 8 characters.');
    if(mode==='signup'){
     const {data,error}=await supabase.auth.signUp({email:mail,password,options:{data:{display_name:name.trim().slice(0,100)}}});if(error)throw error;
-    setMessage(data.session?'Your account is ready!':'Check your email for a confirmation link, then sign in.');
+    if(data.session){setMessage('Your account is ready!');}else{setMode('signin');setMessage('Email sent! Confirm your email, then return here and sign in with the same password.');}
    }else{
     const {error}=await supabase.auth.signInWithPassword({email:mail,password});if(error)throw error;
    }
