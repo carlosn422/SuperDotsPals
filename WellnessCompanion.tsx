@@ -12,9 +12,9 @@ const feelings=['Good','Calm','Stressed','Anxious','Sad','Tired','Overwhelmed'];
 const activities=['Walking','Workout','Work','Meeting','Rest','Social time','Other'];
 type Entry={id:string;body:string;mood:string|null;intensity:number|null;occurred_at:string};
 type Message={id:string;role:'user'|'assistant';content:string;created_at:string};
-export default function WellnessCompanion({companion,color}:{companion:string;color:string}){
+export default function WellnessCompanion({companion,color,initialView='checkin'}:{companion:string;color:string;initialView?:'checkin'|'chat'|'history'}){
  const [mood,setMood]=useState(''),[intensity,setIntensity]=useState(5),[note,setNote]=useState(''),[activity,setActivity]=useState('Walking'),[minutes,setMinutes]=useState('20'),[events,setEvents]=useState<Entry[]>([]);
- const [view,setView]=useState<'checkin'|'chat'|'history'>('checkin');
+ const [view,setView]=useState<'checkin'|'chat'|'history'>(initialView);
  const [chatText,setChatText]=useState(''),[messages,setMessages]=useState<Message[]>([]),[conversationId,setConversationId]=useState<string|null>(null),[busy,setBusy]=useState(false);
  async function userId(){const {data:{user}}=await supabase.auth.getUser();if(!user)throw Error('Please sign in');return user.id}
  async function load(){
