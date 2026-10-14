@@ -5,6 +5,7 @@ import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
 import BreathingStudio from './BreathingStudio';
 import WellnessCompanion from './WellnessCompanion';
+import VoicePreferences from './VoicePreferences';
 import {PromoBanner,ThemeCard,ThemeGallery,WatchThemesCard,SettingsItem} from './SettingsComponents';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Svg, { Circle, Line, Path, Rect, Defs, LinearGradient, Stop, Polygon } from 'react-native-svg';
@@ -52,7 +53,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  const activePosition=useRef(new Animated.Value(0)).current;
  const [navWidth,setNavWidth]=useState(0);
  const [tab,setTab]=useState<Tab>('Today');
- const [settingsPage,setSettingsPage]=useState<'main'|'themes'|'watch'|'health'|'notifications'|'privacy'|'help'>('main');
+ const [settingsPage,setSettingsPage]=useState<'main'|'themes'|'watch'|'health'|'notifications'|'privacy'|'help'|'voice'>('main');
  const [period,setPeriod]=useState<Period>('Day');
  const [mood,setMood]=useState<Mood|' '>(' ');
  useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data,error}=await supabase.from('mood_entries').select('mood').eq('user_id',user.id).order('recorded_at',{ascending:false}).limit(1).maybeSingle();if(error){console.warn('Loading mood failed:',error.message);return;}if(alive&&data&&['Calm','Okay','Anxious','Happy','Tired'].includes(data.mood))setMood(data.mood as Mood)})();return()=>{alive=false}},[]);
@@ -119,6 +120,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
     <PromoBanner companion={selectedCompanion}/>
     <ThemeCard selected={selectedCompanion} onOpen={()=>setSettingsPage('themes')}/>
     <WatchThemesCard onOpen={()=>setSettingsPage('watch')}/>
+    <TouchableOpacity onPress={()=>setSettingsPage('voice')} style={{backgroundColor:'#fff',padding:17,borderRadius:22,flexDirection:'row',alignItems:'center',gap:12}}><Ionicons name="mic-outline" size={24} color={colors.accent}/><View style={{flex:1}}><Text style={{fontWeight:'800',fontSize:15,color:'#25145C'}}>Superdot Voice</Text><Text style={{color:'#8276A5',fontSize:12}}>Choose, preview, and save your voice</Text></View><Ionicons name="chevron-forward" size={17} color="#9E98A8"/></TouchableOpacity>
     <SettingsItem title="Health Data" subtitle="Permissions and wearable readings" status="Not connected" icon="heart-outline" accent={colors.accent} onPress={()=>setSettingsPage('health')}/>
     <SettingsItem title="Notifications" subtitle="Reminders and preferences" status="Not enabled" icon="notifications-outline" accent={colors.accent} onPress={()=>setSettingsPage('notifications')}/>
     <SettingsItem title="Wellness Profile" subtitle="Goals and onboarding answers" icon="person-circle-outline" accent={colors.accent} onPress={onEditProfile}/>
@@ -127,7 +129,8 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
     <TouchableOpacity style={s.settingsRow} onPress={()=>void supabase.auth.signOut()}><Ionicons name="log-out-outline" size={22} color="#D65B79"/><Text style={[s.settingsTitle,{color:'#D65B79'}]}>Sign out</Text></TouchableOpacity>
    </>:<>
     <TouchableOpacity style={s.settingsBack} onPress={()=>setSettingsPage('main')}><Ionicons name="chevron-back" size={18} color={colors.accent}/><Text style={{color:colors.accent,fontWeight:'800'}}>Settings</Text></TouchableOpacity>
-    <Text style={s.mainTitle}>{({themes:'Choose your Superdot',watch:'Apple Watch & Widgets',health:'Apple Health',notifications:'Notifications',privacy:'Privacy & Data',help:'Help & Support'} as const)[settingsPage]}</Text>
+    <Text style={s.mainTitle}>{({themes:'Choose your Superdot',watch:'Apple Watch & Widgets',health:'Apple Health',notifications:'Notifications',privacy:'Privacy & Data',help:'Help & Support',voice:'Superdot Voice'} as const)[settingsPage]}</Text>
+    {settingsPage==='voice'?<VoicePreferences/>:null}
     {settingsPage==='themes'?<ThemeGallery selected={selectedCompanion} saving={themeSaving} onSelect={(id,theme)=>void chooseSuperdot(id,theme)}/>:null}
     {settingsPage==='watch'?<><Card><Heading title="Watch connection"/><Text style={s.bodyMuted}>The watch app has optional Supabase theme synchronization. Sign in to Theme sync on your Apple Watch, then refresh to apply your chosen Superdot. Live WatchConnectivity is not connected yet.</Text></Card><WidgetPreview/></>:null}
     {settingsPage==='health'?<Card><Heading title="Health data access"/><Text style={s.bodyMuted}>Apple Health is not connected. Your displayed HRV, resting heart rate, stress and sleep measurements are sample data. A future HealthKit integration will explicitly ask permission before reading any information.</Text></Card>:null}
