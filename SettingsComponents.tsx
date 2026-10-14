@@ -32,13 +32,9 @@ export function ThemeGallery({selected,onSelect,saving}:{selected:string;onSelec
 }
 export function WatchThemesCard({onOpen}:{onOpen:()=>void}){
  return <View style={s.watchCard}>
-  <TouchableOpacity onPress={onOpen} style={s.watchTop}><View style={s.iconBadge}><Ionicons name="watch-outline" size={25} color="#6C6680"/></View><View style={{flex:1,gap:4}}><Text style={s.title}>Apple Watch Faces & Widgets</Text><Text style={s.subtitle}>Companions, complications and widgets</Text><Text style={s.micro}>Theme sync available in the watch app</Text></View><View style={s.watchMock}><Ionicons name="watch" size={32} color="#5A448C"/><Text style={{fontSize:8,color:'#6D5992'}}>♡ 61</Text></View><Ionicons name="chevron-forward" size={17} color="#9E98A8"/></TouchableOpacity>
+  <TouchableOpacity onPress={onOpen} style={s.watchTop}><View style={s.iconBadge}><Ionicons name="watch-outline" size={25} color="#6C6680"/></View><View style={{flex:1,gap:4}}><Text style={s.title}>Apple Watch Faces & Widgets</Text><Text style={s.subtitle}>Companions, complications and widgets</Text><Text style={s.micro}>Theme sync available in the watch app</Text></View><View style={s.watchMock}><Ionicons name="watch" size={32} color="#5A448C"/><Text style={{fontSize:8,color:'#6D5992'}}>♥</Text></View><Ionicons name="chevron-forward" size={17} color="#9E98A8"/></TouchableOpacity>
   <View style={s.separator}/>
-  <View style={{flexDirection:'row',alignItems:'center',gap:6}}><Text style={s.title}>Custom Watch Themes</Text><View style={s.badge}><Text style={s.badgeText}>Preview</Text></View></View>
-  <View style={s.actionRow}>
-   <TouchableOpacity style={[s.watchAction,{backgroundColor:'#FFE1C8'}]} onPress={()=>Alert.alert('Create a Theme','The watch theme editor is planned but not implemented yet.')}><Ionicons name="color-palette-outline" size={18} color="#C47741"/><Text style={s.actionText}>Create a Theme</Text></TouchableOpacity>
-   <TouchableOpacity style={[s.watchAction,{backgroundColor:'#DAE8FF'}]} onPress={()=>Alert.alert('Redeem a Theme','Theme redemption is not available yet.')}><Ionicons name="cloud-download-outline" size={18} color="#5D85C6"/><Text style={s.actionText}>Redeem a Theme</Text></TouchableOpacity>
-  </View>
+  <Text style={s.subtitle}>Choose a Superdot theme in Settings, then sync it from the watch app. Custom face creation and redemption are not available yet.</Text>
  </View>;
 }
 type SettingIcon='heart-outline'|'notifications-outline'|'shield-checkmark-outline'|'help-circle-outline'|'git-network-outline'|'person-circle-outline';
