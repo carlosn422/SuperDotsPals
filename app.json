@@ -16,6 +16,14 @@
     "android": {
       "package": "com.superdotspals.wellnest"
     },
-    "plugins": []
+    "plugins": [
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow Superdots to listen when you choose to talk to your companion.",
+          "speechRecognitionPermission": "Allow Superdots to convert your speech to text for your private conversations."
+        }
+      ]
+    ]
   }
 }
