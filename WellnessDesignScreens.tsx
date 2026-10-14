@@ -6,6 +6,7 @@ import {COMPANIONS} from './SettingsComponents';
 import {supabase} from './supabase';
 import HealthDataPanel,{HealthMiniStats} from './HealthDataPanel';
 import RecoveryInsights from './RecoveryInsights';
+import HealthTrendOverview from './HealthTrendOverview';
 
 const P='#7139E9',INK='#25145C',MUTED='#80749E';
 type Props={companion:string;accent:string;onPress?:()=>void};
@@ -83,7 +84,7 @@ export function WellnessTrends({companion,accent,period,onPeriod,mood}:{companio
  <Text style={s.body}>{filtered.length?'These bars represent your saved mood check-ins, not watch measurements.':'Start checking in to see your own mood history.'}</Text>
  <View style={s.bars}>{groups.map((g,i)=><View key={i} style={{flex:1,alignItems:'center',gap:6,justifyContent:'flex-end',height:105}}><View style={{width:'58%',minWidth:8,height:g.score?Math.round(g.score*15):5,borderRadius:9,backgroundColor:g.score?accent:'#EDE9F4'}}/><Text style={{fontSize:9,color:MUTED}}>{g.label}</Text></View>)}</View>
  </View>
- <View style={s.grid}><StatCard title="Sleep pattern" value="Unavailable" detail="Connect Apple Health" icon="moon" tint="#F0E6FF"/><StatCard title="Steps & activity" value="Unavailable" detail="Connect Apple Health" icon="walk" tint="#E2F7E9"/></View>
+ <HealthTrendOverview period={period}/>
  <View style={[s.white,{backgroundColor:'#FFF8E9'}]}><Text style={s.celebrateTitle}>💡 Your wellness insights</Text><Text style={s.body}>These are your recorded check-ins. Any connection between sleep, activity and mood needs real synchronized data before conclusions can be drawn.</Text></View></View>;
 }
 export function WellnessHealth({companion,accent,onPermissions,onChat}:{companion:string;accent:string;onPermissions:()=>void;onChat:()=>void}){
