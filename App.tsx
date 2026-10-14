@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { SafeAreaView, StatusBar, ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import Svg, { Circle, Line, Path, Rect, Defs, LinearGradient, Stop, Polygon } from 'react-native-svg';
 import {LifestyleOverview, ThemePicker} from './LifestyleFeatures';
+import {CurrentHRV,ExtraWellness,EmotionCheckin,CoachDemo,WidgetPreview} from './ExtraFeatures';
 
 type Tab = 'Today' | 'Trends' | 'Habits' | 'You';
 type Period = 'Day' | 'Week' | 'Month' | 'Year';
@@ -74,6 +75,7 @@ function App() {
     <Text style={s.updated}>●  Updated 25 min ago  ·  Sample data</Text>
    </View>
    <View style={s.metricsRow}><Card style={{flex:1,padding:16}}><Metric label="AVERAGE HRV" value="61" unit="ms" sub="↑ 12% vs. baseline"/></Card><Card style={{flex:1,padding:16}}><Metric label="RESTING HEART RATE" value="67" unit="bpm" sub="Within your range" color="#7C80C9"/></Card></View>
+   <CurrentHRV/>
    <Card><Heading title="HRV throughout today" detail="View trends →"/><View style={s.chartTop}><Text style={s.chartNumber}>78 <Text style={s.chartUnit}>ms</Text></Text><Text style={s.goodPill}>● Great</Text></View><Sparkline values={hrvDay} filled/><View style={s.axis}><Text style={s.axisText}>6 AM</Text><Text style={s.axisText}>10 AM</Text><Text style={s.axisText}>2 PM</Text><Text style={s.axisText}>6 PM</Text></View></Card>
    <Card><Heading title="Real-time stress" detail="Today"/><View style={s.chartTop}><Text style={s.chartNumber}>26<Text style={s.chartUnit}> / 100</Text></Text><Text style={[s.goodPill,{backgroundColor:C.peach,color:'#BA7946'}]}>● Low stress</Text></View><StressChart/><View style={s.axis}><Text style={s.axisText}>12 AM</Text><Text style={s.axisText}>6 AM</Text><Text style={s.axisText}>12 PM</Text><Text style={s.axisText}>6 PM</Text></View></Card>
    <TouchableOpacity style={s.insight} onPress={()=>go('Trends')}><View style={s.insightIcon}><Text style={{fontSize:23}}>✦</Text></View><View style={{flex:1}}><Text style={s.insightTitle}>A gentle reminder</Text><Text style={s.insightText}>You seem more balanced after a good night's sleep. Keep it up!</Text></View><Text style={s.arrow}>›</Text></TouchableOpacity>
@@ -84,6 +86,7 @@ function App() {
    <Card style={{marginTop:8}}><Heading title="HRV trend" detail="↗ +12%"/><Text style={s.bigValue}>61 <Text style={s.bigUnit}>ms average</Text></Text><Text style={s.bodyMuted}>A higher HRV can reflect improved recovery.</Text><Sparkline values={values} color={C.green} height={185} filled/><View style={s.axis}><Text style={s.axisText}>{period==='Day'?'Morning':'Start'}</Text><Text style={s.axisText}>Midpoint</Text><Text style={s.axisText}>{period==='Day'?'Evening':'Recent'}</Text></View></Card>
    <Card><Heading title="Stress balance"/><View style={s.balanceRow}><View style={[s.balanceBlock,{backgroundColor:C.mint}]}><Text style={s.balanceValue}>72%</Text><Text style={s.balanceLabel}>Restful</Text></View><View style={[s.balanceBlock,{backgroundColor:C.peach}]}><Text style={s.balanceValue}>28%</Text><Text style={s.balanceLabel}>Elevated</Text></View></View><Text style={s.bodyMuted}>Based on fictional readings for this demo.</Text></Card>
    <LifestyleOverview/>
+   <CoachDemo/>
    <Card><Heading title="Your weekly highlights"/><Text style={s.listText}>✦   Your best recovery was on Saturday.</Text><Text style={s.listText}>☾   7h 42m average sleep this week.</Text><Text style={s.listText}>♡   Morning HRV is trending upward.</Text></Card>
   </>:null}
   {tab==='Habits'? <>
@@ -91,6 +94,8 @@ function App() {
    <Card><Heading title="Mood check-in" detail={mood===' '?'Not logged':'Saved ✓'}/><View style={s.moods}>{([{name:'Calm',emoji:'😌'},{name:'Okay',emoji:'🙂'},{name:'Anxious',emoji:'😟'},{name:'Happy',emoji:'🥰'},{name:'Tired',emoji:'😴'}] as {name:Mood;emoji:string}[]).map(m=><TouchableOpacity key={m.name} onPress={()=>setMood(m.name)} style={[s.mood,mood===m.name&&s.moodActive]}><Text style={{fontSize:27}}>{m.emoji}</Text><Text style={s.moodLabel}>{m.name}</Text></TouchableOpacity>)}</View>{mood!==' '?<Text style={s.feedback}>Thanks for checking in. Your {mood.toLowerCase()} mood is logged for this session.</Text>:null}</Card>
    <Card><Heading title="Daily habits" detail="Today"/><View style={s.habitLine}><View><Text style={s.habitTitle}>💧  Water</Text><Text style={s.bodyMuted}>{water} glasses logged</Text></View><View style={s.counter}><TouchableOpacity onPress={()=>setWater(v=>Math.max(0,v-1))}><Text style={s.counterText}>−</Text></TouchableOpacity><Text style={s.counterNumber}>{water}</Text><TouchableOpacity onPress={()=>setWater(v=>v+1)}><Text style={s.counterText}>+</Text></TouchableOpacity></View></View><View style={s.habitLine}><View><Text style={s.habitTitle}>☕  Caffeine</Text><Text style={s.bodyMuted}>{coffee} cups logged</Text></View><View style={s.counter}><TouchableOpacity onPress={()=>setCoffee(v=>Math.max(0,v-1))}><Text style={s.counterText}>−</Text></TouchableOpacity><Text style={s.counterNumber}>{coffee}</Text><TouchableOpacity onPress={()=>setCoffee(v=>v+1)}><Text style={s.counterText}>+</Text></TouchableOpacity></View></View></Card>
    <LifestyleOverview/>
+   <ExtraWellness/>
+   <EmotionCheckin/>
    <View style={s.breathe}><Text style={s.breatheOver}>TAKE A MOMENT</Text><Text style={s.breatheTitle}>Just breathe.</Text><Text style={s.breatheBody}>A minute of mindful breathing may help you feel grounded.</Text><View style={s.breatheCircle}><Text style={s.breatheTimer}>{seconds}s</Text><Text style={s.breatheSmall}>{breathing?'Breathe gently':'Ready when you are'}</Text></View><TouchableOpacity style={s.breatheButton} onPress={()=>{setBreathing(v=>!v);if(seconds===0)setSeconds(60);}}><Text style={s.breatheButtonText}>{breathing?'Pause exercise':seconds<60?'Resume breathing':'Start 1-minute reset'}</Text></TouchableOpacity><TouchableOpacity onPress={()=>{setBreathing(false);setSeconds(60)}}><Text style={s.reset}>Reset timer</Text></TouchableOpacity></View>
   </>:null}
   {tab==='You'? <>
@@ -98,6 +103,7 @@ function App() {
    <Card><Heading title="Your baseline"/><View style={s.baseline}><Metric label="30-DAY HRV" value="54" unit="ms" sub="Sample baseline"/><Metric label="RESTING HR" value="69" unit="bpm" sub="Sample baseline"/></View></Card>
    <Card><Heading title="Data source"/><View style={s.settingLine}><Text style={s.habitTitle}>♡  Apple Health</Text><Text style={s.settingValue}>Not connected</Text></View><Text style={s.bodyMuted}>This prototype uses sample readings only. It does not access Apple Health, detect medical conditions, or send notifications.</Text></Card>
    <ThemePicker/>
+   <WidgetPreview/>
    <Card><Heading title="About this demo"/><Text style={s.about}>Wellnest is an original educational prototype of a stress and recovery tracker for iPhone. The visualization is inspired by general wellness app conventions, not a clinical scoring system.</Text><Text style={[s.about,{marginTop:10}]}>All values are illustrative and should not be used for health decisions.</Text></Card>
   </>:null}
   <Text style={s.disclaimer}>DEMO DATA ONLY  ·  NOT MEDICAL ADVICE</Text>
