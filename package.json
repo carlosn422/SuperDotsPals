@@ -25,7 +25,8 @@
     "expo-speech": "~57.0.3",
     "expo-font": "~57.0.4",
     "expo-constants": "^57.0.0",
-    "@appeeky/expo-healthkit": "^0.4.1"
+    "@appeeky/expo-healthkit": "^0.4.1",
+    "expo-notifications": "~57.0.22"
   },
   "devDependencies": {
     "@types/react": "^19.2.0",
