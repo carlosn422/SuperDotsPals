@@ -1,7 +1,10 @@
-import React,{useEffect,useState} from 'react';
+import React,{useEffect,useState,useRef} from 'react';
 import {View,Text,TextInput,TouchableOpacity,ScrollView,StyleSheet,Alert,ActivityIndicator} from 'react-native';
 import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
+import * as Speech from 'expo-speech';
+import {ExpoSpeechRecognitionModule,useSpeechRecognitionEvent} from 'expo-speech-recognition';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 const feelings=['Good','Calm','Stressed','Anxious','Sad','Tired','Overwhelmed'];
 const activities=['Walking','Workout','Work','Meeting','Rest','Social time','Other'];
@@ -9,6 +12,34 @@ type Entry={id:string;body:string;mood:string|null;intensity:number|null;occurre
 type Message={id:string;role:'user'|'assistant';content:string;created_at:string};
 export default function WellnessCompanion({companion,color}:{companion:string;color:string}){
  const [mood,setMood]=useState(''),[intensity,setIntensity]=useState(5),[note,setNote]=useState(''),[activity,setActivity]=useState('Walking'),[minutes,setMinutes]=useState('20'),[events,setEvents]=useState<Entry[]>([]);
+ const transcriptRef=useRef(''),voiceRequested=useRef(false),sendingVoice=useRef(false);
+ const [listening,setListening]=useState(false),[voiceStatus,setVoiceStatus]=useState('');
+ useSpeechRecognitionEvent('start',()=>{setListening(true);setVoiceStatus('Listening… talk naturally');});
+ useSpeechRecognitionEvent('result',event=>{
+  const transcript=event.results?.[0]?.transcript?.trim()||'';
+  if(transcript){transcriptRef.current=transcript;setChatText(transcript);}
+ });
+ useSpeechRecognitionEvent('end',()=>{
+  setListening(false);
+  if(!voiceRequested.current)return;
+  voiceRequested.current=false;
+  const said=transcriptRef.current.trim();
+  if(said&&!sendingVoice.current){sendingVoice.current=true;void send(said,true).finally(()=>{sendingVoice.current=false})}
+  else{setVoiceStatus('No speech detected. Tap the microphone to try again.')}
+ });
+ useSpeechRecognitionEvent('error',event=>{voiceRequested.current=false;setListening(false);setVoiceStatus(event.message||'Speech recognition unavailable.');});
+ async function beginListening(){
+  if(busy)return;
+  if(listening){ExpoSpeechRecognitionModule.stop();return}
+  try{
+   Speech.stop();transcriptRef.current='';setChatText('');setVoiceStatus('');
+   const permission=await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+   if(!permission.granted){Alert.alert('Microphone permission needed','Enable Microphone and Speech Recognition in iOS Settings.');return}
+   voiceRequested.current=true;
+   ExpoSpeechRecognitionModule.start({lang:'en-US',continuous:false,interimResults:true});
+  }catch(e:any){voiceRequested.current=false;setVoiceStatus(e?.message||'Microphone unavailable.')}
+ }
+ useEffect(()=>()=>{voiceRequested.current=false;ExpoSpeechRecognitionModule.stop();Speech.stop()},[]);
  const [view,setView]=useState<'checkin'|'chat'|'history'>('checkin');
  const [chatText,setChatText]=useState(''),[messages,setMessages]=useState<Message[]>([]),[conversationId,setConversationId]=useState<string|null>(null),[busy,setBusy]=useState(false);
  async function userId(){const {data:{user}}=await supabase.auth.getUser();if(!user)throw Error('Please sign in');return user.id}
@@ -36,8 +67,8 @@ export default function WellnessCompanion({companion,color}:{companion:string;co
   Alert.alert('Activity recorded','This can help you review patterns alongside future moods.');
   }catch(e:any){Alert.alert('Could not save',e?.message||'Try again.')}finally{setBusy(false)}
  }
- async function send(){
-  const input=chatText.trim();if(!input||busy)return;
+ async function send(spoken?:string,readAloud=false){
+  const input=(spoken??chatText).trim();if(!input||busy)return;
   if(input.length>3000){Alert.alert('Message too long','Please shorten your message to 3,000 characters.');return;}
   setBusy(true);
   try {
@@ -46,7 +77,9 @@ export default function WellnessCompanion({companion,color}:{companion:string;co
    if(data?.error)throw Error(data.error);
    if(!data?.reply||!data?.conversationId)throw Error('Your Superdot did not return a complete response.');
    setConversationId(data.conversationId);
+   if(data.possibleStress)setVoiceStatus('Possible stress signal noted privately.');
    setChatText('');
+   if(readAloud){setVoiceStatus('Superdot is responding…');Speech.speak(data.reply,{language:'en-US',rate:0.95,onDone:()=>setVoiceStatus('Tap the mic to talk again'),onError:()=>setVoiceStatus('Tap the mic to talk again')});}
    const id=await userId();
    const {data:history,error:historyError}=await supabase.from('wellness_messages').select('id,role,content,created_at').eq('user_id',id).eq('conversation_id',data.conversationId).order('created_at',{ascending:true}).limit(80);
    if(historyError)throw historyError;
@@ -58,7 +91,7 @@ export default function WellnessCompanion({companion,color}:{companion:string;co
  <View style={s.tabs}>{(['checkin','chat','history'] as const).map(t=><TouchableOpacity key={t} onPress={()=>setView(t)} style={[s.tab,view===t&&{backgroundColor:color}]}><Text style={[s.tabText,view===t&&{color:'#fff'}]}>{t==='checkin'?'Check in':t==='chat'?'Talk':'Journal'}</Text></TouchableOpacity>)}</View>
  {view==='checkin'?<View style={s.card}><Text style={s.heading}>How are you feeling?</Text><View style={s.choices}>{feelings.map(f=><TouchableOpacity key={f} onPress={()=>setMood(f)} style={[s.choice,mood===f&&{backgroundColor:color}]}><Text style={[s.choiceText,mood===f&&{color:'#fff'}]}>{f}</Text></TouchableOpacity>)}</View><Text style={s.heading}>Intensity: {intensity}/10</Text><View style={s.intensity}>{Array.from({length:10},(_,i)=><TouchableOpacity key={i} onPress={()=>setIntensity(i+1)} style={[s.point,{backgroundColor:intensity===i+1?color:'#E8E2F0'}]}/>)}</View><TextInput style={s.input} placeholder="What happened? What might have contributed?" placeholderTextColor="#9D91A9" multiline value={note} onChangeText={setNote}/><TouchableOpacity disabled={busy} onPress={()=>void saveCheckin()} style={[s.button,{backgroundColor:color}]}><Text style={s.buttonText}>Save mood & reflection</Text></TouchableOpacity>
  <Text style={s.heading}>Log a helpful activity</Text><View style={s.choices}>{activities.map(x=><TouchableOpacity key={x} onPress={()=>setActivity(x)} style={[s.choice,activity===x&&{backgroundColor:color}]}><Text style={[s.choiceText,activity===x&&{color:'#fff'}]}>{x}</Text></TouchableOpacity>)}</View><TextInput style={s.shortInput} keyboardType="number-pad" placeholder="Minutes" value={minutes} onChangeText={setMinutes}/><TouchableOpacity disabled={busy} onPress={()=>void saveActivity()} style={[s.button,{backgroundColor:'#E9E1FA'}]}><Text style={[s.buttonText,{color:color}]}>Record activity</Text></TouchableOpacity></View>:null}
- {view==='chat'?<View style={s.card}><Text style={s.heading}>Your private conversation</Text><Text style={s.disclaimer}>Powered by Gemini. The AI can use your private journal, mood and activity history to help you reflect. It is not a therapist or medical diagnosis.</Text><ScrollView style={{maxHeight:360}} contentContainerStyle={{gap:10}}>{messages.map(m=><View key={m.id} style={[s.message,{alignSelf:m.role==='user'?'flex-end':'flex-start',backgroundColor:m.role==='user'?'#EDE4FF':'#F2F4F4'}]}><Text style={s.messageText}>{m.content}</Text></View>)}</ScrollView><TextInput style={s.input} multiline placeholder="Tell your Superdot what's on your mind..." placeholderTextColor="#9D91A9" value={chatText} onChangeText={setChatText}/><TouchableOpacity disabled={busy} onPress={()=>void send()} style={[s.button,{backgroundColor:color}]}>{busy?<ActivityIndicator color="white"/>:<Text style={s.buttonText}>Send</Text>}</TouchableOpacity></View>:null}
+ {view==='chat'?<View style={s.card}><Text style={s.heading}>Your private conversation</Text><Text style={s.disclaimer}>Powered by Gemini. The AI can use your private journal, mood and activity history to help you reflect. It is not a therapist or medical diagnosis.</Text><ScrollView style={{maxHeight:360}} contentContainerStyle={{gap:10}}>{messages.map(m=><View key={m.id} style={[s.message,{alignSelf:m.role==='user'?'flex-end':'flex-start',backgroundColor:m.role==='user'?'#EDE4FF':'#F2F4F4'}]}><Text style={s.messageText}>{m.content}</Text></View>)}</ScrollView><Text style={s.disclaimer}>{voiceStatus||'Tap the microphone, speak, then pause. Superdots will reply aloud.'}</Text><TextInput style={s.input} multiline placeholder="Tell your Superdot what's on your mind..." placeholderTextColor="#9D91A9" value={chatText} onChangeText={setChatText}/><View style={{flexDirection:'row',gap:10}}><TouchableOpacity accessibilityRole="button" accessibilityLabel={listening?'Stop recording':'Start voice conversation'} disabled={busy} onPress={()=>void beginListening()} style={[s.button,{backgroundColor:listening?'#E76B8A':color,flex:1,flexDirection:'row',justifyContent:'center',gap:7}]}><Ionicons name={listening?'stop-circle':'mic'} size={20} color="#fff"/><Text style={s.buttonText}>{listening?'Finish':'Talk'}</Text></TouchableOpacity><TouchableOpacity disabled={busy||listening} onPress={()=>void send()} style={[s.button,{backgroundColor:'#EDE6FF',flex:1}]}>{busy?<ActivityIndicator color={color}/>:<Text style={[s.buttonText,{color}]}>Send text</Text>}</TouchableOpacity></View></View>:null}
  {view==='history'?<View style={s.card}><Text style={s.heading}>Your journal entries</Text><Text style={s.disclaimer}>Your own notes are saved privately. A future doctor export will distinguish notes from AI summaries and health measurements.</Text>{events.length===0?<Text style={s.sub}>No reflections saved yet.</Text>:events.map(e=><View key={e.id} style={s.entry}><Text style={s.entryTitle}>{e.mood||'Reflection'} {e.intensity?('· '+e.intensity+'/10'):''}</Text><Text style={s.sub}>{new Date(e.occurred_at).toLocaleString()}</Text><Text style={s.messageText}>{e.body}</Text></View>)}</View>:null}
  <Text style={s.disclaimer}>Superdots is for emotional reflection, not diagnosis or emergency care.</Text></View>
 }
