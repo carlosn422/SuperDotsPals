@@ -36,7 +36,7 @@ function StressChart() {return <Svg width="100%" height="104" viewBox="0 0 310 1
  {[0,1,2].map(i=><Line key={i} x1="0" y1={20+i*30} x2="310" y2={20+i*30} stroke={C.line} strokeDasharray="4 5"/>)}
  {stressDay.map((v,i)=><Rect key={i} x={5+i*12.6} y={99-v*.88} width={7.5} height={v*.88} rx="3" fill={v>55?C.orange:C.purple} opacity=".87"/>)}
  </Svg>;}
-function Friend({size=136,mood='great'}:{size?:number;mood?:'great'|'okay'}) {
+function Friend({size=136,mood='great',color='#8355FF'}:{size?:number;mood?:'great'|'okay';color?:string}) {
  const great=mood==='great';
  return <View style={{height:size+26,alignItems:'center',justifyContent:'center'}}>
   <Svg width={size} height={size+20} viewBox="0 0 180 188">
@@ -44,7 +44,7 @@ function Friend({size=136,mood='great'}:{size?:number;mood?:'great'|'okay'}) {
    <Circle cx="47" cy="17" r="10" fill="#B59CFF"/><Circle cx="135" cy="17" r="10" fill="#B59CFF"/>
    <Path d="M45 139 Q22 150 20 129 M135 139 Q158 150 160 129" stroke="#7048DB" strokeWidth="12" fill="none" strokeLinecap="round"/>
    <Path d="M68 150 L59 172 M112 150 L121 172" stroke="#7048DB" strokeWidth="12" strokeLinecap="round"/>
-   <Path d="M90 33 C126 33 153 58 153 96 C153 132 126 159 90 159 C54 159 27 132 27 96 C27 58 54 33 90 33" fill="#8355FF"/>
+   <Path d="M90 33 C126 33 153 58 153 96 C153 132 126 159 90 159 C54 159 27 132 27 96 C27 58 54 33 90 33" fill={color}/>
    <Circle cx="57" cy="61" r="10" fill="#A88CFF" opacity=".7"/><Circle cx="126" cy="130" r="9" fill="#A88CFF" opacity=".6"/>
    <Circle cx="65" cy="89" r="17" fill="#FFFFFF"/><Circle cx="114" cy="89" r="17" fill="#FFFFFF"/>
    <Circle cx="69" cy="90" r="8" fill="#25145C"/><Circle cx="110" cy="90" r="8" fill="#25145C"/>
@@ -80,7 +80,7 @@ function AppContent({selectedTheme}:{selectedTheme:string}) {
   <ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
   {tab==='Today'? <>
    <View style={s.greeting}><Text style={s.eyebrow}>TUESDAY, OCTOBER 13</Text><Text style={s.mainTitle}>A little check-in <Text style={{color:colors.accent}}>for you.</Text></Text><Text style={s.intro}>A tiny buddy for your biggest feelings 💜</Text></View>
-   <View style={[s.hero,{backgroundColor:colors.pale}]}><View style={s.heroBubbles}><View style={s.bubbleOne}/><View style={s.bubbleTwo}/></View><Text style={s.heroTiny}>YOUR DAILY READINESS</Text><TouchableOpacity onPress={()=>setCompanion(v=>v==='happy'?'sleepy':'happy')} accessibilityLabel="Tap your companion to change expression"><Friend mood={companion==='happy'?'great':'okay'}/></TouchableOpacity><Text style={s.heroTitle}>You're doing dot-tastic!</Text><Text style={s.heroDescription}>Your little buddy says: take a happy breath!</Text>
+   <View style={[s.hero,{backgroundColor:colors.pale}]}><View style={s.heroBubbles}><View style={s.bubbleOne}/><View style={s.bubbleTwo}/></View><Text style={s.heroTiny}>YOUR DAILY READINESS</Text><TouchableOpacity onPress={()=>setCompanion(v=>v==='happy'?'sleepy':'happy')} accessibilityLabel="Tap your companion to change expression"><Friend color={colors.accent} mood={companion==='happy'?'great':'okay'}/></TouchableOpacity><Text style={s.heroTitle}>You're doing dot-tastic!</Text><Text style={s.heroDescription}>Your little buddy says: take a happy breath!</Text>
     <View style={s.scale}><View style={[s.scaleSegment,{backgroundColor:'#F398AB'}]}/><View style={[s.scaleSegment,{backgroundColor:'#F8BE8D'}]}/><View style={[s.scaleSegment,{backgroundColor:'#B9BBE9'}]}/><View style={[s.scaleSegment,{backgroundColor:C.green,flex:2.3}]}/><View style={s.scaleDot}/></View>
     <Text style={s.updated}>●  Updated 25 min ago  ·  Sample data</Text>
    </View>
