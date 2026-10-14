@@ -6,7 +6,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import {supabase} from './supabase';
 
 Notifications.setNotificationHandler({handleNotification:async()=>({shouldShowBanner:true,shouldShowList:true,shouldPlaySound:false,shouldSetBadge:false})});
-const TIMES=[{hour:8,name:'8 AM'},{hour:12,name:'12 PM'},{hour:18,name:'6 PM'},{hour:21,name:'9 PM'}];
+const TIMES=[{hour:8,name:'8 AM'},{hour:9,name:'9 AM'},{hour:12,name:'12 PM'},{hour:18,name:'6 PM'},{hour:21,name:'9 PM'}];
 const prefs={enabled:false,hour:9,minute:0};
 export default function WellnessReminders(){
  const [enabled,setEnabled]=useState(false),[hour,setHour]=useState(9);
