@@ -62,9 +62,14 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  const [period,setPeriod]=useState<Period>('Day');
  const [mood,setMood]=useState<Mood|' '>(' ');
  useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data,error}=await supabase.from('mood_entries').select('mood').eq('user_id',user.id).order('recorded_at',{ascending:false}).limit(1).maybeSingle();if(error){console.warn('Loading mood failed:',error.message);return;}if(alive&&data&&['Calm','Okay','Anxious','Happy','Tired'].includes(data.mood))setMood(data.mood as Mood)})();return()=>{alive=false}},[]);
- const [water,setWater]=useState(4);
- const [coffee,setCoffee]=useState(1);
- useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data,error}=await supabase.from('habit_entries').select('habit,amount').eq('user_id',user.id).in('habit',['water','caffeine']).order('recorded_at',{ascending:false}).limit(100);if(error){console.warn('Loading habits failed:',error.message);return;}if(alive&&data){const w=data.find(x=>x.habit==='water');const c=data.find(x=>x.habit==='caffeine');if(w)setWater(Number(w.amount));if(c)setCoffee(Number(c.amount));}})();return()=>{alive=false}},[]);
+ const [water,setWater]=useState(0);
+ const [coffee,setCoffee]=useState(0);
+ useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;
+ const today=new Date();today.setHours(0,0,0,0);
+ const {data,error}=await supabase.from('habit_entries').select('habit,amount,recorded_at').eq('user_id',user.id).in('habit',['water','caffeine']).gte('recorded_at',today.toISOString()).order('recorded_at',{ascending:false}).limit(100);
+ if(error){console.warn('Loading habits failed:',error.message);return;}
+ if(alive){const w=data?.find(x=>x.habit==='water');const c=data?.find(x=>x.habit==='caffeine');setWater(w?Number(w.amount):0);setCoffee(c?Number(c.amount):0);}
+ })();return()=>{alive=false}},[]);
  const [breathing,setBreathing]=useState(false);
  const [companion,setCompanion]=useState<'happy'|'sleepy'>('happy');
  const [seconds,setSeconds]=useState(60);
@@ -77,7 +82,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   Animated.timing(activePosition,{toValue:index,duration:180,useNativeDriver:true}).start();
  };
  useEffect(()=>{const index=Math.max(0,tabs.findIndex(t=>t.name===tab));pager.current?.scrollTo({x:index*pageWidth,animated:false});},[pageWidth]);
- async function saveHabit(habit:'water'|'caffeine',amount:number){const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {error}=await supabase.from('habit_entries').insert({user_id:user.id,habit,amount,unit:'cups'});if(error)console.warn('Save habit failed:',error.message);}
+ async function saveHabit(habit:'water'|'caffeine',amount:number){try{const {data:{user}}=await supabase.auth.getUser();if(!user)throw Error('Sign in first');const {error}=await supabase.from('habit_entries').insert({user_id:user.id,habit,amount,unit:'cups'});if(error)throw error;}catch(e:any){console.warn('Save habit failed:',e?.message);Alert.alert('Could not save',e?.message||'Please retry');}}
  async function saveMood(m:Mood){const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {error}=await supabase.from('mood_entries').insert({user_id:user.id,mood:m});if(error)console.warn('Save mood failed:',error.message);}
  return <View style={[s.safe,{paddingTop:Platform.OS==='ios'?insets.top:StatusBar.currentHeight || 0}]}><StatusBar barStyle="dark-content" backgroundColor={C.bg}/>
   <View style={s.top}><View style={s.brand}><View style={[s.logo,{backgroundColor:colors.accent}]}><Text style={s.logoText}>✦</Text></View><Text style={s.brandText}>superdots<Text style={{color:colors.accent}}>.</Text></Text></View><TouchableOpacity accessibilityLabel="Open profile" onPress={()=>go('Settings')} style={s.avatar}><Text style={{fontSize:18}}>☺</Text></TouchableOpacity></View>
