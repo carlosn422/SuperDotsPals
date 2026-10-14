@@ -24,6 +24,17 @@ export function WellnessToday({companion,accent,water,mood,onCheckin,onChat,onAc
 }
 export function WellnessActions({companion,accent,water,onWater,onCaffeine,onBreathing,onChat,onMood,onJournal,caffeine}:{companion:string;accent:string;water:number;caffeine:number;onWater:()=>void;onCaffeine:()=>void;onBreathing:()=>void;onChat:()=>void;onMood:()=>void;onJournal:()=>void}){
  const [day,setDay]=React.useState(0);
+ const [pastAmounts,setPastAmounts]=React.useState<{water:number;caffeine:number}>({water:0,caffeine:0});
+ React.useEffect(()=>{let alive=true;if(day===0)return;
+ (async()=>{try{const {data:{user}}=await supabase.auth.getUser();if(!user)return;
+ const d=new Date();d.setDate(d.getDate()+day);d.setHours(0,0,0,0);
+ const end=new Date(d);end.setDate(end.getDate()+1);
+ const {data,error}=await supabase.from('habit_entries').select('habit,amount').eq('user_id',user.id).in('habit',['water','caffeine']).gte('recorded_at',d.toISOString()).lt('recorded_at',end.toISOString()).order('recorded_at',{ascending:false}).limit(100);
+ if(error)throw error;if(alive)setPastAmounts({water:Number(data?.find(r=>r.habit==='water')?.amount||0),caffeine:Number(data?.find(r=>r.habit==='caffeine')?.amount||0)});
+ }catch(e){console.warn('Daily habit history unavailable',e)}})();return()=>{alive=false};
+ },[day]);
+ const shownWater=day===0?water:pastAmounts.water,shownCaffeine=day===0?caffeine:pastAmounts.caffeine;
+ const selectable=day===0;
  const dates=Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()+i-3);return d});
  const addCard=(emoji:string,title:string,description:string,info:string,action?:()=>void)=>(
  <TouchableOpacity onPress={action} disabled={!action} style={{backgroundColor:'#fff',borderRadius:22,padding:17,flexDirection:'row',alignItems:'center',gap:14}}>
@@ -35,11 +46,11 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onBre
  <SectionHeading title="Your daily actions" detail="Small steps, better days"/>
  <View style={{flexDirection:'row',justifyContent:'space-between',gap:4}}>{dates.map((d,i)=><TouchableOpacity key={i} onPress={()=>setDay(i-3)} style={{flex:1,alignItems:'center',paddingVertical:10,borderRadius:18,backgroundColor:day===i-3?'#D8F6E8':'#fff',gap:4}}><Text style={{fontSize:11,color:MUTED}}>{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]}</Text><Text style={{fontWeight:'900',fontSize:16,color:INK}}>{d.getDate()}</Text>{i===3?<View style={{width:5,height:5,borderRadius:3,backgroundColor:'#50C89E'}}/>:null}</TouchableOpacity>)}</View>
  <View style={{backgroundColor:'#E4F8EE',borderRadius:24,padding:18,flexDirection:'row',alignItems:'center',gap:12}}><View style={{flex:1,gap:7}}><Text style={{color:'#28694F',fontWeight:'900',fontSize:13}}>✦  YOUR SUPERDOT SUGGESTS</Text><Text style={{fontWeight:'900',color:INK,fontSize:18}}>A small reset can help.</Text><Text style={s.body}>How have you been sleeping and feeling lately?</Text><TouchableOpacity onPress={onChat}><Text style={{fontWeight:'800',color:accent}}>Talk to Superdots  →</Text></TouchableOpacity></View><SuperdotMascot id={companion} color={accent} size={86}/></View>
- <SectionHeading title="Today’s wellness" detail="Track and reflect"/>
+ <SectionHeading title={day===0?"Today’s wellness":day<0?"Previous day’s wellness":"Upcoming day"} detail={day===0?"Track and reflect":"Saved entries only"}/>
  {addCard('🌙','Sleep','Review sleep and recovery','Apple Health not connected')}
  {addCard('🏃','Fitness','Movement and activity','Apple Health not connected')}
- {addCard('💧','Hydration',water+' cups logged','Tap to log a glass',onWater)}
- {addCard('☕','Caffeine',caffeine+' cups logged','Tap to log one cup',onCaffeine)}
+ {addCard('💧','Hydration',shownWater+' cups logged',selectable?'Tap to view and edit':'Daily history',selectable?onWater:undefined)}
+ {addCard('☕','Caffeine',shownCaffeine+' cups logged',selectable?'Tap to view and edit':'Daily history',selectable?onCaffeine:undefined)}
  {addCard('🌸','Mindfulness','Take a calming pause','Open guided breathing',onBreathing)}
  {addCard('🙂','Log your feelings','How are you feeling right now?','Check in with Superdots',onMood)}
  {addCard('📖','Journal','Write about your day','View your private notes',onJournal)}
