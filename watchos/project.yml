@@ -1,0 +1,22 @@
+name: SuperdotsWatch
+options:
+  bundleIdPrefix: com.superdotspals
+  deploymentTarget:
+    watchOS: "10.0"
+targets:
+  SuperdotsWatch:
+    type: application
+    platform: watchOS
+    sources:
+      - path: SuperdotsWatch
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.superdotspals.watch
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "4"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_WKApplication: YES
+        INFOPLIST_KEY_WKWatchOnly: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Superdots
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_STYLE: Automatic
