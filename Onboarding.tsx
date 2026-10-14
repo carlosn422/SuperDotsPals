@@ -1,4 +1,4 @@
-import React,{useState} from 'react';
+import React,{useEffect,useState} from 'react';
 import {View,Text,TextInput,TouchableOpacity,ScrollView,StyleSheet,ActivityIndicator,Alert} from 'react-native';
 import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
@@ -17,8 +17,24 @@ const routines=['Keep a regular sleep schedule','Exercise more','Practice mindfu
 const goalsData=[{key:'sleep',name:'Sleep',unit:'hours',values:[6,7,8,9]},{key:'daylight',name:'Daylight',unit:'minutes',values:[10,20,30,40]},{key:'mindfulness',name:'Mindfulness',unit:'minutes',values:[3,5,10,15]},{key:'steps',name:'Steps',unit:'steps',values:[4000,6000,8000,10000]},{key:'water',name:'Water',unit:'cups',values:[4,6,8,10]}] as const;
 const initialTargets:Record<string,number>={sleep:7,daylight:20,mindfulness:5,steps:8000,water:8};
 const stepTitles=['A little about you','What has your body been telling you?','What would you like to understand?','Small habits, big feelings','A note about HRV','Stay in the loop','Your health, your choice','Build your daily goals','Choose your Superdot!'];
-export default function Onboarding({done}:{done:()=>void}){
+export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;editing?:boolean;onCancel?:()=>void}){
  const [step,setStep]=useState(0),[age,setAge]=useState(''),[sex,setSex]=useState(''),[signalsSelected,setSignals]=useState<string[]>([]),[reasonsSelected,setReasons]=useState<string[]>([]),[habitsSelected,setHabits]=useState<string[]>([]),[dot,setDot]=useState('bloop'),[loading,setLoading]=useState(false),[notifications,setNotifications]=useState(false),[targets,setTargets]=useState<Record<string,number>>(initialTargets);
+ const [fetching,setFetching]=useState(editing);
+ useEffect(()=>{if(!editing)return;let active=true;(async()=>{
+  try{
+   const {data:{user}}=await supabase.auth.getUser();if(!user)throw new Error('Not signed in');
+   const [{data:p,error:pe},{data:settings,error:se}]=await Promise.all([
+    supabase.from('profiles').select('birth_year,sex,stress_signals,tracking_reasons,habit_goals,baseline_preferences').eq('id',user.id).single(),
+    supabase.from('user_settings').select('companion,onboarding_notifications_preference').eq('user_id',user.id).single()
+   ]);if(pe||se)throw pe||se;if(!active)return;
+   setAge(p?.birth_year?String(new Date().getFullYear()-p.birth_year):'');
+   setSex(p?.sex||'');setSignals(p?.stress_signals||[]);setReasons(p?.tracking_reasons||[]);
+   setHabits(p?.habit_goals||[]);setDot(settings?.companion||'bloop');
+   setNotifications(settings?.onboarding_notifications_preference===true);
+   setTargets({...initialTargets,...(p?.baseline_preferences||{})});
+  }catch(e:any){if(active)Alert.alert('Could not load your profile',e?.message||'Please try again.');}
+  finally{if(active)setFetching(false)}
+ })();return()=>{active=false}},[editing]);
  const picked=DOTS.find(x=>x.id===dot)||DOTS[0];
  const toggle=(value:string,values:string[],setter:(v:string[])=>void)=>setter(values.includes(value)?values.filter(item=>item!==value):[...values,value]);
  const next=()=>setStep(x=>Math.min(stepTitles.length-1,x+1));
@@ -47,8 +63,9 @@ export default function Onboarding({done}:{done:()=>void}){
   }catch(e:any){Alert.alert('Could not save onboarding',e?.message||'Please try again.');}
   finally{setLoading(false);}
  }
+ if(fetching)return <View style={[s.root,{justifyContent:'center'}]}><ActivityIndicator color={picked.color}/></View>;
  return <View style={s.root}><ScrollView key={step} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
-  <Text style={s.brand}>✦ superdots.</Text>
+  <Text style={s.brand}>✦ superdots.</Text>{editing?<TouchableOpacity onPress={onCancel}><Text style={s.skip}>Cancel editing</Text></TouchableOpacity>:null}
   <Text style={s.progress}>STEP {step+1} OF {stepTitles.length}</Text>
   <View style={s.track}><View style={[s.fill,{width:((step+1)/stepTitles.length*100)+'%',backgroundColor:picked.color}]}/></View>
   <Text style={s.title}>{stepTitles[step]}</Text>
@@ -61,7 +78,7 @@ export default function Onboarding({done}:{done:()=>void}){
   {step===6?<><View style={s.explainer}><Text style={{fontSize:66}}>❤️</Text><Text style={s.explainerTitle}>Apple Health</Text><Text style={s.sub}>With your permission, Superdots could use HRV, heart rate, sleep, steps and mindfulness history to show your trends.</Text><Text style={s.hint}>HealthKit is not connected in this build. We won't request or access health records yet. You'll be asked separately before any future integration.</Text></View></>:null}
   {step===7?<><Text style={s.sub}>Suggested targets are just starting points. Adjust them to suit your routine.</Text><View style={s.goalGrid}>{goalsData.map(g=><View key={g.key} style={s.goalCard}><Text style={s.goalName}>{g.name}</Text><Text style={[s.goalValue,{color:picked.color}]}>{targets[g.key]} <Text style={s.hint}>{g.unit}</Text></Text><View style={s.goalButtons}>{g.values.map(n=><TouchableOpacity key={n} onPress={()=>setTargets(v=>({...v,[g.key]:n}))} style={[s.goalChip,targets[g.key]===n&&{backgroundColor:picked.color}]}><Text style={[s.goalChipText,targets[g.key]===n&&{color:'white'}]}>{n}</Text></TouchableOpacity>)}</View></View>)}</View></>:null}
   {step===8?<><Text style={s.sub}>Your little buddy, your colors. Each Superdot has its own personality!</Text><View style={s.dotGrid}>{DOTS.map(d=><TouchableOpacity key={d.id} onPress={()=>setDot(d.id)} style={[s.dotCard,{borderColor:dot===d.id?d.color:'#EFE9FB',backgroundColor:dot===d.id?d.light:'white'}]}><SuperdotMascot id={d.id} color={d.color} size={92}/><Text style={s.dotName}>{d.name}</Text><Text style={s.dotDesc}>{d.description}</Text>{dot===d.id?<Text style={{color:d.color,fontSize:11,fontWeight:'800'}}>✓ Selected</Text>:null}</TouchableOpacity>)}</View></>:null}
-  <View style={s.buttons}>{step>0?<TouchableOpacity onPress={()=>setStep(v=>v-1)} style={s.back}><Text style={s.backText}>Back</Text></TouchableOpacity>:null}<TouchableOpacity disabled={loading} onPress={()=>step===stepTitles.length-1?void finish():next()} style={[s.primary,{backgroundColor:picked.color}]}>{loading?<ActivityIndicator color="white"/>:<Text style={s.primaryText}>{step===stepTitles.length-1?'Meet my Superdot!':'Continue'}</Text>}</TouchableOpacity></View>
+  <View style={s.buttons}>{step>0?<TouchableOpacity onPress={()=>setStep(v=>v-1)} style={s.back}><Text style={s.backText}>Back</Text></TouchableOpacity>:null}<TouchableOpacity disabled={loading} onPress={()=>step===stepTitles.length-1?void finish():next()} style={[s.primary,{backgroundColor:picked.color}]}>{loading?<ActivityIndicator color="white"/>:<Text style={s.primaryText}>{step===stepTitles.length-1?(editing?'Save changes':'Meet my Superdot!'):'Continue'}</Text>}</TouchableOpacity></View>
   {step!==stepTitles.length-1?<TouchableOpacity onPress={next}><Text style={s.skip}>Skip for now</Text></TouchableOpacity>:null}
   <Text style={s.privacy}>Sensitive questions are optional. Your saved answers are protected by account-level access controls.</Text>
  </ScrollView></View>;
