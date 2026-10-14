@@ -34,14 +34,15 @@ Deno.serve(async req=>{
    const {data:existing}=await db.from("wellness_conversations").select("id").eq("id",conversationId).eq("user_id",user.id).maybeSingle();
    if(!existing)return new Response(JSON.stringify({error:"Conversation not found"}),{status:404,headers});
   }
-  const [journal,moods,activities,readings,prior]=await Promise.all([
+  const [journal,moods,activities,readings,habits,prior]=await Promise.all([
    db.from("wellness_journal").select("mood,intensity,body,occurred_at").eq("user_id",user.id).order("occurred_at",{ascending:false}).limit(12),
    db.from("mood_entries").select("mood,recorded_at").eq("user_id",user.id).order("recorded_at",{ascending:false}).limit(10),
    db.from("wellness_activities").select("activity_type,duration_minutes,occurred_at").eq("user_id",user.id).order("occurred_at",{ascending:false}).limit(15),
    db.from("wellness_readings").select("metric,value,recorded_at,source").eq("user_id",user.id).neq("source","demo").order("recorded_at",{ascending:false}).limit(20),
+   db.from("habit_entries").select("habit,amount,unit,recorded_at").eq("user_id",user.id).order("recorded_at",{ascending:false}).limit(25),
    conversationId?db.from("wellness_messages").select("role,content").eq("conversation_id",conversationId).eq("user_id",user.id).order("created_at",{ascending:false}).limit(12):Promise.resolve({data:[]})
   ]);
-  const context=JSON.stringify({journal:journal.data||[],moods:moods.data||[],activities:activities.data||[],readings:readings.data||[]}).slice(0,13000);
+  const context=JSON.stringify({journal:journal.data||[],moods:moods.data||[],activities:activities.data||[],readings:readings.data||[],habits:habits.data||[]}).slice(0,13000);
   const turns=(prior.data||[]).reverse().map((m:{role:string;content:string})=>({role:m.role==="assistant"?"model":"user",parts:[{text:String(m.content).slice(0,3000)}]}));
   const model=Deno.env.get("GEMINI_MODEL")||"gemini-3.8-flash";
   const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),25000);
