@@ -2,7 +2,7 @@ import React,{useEffect,useState} from 'react';
 import {View,Text,TextInput,TouchableOpacity,ScrollView,StyleSheet,Alert,ActivityIndicator} from 'react-native';
 import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
-import * as Speech from 'expo-speech';
+import {speakWithPreferences} from './VoicePreferences';
 import Constants, {ExecutionEnvironment} from 'expo-constants';
 // Expo Go can report appOwnership=null on some SDK builds; executionEnvironment is authoritative.
 const isExpoGo=Constants.appOwnership==='expo' || (Constants.executionEnvironment===ExecutionEnvironment.StoreClient && Constants.expoGoConfig != null);
@@ -54,7 +54,7 @@ export default function WellnessCompanion({companion,color}:{companion:string;co
    setChatText('');
    const now=new Date().toISOString();
    setMessages(prev=>[...prev,{id:'user-'+Date.now(),role:'user',content:input,created_at:now},{id:'ai-'+Date.now(),role:'assistant',content:data.reply,created_at:now}]);
-   if(readAloud)Speech.speak(data.reply,{language:'en-US',rate:0.95});
+   if(readAloud)void speakWithPreferences(data.reply).catch(e=>console.warn('Speech playback failed',e));
    void (async()=>{try{const id=await userId();const {data:history,error:historyError}=await supabase.from('wellness_messages').select('id,role,content,created_at').eq('user_id',id).eq('conversation_id',data.conversationId).order('created_at',{ascending:true}).limit(80);if(!historyError&&history?.length)setMessages(history as Message[]);}catch(e){console.warn('History refresh failed',e)}})();
   } catch(e:any){Alert.alert('Unable to send',e?.message||'Please retry. Your message has not been cleared.')}
   finally{setBusy(false)}
