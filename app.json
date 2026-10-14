@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Wellnest Demo",
+    "name": "Superdots",
     "slug": "superdotspals",
     "scheme": "wellnest",
     "version": "1.0.0",
@@ -10,7 +10,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.superdotspals.wellnest",
       "infoPlist": {
-        "NSHealthShareUsageDescription": "This demo currently uses sample health readings only."
+        "NSHealthShareUsageDescription": "Allow Superdots to read heart rate variability, resting heart rate, steps and sleep when you choose to sync health data."
       }
     },
     "android": {
@@ -22,6 +22,21 @@
         {
           "microphonePermission": "Allow Superdots to listen when you choose to talk to your companion.",
           "speechRecognitionPermission": "Allow Superdots to convert your speech to text for your private conversations."
+        }
+      ],
+      [
+        "@appeeky/expo-healthkit",
+        {
+          "healthSharePermission": "Allow Superdots to read heart rate variability, resting heart rate, steps and sleep with your permission.",
+          "healthUpdatePermission": false,
+          "isBackgroundDeliveryEnabled": false,
+          "healthConnectPermissions": [
+            "READ_STEPS",
+            "READ_HEART_RATE",
+            "READ_HEART_RATE_VARIABILITY",
+            "READ_SLEEP",
+            "READ_HEALTH_DATA_HISTORY"
+          ]
         }
       ]
     ]
