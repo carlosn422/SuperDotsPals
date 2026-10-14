@@ -10,9 +10,9 @@ export default function SuperdotMascot({id,color,size=102,mood='happy'}:{id:stri
  const grin=<><Path d="M36 57 Q44 72 54 57 Q45 61 36 57" fill="#351764" stroke="#351764" strokeWidth="1.4"/><Ellipse cx="45" cy="65" rx="5" ry="2.3" fill="#FF7DB7"/></>;
  return <Svg width={size} height={size} viewBox="0 0 88 88">
  <Defs>
-  <RadialGradient id="skin" cx="33%" cy="20%" rx="75%" ry="78%"><Stop offset="0%" stopColor="#FFF" stopOpacity=".80"/><Stop offset="34%" stopColor={color}/><Stop offset="78%" stopColor={color}/><Stop offset="100%" stopColor="#25145C" stopOpacity=".35"/></RadialGradient>
-  <RadialGradient id="shine" cx="38%" cy="25%" rx="70%" ry="80%"><Stop offset="0%" stopColor="#FFF" stopOpacity=".96"/><Stop offset="68%" stopColor="#FFF"/><Stop offset="100%" stopColor="#D6D6F1"/></RadialGradient>
-  <RadialGradient id="pupil" cx="30%" cy="25%" rx="68%" ry="70%"><Stop offset="0%" stopColor="#4D3C8B"/><Stop offset="100%" stopColor="#170D35"/></RadialGradient>
+  <RadialGradient id="skin" cx="33%" cy="20%" r="75%"><Stop offset="0%" stopColor="#FFF" stopOpacity=".80"/><Stop offset="34%" stopColor={color}/><Stop offset="78%" stopColor={color}/><Stop offset="100%" stopColor="#25145C" stopOpacity=".35"/></RadialGradient>
+  <RadialGradient id="shine" cx="38%" cy="25%" r="70%"><Stop offset="0%" stopColor="#FFF" stopOpacity=".96"/><Stop offset="68%" stopColor="#FFF"/><Stop offset="100%" stopColor="#D6D6F1"/></RadialGradient>
+  <RadialGradient id="pupil" cx="30%" cy="25%" r="70%"><Stop offset="0%" stopColor="#4D3C8B"/><Stop offset="100%" stopColor="#170D35"/></RadialGradient>
   <LinearGradient id="leaf" x1="0" y1="0" x2="1" y2="1"><Stop offset="0%" stopColor="#98ECC6"/><Stop offset="100%" stopColor="#2E9B6E"/></LinearGradient>
  </Defs>
  <Ellipse cx="44" cy="80" rx="28" ry="5" fill="#352360" opacity=".11"/>
