@@ -5,6 +5,7 @@ import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
 import BreathingStudio from './BreathingStudio';
 import WellnessCompanion from './WellnessCompanion';
+import {WellnessToday,WellnessActions,WellnessTrends,WellnessHealth,WellnessSettingsIntro} from './WellnessDesignScreens';
 import VoicePreferences from './VoicePreferences';
 import {PromoBanner,ThemeCard,ThemeGallery,WatchThemesCard,SettingsItem} from './SettingsComponents';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -77,45 +78,13 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  return <View style={[s.safe,{paddingTop:Platform.OS==='ios'?insets.top:StatusBar.currentHeight || 0}]}><StatusBar barStyle="dark-content" backgroundColor={C.bg}/>
   <View style={s.top}><View style={s.brand}><View style={[s.logo,{backgroundColor:colors.accent}]}><Text style={s.logoText}>✦</Text></View><Text style={s.brandText}>superdots<Text style={{color:colors.accent}}>.</Text></Text></View><TouchableOpacity accessibilityLabel="Open profile" onPress={()=>go('Settings')} style={s.avatar}><Text style={{fontSize:18}}>☺</Text></TouchableOpacity></View>
   <ScrollView ref={pager} horizontal pagingEnabled bounces={false} showsHorizontalScrollIndicator={false} scrollEventThrottle={16} onMomentumScrollEnd={onPageSettled} directionalLockEnabled style={{flex:1}} keyboardShouldPersistTaps="handled">
-  <View key="Today" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-   <View style={s.greeting}><Text style={s.eyebrow}>TUESDAY, OCTOBER 13</Text><Text style={s.mainTitle}>A little check-in <Text style={{color:colors.accent}}>for you.</Text></Text><Text style={s.intro}>A tiny buddy for your biggest feelings 💜</Text></View>
-   <TouchableOpacity onPress={()=>go('Actions')} style={{backgroundColor:colors.accent,borderRadius:19,padding:15,flexDirection:'row',alignItems:'center',gap:10}}><Ionicons name="chatbubble-ellipses-outline" size={21} color="#fff"/><View style={{flex:1}}><Text style={{color:'#fff',fontSize:14,fontWeight:'900'}}>Talk to your Superdot</Text><Text style={{color:'#FFF',opacity:.84,fontSize:11,marginTop:3}}>Check in, reflect, and save a private note</Text></View><Ionicons name="chevron-forward" size={18} color="#fff"/></TouchableOpacity>
-   <View style={[s.hero,{backgroundColor:colors.pale}]}><View style={s.heroBubbles}><View style={s.bubbleOne}/><View style={s.bubbleTwo}/></View><Text style={s.heroTiny}>YOUR DAILY READINESS</Text><TouchableOpacity onPress={()=>setCompanion(v=>v==='happy'?'sleepy':'happy')} accessibilityLabel="Tap your companion to change expression"><SuperdotMascot id={selectedCompanion} color={colors.accent} size={156} mood={companion==='happy'?'happy':'sleepy'}/></TouchableOpacity><Text style={s.heroTitle}>You're doing dot-tastic!</Text><Text style={s.heroDescription}>Your little buddy says: take a happy breath!</Text>
-    <View style={s.scale}><View style={[s.scaleSegment,{backgroundColor:'#F398AB'}]}/><View style={[s.scaleSegment,{backgroundColor:'#F8BE8D'}]}/><View style={[s.scaleSegment,{backgroundColor:'#B9BBE9'}]}/><View style={[s.scaleSegment,{backgroundColor:C.green,flex:2.3}]}/><View style={s.scaleDot}/></View>
-    <Text style={s.updated}>●  Updated 25 min ago  ·  Sample data</Text>
-   </View>
-   <View style={s.metricsRow}><Card style={{flex:1,padding:16}}><Metric label="AVERAGE HRV" value="61" unit="ms" sub="↑ 12% vs. baseline"/></Card><Card style={{flex:1,padding:16}}><Metric label="RESTING HEART RATE" value="67" unit="bpm" sub="Within your range" color="#7C80C9"/></Card></View>
-   <CurrentHRV/>
-   <Card><Heading title="HRV throughout today" detail="View trends →"/><View style={s.chartTop}><Text style={s.chartNumber}>78 <Text style={s.chartUnit}>ms</Text></Text><Text style={s.goodPill}>● Great</Text></View><Sparkline values={hrvDay} filled/><View style={s.axis}><Text style={s.axisText}>6 AM</Text><Text style={s.axisText}>10 AM</Text><Text style={s.axisText}>2 PM</Text><Text style={s.axisText}>6 PM</Text></View></Card>
-   <Card><Heading title="Real-time stress" detail="Today"/><View style={s.chartTop}><Text style={s.chartNumber}>26<Text style={s.chartUnit}> / 100</Text></Text><Text style={[s.goodPill,{backgroundColor:C.peach,color:'#BA7946'}]}>● Low stress</Text></View><StressChart/><View style={s.axis}><Text style={s.axisText}>12 AM</Text><Text style={s.axisText}>6 AM</Text><Text style={s.axisText}>12 PM</Text><Text style={s.axisText}>6 PM</Text></View></Card>
-   <TouchableOpacity style={s.insight} onPress={()=>go('Trends')}><View style={s.insightIcon}><Text style={{fontSize:23}}>✦</Text></View><View style={{flex:1}}><Text style={s.insightTitle}>A gentle reminder</Text><Text style={s.insightText}>You seem more balanced after a good night's sleep. Keep it up!</Text></View><Text style={s.arrow}>›</Text></TouchableOpacity>
-  </ScrollView></View>
-  <View key="Actions" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-   <Text style={s.eyebrow}>SMALL STEPS, BIG CHANGES</Text><Text style={s.mainTitle}>Care for yourself.</Text><Text style={s.intro}>How are you feeling right now?</Text>
-   <WellnessCompanion companion={selectedCompanion} color={colors.accent}/>
-   <Card><Heading title="Mood check-in" detail={mood===' '?'Not logged':'Saved ✓'}/><View style={s.moods}>{([{name:'Calm',emoji:'😌'},{name:'Okay',emoji:'🙂'},{name:'Anxious',emoji:'😟'},{name:'Happy',emoji:'🥰'},{name:'Tired',emoji:'😴'}] as {name:Mood;emoji:string}[]).map(m=><TouchableOpacity key={m.name} onPress={()=>{setMood(m.name);void saveMood(m.name)}} style={[s.mood,mood===m.name&&s.moodActive]}><Text style={{fontSize:27}}>{m.emoji}</Text><Text style={s.moodLabel}>{m.name}</Text></TouchableOpacity>)}</View>{mood!==' '?<Text style={s.feedback}>Thanks for checking in. Your {mood.toLowerCase()} mood is logged for this session.</Text>:null}</Card>
-   <Card><Heading title="Daily habits" detail="Today"/><View style={s.habitLine}><View><Text style={s.habitTitle}>💧  Water</Text><Text style={s.bodyMuted}>{water} glasses logged</Text></View><View style={s.counter}><TouchableOpacity onPress={()=>{const n=Math.max(0,water-1);setWater(n);void saveHabit('water',n)}}><Text style={s.counterText}>−</Text></TouchableOpacity><Text style={s.counterNumber}>{water}</Text><TouchableOpacity onPress={()=>{const n=water+1;setWater(n);void saveHabit('water',n)}}><Text style={s.counterText}>+</Text></TouchableOpacity></View></View><View style={s.habitLine}><View><Text style={s.habitTitle}>☕  Caffeine</Text><Text style={s.bodyMuted}>{coffee} cups logged</Text></View><View style={s.counter}><TouchableOpacity onPress={()=>{const n=Math.max(0,coffee-1);setCoffee(n);void saveHabit('caffeine',n)}}><Text style={s.counterText}>−</Text></TouchableOpacity><Text style={s.counterNumber}>{coffee}</Text><TouchableOpacity onPress={()=>{const n=coffee+1;setCoffee(n);void saveHabit('caffeine',n)}}><Text style={s.counterText}>+</Text></TouchableOpacity></View></View></Card>
-   <ExtraWellness/>
-   <EmotionCheckin/>
-   <BreathingStudio accent={colors.accent} tint={colors.pale}/>
-  </ScrollView></View>
-  <View key="Trends" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-   <Text style={s.eyebrow}>YOUR WELLBEING JOURNEY</Text><Text style={s.mainTitle}>Progress, not perfection.</Text><Text style={s.intro}>See how your body responds over time.</Text>
-   <View style={s.period}>{(['Day','Week','Month','Year'] as Period[]).map(p=><Chip key={p} label={p} active={period===p} onPress={()=>setPeriod(p)}/>)}</View>
-   <Card style={{marginTop:8}}><Heading title="HRV trend" detail="↗ +12%"/><Text style={s.bigValue}>61 <Text style={s.bigUnit}>ms average</Text></Text><Text style={s.bodyMuted}>A higher HRV can reflect improved recovery.</Text><Sparkline values={values} color={C.green} height={185} filled/><View style={s.axis}><Text style={s.axisText}>{period==='Day'?'Morning':'Start'}</Text><Text style={s.axisText}>Midpoint</Text><Text style={s.axisText}>{period==='Day'?'Evening':'Recent'}</Text></View></Card>
-   <Card><Heading title="Stress balance"/><View style={s.balanceRow}><View style={[s.balanceBlock,{backgroundColor:C.mint}]}><Text style={s.balanceValue}>72%</Text><Text style={s.balanceLabel}>Restful</Text></View><View style={[s.balanceBlock,{backgroundColor:C.peach}]}><Text style={s.balanceValue}>28%</Text><Text style={s.balanceLabel}>Elevated</Text></View></View><Text style={s.bodyMuted}>Based on fictional readings for this demo.</Text></Card>
-   <CoachDemo/>
-   <Card><Heading title="Your weekly highlights"/><Text style={s.listText}>✦   Your best recovery was on Saturday.</Text><Text style={s.listText}>☾   7h 42m average sleep this week.</Text><Text style={s.listText}>♡   Morning HRV is trending upward.</Text></Card>
-  </ScrollView></View>
-  <View key="Health" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-   <Text style={s.eyebrow}>YOUR BODY, YOUR WAY</Text><Text style={s.mainTitle}>Health overview.</Text><Text style={s.intro}>Health measurements are simulated until Apple Health is connected.</Text>
-   <CurrentHRV/>
-   <Card><Heading title="Your baseline"/><View style={s.baseline}><Metric label="30-DAY HRV" value="54" unit="ms" sub="Sample baseline"/><Metric label="RESTING HR" value="69" unit="bpm" sub="Sample baseline"/></View></Card>
-   <LifestyleOverview/>
-   <Card><Heading title="Apple Health"/><Text style={s.bodyMuted}>Not connected. No health permissions have been requested.</Text><TouchableOpacity onPress={()=>{setTab('Settings');setSettingsPage('health')}} style={[s.settingsAction,{backgroundColor:colors.pale}]}><Text style={[s.settingsActionText,{color:colors.accent}]}>About health permissions  →</Text></TouchableOpacity></Card>
-  </ScrollView></View>
+  <View key="Today" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><WellnessToday companion={selectedCompanion} accent={colors.accent} water={water} mood={mood} onCheckin={()=>go('Actions')} onChat={()=>go('Actions')} onActions={()=>go('Actions')}/></ScrollView></View>
+  <View key="Actions" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><WellnessActions companion={selectedCompanion} accent={colors.accent} water={water} onWater={()=>{const n=water+1;setWater(n);void saveHabit('water',n)}} onBreathing={()=>Alert.alert('Breathing','Scroll down to begin a guided breathing session.')} onChat={()=>Alert.alert('Superdots','Scroll down to open your Superdot conversation.')} onMood={()=>Alert.alert('Mood','Scroll down to save a mood check-in.')} onJournal={()=>Alert.alert('Journal','Scroll down to open your private journal.')}/><WellnessCompanion companion={selectedCompanion} color={colors.accent}/><BreathingStudio accent={colors.accent} tint={colors.pale}/></ScrollView></View>
+  <View key="Trends" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><WellnessTrends companion={selectedCompanion} accent={colors.accent} period={period} onPeriod={setPeriod} mood={mood}/></ScrollView></View>
+  <View key="Health" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><WellnessHealth companion={selectedCompanion} accent={colors.accent} onPermissions={()=>{go('Settings');setSettingsPage('health')}}/></ScrollView></View>
   <View key="Settings" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
    {settingsPage==='main'?<>
+    <WellnessSettingsIntro companion={selectedCompanion} accent={colors.accent} onThemes={()=>setSettingsPage('themes')}/>
     <Text style={s.mainTitle}>Settings</Text>
     <PromoBanner companion={selectedCompanion}/>
     <ThemeCard selected={selectedCompanion} onOpen={()=>setSettingsPage('themes')}/>
@@ -143,7 +112,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
 
   <View style={[s.navDock,{paddingBottom:Math.max(insets.bottom,8)}]}>
    <View style={s.tabBar} onLayout={e=>setNavWidth(e.nativeEvent.layout.width)}>
-    {navWidth>0?<Animated.View pointerEvents="none" style={[s.slidingPill,{backgroundColor:'#DDF4E8',width:(navWidth-8)/tabs.length,transform:[{translateX:activePosition.interpolate({inputRange:[0,4],outputRange:[0,4*(navWidth-8)/tabs.length]})}]}]}/>:null}
+    {navWidth>0?<Animated.View pointerEvents="none" style={[s.slidingPill,{backgroundColor:'#E9DEFF',width:(navWidth-8)/tabs.length,transform:[{translateX:activePosition.interpolate({inputRange:[0,4],outputRange:[0,4*(navWidth-8)/tabs.length]})}]}]}/>:null}
     {tabs.map(t=>{
     const active=tab===t.name;
     return <TouchableOpacity key={t.name} accessibilityRole="tab" accessibilityLabel={t.name}
