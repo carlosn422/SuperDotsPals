@@ -1,9 +1,9 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {Text,TouchableOpacity,Alert,Modal,View,StyleSheet,ActivityIndicator} from 'react-native';
+import {Text,TouchableOpacity,Alert,Modal,View,StyleSheet,ActivityIndicator,ScrollView} from 'react-native';
 import * as Speech from 'expo-speech';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {ExpoSpeechRecognitionModule,useSpeechRecognitionEvent} from 'expo-speech-recognition';
-export default function VoiceRecognition({color,busy,onResult,onSubmit}:{color:string;busy:boolean;onResult:(text:string)=>void;onSubmit:(text:string)=>Promise<void>}){
+export default function VoiceRecognition({color,busy,onResult,onSubmit,messages}:{color:string;busy:boolean;onResult:(text:string)=>void;onSubmit:(text:string)=>Promise<void>;messages:{id:string;role:'user'|'assistant';content:string}[]}){
  const transcriptRef=useRef(''),voiceRequested=useRef(false),sendingVoice=useRef(false);
  const [listening,setListening]=useState(false),[voiceStatus,setVoiceStatus]=useState('');
  const [open,setOpen]=useState(false);
@@ -35,6 +35,9 @@ export default function VoiceRecognition({color,busy,onResult,onSubmit}:{color:s
    <Text style={styles.status}>{lastVoiceError||voiceStatus||'Tap the microphone to start talking.'}</Text>
    {busy?<ActivityIndicator color="#7139E9" size="large"/>:null}
    </View>
+   <ScrollView style={{maxHeight:240,width:'100%'}} contentContainerStyle={{gap:9,paddingVertical:10}}>
+    {messages.slice(-8).map(m=><View key={m.id} style={{alignSelf:m.role==='user'?'flex-end':'flex-start',backgroundColor:m.role==='user'?'#E3D6FF':'#FFFFFF',padding:11,borderRadius:15,maxWidth:'90%'}}><Text style={{color:'#322354',fontSize:13}}>{m.content}</Text></View>)}
+   </ScrollView>
    <TouchableOpacity disabled={busy} style={styles.micButton} onPress={()=>void beginListening()}><Text style={styles.micText}>{listening?'■  Finish':'🎙  Talk'}</Text></TouchableOpacity>
    <Text style={styles.foot}>Your words are transcribed and sent to your private Gemini conversation.</Text>
   </View>
