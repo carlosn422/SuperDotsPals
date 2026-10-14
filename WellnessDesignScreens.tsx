@@ -22,7 +22,7 @@ export function WellnessToday({companion,accent,water,mood,onCheckin,onChat,onAc
  <SectionHeading title="Today's highlights"/><View style={[s.celebrate,{backgroundColor:'#FFF8EC'}]}><Text style={s.body}>Log your water, mood and breathing to build a picture of your day.</Text></View>
  </View>
 }
-export function WellnessActions({companion,accent,water,onWater,onBreathing,onChat,onMood,onJournal}:{companion:string;accent:string;water:number;onWater:()=>void;onBreathing:()=>void;onChat:()=>void;onMood:()=>void;onJournal:()=>void}){
+export function WellnessActions({companion,accent,water,onWater,onCaffeine,onBreathing,onChat,onMood,onJournal,caffeine}:{companion:string;accent:string;water:number;caffeine:number;onWater:()=>void;onCaffeine:()=>void;onBreathing:()=>void;onChat:()=>void;onMood:()=>void;onJournal:()=>void}){
  const [day,setDay]=React.useState(0);
  const dates=Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()+i-3);return d});
  const addCard=(emoji:string,title:string,description:string,info:string,action?:()=>void)=>(
@@ -39,7 +39,7 @@ export function WellnessActions({companion,accent,water,onWater,onBreathing,onCh
  {addCard('🌙','Sleep','Review sleep and recovery','Apple Health not connected')}
  {addCard('🏃','Fitness','Movement and activity','Apple Health not connected')}
  {addCard('💧','Hydration',water+' cups logged','Tap to log a glass',onWater)}
- {addCard('☕','Caffeine','Reflect on your intake','Record in your wellness journal',onJournal)}
+ {addCard('☕','Caffeine',caffeine+' cups logged','Tap to log one cup',onCaffeine)}
  {addCard('🌸','Mindfulness','Take a calming pause','Open guided breathing',onBreathing)}
  {addCard('🙂','Log your feelings','How are you feeling right now?','Check in with Superdots',onMood)}
  {addCard('📖','Journal','Write about your day','View your private notes',onJournal)}
