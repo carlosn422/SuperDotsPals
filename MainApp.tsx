@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { StatusBar, ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {supabase} from './supabase';
+import BreathingStudio from './BreathingStudio';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Svg, { Circle, Line, Path, Rect, Defs, LinearGradient, Stop, Polygon } from 'react-native-svg';
 import {LifestyleOverview, ThemePicker} from './LifestyleFeatures';
@@ -106,7 +107,7 @@ function AppContent({selectedTheme}:{selectedTheme:string}) {
    <LifestyleOverview/>
    <ExtraWellness/>
    <EmotionCheckin/>
-   <View style={[s.breathe,{backgroundColor:colors.pale}]}><Text style={s.breatheOver}>TAKE A MOMENT</Text><Text style={s.breatheTitle}>Just breathe.</Text><Text style={s.breatheBody}>A minute of mindful breathing may help you feel grounded.</Text><View style={s.breatheCircle}><Text style={s.breatheTimer}>{seconds}s</Text><Text style={s.breatheSmall}>{breathing?'Breathe gently':'Ready when you are'}</Text></View><TouchableOpacity style={[s.breatheButton,{backgroundColor:colors.accent}]} onPress={()=>{setBreathing(v=>!v);if(seconds===0)setSeconds(60);}}><Text style={s.breatheButtonText}>{breathing?'Pause exercise':seconds<60?'Resume breathing':'Start 1-minute reset'}</Text></TouchableOpacity><TouchableOpacity onPress={()=>{setBreathing(false);setSeconds(60)}}><Text style={s.reset}>Reset timer</Text></TouchableOpacity></View>
+   <BreathingStudio accent={colors.accent} tint={colors.pale}/>
   </>:null}
   {tab==='You'? <>
    <Text style={s.eyebrow}>YOUR PERSONAL SPACE</Text><Text style={s.mainTitle}>Your wellbeing.</Text><View style={s.profile}><View style={s.profileAvatar}><Text style={{fontSize:30}}>☺</Text></View><View><Text style={s.profileName}>Your demo profile</Text><Text style={s.bodyMuted}>Finding your balance, one day at a time</Text></View></View>
