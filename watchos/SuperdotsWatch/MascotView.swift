@@ -23,7 +23,7 @@ struct MascotView: View {
             case .poppy:
                 ForEach(0..<6, id: \.self) { i in
                     Ellipse().fill(dot.color).frame(width: 38, height: 52)
-                        .offset(y: -24).rotationEffect(.degrees(Double(i)*60))
+                        .offset(y: -24).rotationEffect(.degrees(Double(i) * 60))
                 }
                 Circle().fill(.pink.opacity(0.6)).frame(width: 53, height: 53)
                 face
@@ -66,7 +66,7 @@ struct Starburst: Shape {
         let center = CGPoint(x: rect.midX, y: rect.midY)
         var path = Path()
         for i in 0..<(points*2) {
-            let angle = Double(i)*.pi/Double(points)-.pi/2
+            let angle = Double(i) * Double.pi / Double(points) - Double.pi / 2
             let radius = min(rect.width,rect.height)*(i.isMultiple(of: 2) ? 0.49 : 0.35)
             let p = CGPoint(x: center.x + cos(angle)*radius, y: center.y + sin(angle)*radius)
             if i == 0 {path.move(to: p)} else {path.addLine(to: p)}
