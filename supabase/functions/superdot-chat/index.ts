@@ -35,7 +35,7 @@ Deno.serve(async req=>{
    if(!existing)return new Response(JSON.stringify({error:"Conversation not found"}),{status:404,headers});
   }
   const [journal,moods,activities,readings,habits,prior]=await Promise.all([
-   db.from("wellness_journal").select("mood,intensity,body,occurred_at").eq("user_id",user.id).order("occurred_at",{ascending:false}).limit(12),
+   db.from("wellness_journal").select("mood,intensity,energy_level,stress_factors,body,occurred_at").eq("user_id",user.id).order("occurred_at",{ascending:false}).limit(12),
    db.from("mood_entries").select("mood,recorded_at").eq("user_id",user.id).order("recorded_at",{ascending:false}).limit(10),
    db.from("wellness_activities").select("activity_type,duration_minutes,occurred_at").eq("user_id",user.id).order("occurred_at",{ascending:false}).limit(15),
    db.from("wellness_readings").select("metric,value,recorded_at,source").eq("user_id",user.id).neq("source","demo").order("recorded_at",{ascending:false}).limit(20),
