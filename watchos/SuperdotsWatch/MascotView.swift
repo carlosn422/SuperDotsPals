@@ -58,6 +58,8 @@ struct MascotView: View {
                 cheeks
             }
         }
+        .frame(width: 92, height: 92)
+        .scaleEffect(size / 92)
         .frame(width: size, height: size)
         .accessibilityLabel("\(dot.title) Superdot mascot")
     }
