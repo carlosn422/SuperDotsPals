@@ -33,7 +33,6 @@
           "healthConnectPermissions": [
             "READ_STEPS",
             "READ_HEART_RATE",
-            "READ_HEART_RATE_VARIABILITY",
             "READ_SLEEP",
             "READ_HEALTH_DATA_HISTORY"
           ]
