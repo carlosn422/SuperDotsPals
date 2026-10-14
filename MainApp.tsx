@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
 import BreathingStudio from './BreathingStudio';
+import WellnessCompanion from './WellnessCompanion';
 import {PromoBanner,ThemeCard,ThemeGallery,WatchThemesCard,SettingsItem} from './SettingsComponents';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Svg, { Circle, Line, Path, Rect, Defs, LinearGradient, Stop, Polygon } from 'react-native-svg';
@@ -89,6 +90,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   </ScrollView></View>
   <View key="Actions" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
    <Text style={s.eyebrow}>SMALL STEPS, BIG CHANGES</Text><Text style={s.mainTitle}>Care for yourself.</Text><Text style={s.intro}>How are you feeling right now?</Text>
+   <WellnessCompanion companion={selectedCompanion} color={colors.accent}/>
    <Card><Heading title="Mood check-in" detail={mood===' '?'Not logged':'Saved ✓'}/><View style={s.moods}>{([{name:'Calm',emoji:'😌'},{name:'Okay',emoji:'🙂'},{name:'Anxious',emoji:'😟'},{name:'Happy',emoji:'🥰'},{name:'Tired',emoji:'😴'}] as {name:Mood;emoji:string}[]).map(m=><TouchableOpacity key={m.name} onPress={()=>{setMood(m.name);void saveMood(m.name)}} style={[s.mood,mood===m.name&&s.moodActive]}><Text style={{fontSize:27}}>{m.emoji}</Text><Text style={s.moodLabel}>{m.name}</Text></TouchableOpacity>)}</View>{mood!==' '?<Text style={s.feedback}>Thanks for checking in. Your {mood.toLowerCase()} mood is logged for this session.</Text>:null}</Card>
    <Card><Heading title="Daily habits" detail="Today"/><View style={s.habitLine}><View><Text style={s.habitTitle}>💧  Water</Text><Text style={s.bodyMuted}>{water} glasses logged</Text></View><View style={s.counter}><TouchableOpacity onPress={()=>{const n=Math.max(0,water-1);setWater(n);void saveHabit('water',n)}}><Text style={s.counterText}>−</Text></TouchableOpacity><Text style={s.counterNumber}>{water}</Text><TouchableOpacity onPress={()=>{const n=water+1;setWater(n);void saveHabit('water',n)}}><Text style={s.counterText}>+</Text></TouchableOpacity></View></View><View style={s.habitLine}><View><Text style={s.habitTitle}>☕  Caffeine</Text><Text style={s.bodyMuted}>{coffee} cups logged</Text></View><View style={s.counter}><TouchableOpacity onPress={()=>{const n=Math.max(0,coffee-1);setCoffee(n);void saveHabit('caffeine',n)}}><Text style={s.counterText}>−</Text></TouchableOpacity><Text style={s.counterNumber}>{coffee}</Text><TouchableOpacity onPress={()=>{const n=coffee+1;setCoffee(n);void saveHabit('caffeine',n)}}><Text style={s.counterText}>+</Text></TouchableOpacity></View></View></Card>
    <ExtraWellness/>
