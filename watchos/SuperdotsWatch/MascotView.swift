@@ -25,28 +25,50 @@ struct MascotView: View {
                     Ellipse().fill(dot.color).frame(width: 38, height: 52)
                         .offset(y: -24).rotationEffect(.degrees(Double(i) * 60))
                 }
-                Circle().fill(.pink.opacity(0.6)).frame(width: 53, height: 53)
+                Circle().fill(Color(red: 1, green: 0.86, blue: 0.82)).frame(width: 53, height: 53)
                 face
+                cheeks
             case .mochi:
                 UnevenRoundedRectangle(topLeadingRadius: 31, bottomLeadingRadius: 20,
                                        bottomTrailingRadius: 30, topTrailingRadius: 20)
                     .fill(dot.color).rotationEffect(.degrees(-7))
+                HStack {
+                    Ellipse().fill(Color(red: 0.44, green: 0.69, blue: 0.96)).frame(width: 25, height: 15)
+                    Ellipse().fill(Color(red: 0.44, green: 0.69, blue: 0.96)).frame(width: 25, height: 15)
+                }.offset(y: 28)
                 face
+                cheeks
             case .zuzu:
                 Starburst(points: 10).fill(dot.color)
                 Circle().fill(Color.yellow.opacity(0.6)).frame(width: 52, height: 52)
                 face
+                cheeks
             case .nori:
                 LeafShape().fill(dot.color)
+                Ellipse().fill(Color(red: 0.13, green: 0.56, blue: 0.34)).frame(width: 34, height: 17).rotationEffect(.degrees(-32)).offset(x: 23, y: -36)
                 HStack(spacing: 14) {
                     Capsule().fill(.white).frame(width: 12, height: 4)
                     Capsule().fill(.white).frame(width: 12, height: 4)
                 }.offset(y: 1)
-                Image(systemName: "mouth").font(.system(size: 14)).foregroundStyle(.white).offset(y: 19)
+                Path { path in
+                    path.move(to: CGPoint(x: 36, y: 59))
+                    path.addQuadCurve(to: CGPoint(x: 56, y: 59), control: CGPoint(x: 46, y: 72))
+                }.stroke(.white, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                .frame(width: 92, height: 92)
+                cheeks
             }
         }
         .frame(width: size, height: size)
         .accessibilityLabel("\(dot.title) Superdot mascot")
+    }
+
+    private var cheeks: some View {
+        HStack(spacing: 48) {
+            Circle().fill(Color(red: 1, green: 0.60, blue: 0.72).opacity(0.8))
+                .frame(width: 12, height: 12)
+            Circle().fill(Color(red: 1, green: 0.60, blue: 0.72).opacity(0.8))
+                .frame(width: 12, height: 12)
+        }.offset(y: 14)
     }
 
     private var face: some View {
@@ -55,7 +77,7 @@ struct MascotView: View {
                 Capsule().fill(.white).frame(width: 9, height: 15)
                 Capsule().fill(.white).frame(width: 9, height: 15)
             }
-            Image(systemName: "mouth.fill").font(.system(size: 15)).foregroundStyle(.indigo)
+            Image(systemName: "mouth.fill").font(.system(size: 15)).foregroundStyle(Color(red: 0.18, green: 0.09, blue: 0.35))
         }
     }
 }
