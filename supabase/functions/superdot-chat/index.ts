@@ -52,10 +52,10 @@ Deno.serve(async req=>{
   const result=await ai.json();
   const answer=(result.candidates?.[0]?.content?.parts||[]).map((p:{text?:string})=>p.text||"").join("").trim().slice(0,4000);
   if(!answer)return new Response(JSON.stringify({error:"No reply was generated. Please try again."}),{status:502,headers});
-  if(!conversationId){const created=await db.from("wellness_conversations").insert({user_id:user.id,title:"Superdot conversation"}).select("id").single();if(created.error)throw created.error;conversationId=created.data.id;}
+  if(!conversationId){const created=await db.from("wellness_conversations").insert({user_id:user.id,title:"Superdot conversation"}).select("id").single();if(created.error){console.error("Failed to create conversation",JSON.stringify({code:created.error.code,message:created.error.message,details:created.error.details}));return new Response(JSON.stringify({error:"Could not start a conversation. Please try again.",code:"conversation_create_failed"}),{status:500,headers});}conversationId=created.data.id;}
   const possibleStress=/\b(stress(?:ed|ful)?|anxious|anxiety|overwhelm(?:ed|ing)?|panick?(?:ing)?|depress(?:ed|ion)?|sad|upset|frustrat(?:ed|ing)|angry|burn(?:ed|t) out|exhaust(?:ed|ing)|lonely|hurt myself|suicid(?:e|al))\b/i.test(message);
   const saved=await db.from("wellness_messages").insert([{user_id:user.id,conversation_id:conversationId,role:"user",content:message,is_ai_generated:false,possible_stress:possibleStress},{user_id:user.id,conversation_id:conversationId,role:"assistant",content:answer,is_ai_generated:true}]);
-  if(saved.error)throw saved.error;
+  if(saved.error){console.error("Failed to persist conversation",JSON.stringify({code:saved.error.code,message:saved.error.message,details:saved.error.details,hint:saved.error.hint}));return new Response(JSON.stringify({error:"The reply was generated but could not be saved. Please try again.",code:"message_save_failed"}),{status:500,headers});}
   return new Response(JSON.stringify({reply:answer,conversationId,possibleStress}),{status:200,headers});
- } catch(error){console.error("superdot-chat",error instanceof Error?error.message:"Unknown error");return new Response(JSON.stringify({error:"Could not complete the request. Please try again."}),{status:500,headers})}
+ } catch(error){console.error("superdot-chat exception",error instanceof Error?error.message:JSON.stringify(error));return new Response(JSON.stringify({error:"Could not complete the request. Please try again."}),{status:500,headers})}
 });
