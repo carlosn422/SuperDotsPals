@@ -20,7 +20,9 @@
     "@expo/vector-icons": "^15.0.2",
     "@supabase/supabase-js": "^2.57.0",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "react-native-url-polyfill": "^2.0.0"
+    "react-native-url-polyfill": "^2.0.0",
+    "expo-speech-recognition": "sdk-54",
+    "expo-speech": "~14.0.7"
   },
   "devDependencies": {
     "@types/react": "~19.1.10",
