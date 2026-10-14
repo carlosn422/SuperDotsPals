@@ -51,13 +51,11 @@ export default function WellnessCompanion({companion,color}:{companion:string;co
    if(data?.error)throw Error(data.error);
    if(!data?.reply||!data?.conversationId)throw Error('Your Superdot did not return a complete response.');
    setConversationId(data.conversationId);
-   if(data.possibleStress)console.info('Possible stress marker saved.');
    setChatText('');
-   if(readAloud){Speech.speak(data.reply,{language:'en-US',rate:0.95});}
-   const id=await userId();
-   const {data:history,error:historyError}=await supabase.from('wellness_messages').select('id,role,content,created_at').eq('user_id',id).eq('conversation_id',data.conversationId).order('created_at',{ascending:true}).limit(80);
-   if(historyError)throw historyError;
-   setMessages((history||[]) as Message[]);
+   const now=new Date().toISOString();
+   setMessages(prev=>[...prev,{id:'user-'+Date.now(),role:'user',content:input,created_at:now},{id:'ai-'+Date.now(),role:'assistant',content:data.reply,created_at:now}]);
+   if(readAloud)Speech.speak(data.reply,{language:'en-US',rate:0.95});
+   void (async()=>{try{const id=await userId();const {data:history,error:historyError}=await supabase.from('wellness_messages').select('id,role,content,created_at').eq('user_id',id).eq('conversation_id',data.conversationId).order('created_at',{ascending:true}).limit(80);if(!historyError&&history?.length)setMessages(history as Message[]);}catch(e){console.warn('History refresh failed',e)}})();
   } catch(e:any){Alert.alert('Unable to send',e?.message||'Please retry. Your message has not been cleared.')}
   finally{setBusy(false)}
  }
@@ -68,7 +66,7 @@ export default function WellnessCompanion({companion,color}:{companion:string;co
  {view==='chat'?<View style={s.card}><Text style={s.heading}>Your private conversation</Text><Text style={s.disclaimer}>Powered by Gemini. The AI can use your private journal, mood and activity history to help you reflect. It is not a therapist or medical diagnosis.</Text><ScrollView style={{maxHeight:360}} contentContainerStyle={{gap:10}}>{messages.map(m=><View key={m.id} style={[s.message,{alignSelf:m.role==='user'?'flex-end':'flex-start',backgroundColor:m.role==='user'?'#EDE4FF':'#F2F4F4'}]}><Text style={s.messageText}>{m.content}</Text></View>)}</ScrollView><Text style={s.disclaimer}>{NativeVoice?'Tap Talk to speak and hear a response.':'Voice needs an iOS development build. Expo Go supports text chat only.'}</Text>
 <TextInput style={s.input} multiline placeholder="Tell your Superdot what's on your mind..." placeholderTextColor="#9D91A9" value={chatText} onChangeText={setChatText}/>
 <View style={{flexDirection:'row',gap:10}}>
- {NativeVoice?<NativeVoice busy={busy} color={color} onResult={setChatText} onSubmit={(message:string)=>send(message,true)}/>:<TouchableOpacity style={[s.button,{backgroundColor:color,flex:1}]} onPress={()=>Alert.alert('Voice conversations need a development build','Expo Go cannot load the native speech-recognition engine. Run npx expo run:ios to use Siri-style conversations. Text chat is available here.')}><Text style={s.buttonText}>🎙 Talk</Text></TouchableOpacity>}
+ {NativeVoice?<NativeVoice busy={busy} color={color} onResult={setChatText} onSubmit={(message:string)=>send(message,true)} messages={messages}/>:<TouchableOpacity style={[s.button,{backgroundColor:color,flex:1}]} onPress={()=>Alert.alert('Voice conversations need a development build','Expo Go cannot load the native speech-recognition engine. Run npx expo run:ios to use Siri-style conversations. Text chat is available here.')}><Text style={s.buttonText}>🎙 Talk</Text></TouchableOpacity>}
  <TouchableOpacity disabled={busy} onPress={()=>void send()} style={[s.button,{backgroundColor:'#EDE6FF',flex:1}]}>{busy?<ActivityIndicator color={color}/>:<Text style={[s.buttonText,{color}]}>Send text</Text>}</TouchableOpacity>
 </View></View>:null}
  {view==='history'?<View style={s.card}><Text style={s.heading}>Your journal entries</Text><Text style={s.disclaimer}>Your own notes are saved privately. A future doctor export will distinguish notes from AI summaries and health measurements.</Text>{events.length===0?<Text style={s.sub}>No reflections saved yet.</Text>:events.map(e=><View key={e.id} style={s.entry}><Text style={s.entryTitle}>{e.mood||'Reflection'} {e.intensity?('· '+e.intensity+'/10'):''}</Text><Text style={s.sub}>{new Date(e.occurred_at).toLocaleString()}</Text><Text style={s.messageText}>{e.body}</Text></View>)}</View>:null}
