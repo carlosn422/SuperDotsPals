@@ -22,16 +22,28 @@ export function WellnessToday({companion,accent,water,mood,onCheckin,onChat,onAc
  </View>
 }
 export function WellnessActions({companion,accent,water,onWater,onBreathing,onChat,onMood,onJournal}:{companion:string;accent:string;water:number;onWater:()=>void;onBreathing:()=>void;onChat:()=>void;onMood:()=>void;onJournal:()=>void}){
- return <View style={s.page}><BrandHead companion={companion}/><PageHero title="Small steps," highlight="big change." detail="Daily actions for a happier, healthier you." companion={companion} accent={accent} button="Let's build good habits" onPress={onWater}/><SectionHeading title="Choose an action" detail="Little things add up 💜"/><View style={s.grid}>
- <PastelCard title="Water" detail={water+' cups logged · add one'} emoji="💧" tint="#E6F4FF" onPress={onWater}/>
- <PastelCard title="Breathing" detail="2-minute calming reset" emoji="☁️" tint="#E6F9F0" onPress={onBreathing}/>
- <PastelCard title="Walk" detail="Take a gentle 10-minute walk" emoji="☀️" tint="#FFF5D6" onPress={onMood}/>
- <PastelCard title="Mindfulness" detail="Be present right now" emoji="🌸" tint="#FFE9F2" onPress={onBreathing}/>
- <PastelCard title="Sleep wind-down" detail="Make space for rest" emoji="🌙" tint="#F0E9FF" onPress={onBreathing}/>
- <PastelCard title="Gratitude" detail="Reflect on something good" emoji="🌱" tint="#FFF1E6" onPress={onJournal}/>
- <PastelCard title="Journal" detail="Log how you feel" emoji="📖" tint="#E7F2FF" onPress={onJournal}/>
- <PastelCard title="Talk to Superdots" detail="A supportive voice and chat" emoji="💜" tint="#F0E6FF" onPress={onChat}/></View>
- <View style={s.chat}><Text style={s.celebrateTitle}>Keep the momentum going</Text><Text style={s.body}>Little actions add up to a brighter, kinder you.</Text></View></View>
+ const [day,setDay]=React.useState(0);
+ const dates=Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()+i-3);return d});
+ const addCard=(emoji:string,title:string,description:string,info:string,action?:()=>void)=>(
+ <TouchableOpacity onPress={action} disabled={!action} style={{backgroundColor:'#fff',borderRadius:22,padding:17,flexDirection:'row',alignItems:'center',gap:14}}>
+  <View style={{width:51,height:51,borderRadius:18,backgroundColor:'#E9F6F0',alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:27}}>{emoji}</Text></View>
+  <View style={{flex:1,gap:5}}><Text style={{fontSize:16,fontWeight:'900',color:INK}}>{title}</Text><Text style={{fontSize:12,color:MUTED}}>{description}</Text><Text style={{fontSize:11,color:'#3A9E7A'}}>{info}</Text></View>
+  <Ionicons name="chevron-forward" size={19} color={MUTED}/>
+ </TouchableOpacity>);
+ return <View style={s.page}><BrandHead companion={companion}/>
+ <SectionHeading title="Your daily actions" detail="Small steps, better days"/>
+ <View style={{flexDirection:'row',justifyContent:'space-between',gap:4}}>{dates.map((d,i)=><TouchableOpacity key={i} onPress={()=>setDay(i-3)} style={{flex:1,alignItems:'center',paddingVertical:10,borderRadius:18,backgroundColor:day===i-3?'#D8F6E8':'#fff',gap:4}}><Text style={{fontSize:11,color:MUTED}}>{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]}</Text><Text style={{fontWeight:'900',fontSize:16,color:INK}}>{d.getDate()}</Text>{i===3?<View style={{width:5,height:5,borderRadius:3,backgroundColor:'#50C89E'}}/>:null}</TouchableOpacity>)}</View>
+ <View style={{backgroundColor:'#E4F8EE',borderRadius:24,padding:18,flexDirection:'row',alignItems:'center',gap:12}}><View style={{flex:1,gap:7}}><Text style={{color:'#28694F',fontWeight:'900',fontSize:13}}>✦  YOUR SUPERDOT SUGGESTS</Text><Text style={{fontWeight:'900',color:INK,fontSize:18}}>A small reset can help.</Text><Text style={s.body}>How have you been sleeping and feeling lately?</Text><TouchableOpacity onPress={onChat}><Text style={{fontWeight:'800',color:accent}}>Talk to Superdots  →</Text></TouchableOpacity></View><SuperdotMascot id={companion} color={accent} size={86}/></View>
+ <SectionHeading title="Today’s wellness" detail="Track and reflect"/>
+ {addCard('🌙','Sleep','Review sleep and recovery','Apple Health not connected')}
+ {addCard('🏃','Fitness','Movement and activity','Apple Health not connected')}
+ {addCard('💧','Hydration',water+' cups logged','Tap to log a glass',onWater)}
+ {addCard('☕','Caffeine','Reflect on your intake','Record in your wellness journal',onJournal)}
+ {addCard('🌸','Mindfulness','Take a calming pause','Open guided breathing',onBreathing)}
+ {addCard('🙂','Log your feelings','How are you feeling right now?','Check in with Superdots',onMood)}
+ {addCard('📖','Journal','Write about your day','View your private notes',onJournal)}
+ <TouchableOpacity onPress={onChat} style={[s.chat,{backgroundColor:'#EEE7FF'}]}><SuperdotMascot id={companion} color={accent} size={72}/><View style={{flex:1,gap:4}}><Text style={s.actionTitle}>Ask your Superdot</Text><Text style={s.body}>Your private AI wellness conversation</Text></View><Ionicons name="arrow-forward" size={21} color={accent}/></TouchableOpacity>
+ </View>;
 }
 export function WellnessTrends({companion,accent,period,onPeriod,mood}:{companion:string;accent:string;period:string;onPeriod:(p:'Day'|'Week'|'Month'|'Year')=>void;mood:string}){
  return <View style={s.page}><BrandHead companion={companion}/><PageHero title="Understand your" highlight="patterns." detail="See how your habits and mood connect over time." companion={companion} accent={accent}/><View style={s.segment}>{(['Week','Month','Year'] as const).map(p=><TouchableOpacity key={p} onPress={()=>onPeriod(p)} style={[s.seg,(period===p)&&{backgroundColor:accent}]}><Text style={{color:period===p?'#fff':MUTED,fontWeight:'800'}}>{p==='Year'?'All Time':p}</Text></TouchableOpacity>)}</View>
