@@ -39,7 +39,7 @@ function StressChart() {return <Svg width="100%" height="104" viewBox="0 0 310 1
  {stressDay.map((v,i)=><Rect key={i} x={5+i*12.6} y={99-v*.88} width={7.5} height={v*.88} rx="3" fill={v>55?C.orange:C.purple} opacity=".87"/>)}
  </Svg>;}
 function Metric({value,unit,label,sub,color=C.deep}:{value:string;unit:string;label:string;sub:string;color?:string}) {return <View style={s.metric}><Text style={s.metricLabel}>{label}</Text><View style={s.metricRow}><Text style={[s.metricValue,{color}]}>{value}</Text><Text style={s.metricUnit}>{unit}</Text></View><Text style={s.metricSub}>{sub}</Text></View>;}
-function AppContent({selectedTheme,selectedCompanion}:{selectedTheme:string;selectedCompanion:string}) {
+function AppContent({selectedTheme,selectedCompanion,onEditProfile}:{selectedTheme:string;selectedCompanion:string;onEditProfile:()=>void}) {
  const palettes:Record<string,{accent:string,pale:string}>={grape:{accent:'#7139E9',pale:'#EEE5FF'},coral:{accent:'#E76B8A',pale:'#FFE7EE'},sky:{accent:'#488CD9',pale:'#E2F1FF'},sunny:{accent:'#E3A426',pale:'#FFF4CE'},mint:{accent:'#3BA986',pale:'#E1F8ED'}};
  const colors=palettes[selectedTheme]||palettes.grape;
  const insets = useSafeAreaInsets();
@@ -95,6 +95,7 @@ function AppContent({selectedTheme,selectedCompanion}:{selectedTheme:string;sele
    <Text style={s.eyebrow}>YOUR PERSONAL SPACE</Text><Text style={s.mainTitle}>Your wellbeing.</Text><View style={s.profile}><View style={s.profileAvatar}><Text style={{fontSize:30}}>☺</Text></View><View><Text style={s.profileName}>Your demo profile</Text><Text style={s.bodyMuted}>Finding your balance, one day at a time</Text></View></View>
    <Card><Heading title="Your baseline"/><View style={s.baseline}><Metric label="30-DAY HRV" value="54" unit="ms" sub="Sample baseline"/><Metric label="RESTING HR" value="69" unit="bpm" sub="Sample baseline"/></View></Card>
    <Card><Heading title="Data source"/><View style={s.settingLine}><Text style={s.habitTitle}>♡  Apple Health</Text><Text style={s.settingValue}>Not connected</Text></View><Text style={s.bodyMuted}>This prototype uses sample readings only. It does not access Apple Health, detect medical conditions, or send notifications.</Text></Card>
+   <TouchableOpacity accessibilityRole="button" style={[s.card,{backgroundColor:colors.pale}]} onPress={onEditProfile}><Text style={{color:colors.accent,fontWeight:'900',textAlign:'center',fontSize:15}}>✦ Edit my wellness profile</Text><Text style={{color:C.muted,textAlign:'center',fontSize:12,marginTop:7}}>Update your goals, health context and Superdot</Text></TouchableOpacity>
    <TouchableOpacity style={s.card} onPress={()=>supabase.auth.signOut()}><Text style={{color:C.deep,fontWeight:'800',textAlign:'center'}}>Sign out</Text></TouchableOpacity>
    <ThemePicker/>
    <WidgetPreview/>
@@ -105,7 +106,7 @@ function AppContent({selectedTheme,selectedCompanion}:{selectedTheme:string;sele
   <View style={[s.tabBar,{height:59+insets.bottom,paddingBottom:insets.bottom}]}>{tabs.map(t=><TouchableOpacity key={t.name} accessibilityRole="tab" accessibilityState={{selected:tab===t.name}} style={s.tab} onPress={()=>go(t.name)}><Ionicons name={tab===t.name?t.icon:t.outline} size={23} color={tab===t.name?colors.accent:'#A9A5B7'}/><Text style={[s.tabLabel,tab===t.name&&s.tabSelected,tab===t.name&&{color:colors.accent}]}>{t.name}</Text></TouchableOpacity>)}</View>
  </View>;
 }
-export default function MainApp({selectedTheme='grape',selectedCompanion='bloop'}:{selectedTheme?:string;selectedCompanion?:string}){return <AppContent selectedTheme={selectedTheme} selectedCompanion={selectedCompanion}/>}
+export default function MainApp({selectedTheme='grape',selectedCompanion='bloop',onEditProfile=()=>{}}:{selectedTheme?:string;selectedCompanion?:string;onEditProfile?:()=>void}){return <AppContent selectedTheme={selectedTheme} selectedCompanion={selectedCompanion} onEditProfile={onEditProfile}/>}
 const s=StyleSheet.create({
  safe:{flex:1,backgroundColor:C.bg},
  top:{height:62,paddingHorizontal:24,flexDirection:'row',alignItems:'center',justifyContent:'space-between',backgroundColor:C.bg},
