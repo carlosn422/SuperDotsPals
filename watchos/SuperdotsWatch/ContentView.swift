@@ -3,6 +3,7 @@ import Charts
 
 struct ContentView: View {
     @EnvironmentObject var store: WatchStore
+    @StateObject private var themeSync = WatchThemeSync()
 
     var body: some View {
         NavigationStack {
@@ -28,12 +29,16 @@ struct ContentView: View {
                     }.font(.caption).padding(10).background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 13))
                     NavigationLink { TrendsView() } label: { Label("HRV trends", systemImage: "chart.xyaxis.line") }
                     NavigationLink { BreathingView() } label: { Label("Take a breath", systemImage: "wind") }
-                    NavigationLink { CompanionPicker() } label: { Label("My Superdot", systemImage: "paintpalette") }
+                    NavigationLink { CompanionPicker(sync: themeSync) } label: { Label("My Superdot", systemImage: "paintpalette") }
+                    NavigationLink { WatchSyncView(sync: themeSync) } label: { Label("Theme sync", systemImage: "arrow.triangle.2.circlepath") }
+                    Text(themeSync.connected ? "Cloud theme sync connected" : "Watch theme saved locally")
+                        .font(.system(size: 10)).foregroundStyle(.secondary)
                     Text("SAMPLE DATA · NOT MEDICAL ADVICE").font(.system(size: 9)).foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 5)
             }
         }
+        .task { await themeSync.refresh(store:store) }
     }
 
     private func metric(_ title: String, value: String, unit: String) -> some View {
@@ -74,11 +79,12 @@ struct TrendsView: View {
 
 struct CompanionPicker: View {
     @EnvironmentObject var store: WatchStore
+    @ObservedObject var sync: WatchThemeSync
 
     var body: some View {
         List(Dot.allCases) { dot in
             Button {
-                store.companion = dot
+                Task { await sync.update(companion: dot,store:store) }
             } label: {
                 HStack(spacing: 10) {
                     MascotView(dot: dot, size: 36)
