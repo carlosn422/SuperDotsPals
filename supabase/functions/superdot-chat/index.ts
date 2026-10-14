@@ -33,7 +33,7 @@ Deno.serve(async req=>{
   ]);
   const context=JSON.stringify({journal:journal.data||[],moods:moods.data||[],activities:activities.data||[],readings:readings.data||[]}).slice(0,13000);
   const turns=(prior.data||[]).reverse().map((m:{role:string;content:string})=>({role:m.role==="assistant"?"model":"user",parts:[{text:String(m.content).slice(0,3000)}]}));
-  const model=Deno.env.get("GEMINI_MODEL")||"gemini-2.5-flash";
+  const model=Deno.env.get("GEMINI_MODEL")||"gemini-3.8-flash";
   const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),25000);
   let ai:Response;
   try{
