@@ -4,6 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import SuperdotMascot from './SuperdotMascot';
 import {COMPANIONS} from './SettingsComponents';
 import {supabase} from './supabase';
+import HealthDataPanel,{HealthMiniStats} from './HealthDataPanel';
 
 const P='#7139E9',INK='#25145C',MUTED='#80749E';
 type Props={companion:string;accent:string;onPress?:()=>void};
@@ -17,7 +18,7 @@ export function StatCard({title,value,detail,icon,tint,onPress}:{title:string;va
 export function WellnessToday({companion,accent,water,mood,onCheckin,onChat,onActions}:{companion:string;accent:string;water:number;mood:string;onCheckin:()=>void;onChat:()=>void;onActions:()=>void}){
  return <View style={s.page}><BrandHead companion={companion}/><PageHero title="A little check-in" highlight="for you" detail="Take a moment to pause and see how you're feeling today." accent={accent} companion={companion} button="Let's check in" onPress={onCheckin}/>
  <View style={[s.celebrate,{backgroundColor:'#EDF9F3'}]}><View style={{flex:1,gap:7}}><Text style={s.celebrateTitle}>You're doing <Text style={{color:accent}}>dot-tastic!</Text></Text><Text style={s.body}>Small steps count. Your Superdot is here for you.</Text></View><SuperdotMascot id={companion} color={accent} size={103}/></View>
- <SectionHeading title="Your daily wellness"/><View style={s.grid}><StatCard title="Water Intake" value={String(water)+' cups'} detail="Logged today" icon="water" tint="#E5F3FF" onPress={onActions}/><StatCard title="Mood" value={mood.trim()||'Not logged'} detail="Tap to check in" icon="happy-outline" tint="#FFF0D6" onPress={onCheckin}/><StatCard title="Steps" value="Not connected" detail="Apple Health needed" icon="walk-outline" tint="#E6F8EB"/><StatCard title="Sleep" value="Not connected" detail="Apple Health needed" icon="moon-outline" tint="#F2E9FF"/></View>
+ <SectionHeading title="Your daily wellness"/><View style={s.grid}><StatCard title="Water Intake" value={String(water)+' cups'} detail="Logged today" icon="water" tint="#E5F3FF" onPress={onActions}/><StatCard title="Mood" value={mood.trim()||'Not logged'} detail="Tap to check in" icon="happy-outline" tint="#FFF0D6" onPress={onCheckin}/></View><HealthMiniStats/>
  <TouchableOpacity onPress={onChat} style={s.chat}><SuperdotMascot id={companion} color={accent} size={68}/><View style={{flex:1}}><Text style={s.actionTitle}>Talk to your Superdot</Text><Text style={s.body}>Share how you're feeling and get support.</Text></View><Ionicons name="chevron-forward" size={20} color={accent}/></TouchableOpacity>
  <SectionHeading title="Today's highlights"/><View style={[s.celebrate,{backgroundColor:'#FFF8EC'}]}><Text style={s.body}>Log your water, mood and breathing to build a picture of your day.</Text></View>
  </View>
@@ -84,10 +85,11 @@ export function WellnessTrends({companion,accent,period,onPeriod,mood}:{companio
  <View style={[s.white,{backgroundColor:'#FFF8E9'}]}><Text style={s.celebrateTitle}>💡 Your wellness insights</Text><Text style={s.body}>These are your recorded check-ins. Any connection between sleep, activity and mood needs real synchronized data before conclusions can be drawn.</Text></View></View>;
 }
 export function WellnessHealth({companion,accent,onPermissions}:{companion:string;accent:string;onPermissions:()=>void}){
- return <View style={s.page}><BrandHead companion={companion}/><PageHero title="Health signals" highlight="from your day." detail="Your activity, sleep and body signals can help you understand wellness patterns." companion="nori" accent="#3BA986"/>
- <TouchableOpacity onPress={onPermissions} style={[s.white,{backgroundColor:'#E6FAEF',flexDirection:'row',alignItems:'center',gap:14}]}><Ionicons name="heart" size={37} color="#EB6996"/><View style={{flex:1}}><Text style={s.cardTitle}>Connect Apple Health</Text><Text style={s.body}>Not connected · no readings synced</Text></View><Ionicons name="chevron-forward" size={22} color={accent}/></TouchableOpacity>
- <SectionHeading title="Your health overview"/><View style={s.grid}><StatCard title="HRV" value="— ms" detail="Awaiting real data" icon="pulse-outline" tint="#FFE7EF"/><StatCard title="Resting Heart Rate" value="— bpm" detail="Awaiting real data" icon="heart-outline" tint="#FFE7EF"/><StatCard title="Steps" value="—" detail="Awaiting real data" icon="walk" tint="#E6FAEF"/><StatCard title="Active Energy" value="— kcal" detail="Awaiting real data" icon="flame-outline" tint="#FFF1DD"/><StatCard title="Sleep" value="— h" detail="Awaiting real data" icon="moon-outline" tint="#F0E8FF"/></View>
- <View style={s.chat}><SuperdotMascot id={companion} color={accent} size={79}/><View style={{flex:1}}><Text style={s.celebrateTitle}>Your data tells a bigger story.</Text><Text style={s.body}>We never invent health readings or treat watch data as a diagnosis.</Text></View></View></View>
+ return <View style={s.page}><BrandHead companion={companion}/>
+ <PageHero title="Health signals" highlight="from your day." detail="Understand your activity, recovery and body signals through real readings." companion="nori" accent="#3BA986"/>
+ <HealthDataPanel/>
+ <TouchableOpacity onPress={onPermissions} style={[s.white,{backgroundColor:'#F1EAFE'}]}><Text style={s.cardTitle}>Privacy & health permissions  →</Text><Text style={s.body}>Choose what Apple Health shares with Superdots. No measurements are requested until you tap Connect.</Text></TouchableOpacity>
+ </View>;
 }
 export function WellnessSettingsIntro({companion,accent,onThemes}:{companion:string;accent:string;onThemes:()=>void}){
  return <View style={s.page}><BrandHead companion={companion}/><PageHero title="Make it" highlight="yours." detail="Personalize your Superdots experience and make wellness feel more like you." companion={companion} accent={accent} button="Explore themes" onPress={onThemes}/>
