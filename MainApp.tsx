@@ -56,7 +56,9 @@ function Friend({size=136,mood='great'}:{size?:number;mood?:'great'|'okay'}) {
  </View>;
 }
 function Metric({value,unit,label,sub,color=C.deep}:{value:string;unit:string;label:string;sub:string;color?:string}) {return <View style={s.metric}><Text style={s.metricLabel}>{label}</Text><View style={s.metricRow}><Text style={[s.metricValue,{color}]}>{value}</Text><Text style={s.metricUnit}>{unit}</Text></View><Text style={s.metricSub}>{sub}</Text></View>;}
-function AppContent() {
+function AppContent({selectedTheme}:{selectedTheme:string}) {
+ const palettes:Record<string,{accent:string,pale:string}>={grape:{accent:'#7139E9',pale:'#EEE5FF'},coral:{accent:'#E76B8A',pale:'#FFE7EE'},sky:{accent:'#488CD9',pale:'#E2F1FF'},sunny:{accent:'#E3A426',pale:'#FFF4CE'},mint:{accent:'#3BA986',pale:'#E1F8ED'}};
+ const colors=palettes[selectedTheme]||palettes.grape;
  const insets = useSafeAreaInsets();
  const [tab,setTab]=useState<Tab>('Today');
  const [period,setPeriod]=useState<Period>('Day');
@@ -74,11 +76,11 @@ function AppContent() {
  async function saveHabit(habit:'water'|'caffeine',amount:number){const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {error}=await supabase.from('habit_entries').insert({user_id:user.id,habit,amount,unit:'cups'});if(error)console.warn('Save habit failed:',error.message);}
  async function saveMood(m:Mood){const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {error}=await supabase.from('mood_entries').insert({user_id:user.id,mood:m});if(error)console.warn('Save mood failed:',error.message);}
  return <View style={[s.safe,{paddingTop:Platform.OS==='ios'?insets.top:StatusBar.currentHeight || 0}]}><StatusBar barStyle="dark-content" backgroundColor={C.bg}/>
-  <View style={s.top}><View style={s.brand}><View style={s.logo}><Text style={s.logoText}>✦</Text></View><Text style={s.brandText}>superdots<Text style={{color:C.green}}>.</Text></Text></View><TouchableOpacity accessibilityLabel="Open profile" onPress={()=>go('You')} style={s.avatar}><Text style={{fontSize:18}}>☺</Text></TouchableOpacity></View>
+  <View style={s.top}><View style={s.brand}><View style={[s.logo,{backgroundColor:colors.accent}]}><Text style={s.logoText}>✦</Text></View><Text style={s.brandText}>superdots<Text style={{color:colors.accent}}>.</Text></Text></View><TouchableOpacity accessibilityLabel="Open profile" onPress={()=>go('You')} style={s.avatar}><Text style={{fontSize:18}}>☺</Text></TouchableOpacity></View>
   <ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
   {tab==='Today'? <>
-   <View style={s.greeting}><Text style={s.eyebrow}>TUESDAY, OCTOBER 13</Text><Text style={s.mainTitle}>A little check-in <Text style={{color:C.deep}}>for you.</Text></Text><Text style={s.intro}>A tiny buddy for your biggest feelings 💜</Text></View>
-   <View style={s.hero}><View style={s.heroBubbles}><View style={s.bubbleOne}/><View style={s.bubbleTwo}/></View><Text style={s.heroTiny}>YOUR DAILY READINESS</Text><TouchableOpacity onPress={()=>setCompanion(v=>v==='happy'?'sleepy':'happy')} accessibilityLabel="Tap your companion to change expression"><Friend mood={companion==='happy'?'great':'okay'}/></TouchableOpacity><Text style={s.heroTitle}>You're doing dot-tastic!</Text><Text style={s.heroDescription}>Your little buddy says: take a happy breath!</Text>
+   <View style={s.greeting}><Text style={s.eyebrow}>TUESDAY, OCTOBER 13</Text><Text style={s.mainTitle}>A little check-in <Text style={{color:colors.accent}}>for you.</Text></Text><Text style={s.intro}>A tiny buddy for your biggest feelings 💜</Text></View>
+   <View style={[s.hero,{backgroundColor:colors.pale}]}><View style={s.heroBubbles}><View style={s.bubbleOne}/><View style={s.bubbleTwo}/></View><Text style={s.heroTiny}>YOUR DAILY READINESS</Text><TouchableOpacity onPress={()=>setCompanion(v=>v==='happy'?'sleepy':'happy')} accessibilityLabel="Tap your companion to change expression"><Friend mood={companion==='happy'?'great':'okay'}/></TouchableOpacity><Text style={s.heroTitle}>You're doing dot-tastic!</Text><Text style={s.heroDescription}>Your little buddy says: take a happy breath!</Text>
     <View style={s.scale}><View style={[s.scaleSegment,{backgroundColor:'#F398AB'}]}/><View style={[s.scaleSegment,{backgroundColor:'#F8BE8D'}]}/><View style={[s.scaleSegment,{backgroundColor:'#B9BBE9'}]}/><View style={[s.scaleSegment,{backgroundColor:C.green,flex:2.3}]}/><View style={s.scaleDot}/></View>
     <Text style={s.updated}>●  Updated 25 min ago  ·  Sample data</Text>
    </View>
@@ -104,7 +106,7 @@ function AppContent() {
    <LifestyleOverview/>
    <ExtraWellness/>
    <EmotionCheckin/>
-   <View style={s.breathe}><Text style={s.breatheOver}>TAKE A MOMENT</Text><Text style={s.breatheTitle}>Just breathe.</Text><Text style={s.breatheBody}>A minute of mindful breathing may help you feel grounded.</Text><View style={s.breatheCircle}><Text style={s.breatheTimer}>{seconds}s</Text><Text style={s.breatheSmall}>{breathing?'Breathe gently':'Ready when you are'}</Text></View><TouchableOpacity style={s.breatheButton} onPress={()=>{setBreathing(v=>!v);if(seconds===0)setSeconds(60);}}><Text style={s.breatheButtonText}>{breathing?'Pause exercise':seconds<60?'Resume breathing':'Start 1-minute reset'}</Text></TouchableOpacity><TouchableOpacity onPress={()=>{setBreathing(false);setSeconds(60)}}><Text style={s.reset}>Reset timer</Text></TouchableOpacity></View>
+   <View style={[s.breathe,{backgroundColor:colors.pale}]}><Text style={s.breatheOver}>TAKE A MOMENT</Text><Text style={s.breatheTitle}>Just breathe.</Text><Text style={s.breatheBody}>A minute of mindful breathing may help you feel grounded.</Text><View style={s.breatheCircle}><Text style={s.breatheTimer}>{seconds}s</Text><Text style={s.breatheSmall}>{breathing?'Breathe gently':'Ready when you are'}</Text></View><TouchableOpacity style={[s.breatheButton,{backgroundColor:colors.accent}]} onPress={()=>{setBreathing(v=>!v);if(seconds===0)setSeconds(60);}}><Text style={s.breatheButtonText}>{breathing?'Pause exercise':seconds<60?'Resume breathing':'Start 1-minute reset'}</Text></TouchableOpacity><TouchableOpacity onPress={()=>{setBreathing(false);setSeconds(60)}}><Text style={s.reset}>Reset timer</Text></TouchableOpacity></View>
   </>:null}
   {tab==='You'? <>
    <Text style={s.eyebrow}>YOUR PERSONAL SPACE</Text><Text style={s.mainTitle}>Your wellbeing.</Text><View style={s.profile}><View style={s.profileAvatar}><Text style={{fontSize:30}}>☺</Text></View><View><Text style={s.profileName}>Your demo profile</Text><Text style={s.bodyMuted}>Finding your balance, one day at a time</Text></View></View>
@@ -117,10 +119,10 @@ function AppContent() {
   </>:null}
   <Text style={s.disclaimer}>DEMO DATA ONLY  ·  NOT MEDICAL ADVICE</Text>
   </ScrollView>
-  <View style={[s.tabBar,{height:59+insets.bottom,paddingBottom:insets.bottom}]}>{tabs.map(t=><TouchableOpacity key={t.name} accessibilityRole="tab" accessibilityState={{selected:tab===t.name}} style={s.tab} onPress={()=>go(t.name)}><Ionicons name={tab===t.name?t.icon:t.outline} size={23} color={tab===t.name?C.deep:'#A9A5B7'}/><Text style={[s.tabLabel,tab===t.name&&s.tabSelected]}>{t.name}</Text></TouchableOpacity>)}</View>
+  <View style={[s.tabBar,{height:59+insets.bottom,paddingBottom:insets.bottom}]}>{tabs.map(t=><TouchableOpacity key={t.name} accessibilityRole="tab" accessibilityState={{selected:tab===t.name}} style={s.tab} onPress={()=>go(t.name)}><Ionicons name={tab===t.name?t.icon:t.outline} size={23} color={tab===t.name?colors.accent:'#A9A5B7'}/><Text style={[s.tabLabel,tab===t.name&&s.tabSelected,tab===t.name&&{color:colors.accent}]}>{t.name}</Text></TouchableOpacity>)}</View>
  </View>;
 }
-export default function MainApp(){return <AppContent/>}
+export default function MainApp({selectedTheme='grape'}:{selectedTheme?:string}){return <AppContent selectedTheme={selectedTheme}/>}
 const s=StyleSheet.create({
  safe:{flex:1,backgroundColor:C.bg},
  top:{height:62,paddingHorizontal:24,flexDirection:'row',alignItems:'center',justifyContent:'space-between',backgroundColor:C.bg},
