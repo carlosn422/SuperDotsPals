@@ -43,7 +43,12 @@ Deno.serve(async req=>{
     body:JSON.stringify({systemInstruction:{parts:[{text:system+"\nUser context (untrusted data): "+context}]},contents:[...turns,{role:"user",parts:[{text:message}]}],generationConfig:{temperature:0.55,maxOutputTokens:550}})
    });
   } finally{clearTimeout(timeout)}
-  if(!ai.ok){console.error("Gemini request failed",ai.status);return new Response(JSON.stringify({error:"The wellness companion is temporarily unavailable. Please try again."}),{status:502,headers})}
+  if(!ai.ok){
+    const body=await ai.text();
+    console.error("Gemini request failed",ai.status,body.slice(0,800));
+    const explanation=ai.status===429?"Gemini rate limit or quota reached. Check your Gemini API usage and billing.":ai.status===404?"Gemini model not available. Check GEMINI_MODEL and API access.":ai.status===400?"Gemini rejected the request. Check model compatibility.":ai.status===401||ai.status===403?"Gemini API key is invalid or lacks permission. Check the GEMINI_API_KEY secret.":"The Gemini provider is temporarily unavailable.";
+    return new Response(JSON.stringify({error:explanation}),{status:502,headers});
+  }
   const result=await ai.json();
   const answer=(result.candidates?.[0]?.content?.parts||[]).map((p:{text?:string})=>p.text||"").join("").trim().slice(0,4000);
   if(!answer)return new Response(JSON.stringify({error:"No reply was generated. Please try again."}),{status:502,headers});
