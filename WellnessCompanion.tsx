@@ -5,7 +5,7 @@ import SuperdotMascot from './SuperdotMascot';
 import * as Speech from 'expo-speech';
 import Constants, {ExecutionEnvironment} from 'expo-constants';
 // Expo Go can report appOwnership=null on some SDK builds; executionEnvironment is authoritative.
-const isExpoGo=Constants.executionEnvironment===ExecutionEnvironment.StoreClient || Constants.appOwnership==='expo';
+const isExpoGo=Constants.appOwnership==='expo' || (Constants.executionEnvironment===ExecutionEnvironment.StoreClient && Constants.expoGoConfig != null);
 const NativeVoice=isExpoGo?null:require('./VoiceRecognitionNative').default;
 
 const feelings=['Good','Calm','Stressed','Anxious','Sad','Tired','Overwhelmed'];
