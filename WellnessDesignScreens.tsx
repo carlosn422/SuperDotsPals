@@ -5,6 +5,7 @@ import SuperdotMascot from './SuperdotMascot';
 import {COMPANIONS} from './SettingsComponents';
 import {supabase} from './supabase';
 import HealthDataPanel,{HealthMiniStats} from './HealthDataPanel';
+import RecoveryInsights from './RecoveryInsights';
 
 const P='#7139E9',INK='#25145C',MUTED='#80749E';
 type Props={companion:string;accent:string;onPress?:()=>void};
@@ -18,6 +19,7 @@ export function StatCard({title,value,detail,icon,tint,onPress}:{title:string;va
 export function WellnessToday({companion,accent,water,mood,onCheckin,onChat,onActions}:{companion:string;accent:string;water:number;mood:string;onCheckin:()=>void;onChat:()=>void;onActions:()=>void}){
  return <View style={s.page}><BrandHead companion={companion}/><PageHero title="A little check-in" highlight="for you" detail="Take a moment to pause and see how you're feeling today." accent={accent} companion={companion} button="Let's check in" onPress={onCheckin}/>
  <View style={[s.celebrate,{backgroundColor:'#EDF9F3'}]}><View style={{flex:1,gap:7}}><Text style={s.celebrateTitle}>You're doing <Text style={{color:accent}}>dot-tastic!</Text></Text><Text style={s.body}>Small steps count. Your Superdot is here for you.</Text></View><SuperdotMascot id={companion} color={accent} size={103}/></View>
+ <RecoveryInsights companion={companion} onChat={onChat}/>
  <SectionHeading title="Your daily wellness"/><View style={s.grid}><StatCard title="Water Intake" value={String(water)+' cups'} detail="Logged today" icon="water" tint="#E5F3FF" onPress={onActions}/><StatCard title="Mood" value={mood.trim()||'Not logged'} detail="Tap to check in" icon="happy-outline" tint="#FFF0D6" onPress={onCheckin}/></View><HealthMiniStats/>
  <TouchableOpacity onPress={onChat} style={s.chat}><SuperdotMascot id={companion} color={accent} size={68}/><View style={{flex:1}}><Text style={s.actionTitle}>Talk to your Superdot</Text><Text style={s.body}>Share how you're feeling and get support.</Text></View><Ionicons name="chevron-forward" size={20} color={accent}/></TouchableOpacity>
  <SectionHeading title="Today's highlights"/><View style={[s.celebrate,{backgroundColor:'#FFF8EC'}]}><Text style={s.body}>Log your water, mood and breathing to build a picture of your day.</Text></View>
@@ -88,6 +90,7 @@ export function WellnessHealth({companion,accent,onPermissions}:{companion:strin
  return <View style={s.page}><BrandHead companion={companion}/>
  <PageHero title="Health signals" highlight="from your day." detail="Understand your activity, recovery and body signals through real readings." companion="nori" accent="#3BA986"/>
  <HealthDataPanel/>
+ <RecoveryInsights companion={companion} onChat={onPermissions}/>
  <TouchableOpacity onPress={onPermissions} style={[s.white,{backgroundColor:'#F1EAFE'}]}><Text style={s.cardTitle}>Privacy & health permissions  →</Text><Text style={s.body}>Choose what Apple Health shares with Superdots. No measurements are requested until you tap Connect.</Text></TouchableOpacity>
  </View>;
 }
