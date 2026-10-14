@@ -3,6 +3,7 @@ import {View,Text,TouchableOpacity,StyleSheet} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import SuperdotMascot from './SuperdotMascot';
 import {COMPANIONS} from './SettingsComponents';
+import {supabase} from './supabase';
 
 const P='#7139E9',INK='#25145C',MUTED='#80749E';
 type Props={companion:string;accent:string;onPress?:()=>void};
@@ -46,10 +47,30 @@ export function WellnessActions({companion,accent,water,onWater,onBreathing,onCh
  </View>;
 }
 export function WellnessTrends({companion,accent,period,onPeriod,mood}:{companion:string;accent:string;period:string;onPeriod:(p:'Day'|'Week'|'Month'|'Year')=>void;mood:string}){
- return <View style={s.page}><BrandHead companion={companion}/><PageHero title="Understand your" highlight="patterns." detail="See how your habits and mood connect over time." companion={companion} accent={accent}/><View style={s.segment}>{(['Week','Month','Year'] as const).map(p=><TouchableOpacity key={p} onPress={()=>onPeriod(p)} style={[s.seg,(period===p)&&{backgroundColor:accent}]}><Text style={{color:period===p?'#fff':MUTED,fontWeight:'800'}}>{p==='Year'?'All Time':p}</Text></TouchableOpacity>)}</View>
- <SectionHeading title="Mood trend"/><View style={s.white}><Text style={s.cardTitle}>How you've been feeling</Text><Text style={s.big}>{mood.trim()||'No check-ins yet'}</Text><Text style={s.body}>Your mood check-ins will help you identify patterns over time.</Text><View style={s.bars}>{[32,45,38,62,49,67,51].map((v,i)=><View key={i} style={[s.bar,{height:v,backgroundColor:i===5?accent:'#E3D5FF'}]}/>)}</View><Text style={s.caption}>Illustrative chart · historical insights require recorded entries</Text></View>
+ const [entries,setEntries]=React.useState<{mood:string;recorded_at:string}[]>([]);
+ const [loading,setLoading]=React.useState(true);
+ React.useEffect(()=>{let active=true;(async()=>{try{const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data,error}=await supabase.from('mood_entries').select('mood,recorded_at').eq('user_id',user.id).order('recorded_at',{ascending:false}).limit(365);if(error)throw error;if(active)setEntries(data||[])}catch(error){console.warn('Mood trends unavailable',error)}finally{if(active)setLoading(false)}})();return()=>{active=false}},[]);
+ const days=period==='Day'?1:period==='Week'?7:period==='Month'?30:365;
+ const today=new Date();const start=new Date(today);start.setHours(0,0,0,0);start.setDate(start.getDate()-days+1);
+ const values={Happy:5,Calm:4,Okay:3,Tired:2,Anxious:1,Sad:1,Stressed:1,Overwhelmed:1,Good:4};
+ const filtered=entries.filter(e=>new Date(e.recorded_at)>=start);
+ const periods=period==='Day'?1:period==='Week'?7:period==='Month'?6:12;
+ const groups=Array.from({length:periods},(_,i)=>{
+  const d=new Date(start);d.setDate(start.getDate()+Math.floor(i*days/periods));
+  const next=new Date(start);next.setDate(start.getDate()+Math.floor((i+1)*days/periods));
+  const bucket=filtered.filter(e=>{const t=new Date(e.recorded_at);return t>=d&&t<next});
+  const score=bucket.length?bucket.reduce((sum,e)=>sum+(values[e.mood as keyof typeof values]||3),0)/bucket.length:null;
+  return {label:period==='Week'?['S','M','T','W','T','F','S'][d.getDay()]:period==='Day'?'Today':String(d.getDate()),score,count:bucket.length};
+ });
+ return <View style={s.page}><BrandHead companion={companion}/><PageHero title="Understand your" highlight="patterns." detail="See how your habits and mood connect over time." companion={companion} accent={accent}/>
+ <View style={s.segment}>{(['Day','Week','Month','Year'] as const).map(p=><TouchableOpacity key={p} onPress={()=>onPeriod(p)} style={[s.seg,period===p&&{backgroundColor:accent}]}><Text style={{color:period===p?'#fff':MUTED,fontWeight:'800',fontSize:12}}>{p}</Text></TouchableOpacity>)}</View>
+ <SectionHeading title="Mood trend"/><View style={s.white}><Text style={s.cardTitle}>How you've been feeling</Text>
+ <Text style={s.big}>{loading?'Loading…':filtered.length?filtered.length+' check-ins':'No check-ins yet'}</Text>
+ <Text style={s.body}>{filtered.length?'These bars represent your saved mood check-ins, not watch measurements.':'Start checking in to see your own mood history.'}</Text>
+ <View style={s.bars}>{groups.map((g,i)=><View key={i} style={{flex:1,alignItems:'center',gap:6,justifyContent:'flex-end',height:105}}><View style={{width:'58%',minWidth:8,height:g.score?Math.round(g.score*15):5,borderRadius:9,backgroundColor:g.score?accent:'#EDE9F4'}}/><Text style={{fontSize:9,color:MUTED}}>{g.label}</Text></View>)}</View>
+ </View>
  <View style={s.grid}><StatCard title="Sleep pattern" value="Unavailable" detail="Connect Apple Health" icon="moon" tint="#F0E6FF"/><StatCard title="Steps & activity" value="Unavailable" detail="Connect Apple Health" icon="walk" tint="#E2F7E9"/></View>
- <View style={[s.white,{backgroundColor:'#FFF8E9'}]}><Text style={s.celebrateTitle}>💡 Your wellness insights</Text><Text style={s.body}>As you log more activities and connect health readings, Superdots can help you reflect on possible patterns.</Text></View></View>
+ <View style={[s.white,{backgroundColor:'#FFF8E9'}]}><Text style={s.celebrateTitle}>💡 Your wellness insights</Text><Text style={s.body}>These are your recorded check-ins. Any connection between sleep, activity and mood needs real synchronized data before conclusions can be drawn.</Text></View></View>;
 }
 export function WellnessHealth({companion,accent,onPermissions}:{companion:string;accent:string;onPermissions:()=>void}){
  return <View style={s.page}><BrandHead companion={companion}/><PageHero title="Health signals" highlight="from your day." detail="Your activity, sleep and body signals can help you understand wellness patterns." companion="nori" accent="#3BA986"/>
