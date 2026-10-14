@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { StatusBar, ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, useWindowDimensions, NativeSyntheticEvent, NativeScrollEvent, Animated } from 'react-native';
+import { StatusBar, ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Alert, useWindowDimensions, NativeSyntheticEvent, NativeScrollEvent, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
@@ -39,9 +39,11 @@ function StressChart() {return <Svg width="100%" height="104" viewBox="0 0 310 1
  {stressDay.map((v,i)=><Rect key={i} x={5+i*12.6} y={99-v*.88} width={7.5} height={v*.88} rx="3" fill={v>55?C.orange:C.purple} opacity=".87"/>)}
  </Svg>;}
 function Metric({value,unit,label,sub,color=C.deep}:{value:string;unit:string;label:string;sub:string;color?:string}) {return <View style={s.metric}><Text style={s.metricLabel}>{label}</Text><View style={s.metricRow}><Text style={[s.metricValue,{color}]}>{value}</Text><Text style={s.metricUnit}>{unit}</Text></View><Text style={s.metricSub}>{sub}</Text></View>;}
-function AppContent({selectedTheme,selectedCompanion,onEditProfile}:{selectedTheme:string;selectedCompanion:string;onEditProfile:()=>void}) {
+function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChanged}:{selectedTheme:string;selectedCompanion:string;onEditProfile:()=>void;onThemeChanged:(theme:string,companion:string)=>void}) {
  const palettes:Record<string,{accent:string,pale:string}>={grape:{accent:'#7139E9',pale:'#EEE5FF'},coral:{accent:'#E76B8A',pale:'#FFE7EE'},sky:{accent:'#488CD9',pale:'#E2F1FF'},sunny:{accent:'#E3A426',pale:'#FFF4CE'},mint:{accent:'#3BA986',pale:'#E1F8ED'}};
  const colors=palettes[selectedTheme]||palettes.grape;
+ const [themeSaving,setThemeSaving]=useState(false);
+ async function chooseSuperdot(id:string,theme:string){setThemeSaving(true);try{const {data:{user}}=await supabase.auth.getUser();if(!user)throw Error('Please sign in');const {error}=await supabase.from('user_settings').update({theme,companion:id}).eq('user_id',user.id);if(error)throw error;onThemeChanged(theme,id);}catch(e:any){Alert.alert('Could not update your Superdot',e?.message||'Please retry.')}finally{setThemeSaving(false)}}
  const insets = useSafeAreaInsets();
  const {width:pageWidth}=useWindowDimensions();
  const pager=useRef<ScrollView>(null);
@@ -111,6 +113,8 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile}:{selectedThe
    {settingsPage==='main'?<>
     <Text style={s.eyebrow}>MAKE SUPERDOTS YOURS</Text><Text style={s.mainTitle}>Settings.</Text>
     <View style={s.settingsHero}><SuperdotMascot id={selectedCompanion} color={colors.accent} size={75}/><View style={{flex:1,gap:4}}><Text style={s.settingsHeroTitle}>My Superdot</Text><Text style={s.bodyMuted}>Change your buddy, goals and color theme.</Text><TouchableOpacity onPress={onEditProfile}><Text style={{color:colors.accent,fontWeight:'800',fontSize:12}}>Customize my profile  →</Text></TouchableOpacity></View></View>
+    <View style={s.settingsRow}><View style={{flex:1,gap:3}}><Text style={s.settingsTitle}>Choose your Superdot theme</Text><Text style={s.settingsSubtitle}>Saved to your Supabase profile</Text></View></View>
+    <View style={{flexDirection:'row',gap:7,flexWrap:'wrap',justifyContent:'space-between'}}>{([{id:'bloop',name:'Bloop',theme:'grape',color:'#7139E9'},{id:'poppy',name:'Poppy',theme:'coral',color:'#E76B8A'},{id:'mochi',name:'Mochi',theme:'sky',color:'#488CD9'},{id:'zuzu',name:'Zuzu',theme:'sunny',color:'#E3A426'},{id:'nori',name:'Nori',theme:'mint',color:'#3BA986'}] as const).map(d=><TouchableOpacity key={d.id} disabled={themeSaving} onPress={()=>void chooseSuperdot(d.id,d.theme)} style={{width:'18%',paddingVertical:10,borderRadius:16,backgroundColor:selectedCompanion===d.id?colors.pale:'#fff',alignItems:'center',gap:4,borderWidth:selectedCompanion===d.id?2:1,borderColor:selectedCompanion===d.id?colors.accent:C.line}}><SuperdotMascot id={d.id} color={d.color} size={40}/><Text style={{fontSize:9,fontWeight:'800',color:C.ink}}>{d.name}</Text></TouchableOpacity>)}</View>
     {([
       {id:'watch',icon:'watch-outline',title:'Apple Watch & Widgets',subtitle:'Companions, complications and widgets',status:'Preview only'},
       {id:'health',icon:'heart-outline',title:'Apple Health',subtitle:'Permissions and wearable readings',status:'Not connected'},
@@ -146,7 +150,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile}:{selectedThe
   </View>
  </View>;
 }
-export default function MainApp({selectedTheme='grape',selectedCompanion='bloop',onEditProfile=()=>{}}:{selectedTheme?:string;selectedCompanion?:string;onEditProfile?:()=>void}){return <AppContent selectedTheme={selectedTheme} selectedCompanion={selectedCompanion} onEditProfile={onEditProfile}/>}
+export default function MainApp({selectedTheme='grape',selectedCompanion='bloop',onEditProfile=()=>{},onThemeChanged=()=>{}}:{selectedTheme?:string;selectedCompanion?:string;onEditProfile?:()=>void;onThemeChanged?:(theme:string,companion:string)=>void}){return <AppContent selectedTheme={selectedTheme} selectedCompanion={selectedCompanion} onEditProfile={onEditProfile} onThemeChanged={onThemeChanged}/>}
 const s=StyleSheet.create({
  safe:{flex:1,backgroundColor:C.bg},
  top:{height:62,paddingHorizontal:24,flexDirection:'row',alignItems:'center',justifyContent:'space-between',backgroundColor:C.bg},
