@@ -99,7 +99,6 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
    {settingsPage==='main'?<>
     <WellnessSettingsIntro companion={selectedCompanion} accent={colors.accent} onThemes={()=>setSettingsPage('themes')}/>
     <Text style={s.mainTitle}>Settings</Text>
-    <PromoBanner companion={selectedCompanion}/>
     <ThemeCard selected={selectedCompanion} onOpen={()=>setSettingsPage('themes')}/>
     <WatchThemesCard onOpen={()=>setSettingsPage('watch')}/>
     <TouchableOpacity onPress={()=>setSettingsPage('voice')} style={{backgroundColor:'#fff',padding:17,borderRadius:22,flexDirection:'row',alignItems:'center',gap:12}}><Ionicons name="mic-outline" size={24} color={colors.accent}/><View style={{flex:1}}><Text style={{fontWeight:'800',fontSize:15,color:'#25145C'}}>Superdot Voice</Text><Text style={{color:'#8276A5',fontSize:12}}>Choose, preview, and save your voice</Text></View><Ionicons name="chevron-forward" size={17} color="#9E98A8"/></TouchableOpacity>
