@@ -1,5 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { SafeAreaView, StatusBar, ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { StatusBar, ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import Svg, { Circle, Line, Path, Rect, Defs, LinearGradient, Stop, Polygon } from 'react-native-svg';
 import {LifestyleOverview, ThemePicker} from './LifestyleFeatures';
 import {CurrentHRV,ExtraWellness,EmotionCheckin,CoachDemo,WidgetPreview} from './ExtraFeatures';
@@ -13,7 +15,7 @@ const hrvWeek = [42,48,55,44,63,59,72,67,61,74,70,78,64,76];
 const hrvMonth = [41,46,44,49,54,50,61,58,55,66,63,72,67,73];
 const hrvYear = [38,42,40,49,45,54,57,53,60,63,61,69];
 const stressDay = [16,20,14,12,23,17,26,39,61,49,70,55,42,32,57,48,28,22,35,16,19,14,10,17];
-const tabs: {name:Tab; icon:string}[] = [{name:'Today',icon:'⌂'},{name:'Trends',icon:'▥'},{name:'Habits',icon:'♡'},{name:'You',icon:'☺'}];
+const tabs: {name:Tab; icon:'home'|'stats-chart'|'heart'|'person-circle'; outline:'home-outline'|'stats-chart-outline'|'heart-outline'|'person-circle-outline'}[] = [{name:'Today',icon:'home',outline:'home-outline'},{name:'Trends',icon:'stats-chart',outline:'stats-chart-outline'},{name:'Habits',icon:'heart',outline:'heart-outline'},{name:'You',icon:'person-circle',outline:'person-circle-outline'}];
 
 function Card({children,style}: {children:React.ReactNode;style?:any}) { return <View style={[s.card,style]}>{children}</View>; }
 function Chip({label,active,onPress}: {label:string;active:boolean;onPress:()=>void}) { return <TouchableOpacity onPress={onPress} style={[s.chip,active&&s.chipActive]}><Text style={[s.chipText,active&&s.chipTextActive]}>{label}</Text></TouchableOpacity>; }
@@ -53,7 +55,8 @@ function Friend({size=136,mood='great'}:{size?:number;mood?:'great'|'okay'}) {
  </View>;
 }
 function Metric({value,unit,label,sub,color=C.deep}:{value:string;unit:string;label:string;sub:string;color?:string}) {return <View style={s.metric}><Text style={s.metricLabel}>{label}</Text><View style={s.metricRow}><Text style={[s.metricValue,{color}]}>{value}</Text><Text style={s.metricUnit}>{unit}</Text></View><Text style={s.metricSub}>{sub}</Text></View>;}
-function App() {
+function AppContent() {
+ const insets = useSafeAreaInsets();
  const [tab,setTab]=useState<Tab>('Today');
  const [period,setPeriod]=useState<Period>('Day');
  const [mood,setMood]=useState<Mood|' '>(' ');
@@ -65,7 +68,7 @@ function App() {
  useEffect(()=>{if(!breathing)return;const id=setInterval(()=>setSeconds(v=>{if(v<=1){setBreathing(false);return 60;}return v-1;}),1000);return()=>clearInterval(id);},[breathing]);
  const values=useMemo(()=>period==='Day'?hrvDay:period==='Week'?hrvWeek:period==='Month'?hrvMonth:hrvYear,[period]);
  const go=(t:Tab)=>{setTab(t);setPeriod('Day');};
- return <SafeAreaView style={s.safe}><StatusBar barStyle="dark-content" backgroundColor={C.bg}/>
+ return <View style={[s.safe,{paddingTop:Platform.OS==='ios'?insets.top:StatusBar.currentHeight || 0}]}><StatusBar barStyle="dark-content" backgroundColor={C.bg}/>
   <View style={s.top}><View style={s.brand}><View style={s.logo}><Text style={s.logoText}>✦</Text></View><Text style={s.brandText}>superdots<Text style={{color:C.green}}>.</Text></Text></View><TouchableOpacity accessibilityLabel="Open profile" onPress={()=>go('You')} style={s.avatar}><Text style={{fontSize:18}}>☺</Text></TouchableOpacity></View>
   <ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
   {tab==='Today'? <>
@@ -108,12 +111,12 @@ function App() {
   </>:null}
   <Text style={s.disclaimer}>DEMO DATA ONLY  ·  NOT MEDICAL ADVICE</Text>
   </ScrollView>
-  <View style={s.tabBar}>{tabs.map(t=><TouchableOpacity key={t.name} accessibilityRole="tab" accessibilityState={{selected:tab===t.name}} style={s.tab} onPress={()=>go(t.name)}><Text style={[s.tabIcon,tab===t.name&&s.tabSelected]}>{t.icon}</Text><Text style={[s.tabLabel,tab===t.name&&s.tabSelected]}>{t.name}</Text></TouchableOpacity>)}</View>
- </SafeAreaView>;
+  <View style={[s.tabBar,{height:59+insets.bottom,paddingBottom:insets.bottom}]}>{tabs.map(t=><TouchableOpacity key={t.name} accessibilityRole="tab" accessibilityState={{selected:tab===t.name}} style={s.tab} onPress={()=>go(t.name)}><Ionicons name={tab===t.name?t.icon:t.outline} size={23} color={tab===t.name?C.deep:'#A9A5B7'}/><Text style={[s.tabLabel,tab===t.name&&s.tabSelected]}>{t.name}</Text></TouchableOpacity>)}</View>
+ </View>;
 }
-export default App;
+export default function App(){return <SafeAreaProvider><AppContent/></SafeAreaProvider>}
 const s=StyleSheet.create({
- safe:{flex:1,backgroundColor:C.bg,paddingTop:Platform.OS==='android'?StatusBar.currentHeight:0},
+ safe:{flex:1,backgroundColor:C.bg},
  top:{height:62,paddingHorizontal:24,flexDirection:'row',alignItems:'center',justifyContent:'space-between',backgroundColor:C.bg},
  brand:{flexDirection:'row',alignItems:'center',gap:9},logo:{backgroundColor:C.green,width:29,height:29,borderRadius:11,alignItems:'center',justifyContent:'center'},logoText:{color:'white',fontSize:20,fontWeight:'900'},brandText:{fontSize:22,fontWeight:'800',letterSpacing:-1,color:C.ink},
  avatar:{height:38,width:38,borderRadius:19,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'},
@@ -132,5 +135,5 @@ const s=StyleSheet.create({
  habitLine:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingVertical:15,borderTopWidth:1,borderTopColor:C.line},habitTitle:{fontSize:14,color:C.ink,fontWeight:'800'},counter:{flexDirection:'row',gap:13,alignItems:'center',backgroundColor:C.bg,paddingVertical:7,paddingHorizontal:12,borderRadius:14},counterText:{color:C.deep,fontSize:20,fontWeight:'700',width:22,textAlign:'center'},counterNumber:{color:C.ink,fontSize:16,fontWeight:'800',minWidth:17,textAlign:'center'},
  breathe:{backgroundColor:'#DDF2EA',borderRadius:24,alignItems:'center',padding:23},breatheOver:{fontSize:10,color:C.deep,fontWeight:'800',letterSpacing:2},breatheTitle:{fontSize:29,color:C.ink,fontWeight:'900',marginTop:7},breatheBody:{textAlign:'center',color:'#698879',fontSize:12,lineHeight:18,marginTop:8},breatheCircle:{width:178,height:178,borderRadius:89,backgroundColor:C.green,borderColor:'#CBB7FF',borderWidth:17,marginVertical:21,alignItems:'center',justifyContent:'center'},breatheTimer:{fontSize:37,color:'#fff',fontWeight:'900'},breatheSmall:{fontSize:10,color:'#F8F4FF'},breatheButton:{backgroundColor:C.deep,paddingHorizontal:25,paddingVertical:15,borderRadius:16},breatheButtonText:{color:'#fff',fontWeight:'800',fontSize:13},reset:{fontSize:11,color:C.deep,marginTop:15,fontWeight:'700'},
  profile:{flexDirection:'row',gap:13,alignItems:'center',paddingVertical:15},profileAvatar:{width:62,height:62,borderRadius:23,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'},profileName:{fontSize:17,fontWeight:'800',color:C.ink},baseline:{flexDirection:'row',justifyContent:'space-between'},settingLine:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:9},settingValue:{fontSize:11,fontWeight:'700',color:C.muted},about:{fontSize:13,lineHeight:20,color:C.muted},disclaimer:{textAlign:'center',fontSize:9,letterSpacing:1.1,fontWeight:'700',color:'#ABB7AE',marginVertical:9},
- tabBar:{backgroundColor:'#fff',height:73,flexDirection:'row',borderTopColor:C.line,borderTopWidth:1,paddingBottom:Platform.OS==='ios'?10:0},tab:{flex:1,alignItems:'center',justifyContent:'center',gap:3},tabIcon:{color:'#ABB6AD',fontSize:25,fontWeight:'800'},tabLabel:{fontSize:10,color:'#ABB6AD',fontWeight:'700'},tabSelected:{color:C.deep}
+ tabBar:{backgroundColor:'#fff',flexDirection:'row',borderTopColor:C.line,borderTopWidth:1},tab:{flex:1,alignItems:'center',justifyContent:'center',gap:3},tabIcon:{color:'#ABB6AD',fontSize:25,fontWeight:'800'},tabLabel:{fontSize:10,color:'#ABB6AD',fontWeight:'700'},tabSelected:{color:C.deep}
 });

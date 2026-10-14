@@ -18,12 +18,3 @@ npx expo start --ios
 - iOS-first Expo app (no Apple Health/Watch integration yet)
 
 **Important:** No real physiological data is used. All health values and recommendations are fictional demonstrations, not medical advice. Habit entries and theme previews are session-local. App has not yet been tested on an iPhone simulator.
-
-## Added feature coverage
-- Current HRV sample: 67ms latest with baseline comparison
-- Mindfulness session counter and simulated environmental noise levels
-- Twelve selectable emotional-state check-ins
-- Preset wellness-buddy explanations to mimic an AI coach, without live AI
-- HRV, Stress and Sleep widget/watch *previews* (not actual system widgets)
-
-Future native work: HealthKit authorization, true live readings, validated scoring, watchOS companion and complications, iOS widget extension, cloud-sync choice, and safe AI processing with consent.
