@@ -86,11 +86,11 @@ export function WellnessTrends({companion,accent,period,onPeriod,mood}:{companio
  <View style={s.grid}><StatCard title="Sleep pattern" value="Unavailable" detail="Connect Apple Health" icon="moon" tint="#F0E6FF"/><StatCard title="Steps & activity" value="Unavailable" detail="Connect Apple Health" icon="walk" tint="#E2F7E9"/></View>
  <View style={[s.white,{backgroundColor:'#FFF8E9'}]}><Text style={s.celebrateTitle}>💡 Your wellness insights</Text><Text style={s.body}>These are your recorded check-ins. Any connection between sleep, activity and mood needs real synchronized data before conclusions can be drawn.</Text></View></View>;
 }
-export function WellnessHealth({companion,accent,onPermissions}:{companion:string;accent:string;onPermissions:()=>void}){
+export function WellnessHealth({companion,accent,onPermissions,onChat}:{companion:string;accent:string;onPermissions:()=>void;onChat:()=>void}){
  return <View style={s.page}><BrandHead companion={companion}/>
  <PageHero title="Health signals" highlight="from your day." detail="Understand your activity, recovery and body signals through real readings." companion="nori" accent="#3BA986"/>
  <HealthDataPanel/>
- <RecoveryInsights companion={companion} onChat={onPermissions}/>
+ <RecoveryInsights companion={companion} onChat={onChat}/>
  <TouchableOpacity onPress={onPermissions} style={[s.white,{backgroundColor:'#F1EAFE'}]}><Text style={s.cardTitle}>Privacy & health permissions  →</Text><Text style={s.body}>Choose what Apple Health shares with Superdots. No measurements are requested until you tap Connect.</Text></TouchableOpacity>
  </View>;
 }
