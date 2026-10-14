@@ -36,28 +36,29 @@ export default function WellnessCompanion({companion,color}:{companion:string;co
   Alert.alert('Activity recorded','This can help you review patterns alongside future moods.');
   }catch(e:any){Alert.alert('Could not save',e?.message||'Try again.')}finally{setBusy(false)}
  }
- // Transparent scripted reflection; no LLM or medical inference is claimed.
- function sampleReply(input:string){
-  const t=input.toLowerCase();
-  if(/hurt myself|kill myself|suicid/.test(t))return "I'm concerned about your safety. Please reach out to someone you trust now. If you might act on these thoughts, contact local emergency services. In the U.S., call or text 988 for immediate support.";
-  if(/walk|exercise/.test(t))return "Movement may be worth tracking alongside your mood. How did you feel before and after? Over time, your journal could help reveal patterns.";
-  if(/bad|stress|anxious|overwhelm|sad/.test(t))return "I'm here to help you reflect. Did anything happen today that might be contributing? A short pause, gentle breathing, or a walk could help, but we can't know the cause from health readings alone.";
-  return "Thanks for sharing. What happened just before you felt this way, and what would you like to remember about today? Your words can help build a useful journal for future conversations with your doctor.";
- }
  async function send(){
-  const input=chatText.trim();if(!input)return;setBusy(true);
-  try{const id=await userId();let cid=conversationId;
-   if(!cid){const {data,error}=await supabase.from('wellness_conversations').insert({user_id:id,title:'My Superdot conversation'}).select('id').single();if(error)throw error;cid=data.id;setConversationId(cid)}
-   const reply=sampleReply(input);
-   const {error}=await supabase.from('wellness_messages').insert([{user_id:id,conversation_id:cid,role:'user',content:input,is_ai_generated:false},{user_id:id,conversation_id:cid,role:'assistant',content:reply,is_ai_generated:false}]);if(error)throw error;
-   setChatText('');const {data,error:e}=await supabase.from('wellness_messages').select('id,role,content,created_at').eq('conversation_id',cid).order('created_at',{ascending:true}).limit(80);if(e)throw e;setMessages((data||[]) as Message[]);
-  }catch(e:any){Alert.alert('Message not saved',e?.message||'Please retry')}finally{setBusy(false)}
+  const input=chatText.trim();if(!input||busy)return;
+  if(input.length>3000){Alert.alert('Message too long','Please shorten your message to 3,000 characters.');return;}
+  setBusy(true);
+  try {
+   const {data,error}=await supabase.functions.invoke('superdot-chat',{body:{message:input,conversationId}});
+   if(error){let msg='Could not reach your Superdot. Please try again.';try{const detail=await error.context?.json?.();if(detail?.error)msg=detail.error;}catch{}throw Error(msg);}
+   if(data?.error)throw Error(data.error);
+   if(!data?.reply||!data?.conversationId)throw Error('Your Superdot did not return a complete response.');
+   setConversationId(data.conversationId);
+   setChatText('');
+   const id=await userId();
+   const {data:history,error:historyError}=await supabase.from('wellness_messages').select('id,role,content,created_at').eq('user_id',id).eq('conversation_id',data.conversationId).order('created_at',{ascending:true}).limit(80);
+   if(historyError)throw historyError;
+   setMessages((history||[]) as Message[]);
+  } catch(e:any){Alert.alert('Unable to send',e?.message||'Please retry. Your message has not been cleared.')}
+  finally{setBusy(false)}
  }
  return <View style={s.container}><View style={s.header}><SuperdotMascot id={companion} color={color} size={66}/><View style={{flex:1}}><Text style={s.title}>Talk to your Superdot</Text><Text style={s.sub}>A safe space to reflect, understand and remember.</Text></View></View>
  <View style={s.tabs}>{(['checkin','chat','history'] as const).map(t=><TouchableOpacity key={t} onPress={()=>setView(t)} style={[s.tab,view===t&&{backgroundColor:color}]}><Text style={[s.tabText,view===t&&{color:'#fff'}]}>{t==='checkin'?'Check in':t==='chat'?'Talk':'Journal'}</Text></TouchableOpacity>)}</View>
  {view==='checkin'?<View style={s.card}><Text style={s.heading}>How are you feeling?</Text><View style={s.choices}>{feelings.map(f=><TouchableOpacity key={f} onPress={()=>setMood(f)} style={[s.choice,mood===f&&{backgroundColor:color}]}><Text style={[s.choiceText,mood===f&&{color:'#fff'}]}>{f}</Text></TouchableOpacity>)}</View><Text style={s.heading}>Intensity: {intensity}/10</Text><View style={s.intensity}>{Array.from({length:10},(_,i)=><TouchableOpacity key={i} onPress={()=>setIntensity(i+1)} style={[s.point,{backgroundColor:intensity===i+1?color:'#E8E2F0'}]}/>)}</View><TextInput style={s.input} placeholder="What happened? What might have contributed?" placeholderTextColor="#9D91A9" multiline value={note} onChangeText={setNote}/><TouchableOpacity disabled={busy} onPress={()=>void saveCheckin()} style={[s.button,{backgroundColor:color}]}><Text style={s.buttonText}>Save mood & reflection</Text></TouchableOpacity>
  <Text style={s.heading}>Log a helpful activity</Text><View style={s.choices}>{activities.map(x=><TouchableOpacity key={x} onPress={()=>setActivity(x)} style={[s.choice,activity===x&&{backgroundColor:color}]}><Text style={[s.choiceText,activity===x&&{color:'#fff'}]}>{x}</Text></TouchableOpacity>)}</View><TextInput style={s.shortInput} keyboardType="number-pad" placeholder="Minutes" value={minutes} onChangeText={setMinutes}/><TouchableOpacity disabled={busy} onPress={()=>void saveActivity()} style={[s.button,{backgroundColor:'#E9E1FA'}]}><Text style={[s.buttonText,{color:color}]}>Record activity</Text></TouchableOpacity></View>:null}
- {view==='chat'?<View style={s.card}><Text style={s.heading}>Your private conversation</Text><Text style={s.disclaimer}>Reflection demo: responses are predefined, not live AI or personalized health analysis. Conversations are stored in Supabase.</Text><ScrollView style={{maxHeight:360}} contentContainerStyle={{gap:10}}>{messages.map(m=><View key={m.id} style={[s.message,{alignSelf:m.role==='user'?'flex-end':'flex-start',backgroundColor:m.role==='user'?'#EDE4FF':'#F2F4F4'}]}><Text style={s.messageText}>{m.content}</Text></View>)}</ScrollView><TextInput style={s.input} multiline placeholder="Tell your Superdot what's on your mind..." placeholderTextColor="#9D91A9" value={chatText} onChangeText={setChatText}/><TouchableOpacity disabled={busy} onPress={()=>void send()} style={[s.button,{backgroundColor:color}]}>{busy?<ActivityIndicator color="white"/>:<Text style={s.buttonText}>Send</Text>}</TouchableOpacity></View>:null}
+ {view==='chat'?<View style={s.card}><Text style={s.heading}>Your private conversation</Text><Text style={s.disclaimer}>Powered by Gemini. The AI can use your private journal, mood and activity history to help you reflect. It is not a therapist or medical diagnosis.</Text><ScrollView style={{maxHeight:360}} contentContainerStyle={{gap:10}}>{messages.map(m=><View key={m.id} style={[s.message,{alignSelf:m.role==='user'?'flex-end':'flex-start',backgroundColor:m.role==='user'?'#EDE4FF':'#F2F4F4'}]}><Text style={s.messageText}>{m.content}</Text></View>)}</ScrollView><TextInput style={s.input} multiline placeholder="Tell your Superdot what's on your mind..." placeholderTextColor="#9D91A9" value={chatText} onChangeText={setChatText}/><TouchableOpacity disabled={busy} onPress={()=>void send()} style={[s.button,{backgroundColor:color}]}>{busy?<ActivityIndicator color="white"/>:<Text style={s.buttonText}>Send</Text>}</TouchableOpacity></View>:null}
  {view==='history'?<View style={s.card}><Text style={s.heading}>Your journal entries</Text><Text style={s.disclaimer}>Your own notes are saved privately. A future doctor export will distinguish notes from AI summaries and health measurements.</Text>{events.length===0?<Text style={s.sub}>No reflections saved yet.</Text>:events.map(e=><View key={e.id} style={s.entry}><Text style={s.entryTitle}>{e.mood||'Reflection'} {e.intensity?('· '+e.intensity+'/10'):''}</Text><Text style={s.sub}>{new Date(e.occurred_at).toLocaleString()}</Text><Text style={s.messageText}>{e.body}</Text></View>)}</View>:null}
  <Text style={s.disclaimer}>Superdots is for emotional reflection, not diagnosis or emergency care.</Text></View>
 }
