@@ -23,14 +23,14 @@ export default function WellnessReportExport(){
    const [moods,habits,journal,readings]=await Promise.all([
     supabase.from('mood_entries').select('mood,recorded_at').eq('user_id',user.id).gte('recorded_at',iso).order('recorded_at',{ascending:false}).limit(500),
     supabase.from('habit_entries').select('habit,amount,unit,recorded_at').eq('user_id',user.id).gte('recorded_at',iso).order('recorded_at',{ascending:false}).limit(1000),
-    supabase.from('wellness_journal').select('mood,intensity,body,occurred_at').eq('user_id',user.id).gte('occurred_at',iso).order('occurred_at',{ascending:false}).limit(400),
+    supabase.from('wellness_journal').select('mood,intensity,energy_level,stress_factors,body,occurred_at').eq('user_id',user.id).gte('occurred_at',iso).order('occurred_at',{ascending:false}).limit(400),
     supabase.from('wellness_readings').select('metric,value,source,recorded_at').eq('user_id',user.id).eq('source','healthkit').gte('recorded_at',iso).order('recorded_at',{ascending:false}).limit(1500)
    ]);
    for(const q of [moods,habits,journal,readings])if(q.error)throw q.error;
    const unique=new Map<string,{habit:string;amount:number;unit:string;recorded_at:string}>();
    for(const r of habits.data||[]){const k=dayKey(r.recorded_at)+'-'+r.habit;if(!unique.has(k))unique.set(k,r);}
    const sorted=[...unique.values()].sort((a,b)=>b.recorded_at.localeCompare(a.recorded_at));
-   const notes=(journal.data||[]).map(r=>[dateCell(r.occurred_at),r.mood||'—',r.intensity??'—',r.body?.slice(0,700)||'']);
+   const notes=(journal.data||[]).map(r=>[dateCell(r.occurred_at),r.mood||'—',r.energy_level||'—',(r.stress_factors||[]).join(', '),r.intensity??'—',r.body?.slice(0,700)||'']);
    const html=`<!doctype html><html><head><meta charset="utf-8"/><style>
     body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;color:#25145C;padding:24px}
     h1{color:#7139E9;font-size:26px;margin:0 0 8px}.small{font-size:11px;color:#6A6280}
@@ -47,7 +47,7 @@ export default function WellnessReportExport(){
     <h2>Habits (latest saved total per day)</h2>
     ${table(['Date','Habit','Total','Unit'],sorted.map(r=>[dateCell(r.recorded_at),r.habit,r.amount,r.unit]))}
     <h2>Private journal and reflections</h2>
-    ${table(['Date','Mood','Intensity','User note'],notes)}
+    ${table(['Date','Mood','Energy','Possible contributors','Intensity','User note'],notes)}
     <h2>Apple Health measurements (${readings.data?.length||0})</h2>
     ${table(['Date','Measurement','Value','Source'],(readings.data||[]).map(r=>[dateCell(r.recorded_at),r.metric,r.value,'Apple Health']))}
     <footer>Superdots · Created locally on your device for sharing at your request. Verify measurements with your healthcare professional if using this for care.</footer>
