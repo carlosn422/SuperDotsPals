@@ -9,7 +9,7 @@ import Svg, { Circle, Line, Path, Rect, Defs, LinearGradient, Stop, Polygon } fr
 import {LifestyleOverview, ThemePicker} from './LifestyleFeatures';
 import {CurrentHRV,ExtraWellness,EmotionCheckin,CoachDemo,WidgetPreview} from './ExtraFeatures';
 
-type Tab = 'Today' | 'Trends' | 'Habits' | 'You';
+type Tab = 'Today' | 'Actions' | 'Trends' | 'Health' | 'Settings';
 type Period = 'Day' | 'Week' | 'Month' | 'Year';
 type Mood = 'Calm' | 'Okay' | 'Anxious' | 'Happy' | 'Tired';
 const C = { ink:'#25145C', muted:'#8276A5', green:'#7644F5', deep:'#5D31D1', surface:'#FFFFFF', bg:'#F8F6FF', mint:'#EBE4FF', peach:'#FFF0DE', orange:'#F4A570', lilac:'#F0EBFF', purple:'#A997FA', line:'#EEE8FA', red:'#EC7D8C' };
@@ -18,7 +18,7 @@ const hrvWeek = [42,48,55,44,63,59,72,67,61,74,70,78,64,76];
 const hrvMonth = [41,46,44,49,54,50,61,58,55,66,63,72,67,73];
 const hrvYear = [38,42,40,49,45,54,57,53,60,63,61,69];
 const stressDay = [16,20,14,12,23,17,26,39,61,49,70,55,42,32,57,48,28,22,35,16,19,14,10,17];
-const tabs: {name:Tab; icon:'home'|'stats-chart'|'heart'|'person-circle'; outline:'home-outline'|'stats-chart-outline'|'heart-outline'|'person-circle-outline'}[] = [{name:'Today',icon:'home',outline:'home-outline'},{name:'Trends',icon:'stats-chart',outline:'stats-chart-outline'},{name:'Habits',icon:'heart',outline:'heart-outline'},{name:'You',icon:'person-circle',outline:'person-circle-outline'}];
+const tabs: {name:Tab;icon:'home'|'sparkles'|'stats-chart'|'heart'|'settings';outline:'home-outline'|'sparkles-outline'|'stats-chart-outline'|'heart-outline'|'settings-outline'}[] = [{name:'Today',icon:'home',outline:'home-outline'},{name:'Actions',icon:'sparkles',outline:'sparkles-outline'},{name:'Trends',icon:'stats-chart',outline:'stats-chart-outline'},{name:'Health',icon:'heart',outline:'heart-outline'},{name:'Settings',icon:'settings',outline:'settings-outline'}];
 
 function Card({children,style}: {children:React.ReactNode;style?:any}) { return <View style={[s.card,style]}>{children}</View>; }
 function Chip({label,active,onPress}: {label:string;active:boolean;onPress:()=>void}) { return <TouchableOpacity onPress={onPress} style={[s.chip,active&&s.chipActive]}><Text style={[s.chipText,active&&s.chipTextActive]}>{label}</Text></TouchableOpacity>; }
@@ -44,6 +44,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile}:{selectedThe
  const colors=palettes[selectedTheme]||palettes.grape;
  const insets = useSafeAreaInsets();
  const [tab,setTab]=useState<Tab>('Today');
+ const [settingsPage,setSettingsPage]=useState<'main'|'watch'|'health'|'notifications'|'privacy'|'help'>('main');
  const [period,setPeriod]=useState<Period>('Day');
  const [mood,setMood]=useState<Mood|' '>(' ');
  useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data,error}=await supabase.from('mood_entries').select('mood').eq('user_id',user.id).order('recorded_at',{ascending:false}).limit(1).maybeSingle();if(error){console.warn('Loading mood failed:',error.message);return;}if(alive&&data&&['Calm','Okay','Anxious','Happy','Tired'].includes(data.mood))setMood(data.mood as Mood)})();return()=>{alive=false}},[]);
@@ -55,11 +56,11 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile}:{selectedThe
  const [seconds,setSeconds]=useState(60);
  useEffect(()=>{if(!breathing)return;const id=setInterval(()=>setSeconds(v=>{if(v<=1){setBreathing(false);return 60;}return v-1;}),1000);return()=>clearInterval(id);},[breathing]);
  const values=useMemo(()=>period==='Day'?hrvDay:period==='Week'?hrvWeek:period==='Month'?hrvMonth:hrvYear,[period]);
- const go=(t:Tab)=>{setTab(t);setPeriod('Day');};
+ const go=(t:Tab)=>{setTab(t);setPeriod('Day');setSettingsPage('main');};
  async function saveHabit(habit:'water'|'caffeine',amount:number){const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {error}=await supabase.from('habit_entries').insert({user_id:user.id,habit,amount,unit:'cups'});if(error)console.warn('Save habit failed:',error.message);}
  async function saveMood(m:Mood){const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {error}=await supabase.from('mood_entries').insert({user_id:user.id,mood:m});if(error)console.warn('Save mood failed:',error.message);}
  return <View style={[s.safe,{paddingTop:Platform.OS==='ios'?insets.top:StatusBar.currentHeight || 0}]}><StatusBar barStyle="dark-content" backgroundColor={C.bg}/>
-  <View style={s.top}><View style={s.brand}><View style={[s.logo,{backgroundColor:colors.accent}]}><Text style={s.logoText}>✦</Text></View><Text style={s.brandText}>superdots<Text style={{color:colors.accent}}>.</Text></Text></View><TouchableOpacity accessibilityLabel="Open profile" onPress={()=>go('You')} style={s.avatar}><Text style={{fontSize:18}}>☺</Text></TouchableOpacity></View>
+  <View style={s.top}><View style={s.brand}><View style={[s.logo,{backgroundColor:colors.accent}]}><Text style={s.logoText}>✦</Text></View><Text style={s.brandText}>superdots<Text style={{color:colors.accent}}>.</Text></Text></View><TouchableOpacity accessibilityLabel="Open profile" onPress={()=>go('Settings')} style={s.avatar}><Text style={{fontSize:18}}>☺</Text></TouchableOpacity></View>
   <ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
   {tab==='Today'? <>
    <View style={s.greeting}><Text style={s.eyebrow}>TUESDAY, OCTOBER 13</Text><Text style={s.mainTitle}>A little check-in <Text style={{color:colors.accent}}>for you.</Text></Text><Text style={s.intro}>A tiny buddy for your biggest feelings 💜</Text></View>
@@ -78,32 +79,49 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile}:{selectedThe
    <View style={s.period}>{(['Day','Week','Month','Year'] as Period[]).map(p=><Chip key={p} label={p} active={period===p} onPress={()=>setPeriod(p)}/>)}</View>
    <Card style={{marginTop:8}}><Heading title="HRV trend" detail="↗ +12%"/><Text style={s.bigValue}>61 <Text style={s.bigUnit}>ms average</Text></Text><Text style={s.bodyMuted}>A higher HRV can reflect improved recovery.</Text><Sparkline values={values} color={C.green} height={185} filled/><View style={s.axis}><Text style={s.axisText}>{period==='Day'?'Morning':'Start'}</Text><Text style={s.axisText}>Midpoint</Text><Text style={s.axisText}>{period==='Day'?'Evening':'Recent'}</Text></View></Card>
    <Card><Heading title="Stress balance"/><View style={s.balanceRow}><View style={[s.balanceBlock,{backgroundColor:C.mint}]}><Text style={s.balanceValue}>72%</Text><Text style={s.balanceLabel}>Restful</Text></View><View style={[s.balanceBlock,{backgroundColor:C.peach}]}><Text style={s.balanceValue}>28%</Text><Text style={s.balanceLabel}>Elevated</Text></View></View><Text style={s.bodyMuted}>Based on fictional readings for this demo.</Text></Card>
-   <LifestyleOverview/>
    <CoachDemo/>
    <Card><Heading title="Your weekly highlights"/><Text style={s.listText}>✦   Your best recovery was on Saturday.</Text><Text style={s.listText}>☾   7h 42m average sleep this week.</Text><Text style={s.listText}>♡   Morning HRV is trending upward.</Text></Card>
   </>:null}
-  {tab==='Habits'? <>
+  {tab==='Actions'? <>
    <Text style={s.eyebrow}>SMALL STEPS, BIG CHANGES</Text><Text style={s.mainTitle}>Care for yourself.</Text><Text style={s.intro}>How are you feeling right now?</Text>
    <Card><Heading title="Mood check-in" detail={mood===' '?'Not logged':'Saved ✓'}/><View style={s.moods}>{([{name:'Calm',emoji:'😌'},{name:'Okay',emoji:'🙂'},{name:'Anxious',emoji:'😟'},{name:'Happy',emoji:'🥰'},{name:'Tired',emoji:'😴'}] as {name:Mood;emoji:string}[]).map(m=><TouchableOpacity key={m.name} onPress={()=>{setMood(m.name);void saveMood(m.name)}} style={[s.mood,mood===m.name&&s.moodActive]}><Text style={{fontSize:27}}>{m.emoji}</Text><Text style={s.moodLabel}>{m.name}</Text></TouchableOpacity>)}</View>{mood!==' '?<Text style={s.feedback}>Thanks for checking in. Your {mood.toLowerCase()} mood is logged for this session.</Text>:null}</Card>
    <Card><Heading title="Daily habits" detail="Today"/><View style={s.habitLine}><View><Text style={s.habitTitle}>💧  Water</Text><Text style={s.bodyMuted}>{water} glasses logged</Text></View><View style={s.counter}><TouchableOpacity onPress={()=>{const n=Math.max(0,water-1);setWater(n);void saveHabit('water',n)}}><Text style={s.counterText}>−</Text></TouchableOpacity><Text style={s.counterNumber}>{water}</Text><TouchableOpacity onPress={()=>{const n=water+1;setWater(n);void saveHabit('water',n)}}><Text style={s.counterText}>+</Text></TouchableOpacity></View></View><View style={s.habitLine}><View><Text style={s.habitTitle}>☕  Caffeine</Text><Text style={s.bodyMuted}>{coffee} cups logged</Text></View><View style={s.counter}><TouchableOpacity onPress={()=>{const n=Math.max(0,coffee-1);setCoffee(n);void saveHabit('caffeine',n)}}><Text style={s.counterText}>−</Text></TouchableOpacity><Text style={s.counterNumber}>{coffee}</Text><TouchableOpacity onPress={()=>{const n=coffee+1;setCoffee(n);void saveHabit('caffeine',n)}}><Text style={s.counterText}>+</Text></TouchableOpacity></View></View></Card>
-   <LifestyleOverview/>
    <ExtraWellness/>
    <EmotionCheckin/>
    <BreathingStudio accent={colors.accent} tint={colors.pale}/>
   </>:null}
-  {tab==='You'? <>
-   <Text style={s.eyebrow}>YOUR PERSONAL SPACE</Text><Text style={s.mainTitle}>Your wellbeing.</Text><View style={s.profile}><View style={s.profileAvatar}><Text style={{fontSize:30}}>☺</Text></View><View><Text style={s.profileName}>Your demo profile</Text><Text style={s.bodyMuted}>Finding your balance, one day at a time</Text></View></View>
+  {tab==='Health'? <>
+   <Text style={s.eyebrow}>YOUR BODY, YOUR WAY</Text><Text style={s.mainTitle}>Health overview.</Text><Text style={s.intro}>Health measurements are simulated until Apple Health is connected.</Text>
+   <CurrentHRV/>
    <Card><Heading title="Your baseline"/><View style={s.baseline}><Metric label="30-DAY HRV" value="54" unit="ms" sub="Sample baseline"/><Metric label="RESTING HR" value="69" unit="bpm" sub="Sample baseline"/></View></Card>
-   <Card><Heading title="Data source"/><View style={s.settingLine}><Text style={s.habitTitle}>♡  Apple Health</Text><Text style={s.settingValue}>Not connected</Text></View><Text style={s.bodyMuted}>This prototype uses sample readings only. It does not access Apple Health, detect medical conditions, or send notifications.</Text></Card>
-   <TouchableOpacity accessibilityRole="button" style={[s.card,{backgroundColor:colors.pale}]} onPress={onEditProfile}><Text style={{color:colors.accent,fontWeight:'900',textAlign:'center',fontSize:15}}>✦ Edit my wellness profile</Text><Text style={{color:C.muted,textAlign:'center',fontSize:12,marginTop:7}}>Update your goals, health context and Superdot</Text></TouchableOpacity>
-   <TouchableOpacity style={s.card} onPress={()=>supabase.auth.signOut()}><Text style={{color:C.deep,fontWeight:'800',textAlign:'center'}}>Sign out</Text></TouchableOpacity>
-   <ThemePicker/>
-   <WidgetPreview/>
-   <Card><Heading title="About this demo"/><Text style={s.about}>Wellnest is an original educational prototype of a stress and recovery tracker for iPhone. The visualization is inspired by general wellness app conventions, not a clinical scoring system.</Text><Text style={[s.about,{marginTop:10}]}>All values are illustrative and should not be used for health decisions.</Text></Card>
+   <LifestyleOverview/>
+   <Card><Heading title="Apple Health"/><Text style={s.bodyMuted}>Not connected. No health permissions have been requested.</Text><TouchableOpacity onPress={()=>{setTab('Settings');setSettingsPage('health')}} style={[s.settingsAction,{backgroundColor:colors.pale}]}><Text style={[s.settingsActionText,{color:colors.accent}]}>About health permissions  →</Text></TouchableOpacity></Card>
+  </>:null}
+  {tab==='Settings'? <>
+   {settingsPage==='main'?<>
+    <Text style={s.eyebrow}>MAKE SUPERDOTS YOURS</Text><Text style={s.mainTitle}>Settings.</Text>
+    <View style={s.settingsHero}><SuperdotMascot id={selectedCompanion} color={colors.accent} size={75}/><View style={{flex:1,gap:4}}><Text style={s.settingsHeroTitle}>My Superdot</Text><Text style={s.bodyMuted}>Change your buddy, goals and color theme.</Text><TouchableOpacity onPress={onEditProfile}><Text style={{color:colors.accent,fontWeight:'800',fontSize:12}}>Customize my profile  →</Text></TouchableOpacity></View></View>
+    {([
+      {id:'watch',icon:'watch-outline',title:'Apple Watch & Widgets',subtitle:'Companions, complications and widgets',status:'Preview only'},
+      {id:'health',icon:'heart-outline',title:'Apple Health',subtitle:'Permissions and wearable readings',status:'Not connected'},
+      {id:'notifications',icon:'notifications-outline',title:'Notifications',subtitle:'Reminder preferences and permissions',status:'Not enabled'},
+      {id:'privacy',icon:'shield-checkmark-outline',title:'Privacy & Data',subtitle:'Account storage and data protection',status:''},
+      {id:'help',icon:'help-circle-outline',title:'Help & Support',subtitle:'Getting started and troubleshooting',status:''}
+    ] as const).map(item=><TouchableOpacity key={item.id} accessibilityRole="button" onPress={()=>setSettingsPage(item.id)} style={s.settingsRow}><View style={[s.settingsIcon,{backgroundColor:colors.pale}]}><Ionicons name={item.icon} size={22} color={colors.accent}/></View><View style={{flex:1,gap:3}}><Text style={s.settingsTitle}>{item.title}</Text><Text style={s.settingsSubtitle}>{item.subtitle}</Text>{item.status?<Text style={s.settingsStatus}>{item.status}</Text>:null}</View><Ionicons name="chevron-forward" size={17} color="#A59AB9"/></TouchableOpacity>)}
+    <TouchableOpacity onPress={()=>void supabase.auth.signOut()} style={s.settingsRow}><Ionicons name="log-out-outline" size={22} color="#D65B79"/><Text style={[s.settingsTitle,{color:'#D65B79',flex:1,marginLeft:9}]}>Sign out</Text><Ionicons name="chevron-forward" size={17} color="#A59AB9"/></TouchableOpacity>
+   </>:<>
+    <TouchableOpacity style={s.settingsBack} onPress={()=>setSettingsPage('main')}><Ionicons name="chevron-back" size={18} color={colors.accent}/><Text style={{color:colors.accent,fontWeight:'800'}}>Settings</Text></TouchableOpacity>
+    <Text style={s.mainTitle}>{({watch:'Apple Watch & Widgets',health:'Apple Health',notifications:'Notifications',privacy:'Privacy & Data',help:'Help & Support'} as const)[settingsPage]}</Text>
+    {settingsPage==='watch'?<><Card><Heading title="Watch connection"/><Text style={s.bodyMuted}>The SwiftUI watch app currently runs independently with sample metrics and local companion selection. Phone-to-watch sync is not connected yet.</Text></Card><WidgetPreview/></>:null}
+    {settingsPage==='health'?<Card><Heading title="Health data access"/><Text style={s.bodyMuted}>Apple Health is not connected. Your displayed HRV, resting heart rate, stress and sleep measurements are sample data. A future HealthKit integration will explicitly ask permission before reading any information.</Text></Card>:null}
+    {settingsPage==='notifications'?<Card><Heading title="Reminder settings"/><Text style={s.bodyMuted}>You can save notification preferences during onboarding, but system push or local notifications have not been implemented. No reminders are currently sent.</Text><TouchableOpacity style={[s.settingsAction,{backgroundColor:colors.pale}]} onPress={onEditProfile}><Text style={[s.settingsActionText,{color:colors.accent}]}>Edit my preferences  →</Text></TouchableOpacity></Card>:null}
+    {settingsPage==='privacy'?<Card><Heading title="Your information"/><Text style={s.bodyMuted}>Your profile, selected companion, mood logs and habit entries are stored in Supabase with user-specific row-level security. This demo does not upload HealthKit readings.</Text><Text style={[s.bodyMuted,{marginTop:10}]}>For account data requests or deletion, contact the app operator. An in-app export and deletion flow has not yet been implemented.</Text></Card>:null}
+    {settingsPage==='help'?<Card><Heading title="Need help?"/><Text style={s.bodyMuted}>To change onboarding answers, open Settings and select Customize my profile. For login issues, use Forgot password on the sign-in screen. Watch and health syncing are upcoming features.</Text></Card>:null}
+   </>}
   </>:null}
   <Text style={s.disclaimer}>DEMO DATA ONLY  ·  NOT MEDICAL ADVICE</Text>
   </ScrollView>
-  <View style={[s.tabBar,{height:59+insets.bottom,paddingBottom:insets.bottom}]}>{tabs.map(t=><TouchableOpacity key={t.name} accessibilityRole="tab" accessibilityState={{selected:tab===t.name}} style={s.tab} onPress={()=>go(t.name)}><Ionicons name={tab===t.name?t.icon:t.outline} size={23} color={tab===t.name?colors.accent:'#A9A5B7'}/><Text style={[s.tabLabel,tab===t.name&&s.tabSelected,tab===t.name&&{color:colors.accent}]}>{t.name}</Text></TouchableOpacity>)}</View>
+  <View style={[s.tabBar,{height:59+insets.bottom,paddingBottom:insets.bottom}]}>{tabs.map(t=><TouchableOpacity key={t.name} accessibilityRole="tab" accessibilityState={{selected:tab===t.name}} style={[s.tab,tab===t.name&&{backgroundColor:colors.pale,marginVertical:5}]} onPress={()=>go(t.name)}><Ionicons name={tab===t.name?t.icon:t.outline} size={23} color={tab===t.name?colors.accent:'#A9A5B7'}/><Text style={[s.tabLabel,tab===t.name&&s.tabSelected,tab===t.name&&{color:colors.accent}]}>{t.name}</Text></TouchableOpacity>)}</View>
  </View>;
 }
 export default function MainApp({selectedTheme='grape',selectedCompanion='bloop',onEditProfile=()=>{}}:{selectedTheme?:string;selectedCompanion?:string;onEditProfile?:()=>void}){return <AppContent selectedTheme={selectedTheme} selectedCompanion={selectedCompanion} onEditProfile={onEditProfile}/>}
@@ -127,5 +145,5 @@ const s=StyleSheet.create({
  habitLine:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingVertical:15,borderTopWidth:1,borderTopColor:C.line},habitTitle:{fontSize:14,color:C.ink,fontWeight:'800'},counter:{flexDirection:'row',gap:13,alignItems:'center',backgroundColor:C.bg,paddingVertical:7,paddingHorizontal:12,borderRadius:14},counterText:{color:C.deep,fontSize:20,fontWeight:'700',width:22,textAlign:'center'},counterNumber:{color:C.ink,fontSize:16,fontWeight:'800',minWidth:17,textAlign:'center'},
  breathe:{backgroundColor:'#DDF2EA',borderRadius:24,alignItems:'center',padding:23},breatheOver:{fontSize:10,color:C.deep,fontWeight:'800',letterSpacing:2},breatheTitle:{fontSize:29,color:C.ink,fontWeight:'900',marginTop:7},breatheBody:{textAlign:'center',color:'#698879',fontSize:12,lineHeight:18,marginTop:8},breatheCircle:{width:178,height:178,borderRadius:89,backgroundColor:C.green,borderColor:'#CBB7FF',borderWidth:17,marginVertical:21,alignItems:'center',justifyContent:'center'},breatheTimer:{fontSize:37,color:'#fff',fontWeight:'900'},breatheSmall:{fontSize:10,color:'#F8F4FF'},breatheButton:{backgroundColor:C.deep,paddingHorizontal:25,paddingVertical:15,borderRadius:16},breatheButtonText:{color:'#fff',fontWeight:'800',fontSize:13},reset:{fontSize:11,color:C.deep,marginTop:15,fontWeight:'700'},
  profile:{flexDirection:'row',gap:13,alignItems:'center',paddingVertical:15},profileAvatar:{width:62,height:62,borderRadius:23,backgroundColor:C.mint,alignItems:'center',justifyContent:'center'},profileName:{fontSize:17,fontWeight:'800',color:C.ink},baseline:{flexDirection:'row',justifyContent:'space-between'},settingLine:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:9},settingValue:{fontSize:11,fontWeight:'700',color:C.muted},about:{fontSize:13,lineHeight:20,color:C.muted},disclaimer:{textAlign:'center',fontSize:9,letterSpacing:1.1,fontWeight:'700',color:'#ABB7AE',marginVertical:9},
- tabBar:{backgroundColor:'#fff',flexDirection:'row',borderTopColor:C.line,borderTopWidth:1},tab:{flex:1,alignItems:'center',justifyContent:'center',gap:3},tabIcon:{color:'#ABB6AD',fontSize:25,fontWeight:'800'},tabLabel:{fontSize:10,color:'#ABB6AD',fontWeight:'700'},tabSelected:{color:C.deep}
+ tabBar:{backgroundColor:'#fff',flexDirection:'row',borderTopColor:C.line,borderTopWidth:1,paddingHorizontal:5},tab:{flex:1,alignItems:'center',justifyContent:'center',gap:3,borderRadius:15},tabIcon:{color:'#ABB6AD',fontSize:25,fontWeight:'800'},tabLabel:{fontSize:10,color:'#ABB6AD',fontWeight:'700'},tabSelected:{color:C.deep},settingsHero:{backgroundColor:'#fff',borderRadius:23,padding:17,flexDirection:'row',alignItems:'center',gap:14},settingsHeroTitle:{fontSize:18,color:C.ink,fontWeight:'900'},settingsRow:{backgroundColor:'#fff',borderRadius:18,padding:14,flexDirection:'row',alignItems:'center',gap:11},settingsIcon:{height:43,width:43,borderRadius:14,alignItems:'center',justifyContent:'center'},settingsTitle:{fontSize:14,fontWeight:'800',color:C.ink},settingsSubtitle:{fontSize:11,color:C.muted,lineHeight:16},settingsStatus:{fontSize:10,fontWeight:'700',color:'#B07A9B'},settingsBack:{flexDirection:'row',alignItems:'center',gap:4,marginBottom:10},settingsAction:{padding:12,borderRadius:12,marginTop:12},settingsActionText:{fontSize:12,fontWeight:'800'}
 });
