@@ -80,8 +80,8 @@ struct LeafShape: Shape {
     func path(in rect: CGRect) -> Path {
         var p = Path()
         p.move(to: CGPoint(x: rect.midX, y: rect.minY))
-        p.addCurve(to: CGPoint(x: rect.midX, y: rect.maxY), control1: CGPoint(x: rect.maxX*1.28, y: rect.height*0.36), control2: CGPoint(x: rect.maxX, y: rect.maxY))
-        p.addCurve(to: CGPoint(x: rect.midX, y: rect.minY), control1: CGPoint(x: rect.minX, y: rect.maxY), control2: CGPoint(x: rect.minX-rect.width*0.12, y: rect.height*0.30))
+        p.addCurve(to: CGPoint(x: rect.midX, y: rect.maxY), control1: CGPoint(x: rect.maxX * 1.28, y: rect.height * 0.36), control2: CGPoint(x: rect.maxX, y: rect.maxY))
+        p.addCurve(to: CGPoint(x: rect.midX, y: rect.minY), control1: CGPoint(x: rect.minX, y: rect.maxY), control2: CGPoint(x: rect.minX - rect.width * 0.12, y: rect.height * 0.30))
         return p
     }
 }
