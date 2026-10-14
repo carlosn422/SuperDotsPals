@@ -1,25 +1,20 @@
-# Wellnest — iOS-first React Native wellness demo
+# Superdots Pals — iOS-first Wellness Demo
 
-An original sample-data stress and recovery app inspired by the general functionality of StressWatch. **Not affiliated with StressWatch.** It does not copy original app imagery or Mr. Fizz artwork.
+A playful, original React Native Expo stress and recovery demo inspired by wellness dashboards. Visual styling takes cues from the supplied Superdots brand direction: vivid grape-purple, soft lilac, rounded cards, and a friendly two-eyed alien companion with antennae. This new illustrated mascot is **not** a reproduction of the existing one-eyed Superdots logo artwork.
 
-## Quick start
+## Run
 
 ```bash
 npm install
 npx expo start --ios
 ```
 
-Run on macOS with Xcode Simulator, or use `npx expo start` and open in Expo Go on an iPhone.
+## Included
 
-## What's included
+- Today with tappable companion and fictional HRV and stress readings
+- Trends with day/week/month/year charts and sample insights
+- Sleep stages, workouts, steps, daylight, mood, water and caffeine trackers
+- One-minute breathing activity and theme selector
+- iOS-first Expo app (no Apple Health/Watch integration yet)
 
-- Today: friendly recovery character, daily readiness, HRV and resting-heart-rate metrics, charted stress and HRV.
-- Trends: day/week/month switches, HRV chart, stress balance, weekly insights.
-- Habits: interactive mood, water and caffeine logs; one-minute breathing countdown.
-- You: personal sample baseline, current connection status and safety disclaimers.
-
-All values are fictional and some controls retain state only during the current app session. No login, persistent database, Apple Health or Apple Watch integration is implemented. No AI API calls are made and all insights are static examples.
-
-### Next implementation steps
-
-Connect iOS HealthKit with user authorization, persist personal baselines securely, choose and validate a transparent metric interpretation approach, and add Apple Watch support as a separate watchOS project.
+**Important:** No real physiological data is used. All health values and recommendations are fictional demonstrations, not medical advice. Habit entries and theme previews are session-local. App has not yet been tested on an iPhone simulator.
