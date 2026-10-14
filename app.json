@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "Wellnest Demo",
+    "slug": "superdotspals",
+    "scheme": "wellnest",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.superdotspals.wellnest",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "This demo currently uses sample health readings only."
+      }
+    },
+    "android": {
+      "package": "com.superdotspals.wellnest"
+    },
+    "plugins": []
+  }
+}
