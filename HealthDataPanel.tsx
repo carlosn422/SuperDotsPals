@@ -24,6 +24,7 @@ async function syncNativeHealth():Promise<number>{
   h.queryQuantitySamples({type:h.QuantityType.heartRateVariabilitySDNN,unit:'ms',from:recent,to:now,limit:90,ascending:false}),
   h.queryQuantitySamples({type:h.QuantityType.restingHeartRate,unit:'count/min',from:recent,to:now,limit:40,ascending:false}),
   h.queryStatistics({type:h.QuantityType.stepCount,unit:'count',from:day,to:now,options:h.StatisticsOption.cumulativeSum}),
+  h.queryStatisticsCollection({type:h.QuantityType.stepCount,unit:'count',from:recent,to:now,interval:{day:1},options:h.StatisticsOption.cumulativeSum}),
   h.queryCategorySamples({type:h.CategoryType.sleepAnalysis,from:night,to:now,limit:100,ascending:false})
  ]);
  const uploaded:Upload[]=[];
@@ -39,7 +40,9 @@ async function syncNativeHealth():Promise<number>{
  rests.forEach((v:any)=>append('resting_heart_rate',v.value,'rest-'+String(v.uuid||v.startDate),v.endDate||v.startDate));
  const steps=results[2].status==='fulfilled'?(results[2] as PromiseFulfilledResult<any>).value:null;
  if(steps&&steps.sum!==null&&steps.sum!==undefined)append('steps',steps.sum,'steps-'+keyForToday(),now);
- const sleeps=samples(3);
+ const stepDays=samples(3);
+ if(Array.isArray(stepDays))stepDays.forEach((v:any)=>{const d=new Date(v.startDate||v.start);if(Number.isNaN(d.getTime())||v.sum===undefined||v.sum===null)return;d.setHours(12,0,0,0);const key=[d.getFullYear(),d.getMonth()+1,d.getDate()].join('-');append('steps',v.sum,'steps-'+key,d)});
+ const sleeps=samples(4);
  if(Array.isArray(sleeps)){
   const allowed=[h.SleepAnalysisValue.asleepUnspecified,h.SleepAnalysisValue.asleepCore,h.SleepAnalysisValue.asleepDeep,h.SleepAnalysisValue.asleepREM].filter(x=>x!==undefined);
   const spans=sleeps.filter((v:any)=>allowed.includes(v.value)).map((v:any)=>[new Date(v.startDate).getTime(),new Date(v.endDate).getTime()]).filter(([a,b]:number[])=>Number.isFinite(a)&&Number.isFinite(b)&&b>a).sort((a:number[],b:number[])=>a[0]-b[0]);
@@ -47,10 +50,11 @@ async function syncNativeHealth():Promise<number>{
   const minutes=merged.reduce((total,[a,b])=>total+(b-a)/60000,0);
   if(minutes>0)append('sleep_minutes',Math.min(minutes,1440),'sleep-'+keyForToday(),now);
  }
- if(!uploaded.length)return 0;
- const {error}=await supabase.from('wellness_readings').upsert(uploaded,{onConflict:'user_id,source,metric,source_record_key'});
+ const unique=[...new Map(uploaded.map(v=>[v.metric+'|'+v.source_record_key,v])).values()];
+ if(!unique.length)return 0;
+ const {error}=await supabase.from('wellness_readings').upsert(unique,{onConflict:'user_id,source,metric,source_record_key'});
  if(error)throw error;
- return uploaded.length;
+ return unique.length;
 }
 export function useSavedHealth(){
  const [readings,setReadings]=useState<Reading[]>([]),[loading,setLoading]=useState(true);
