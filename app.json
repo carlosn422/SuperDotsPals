@@ -38,6 +38,10 @@
             "READ_HEALTH_DATA_HISTORY"
           ]
         }
+      ],
+      [
+        "expo-notifications",
+        {}
       ]
     ]
   }
