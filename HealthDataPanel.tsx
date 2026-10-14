@@ -21,8 +21,8 @@ async function syncNativeHealth():Promise<number>{
  const now=new Date(),recent=new Date(now.getTime()-30*86400000),day=new Date();day.setHours(0,0,0,0);
  const night=new Date(now.getTime()-24*3600000);
  const results=await Promise.allSettled([
-  h.queryQuantitySamples({type:h.QuantityType.heartRateVariabilitySDNN,unit:'ms',from:recent,to:now,limit:1,ascending:false}),
-  h.queryQuantitySamples({type:h.QuantityType.restingHeartRate,unit:'count/min',from:recent,to:now,limit:1,ascending:false}),
+  h.queryQuantitySamples({type:h.QuantityType.heartRateVariabilitySDNN,unit:'ms',from:recent,to:now,limit:90,ascending:false}),
+  h.queryQuantitySamples({type:h.QuantityType.restingHeartRate,unit:'count/min',from:recent,to:now,limit:40,ascending:false}),
   h.queryStatistics({type:h.QuantityType.stepCount,unit:'count',from:day,to:now,options:h.StatisticsOption.cumulativeSum}),
   h.queryCategorySamples({type:h.CategoryType.sleepAnalysis,from:night,to:now,limit:100,ascending:false})
  ]);
@@ -33,10 +33,10 @@ async function syncNativeHealth():Promise<number>{
   uploaded.push({user_id:user.id,metric,value:Math.round(num*100)/100,source:'healthkit',source_record_key:key,recorded_at:d.toISOString()});
  };
  const samples=(index:number)=>results[index].status==='fulfilled'?(results[index] as PromiseFulfilledResult<any>).value:[];
- const hrv=Array.isArray(samples(0))?samples(0)[0]:null;
- if(hrv)append('hrv',hrv.value,'hrv-'+String(hrv.uuid||hrv.startDate),hrv.endDate||hrv.startDate);
- const resting=Array.isArray(samples(1))?samples(1)[0]:null;
- if(resting)append('resting_heart_rate',resting.value,'rest-'+String(resting.uuid||resting.startDate),resting.endDate||resting.startDate);
+ const hrvs=Array.isArray(samples(0))?samples(0):[];
+ hrvs.forEach((v:any)=>append('hrv',v.value,'hrv-'+String(v.uuid||v.startDate),v.endDate||v.startDate));
+ const rests=Array.isArray(samples(1))?samples(1):[];
+ rests.forEach((v:any)=>append('resting_heart_rate',v.value,'rest-'+String(v.uuid||v.startDate),v.endDate||v.startDate));
  const steps=results[2].status==='fulfilled'?(results[2] as PromiseFulfilledResult<any>).value:null;
  if(steps&&steps.sum!==null&&steps.sum!==undefined)append('steps',steps.sum,'steps-'+keyForToday(),now);
  const sleeps=samples(3);
@@ -55,7 +55,7 @@ async function syncNativeHealth():Promise<number>{
 export function useSavedHealth(){
  const [readings,setReadings]=useState<Reading[]>([]),[loading,setLoading]=useState(true);
  const reload=useCallback(async()=>{try{const {data:{user}}=await supabase.auth.getUser();if(!user){setReadings([]);return}
- const {data,error}=await supabase.from('wellness_readings').select('metric,value,recorded_at,source').eq('user_id',user.id).eq('source','healthkit').order('recorded_at',{ascending:false}).limit(120);
+ const {data,error}=await supabase.from('wellness_readings').select('metric,value,recorded_at,source').eq('user_id',user.id).eq('source','healthkit').order('recorded_at',{ascending:false}).limit(250);
  if(error)throw error;setReadings((data||[]) as Reading[]);
  }catch(e){console.warn('Unable to load saved HealthKit readings',e)}finally{setLoading(false)}},[]);
  useEffect(()=>{void reload()},[reload]);
