@@ -137,7 +137,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
 
   <View style={[s.navDock,{paddingBottom:Math.max(insets.bottom,8)}]}>
    <View style={s.tabBar} onLayout={e=>setNavWidth(e.nativeEvent.layout.width)}>
-    {navWidth>0?<Animated.View pointerEvents="none" style={[s.slidingPill,{backgroundColor:colors.pale,width:(navWidth-8)/tabs.length,transform:[{translateX:activePosition.interpolate({inputRange:[0,4],outputRange:[0,4*(navWidth-8)/tabs.length]})}]}]}/>:null}
+    {navWidth>0?<Animated.View pointerEvents="none" style={[s.slidingPill,{backgroundColor:'#DDF4E8',width:(navWidth-8)/tabs.length,transform:[{translateX:activePosition.interpolate({inputRange:[0,4],outputRange:[0,4*(navWidth-8)/tabs.length]})}]}]}/>:null}
     {tabs.map(t=>{
     const active=tab===t.name;
     return <TouchableOpacity key={t.name} accessibilityRole="tab" accessibilityLabel={t.name}
