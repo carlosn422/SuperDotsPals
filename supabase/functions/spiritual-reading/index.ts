@@ -35,7 +35,9 @@ Deno.serve(async(req:Request)=>{
   const key=Deno.env.get("GEMINI_API_KEY");
   const model=Deno.env.get("SPIRITUAL_GEMINI_MODEL")||"gemini-2.5-flash-lite";
   let aiResult:any=null,usedAI=false;
-  if(key){
+  let aiAllowed=Boolean(key);
+  if(aiAllowed){const since=new Date(Date.now()-24*60*60*1000).toISOString();const {count,error:usageError}=await db.from("spiritual_ai_usage").select("id",{head:true,count:"exact"}).eq("user_id",user.id).gte("created_at",since);if(usageError||Number(count||0)>=10)aiAllowed=false;}
+  if(aiAllowed){
    const instruction=action==="questions"?
    "You create exactly TWO gentle, optional, emotionally neutral reflection questions for a faith-based wellness app. Do not diagnose, presume causation, impose guilt, or tell someone to stop medical care. Return JSON only: {\"questions\":[\"...\",\"...\"]}. Each question <=120 characters.":
    "Select ONE reference from the provided verified Bible catalog ONLY. Never invent Bible text or a reference. Offer a warm two-sentence reflection that does not diagnose or promise a cure. Return JSON only: {\"reference\":\"exact supplied reference\",\"reflection\":\"...\"}. Reflection <=300 characters.";
@@ -46,7 +48,7 @@ Deno.serve(async(req:Request)=>{
      method:"POST",signal:abort.signal,headers:{"Content-Type":"application/json","x-goog-api-key":key},
      body:JSON.stringify({systemInstruction:{parts:[{text:instruction}]},contents:[{role:"user",parts:[{text:JSON.stringify(context).slice(0,3300)}]}],generationConfig:{temperature:0.3,maxOutputTokens:230,responseMimeType:"application/json"}})
     });
-    if(response.ok){const json=await response.json();const text=(json.candidates?.[0]?.content?.parts||[]).map((x:{text?:string})=>x.text||"").join("");aiResult=safeJson(text);usedAI=true;}
+    if(response.ok){const json=await response.json();const text=(json.candidates?.[0]?.content?.parts||[]).map((x:{text?:string})=>x.text||"").join("");aiResult=safeJson(text);usedAI=true;await db.from("spiritual_ai_usage").insert({user_id:user.id,action,input_tokens:json.usageMetadata?.promptTokenCount||null,output_tokens:json.usageMetadata?.candidatesTokenCount||null});}
     else console.warn("Spiritual Gemini unavailable",response.status);
    }catch(e){console.warn("Spiritual Gemini failed",String(e))}
    finally{clearTimeout(timer)}
