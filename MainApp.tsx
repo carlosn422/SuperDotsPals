@@ -9,7 +9,8 @@ import HabitDetails from './HabitDetails';
 import WellnessReminders from './WellnessReminders';
 import WellnessReportExport from './WellnessReportExport';
 import {WellnessToday,WellnessActions,WellnessTrends,WellnessHealth,WellnessSettingsIntro} from './WellnessDesignScreens';
-import {PromoBanner,ThemeCard,ThemeGallery,WatchThemesCard,SettingsItem} from './SettingsComponents';
+import {WatchThemesCard,SettingsItem} from './SettingsComponents';
+import {APP_THEME} from './MoodMascot';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Svg, { Circle, Line, Path, Rect, Defs, LinearGradient, Stop, Polygon } from 'react-native-svg';
 import {LifestyleOverview, ThemePicker} from './LifestyleFeatures';
@@ -18,7 +19,7 @@ import {CurrentHRV,ExtraWellness,EmotionCheckin,CoachDemo,WidgetPreview} from '.
 type Tab = 'Today' | 'Actions' | 'Trends' | 'Health' | 'Settings';
 type Period = 'Day' | 'Week' | 'Month' | 'Year';
 type Mood = 'Calm' | 'Okay' | 'Anxious' | 'Happy' | 'Tired';
-const C = { ink:'#25145C', muted:'#8276A5', green:'#7644F5', deep:'#5D31D1', surface:'#FFFFFF', bg:'#F8F6FF', mint:'#EBE4FF', peach:'#FFF0DE', orange:'#F4A570', lilac:'#F0EBFF', purple:'#A997FA', line:'#EEE8FA', red:'#EC7D8C' };
+const C = { ink:APP_THEME.ink, muted:APP_THEME.muted, green:APP_THEME.primary, deep:APP_THEME.primary, surface:APP_THEME.surface, bg:APP_THEME.background, mint:APP_THEME.primarySoft, peach:'#FFF0DE', orange:'#F4A570', lilac:APP_THEME.primarySoft, purple:APP_THEME.primary, line:APP_THEME.border, red:'#EC7D8C' };
 const hrvDay = [40,48,44,58,53,64,48,74,62,55,67,58,78,71,57,60,82,69];
 const hrvWeek = [42,48,55,44,63,59,72,67,61,74,70,78,64,76];
 const hrvMonth = [41,46,44,49,54,50,61,58,55,66,63,72,67,73];
@@ -46,10 +47,7 @@ function StressChart() {return <Svg width="100%" height="104" viewBox="0 0 310 1
  </Svg>;}
 function Metric({value,unit,label,sub,color=C.deep}:{value:string;unit:string;label:string;sub:string;color?:string}) {return <View style={s.metric}><Text style={s.metricLabel}>{label}</Text><View style={s.metricRow}><Text style={[s.metricValue,{color}]}>{value}</Text><Text style={s.metricUnit}>{unit}</Text></View><Text style={s.metricSub}>{sub}</Text></View>;}
 function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChanged}:{selectedTheme:string;selectedCompanion:string;onEditProfile:()=>void;onThemeChanged:(theme:string,companion:string)=>void}) {
- const palettes:Record<string,{accent:string,pale:string}>={grape:{accent:'#7139E9',pale:'#EEE5FF'},coral:{accent:'#E76B8A',pale:'#FFE7EE'},sky:{accent:'#488CD9',pale:'#E2F1FF'},sunny:{accent:'#E3A426',pale:'#FFF4CE'},mint:{accent:'#3BA986',pale:'#E1F8ED'}};
- const colors=palettes[selectedTheme]||palettes.grape;
- const [themeSaving,setThemeSaving]=useState(false);
- async function chooseSuperdot(id:string,theme:string){setThemeSaving(true);try{const {data:{user}}=await supabase.auth.getUser();if(!user)throw Error('Please sign in');const {error}=await supabase.from('user_settings').update({theme,companion:id}).eq('user_id',user.id);if(error)throw error;onThemeChanged(theme,id);}catch(e:any){Alert.alert('Could not update your Superdot',e?.message||'Please retry.')}finally{setThemeSaving(false)}}
+ const colors={accent:APP_THEME.primary,pale:APP_THEME.primarySoft};
  const insets = useSafeAreaInsets();
  const {width:pageWidth}=useWindowDimensions();
  const pager=useRef<ScrollView>(null);
@@ -61,10 +59,10 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  const [actionView,setActionView]=useState<'checkin'|'chat'|'history'>('checkin');
  const [actionVersion,setActionVersion]=useState(0);
  const openAction=(view:'checkin'|'chat'|'history')=>{setActionView(view);setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:680,animated:true});};
- const [settingsPage,setSettingsPage]=useState<'main'|'themes'|'watch'|'health'|'notifications'|'privacy'|'help'>('main');
+ const [settingsPage,setSettingsPage]=useState<'main'|'watch'|'health'|'notifications'|'privacy'|'help'>('main');
  const [period,setPeriod]=useState<Period>('Day');
- const [mood,setMood]=useState<Mood|' '>(' ');
- useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data,error}=await supabase.from('mood_entries').select('mood').eq('user_id',user.id).gte('recorded_at',new Date(new Date().setHours(0,0,0,0)).toISOString()).order('recorded_at',{ascending:false}).limit(1).maybeSingle();if(error){console.warn('Loading mood failed:',error.message);return;}if(alive&&data&&['Calm','Okay','Anxious','Happy','Tired'].includes(data.mood))setMood(data.mood as Mood)})();return()=>{alive=false}},[]);
+ const [mood,setMood]=useState<string>('');
+ useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data,error}=await supabase.from('mood_entries').select('mood').eq('user_id',user.id).gte('recorded_at',new Date(new Date().setHours(0,0,0,0)).toISOString()).order('recorded_at',{ascending:false}).limit(1).maybeSingle();if(error){console.warn('Loading mood failed:',error.message);return;}if(alive&&data?.mood)setMood(data.mood)})();return()=>{alive=false}},[]);
  const [water,setWater]=useState(0);
  const [coffee,setCoffee]=useState(0);
  useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;
@@ -90,15 +88,14 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  return <View style={[s.safe,{paddingTop:Platform.OS==='ios'?insets.top:StatusBar.currentHeight || 0}]}><StatusBar barStyle="dark-content" backgroundColor={C.bg}/>
   <View style={s.top}><View style={s.brand}><View style={[s.logo,{backgroundColor:colors.accent}]}><Text style={s.logoText}>✦</Text></View><Text style={s.brandText}>superdots<Text style={{color:colors.accent}}>.</Text></Text></View><TouchableOpacity accessibilityLabel="Open profile" onPress={()=>go('Settings')} style={s.avatar}><Text style={{fontSize:18}}>☺</Text></TouchableOpacity></View>
   <ScrollView ref={pager} horizontal pagingEnabled bounces={false} showsHorizontalScrollIndicator={false} scrollEventThrottle={16} onMomentumScrollEnd={onPageSettled} directionalLockEnabled style={{flex:1}} keyboardShouldPersistTaps="handled">
-  <View key="Today" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><WellnessToday companion={selectedCompanion} accent={colors.accent} water={water} mood={mood} onCheckin={()=>{go('Actions');openAction('checkin')}} onChat={()=>{go('Actions');openAction('chat')}} onActions={()=>{go('Actions');setActionDetail('water')}}/></ScrollView></View>
-  <View key="Actions" style={{width:pageWidth,flex:1}}><ScrollView ref={actionScroll} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">{actionDetail?<HabitDetails habit={actionDetail} onBack={()=>{setActionDetail(null);actionScroll.current?.scrollTo({y:0,animated:true})}} onSaved={(habit,n)=>{if(habit==='water')setWater(n);else setCoffee(n)}}/>:<><WellnessActions companion={selectedCompanion} accent={colors.accent} water={water} caffeine={coffee} onCaffeine={()=>{setActionDetail('caffeine');actionScroll.current?.scrollTo({y:0,animated:true})}} onWater={()=>{setActionDetail('water');actionScroll.current?.scrollTo({y:0,animated:true})}} onBreathing={()=>actionScroll.current?.scrollToEnd({animated:true})} onChat={()=>openAction('chat')} onMood={()=>openAction('checkin')} onJournal={()=>openAction('history')}/><WellnessCompanion key={actionVersion} initialView={actionView} companion={selectedCompanion} color={colors.accent}/><BreathingStudio accent={colors.accent} tint={colors.pale}/></>}</ScrollView></View>
-  <View key="Trends" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><WellnessTrends companion={selectedCompanion} accent={colors.accent} period={period} onPeriod={setPeriod} mood={mood}/><WellnessReportExport/></ScrollView></View>
-  <View key="Health" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><WellnessHealth companion={selectedCompanion} accent={colors.accent} onChat={()=>{go('Actions');openAction('chat')}} onPermissions={()=>{go('Settings');setSettingsPage('health')}}/></ScrollView></View>
+  <View key="Today" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><WellnessToday companion={mood} accent={colors.accent} water={water} mood={mood} onCheckin={()=>{go('Actions');openAction('checkin')}} onChat={()=>{go('Actions');openAction('chat')}} onActions={()=>{go('Actions');setActionDetail('water')}}/></ScrollView></View>
+  <View key="Actions" style={{width:pageWidth,flex:1}}><ScrollView ref={actionScroll} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">{actionDetail?<HabitDetails habit={actionDetail} onBack={()=>{setActionDetail(null);actionScroll.current?.scrollTo({y:0,animated:true})}} onSaved={(habit,n)=>{if(habit==='water')setWater(n);else setCoffee(n)}}/>:<><WellnessActions companion={mood} accent={colors.accent} water={water} caffeine={coffee} onCaffeine={()=>{setActionDetail('caffeine');actionScroll.current?.scrollTo({y:0,animated:true})}} onWater={()=>{setActionDetail('water');actionScroll.current?.scrollTo({y:0,animated:true})}} onBreathing={()=>actionScroll.current?.scrollToEnd({animated:true})} onChat={()=>openAction('chat')} onMood={()=>openAction('checkin')} onJournal={()=>openAction('history')}/><WellnessCompanion key={actionVersion} initialView={actionView} companion={mood} color={colors.accent}/><BreathingStudio accent={colors.accent} tint={colors.pale}/></>}</ScrollView></View>
+  <View key="Trends" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><WellnessTrends companion={mood} accent={colors.accent} period={period} onPeriod={setPeriod} mood={mood}/><WellnessReportExport/></ScrollView></View>
+  <View key="Health" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><WellnessHealth companion={mood} accent={colors.accent} onChat={()=>{go('Actions');openAction('chat')}} onPermissions={()=>{go('Settings');setSettingsPage('health')}}/></ScrollView></View>
   <View key="Settings" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
    {settingsPage==='main'?<>
-    <WellnessSettingsIntro companion={selectedCompanion} accent={colors.accent} onThemes={()=>setSettingsPage('themes')}/>
+    <WellnessSettingsIntro companion={mood} accent={colors.accent}/>
     <Text style={s.mainTitle}>Settings</Text>
-    <ThemeCard selected={selectedCompanion} onOpen={()=>setSettingsPage('themes')}/>
     <WatchThemesCard onOpen={()=>setSettingsPage('watch')}/>
 
     <SettingsItem title="Health Data" subtitle="Permissions and wearable readings" status="Open Health to connect or sync" icon="heart-outline" accent={colors.accent} onPress={()=>setSettingsPage('health')}/>
@@ -109,12 +106,11 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
     <TouchableOpacity style={s.settingsRow} onPress={()=>void supabase.auth.signOut()}><Ionicons name="log-out-outline" size={22} color="#D65B79"/><Text style={[s.settingsTitle,{color:'#D65B79'}]}>Sign out</Text></TouchableOpacity>
    </>:<>
     <TouchableOpacity style={s.settingsBack} onPress={()=>setSettingsPage('main')}><Ionicons name="chevron-back" size={18} color={colors.accent}/><Text style={{color:colors.accent,fontWeight:'800'}}>Settings</Text></TouchableOpacity>
-    <Text style={s.mainTitle}>{({themes:'Choose your Superdot',watch:'Apple Watch & Widgets',health:'Apple Health',notifications:'Notifications',privacy:'Privacy & Data',help:'Help & Support'} as const)[settingsPage]}</Text>
-    {settingsPage==='themes'?<ThemeGallery selected={selectedCompanion} saving={themeSaving} onSelect={(id,theme)=>void chooseSuperdot(id,theme)}/>:null}
-    {settingsPage==='watch'?<><Card><Heading title="Watch connection"/><Text style={s.bodyMuted}>The watch app offers optional Supabase theme synchronization. Apple Watch health readings are accessed through Apple Health on your iPhone after permission. Live WatchConnectivity is not connected yet.</Text></Card><WidgetPreview/></>:null}
+    <Text style={s.mainTitle}>{({watch:'Apple Watch & Widgets',health:'Apple Health',notifications:'Notifications',privacy:'Privacy & Data',help:'Help & Support'} as const)[settingsPage]}</Text>
+    {settingsPage==='watch'?<><Card><Heading title="Watch connection"/><Text style={s.bodyMuted}>The watch app offers optional watch companion synchronization. Apple Watch health readings are accessed through Apple Health on your iPhone after permission. Live WatchConnectivity is not connected yet.</Text></Card><WidgetPreview/></>:null}
     {settingsPage==='health'?<Card><Heading title="Health data access"/><Text style={s.bodyMuted}>Superdots can read real Apple Health measurements after you explicitly approve access. Syncing uploads selected HRV, resting heart rate, steps and sleep summaries to your private account. Permission is controlled in the Apple Health app. No clinical diagnosis is made.</Text><TouchableOpacity onPress={()=>go('Health')} style={[s.settingsAction,{backgroundColor:colors.pale}]}><Text style={[s.settingsActionText,{color:colors.accent}]}>Open Health and sync  →</Text></TouchableOpacity></Card>:null}
     {settingsPage==='notifications'?<WellnessReminders/>:null}
-    {settingsPage==='privacy'?<Card><Heading title="Your information"/><Text style={s.bodyMuted}>Your profile, selected companion, mood logs and habit entries are stored in Supabase under user-specific access policies. Choosing Connect and sync on the Health screen also stores selected HealthKit measurements in your account.</Text><Text style={[s.bodyMuted,{marginTop:10}]}>For account data requests or deletion, contact the app operator. An in-app export and deletion flow has not yet been implemented.</Text></Card>:null}
+    {settingsPage==='privacy'?<Card><Heading title="Your information"/><Text style={s.bodyMuted}>Your profile, mood logs and habit entries are stored in Supabase under user-specific access policies. Choosing Connect and sync on the Health screen also stores selected HealthKit measurements in your account.</Text><Text style={[s.bodyMuted,{marginTop:10}]}>For account data requests or deletion, contact the app operator. An in-app export and deletion flow has not yet been implemented.</Text></Card>:null}
     {settingsPage==='help'?<Card><Heading title="Need help?"/><Text style={s.bodyMuted}>To change onboarding answers, open Settings and select Customize my profile. For login issues, use Forgot password on the sign-in screen. Watch and health syncing are upcoming features.</Text></Card>:null}
    </>}
   </ScrollView></View>
