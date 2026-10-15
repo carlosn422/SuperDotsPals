@@ -13,7 +13,8 @@ struct AnimatedMoodMascot: View {
         if ["happy","good","great","joy","excited","proud"].contains(where:value.contains) { return "joy" }
         if ["anger","angry","frustrated","mad","irritated"].contains(where:value.contains) { return "anger" }
         if ["fear","anxious","stress","worried","nervous","overwhelmed"].contains(where:value.contains) { return "fear" }
-        if ["sad","tired","down","exhausted","depressed","lonely"].contains(where:value.contains) { return "sadness" }
+        if ["tired","sleepy","exhausted","fatigued"].contains(where:value.contains) { return "tired" }
+        if ["sad","down","depressed","lonely"].contains(where:value.contains) { return "sadness" }
         return "disgust"
     }
 
