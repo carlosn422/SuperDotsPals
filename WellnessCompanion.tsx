@@ -3,7 +3,7 @@ import {View,Text,TextInput,TouchableOpacity,ScrollView,StyleSheet,Alert,Activit
 import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
 
-const feelings=['Good','Calm','Stressed','Anxious','Sad','Tired','Overwhelmed'];
+const feelings=['Good','Calm','Joyful','Angry','Frustrated','Stressed','Anxious','Sad','Tired','Overwhelmed'];
 const activities=['Walking','Workout','Work','Meeting','Rest','Social time','Other'];
 const stressFactors=['Work','Sleep','Relationships','Caffeine','Exercise','Hydration','Health','Other'];
 type Entry={id:string;body:string;mood:string|null;intensity:number|null;energy_level:string|null;stress_factors:string[];occurred_at:string};
