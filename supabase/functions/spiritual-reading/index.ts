@@ -59,7 +59,15 @@ Deno.serve(async(req:Request)=>{
   }
   if(action==="questions"){
    const items=Array.isArray(aiResult?.items)?aiResult.items.filter((x:any)=>typeof x?.question==="string"&&x.question.length>10&&x.question.length<=120&&Array.isArray(x.choices)&&x.choices.length===4&&x.choices.every((c:unknown)=>typeof c==="string"&&(c as string).length>1&&(c as string).length<=55)).slice(0,3):[];
-   const fallbackItems=[...simpleQuestions[mood], 'What would feel most supportive for you right now?'].map(q=>({question:q,choices:["Something happening today","An ongoing situation","My physical energy or rest","I am not sure yet"]}));
+   const moodChoices:Record<string,string[][]>={
+    Joyful:[["A meaningful accomplishment","Time with someone I love","An unexpected good moment","Feeling grateful for life"],["A person who supported me","A small everyday blessing","An opportunity or breakthrough","I am still figuring it out"],["Celebrating with someone","Remembering this moment","Sharing kindness with others","Taking time for gratitude"]],
+    Calm:[["Time away from distractions","An encouraging conversation","Prayer or quiet reflection","Feeling prepared"],["Rest and recovery","Feeling connected","Being outdoors","Having fewer worries"],["Protecting my quiet time","Making space for prayer","Setting healthy boundaries","Sharing peace with others"]],
+    Sad:[["A loss or disappointment","Feeling lonely","An ongoing difficult situation","I cannot pinpoint it"],["A friend or family member","Space to process feelings","A reminder of hope","Rest and compassion"],["Someone listening to me","A reassuring passage","A small step forward","Time for myself"]],
+    Angry:[["A difficult conversation","Feeling treated unfairly","Too many demands","Unmet expectations"],["Feeling unheard","A crossed boundary","Stress building up","Something unexpected"],["Time to cool down","A kind conversation","Help setting a boundary","Guidance to respond patiently"]],
+    Anxious:[["An upcoming decision","Work or family responsibilities","Uncertainty about the future","Something hard to explain"],["Having too much to do","Fear of letting someone down","A difficult relationship","Not enough rest"],["Reassurance and perspective","One manageable next step","Support from someone","Quiet time to reflect"]],
+    Tired:[["Not enough sleep","An emotionally demanding day","Too many responsibilities","Feeling unmotivated"],["Physical exhaustion","Feeling mentally drained","Not enough downtime","Something weighing on me"],["Permission to rest","Help with a responsibility","Some quiet time","Encouragement to slow down"]]
+   };
+   const fallbackItems=[...simpleQuestions[mood], "What would feel most supportive for you right now?"].map((question,i)=>({question,choices:moodChoices[mood][i]}));
    return out({items:items.length===3?items:fallbackItems,usedAI:items.length===3&&usedAI});
   }
   const selected=catalog.find(p=>p.reference===aiResult?.reference)||catalog.find(p=>p.reference===fallback[mood])||catalog[0];
