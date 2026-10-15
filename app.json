@@ -18,13 +18,6 @@
     },
     "plugins": [
       [
-        "expo-speech-recognition",
-        {
-          "microphonePermission": "Allow Superdots to listen when you choose to talk to your companion.",
-          "speechRecognitionPermission": "Allow Superdots to convert your speech to text for your private conversations."
-        }
-      ],
-      [
         "@appeeky/expo-healthkit",
         {
           "healthSharePermission": "Allow Superdots to read heart rate variability, resting heart rate, steps and sleep with your permission.",
