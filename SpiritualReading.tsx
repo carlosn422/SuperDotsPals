@@ -61,7 +61,7 @@ export default function SpiritualReading(){
   <View style={{backgroundColor:'white',padding:13,borderRadius:15,gap:6}}><Text style={{fontWeight:'900',color:ink}}>A reflection for today</Text><Text style={{color:muted,lineHeight:21}}>{reflection}</Text></View>
   {btn(isFavorite?'Remove from favorites':'♡ Save favorite verse',()=>void saveFavorite())}
   {btn('Read from source',()=>void Linking.openURL(passage.source_url),false)}
-  {btn('Another reading',()=>void recommend(),false)}
+  {btn('Choose another mood',()=>{setMood('');setStep('mood')},false)}
   {btn('Start again',()=>{setMood('');setStep('start')},false)}
  </View>:null}
  {step==='favorites'?<View style={{backgroundColor:'white',padding:16,borderRadius:22,gap:12}}>
