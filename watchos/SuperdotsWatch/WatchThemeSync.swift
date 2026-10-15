@@ -72,7 +72,7 @@ final class WatchThemeSync: ObservableObject {
 
     func signOut() {
         for key in ["watch_access","watch_refresh","watch_user","watch_pairing_id"] { storeSecret(nil,for:key) }
-        accessToken = ""; refreshToken = ""; userId = ""; pairingId = ""; pairingSecret = ""; pairingURL = ""; pairingActive = false; connected = false
+        accessToken = ""; refreshToken = ""; userId = ""; pairingId = ""; pairingSecret = ""; pairingURL = ""; pairingActive = false; pairingConnecting = false; connected = false
         message = "Disconnected. Your watch will show local defaults."
     }
 
@@ -135,6 +135,7 @@ final class WatchThemeSync: ObservableObject {
 
     @Published var pairingURL = ""
     @Published var pairingActive = false
+    @Published var pairingConnecting = false
     private var pairingId = ""
     private var pairingSecret = ""
 
@@ -162,6 +163,9 @@ final class WatchThemeSync: ObservableObject {
             let status=obj["status"] as? String ?? ""
             if status=="expired" {pairingActive=false;message="QR expired. Generate a new code.";return}
             if status=="approved",let hash=obj["tokenHash"] as? String {
+                pairingConnecting=true
+                message="Connecting your watch…"
+                let started=Date()
                 let verify=try JSONSerialization.data(withJSONObject:["token_hash":hash,"type":"magiclink"])
                 let session=try await request("/auth/v1/verify",method:"POST",body:verify,authenticated:false)
                 try loadSession(session)
@@ -173,6 +177,9 @@ final class WatchThemeSync: ObservableObject {
                 pairingURL="";pairingSecret=""
                 message="Watch connected to your Superdots account."
                 await refresh(store:store)
+                let remaining=3.0-Date().timeIntervalSince(started)
+                if remaining>0 {try? await Task.sleep(for:.seconds(remaining))}
+                pairingConnecting=false
             }
         }catch{message="Waiting for connection: \(error.localizedDescription)"}
     }
@@ -257,7 +264,10 @@ struct WatchSyncView: View {
  var body:some View {
   ScrollView {
    VStack(spacing:12) {
-    if sync.connected {
+    if sync.pairingConnecting {
+     ProgressView().controlSize(.large).tint(.purple)
+     Text("Connecting Apple Watch…").font(.headline).multilineTextAlignment(.center)
+    } else if sync.connected {
      Image(systemName:"checkmark.circle.fill").font(.largeTitle).foregroundStyle(.green)
      Text("Connected").font(.headline)
      Text(sync.message).font(.caption2).multilineTextAlignment(.center)
