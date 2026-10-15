@@ -26,7 +26,10 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJo
   try{const {data:{user},error:authError}=await supabase.auth.getUser();if(authError||!user)throw Error('Please sign in.');
    const {error}=await supabase.from('wellness_journal').insert({user_id:user.id,entry_type:'reflection',body:note.trim()||'Mood check-in',mood,reflection_answers:withDetails?answers:{},stress_factors:[]});
    if(error)throw error;
-   setSavedAnswers(withDetails?{...answers}:{});changeStep(3);onSaved(mood);
+   const completedAnswers=withDetails?{...answers}:{};
+   setSavedAnswers(completedAnswers);
+   onSaved(mood);
+   onFindVerse(mood,completedAnswers);
   }catch(e:any){Alert.alert('Could not save your mood',e.message||'Please try again.')}finally{setBusy(false)}
  }
  const shownQuestions=questions.length?questions:(fallback[mood]||[]);
