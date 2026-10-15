@@ -10,7 +10,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.superdotspals.wellnest",
       "infoPlist": {
-        "NSHealthShareUsageDescription": "Allow Superdots to read heart rate variability, resting heart rate, steps and sleep when you choose to sync health data."
+        "NSHealthShareUsageDescription": "Allow Superdots to read heart rate variability, resting heart rate, steps and sleep when you choose to sync health data.",
+        "NSCameraUsageDescription": "Allow Superdots to scan your Apple Watch pairing QR code."
       }
     },
     "android": {
@@ -34,6 +35,12 @@
       [
         "expo-notifications",
         {}
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Superdots to scan an Apple Watch pairing QR code."
+        }
       ]
     ]
   }
