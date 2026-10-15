@@ -80,10 +80,17 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJo
   {step===2?<View style={{gap:12}}>
    <View style={{flexDirection:'row',alignItems:'center',gap:10}}><SuperdotMascot id={mood} size={56}/><View style={{flex:1}}><Text style={{fontWeight:'800',fontSize:14,color:'#281F49'}}>{mood}</Text><Text style={{fontSize:11,color:'#8980A0'}}>Let's explore this feeling</Text></View><Text style={{fontSize:11,color:'#817892'}}>{questionIndex+1} of {shownQuestions.length}</Text></View>
    <View style={{height:4,backgroundColor:'#EDEAF4',borderRadius:3,overflow:'hidden'}}><View style={{width:`${(questionIndex+1)/Math.max(shownQuestions.length,1)*100}%` as `${number}%`,height:4,backgroundColor:color,borderRadius:3}}/></View>
-   {loadingQuestions?<Text style={{color:color,fontSize:12}}>Personalizing your questions…</Text>:null}
+   <View style={{position:'relative',gap:12}}>
    <Text style={{fontSize:17,fontWeight:'900',color:'#251C45',lineHeight:24}}>{currentQuestion}</Text>
    <View accessibilityRole="radiogroup" style={{gap:7}}>{[...currentItem.choices,'Other / prefer not to say'].map(c=>option(c,()=>setAnswers(v=>({...v,[currentQuestion]:c})),answers[currentQuestion]===c))}</View>
    {questionIndex===shownQuestions.length-1?<TextInput placeholder="Add a note (optional)" placeholderTextColor="#A59DB5" multiline maxLength={1000} value={note} onChangeText={setNote} style={{minHeight:63,borderWidth:1,borderColor:'#ECE8F3',borderRadius:13,padding:11,textAlignVertical:'top',color:'#30284C'}}/>:null}
+
+    {loadingQuestions?<View accessibilityRole="progressbar" style={{position:'absolute',top:0,bottom:0,left:0,right:0,zIndex:5,borderRadius:16,backgroundColor:'rgba(248,246,253,0.97)',justifyContent:'center',alignItems:'center',padding:18,gap:14}}>
+     <ActivityIndicator size="large" color={color}/>
+     <Text style={{color:'#352653',fontWeight:'900',fontSize:15,textAlign:'center'}}>Personalizing your questions…</Text>
+     <Text style={{color:'#807694',fontSize:12,textAlign:'center'}}>Finding thoughtful questions for how you feel</Text>
+    </View>:null}
+   </View>
    <View style={{flexDirection:'row',gap:8}}>
     <View style={{flex:1}}>{secondary('Back',backQuestion)}</View>
     <View style={{flex:2}}>{primary(questionIndex===shownQuestions.length-1?'Finish check-in':'Next →',()=>questionIndex===shownQuestions.length-1?void save(true):nextQuestion())}</View>
