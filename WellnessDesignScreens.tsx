@@ -39,14 +39,30 @@ export function MeetYourMoods({onCheckin}:{onCheckin:()=>void}){
    </TouchableOpacity>
  </View>;
 }
-export function WellnessToday({companion,accent,water,mood,onCheckin,onChat,onActions}:{companion:string;accent:string;water:number;mood:string;onCheckin:()=>void;onChat:()=>void;onActions:()=>void}){
- return <View style={s.page}><BrandHead companion={companion}/><PageHero title="A little check-in" highlight="for you" detail="Take a moment to pause and see how you're feeling today." accent={accent} companion={companion} button="Let's check in" onPress={onCheckin}/>
- <MeetYourMoods onCheckin={onCheckin}/>
- <RecoveryInsights companion={companion} onChat={onChat}/>
- <SectionHeading title="Your daily wellness"/><View style={s.grid}><StatCard title="Water Intake" value={String(water)+' cups'} detail="Logged today" icon="water" tint="#E5F3FF" onPress={onActions}/><StatCard title="Mood" value={mood.trim()||'Not logged'} detail="Tap to check in" icon="happy-outline" tint="#FFF0D6" onPress={onCheckin}/></View><HealthMiniStats/>
- <TouchableOpacity onPress={onChat} style={s.chat}><SuperdotMascot id={companion} color={accent} size={68}/><View style={{flex:1}}><Text style={s.actionTitle}>Talk to your Superdot</Text><Text style={s.body}>Share how you're feeling and get support.</Text></View><Ionicons name="chevron-forward" size={20} color={accent}/></TouchableOpacity>
- <SectionHeading title="Today's highlights"/><View style={[s.celebrate,{backgroundColor:'#FFF8EC'}]}><Text style={s.body}>Log your water, mood and breathing to build a picture of your day.</Text></View>
- </View>
+export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,onChat,onActions,onCaffeine,onJournal}:{companion:string;accent:string;water:number;caffeine:number;mood:string;onCheckin:()=>void;onChat:()=>void;onActions:()=>void;onCaffeine:()=>void;onJournal:()=>void}){
+ const today=new Date();
+ const date=today.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+ const row=(icon:any,label:string,detail:string,onPress:()=>void)=>(
+  <TouchableOpacity onPress={onPress} style={{backgroundColor:'#FFFFFF',paddingVertical:13,paddingHorizontal:13,flexDirection:'row',alignItems:'center',gap:12,borderBottomColor:'#F0EEF5',borderBottomWidth:1}}>
+   <View style={{width:39,height:39,borderRadius:13,backgroundColor:APP_THEME.primarySoft,alignItems:'center',justifyContent:'center'}}><Ionicons name={icon} color={accent} size={19}/></View>
+   <View style={{flex:1,gap:3}}><Text style={{fontWeight:'800',color:INK,fontSize:14}}>{label}</Text><Text style={{color:MUTED,fontSize:11}}>{detail}</Text></View>
+   <Ionicons name="chevron-forward" color={accent} size={18}/>
+  </TouchableOpacity>
+ );
+ return <View style={[s.page,{gap:17}]}>
+  <PageHero title="A little check-in" highlight="for you" detail="Take a moment to pause and see how you're feeling today." accent={accent} companion={companion} button="Let's check in" onPress={onCheckin}/>
+  <View style={{gap:10}}>
+   <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={{fontWeight:'900',fontSize:19,color:INK}}>Today</Text><Text style={{color:MUTED,fontSize:12}}>{date}</Text></View>
+   <View style={{borderRadius:20,overflow:'hidden',borderColor:APP_THEME.border,borderWidth:1}}>
+    {row('water-outline','Water',water+' cups logged today',onActions)}
+    {row('cafe-outline','Caffeine',caffeine+' cups logged today',onCaffeine)}
+    {row('book-outline','Journal','View your private reflections',onJournal)}
+    {row('happy-outline','Mood',mood||'Not checked in yet',onCheckin)}
+   </View>
+  </View>
+  <RecoveryInsights companion={companion} onChat={onChat}/>
+  <HealthMiniStats/>
+ </View>;
 }
 export function WellnessActions({companion,accent,water,onWater,onCaffeine,onBreathing,onChat,onMood,onJournal,caffeine}:{companion:string;accent:string;water:number;caffeine:number;onWater:()=>void;onCaffeine:()=>void;onBreathing:()=>void;onChat:()=>void;onMood:()=>void;onJournal:()=>void}){
  const [day,setDay]=React.useState(0);
