@@ -39,7 +39,7 @@ Deno.serve(async(req:Request)=>{
   if(aiAllowed){const since=new Date(Date.now()-24*60*60*1000).toISOString();const {count,error:usageError}=await db.from("spiritual_ai_usage").select("id",{head:true,count:"exact"}).eq("user_id",user.id).gte("created_at",since);if(usageError||Number(count||0)>=10)aiAllowed=false;}
   if(aiAllowed){
    const instruction=action==="questions"?
-   "You create exactly TWO gentle, optional, emotionally neutral reflection questions for a faith-based wellness app. Do not diagnose, presume causation, impose guilt, or tell someone to stop medical care. Return JSON only: {\"questions\":[\"...\",\"...\"]}. Each question <=120 characters.":
+   "Generate THREE thoughtful and DISTINCT emotionally supportive questions that help understand WHY a person feels their selected mood, in a wellness app. Tailor to the mood and available history, without claiming health data caused the feeling. Favor open exploration of real-life events, relationships, stressors and hopes. For EACH question provide FOUR short, specific multiple choice answers (never generic Yes/No) plus an optional Other option handled by the app. Do not diagnose or pressure faith. Return JSON only: {\"items\":[{\"question\":\"...\",\"choices\":[\"...\",\"...\",\"...\",\"...\"]}, ...]}. Question max 120 characters, choice max 55.":
    "Select ONE reference from the provided verified Bible catalog ONLY. Never invent Bible text or a reference. Offer a warm two-sentence reflection that does not diagnose or promise a cure. Return JSON only: {\"reference\":\"exact supplied reference\",\"reflection\":\"...\"}. Reflection <=300 characters.";
    const context={mood,answers,history,availableReferences:action==="recommend"?catalog.map(p=>({reference:p.reference,topics:p.topics})):undefined};
    const abort=new AbortController();const timer=setTimeout(()=>abort.abort(),12000);
@@ -54,8 +54,9 @@ Deno.serve(async(req:Request)=>{
    finally{clearTimeout(timer)}
   }
   if(action==="questions"){
-   const proposed=Array.isArray(aiResult?.questions)?aiResult.questions.filter((v:unknown)=>typeof v==="string"&&v.length>10&&v.length<=120).slice(0,2):[];
-   return out({questions:proposed.length===2?proposed:simpleQuestions[mood],usedAI:proposed.length===2&&usedAI});
+   const items=Array.isArray(aiResult?.items)?aiResult.items.filter((x:any)=>typeof x?.question==="string"&&x.question.length>10&&x.question.length<=120&&Array.isArray(x.choices)&&x.choices.length===4&&x.choices.every((c:unknown)=>typeof c==="string"&&(c as string).length>1&&(c as string).length<=55)).slice(0,3):[];
+   const fallbackItems=simpleQuestions[mood].map(q=>({question:q,choices:["Something happening today","An ongoing situation","My physical energy or rest","I am not sure yet"]}));
+   return out({items:items.length===3?items:fallbackItems,usedAI:items.length===3&&usedAI});
   }
   const selected=catalog.find(p=>p.reference===aiResult?.reference)||catalog.find(p=>p.reference===fallback[mood])||catalog[0];
   const reflection=typeof aiResult?.reflection==="string"&&aiResult.reflection.length<=300?aiResult.reflection:"This passage offers a starting point for prayer and reflection on what matters to you today.";
