@@ -8,7 +8,7 @@ const activities=['Walking','Workout','Work','Meeting','Rest','Social time','Oth
 const stressFactors=['Work','Sleep','Relationships','Caffeine','Exercise','Hydration','Health','Other'];
 type Entry={id:string;body:string;mood:string|null;intensity:number|null;energy_level:string|null;stress_factors:string[];occurred_at:string};
 type Message={id:string;role:'user'|'assistant';content:string;created_at:string};
-export default function WellnessCompanion({companion,color,initialView='checkin'}:{companion:string;color:string;initialView?:'checkin'|'chat'|'history'}){
+export default function WellnessCompanion({companion,color,initialView='checkin',onMoodSaved}:{companion:string;color:string;initialView?:'checkin'|'chat'|'history';onMoodSaved?:(mood:string)=>void}){
  const [mood,setMood]=useState(''),[energy,setEnergy]=useState<'energized'|'tired'|'neutral'>('neutral'),[factors,setFactors]=useState<string[]>([]),[intensity,setIntensity]=useState(5),[note,setNote]=useState(''),[activity,setActivity]=useState('Walking'),[minutes,setMinutes]=useState('20'),[events,setEvents]=useState<Entry[]>([]);
  const [view,setView]=useState<'checkin'|'chat'|'history'>(initialView);
  const [chatText,setChatText]=useState(''),[messages,setMessages]=useState<Message[]>([]),[conversationId,setConversationId]=useState<string|null>(null),[busy,setBusy]=useState(false);
@@ -28,7 +28,7 @@ export default function WellnessCompanion({companion,color,initialView='checkin'
   setBusy(true);
   try{const id=await userId();const body=note.trim()||'Mood check-in';
    const {error}=await supabase.from('wellness_journal').insert({user_id:id,body,entry_type:'reflection',mood,intensity,energy_level:energy,stress_factors:factors});if(error)throw error;
-   setMood('');setEnergy('neutral');setFactors([]);setNote('');await load();Alert.alert('Saved privately','Your reflection has been recorded.');
+   onMoodSaved?.(mood);setMood('');setEnergy('neutral');setFactors([]);setNote('');await load();Alert.alert('Saved privately','Your reflection has been recorded.');
   }catch(e:any){Alert.alert('Could not save',e?.message||'Try again.')}finally{setBusy(false)}
  }
  async function saveActivity(){
@@ -54,7 +54,7 @@ export default function WellnessCompanion({companion,color,initialView='checkin'
   } catch(e:any){Alert.alert('Unable to send',e?.message||'Please retry. Your message has not been cleared.')}
   finally{setBusy(false)}
  }
- return <View style={s.container}><View style={s.header}><SuperdotMascot id={companion} color={color} size={66}/><View style={{flex:1}}><Text style={s.title}>Talk to your Superdot</Text><Text style={s.sub}>A safe space to reflect, understand and remember.</Text></View></View>
+ return <View style={s.container}><View style={s.header}><SuperdotMascot id={mood||companion} color={color} size={66}/><View style={{flex:1}}><Text style={s.title}>Talk to your Superdot</Text><Text style={s.sub}>A safe space to reflect, understand and remember.</Text></View></View>
  <View style={s.tabs}>{(['checkin','chat','history'] as const).map(t=><TouchableOpacity key={t} onPress={()=>setView(t)} style={[s.tab,view===t&&{backgroundColor:color}]}><Text style={[s.tabText,view===t&&{color:'#fff'}]}>{t==='checkin'?'Check in':t==='chat'?'Talk':'Journal'}</Text></TouchableOpacity>)}</View>
  {view==='checkin'?<View style={s.card}><Text style={s.heading}>How are you feeling?</Text><View style={s.choices}>{feelings.map(f=><TouchableOpacity key={f} onPress={()=>setMood(f)} style={[s.choice,mood===f&&{backgroundColor:color}]}><Text style={[s.choiceText,mood===f&&{color:'#fff'}]}>{f}</Text></TouchableOpacity>)}</View><Text style={s.heading}>How is your energy?</Text><View style={s.choices}>{([{v:'energized',name:'⚡ Energized'},{v:'neutral',name:'🙂 Balanced'},{v:'tired',name:'😴 Tired'}] as const).map(o=><TouchableOpacity key={o.v} onPress={()=>setEnergy(o.v)} style={[s.choice,energy===o.v&&{backgroundColor:color}]}><Text style={[s.choiceText,energy===o.v&&{color:'#fff'}]}>{o.name}</Text></TouchableOpacity>)}</View>
  <Text style={s.heading}>What might be contributing?</Text><Text style={s.sub}>Select any factors you want to track. You can leave this blank.</Text>
