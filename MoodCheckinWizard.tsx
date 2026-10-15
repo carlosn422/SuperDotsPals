@@ -13,7 +13,7 @@ const fallback:Record<string,string[]>={
  Tired:['Did you sleep less than you wanted?','Has your day been physically or mentally demanding?','Have you had enough time to recover?']
 };
 const choices=['Yes','A little','No','Not sure','Prefer not to say'];
-export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onNavigate}:{color:string;onSaved:(mood:string)=>void;onExploreAI:(mood:string)=>void;onDone:()=>void;onNavigate?:()=>void}){
+export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJournal,onInsights,onNavigate}:{color:string;onSaved:(mood:string)=>void;onExploreAI:(mood:string)=>void;onDone:()=>void;onJournal:()=>void;onInsights:()=>void;onNavigate?:()=>void}){
  const [step,setStep]=useState<0|1|2|3>(0),[mood,setMood]=useState<string>(''),[questions,setQuestions]=useState<string[]>([]),[answers,setAnswers]=useState<Record<string,string>>({}),[note,setNote]=useState(''),[questionIndex,setQuestionIndex]=useState(0),[busy,setBusy]=useState(false);
  useEffect(()=>{if(!mood)return;let active=true;setQuestions(fallback[mood]||[]);setAnswers({});setQuestionIndex(0);
  (async()=>{const {data,error}=await supabase.from('mood_questions').select('question').eq('mood',mood).eq('is_active',true).order('sort_order',{ascending:true}).limit(3);
@@ -78,9 +78,16 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onNa
   {step===3?<View style={{gap:13,alignItems:'stretch',paddingTop:11}}>
    <View style={{alignItems:'center',gap:7}}><Text style={{fontSize:35,color:color}}>✓</Text><SuperdotMascot id={mood} size={107}/><Text style={{fontSize:22,fontWeight:'900',color:'#251C45'}}>Check-in complete!</Text><Text style={{color:'#827892',textAlign:'center',fontSize:12,lineHeight:18}}>Your mood has been saved privately.</Text></View>
    <View style={{backgroundColor:'#F2EFFB',borderRadius:13,padding:12,flexDirection:'row',alignItems:'center',gap:9}}><SuperdotMascot id={mood} size={54}/><View style={{flex:1}}><Text style={{fontSize:11,color:'#817892'}}>Your mood today</Text><Text style={{fontSize:15,fontWeight:'900',color:'#30264D'}}>{mood}</Text><Text style={{fontSize:11,color:'#817892'}}>{new Date().toLocaleString()}</Text></View></View>
-   <Text style={{fontSize:14,fontWeight:'900',color:'#30264D'}}>What's next?</Text>
-   {secondary('Talk to your Superdot  →',()=>onExploreAI(mood))}
-   {primary('Back to Today',onDone)}
+   <Text style={{fontSize:15,fontWeight:'900',color:'#30264D'}}>What's next?</Text>
+   {[
+    {icon:'💬',title:'Talk to your Superdot',sub:'Explore this feeling through AI text chat',go:()=>onExploreAI(mood)},
+    {icon:'📖',title:'Write in your journal',sub:'Reflect on your thoughts',go:onJournal},
+    {icon:'💡',title:'View insights',sub:'See your patterns over time',go:onInsights},
+   ].map(item=><TouchableOpacity key={item.title} accessibilityRole="button" onPress={item.go} style={{borderWidth:1,borderColor:'#ECE9F4',borderRadius:14,padding:11,flexDirection:'row',alignItems:'center',gap:11}}>
+    <View style={{backgroundColor:'#F1ECFF',width:40,height:40,borderRadius:12,justifyContent:'center',alignItems:'center'}}><Text style={{fontSize:22}}>{item.icon}</Text></View>
+    <View style={{flex:1,gap:3}}><Text style={{fontWeight:'800',color:'#30264D',fontSize:13}}>{item.title}</Text><Text style={{color:'#89809B',fontSize:11}}>{item.sub}</Text></View>
+   </TouchableOpacity>)}
+   {primary('Back to Home',onDone)}
   </View>:null}
   {busy?<ActivityIndicator color={color}/>:null}
  </View>;
