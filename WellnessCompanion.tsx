@@ -2,11 +2,6 @@ import React,{useEffect,useState} from 'react';
 import {View,Text,TextInput,TouchableOpacity,ScrollView,StyleSheet,Alert,ActivityIndicator} from 'react-native';
 import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
-import {speakWithPreferences} from './VoicePreferences';
-import Constants, {ExecutionEnvironment} from 'expo-constants';
-// Expo Go can report appOwnership=null on some SDK builds; executionEnvironment is authoritative.
-const isExpoGo=Constants.appOwnership==='expo' || (Constants.executionEnvironment===ExecutionEnvironment.StoreClient && Constants.expoGoConfig != null);
-const NativeVoice=isExpoGo?null:require('./VoiceRecognitionNative').default;
 
 const feelings=['Good','Calm','Stressed','Anxious','Sad','Tired','Overwhelmed'];
 const activities=['Walking','Workout','Work','Meeting','Rest','Social time','Other'];
@@ -42,8 +37,8 @@ export default function WellnessCompanion({companion,color,initialView='checkin'
   Alert.alert('Activity recorded','This can help you review patterns alongside future moods.');
   }catch(e:any){Alert.alert('Could not save',e?.message||'Try again.')}finally{setBusy(false)}
  }
- async function send(spoken?:string,readAloud=false){
-  const input=(spoken??chatText).trim();if(!input||busy)return;
+ async function send(){
+  const input=chatText.trim();if(!input||busy)return;
   if(input.length>3000){Alert.alert('Message too long','Please shorten your message to 3,000 characters.');return;}
   setBusy(true);
   try {
@@ -55,7 +50,6 @@ export default function WellnessCompanion({companion,color,initialView='checkin'
    setChatText('');
    const now=new Date().toISOString();
    setMessages(prev=>[...prev,{id:'user-'+Date.now(),role:'user',content:input,created_at:now},{id:'ai-'+Date.now(),role:'assistant',content:data.reply,created_at:now}]);
-   if(readAloud)void speakWithPreferences(data.reply).catch(e=>console.warn('Speech playback failed',e));
    void (async()=>{try{const id=await userId();const {data:history,error:historyError}=await supabase.from('wellness_messages').select('id,role,content,created_at').eq('user_id',id).eq('conversation_id',data.conversationId).order('created_at',{ascending:true}).limit(80);if(!historyError&&history?.length)setMessages(history as Message[]);}catch(e){console.warn('History refresh failed',e)}})();
   } catch(e:any){Alert.alert('Unable to send',e?.message||'Please retry. Your message has not been cleared.')}
   finally{setBusy(false)}
@@ -67,11 +61,8 @@ export default function WellnessCompanion({companion,color,initialView='checkin'
  <View style={s.choices}>{stressFactors.map(f=><TouchableOpacity key={f} onPress={()=>setFactors(v=>v.includes(f)?v.filter(x=>x!==f):[...v,f])} style={[s.choice,factors.includes(f)&&{backgroundColor:color}]}><Text style={[s.choiceText,factors.includes(f)&&{color:'#fff'}]}>{f}</Text></TouchableOpacity>)}</View>
  <Text style={s.heading}>Intensity: {intensity}/10</Text><View style={s.intensity}>{Array.from({length:10},(_,i)=><TouchableOpacity key={i} onPress={()=>setIntensity(i+1)} style={[s.point,{backgroundColor:intensity===i+1?color:'#E8E2F0'}]}/>)}</View><TextInput style={s.input} placeholder="What happened? What might have contributed?" placeholderTextColor="#9D91A9" multiline value={note} onChangeText={setNote}/><TouchableOpacity disabled={busy} onPress={()=>void saveCheckin()} style={[s.button,{backgroundColor:color}]}><Text style={s.buttonText}>Save mood & reflection</Text></TouchableOpacity>
  <Text style={s.heading}>Log a helpful activity</Text><View style={s.choices}>{activities.map(x=><TouchableOpacity key={x} onPress={()=>setActivity(x)} style={[s.choice,activity===x&&{backgroundColor:color}]}><Text style={[s.choiceText,activity===x&&{color:'#fff'}]}>{x}</Text></TouchableOpacity>)}</View><TextInput style={s.shortInput} keyboardType="number-pad" placeholder="Minutes" value={minutes} onChangeText={setMinutes}/><TouchableOpacity disabled={busy} onPress={()=>void saveActivity()} style={[s.button,{backgroundColor:'#E9E1FA'}]}><Text style={[s.buttonText,{color:color}]}>Record activity</Text></TouchableOpacity></View>:null}
- {view==='chat'?<View style={s.card}><Text style={s.heading}>Your private conversation</Text><Text style={s.disclaimer}>Powered by Gemini. The AI can use your private journal, mood and activity history to help you reflect. It is not a therapist or medical diagnosis.</Text><ScrollView style={{maxHeight:360}} contentContainerStyle={{gap:10}}>{messages.map(m=><View key={m.id} style={[s.message,{alignSelf:m.role==='user'?'flex-end':'flex-start',backgroundColor:m.role==='user'?'#EDE4FF':'#F2F4F4'}]}><Text style={s.messageText}>{m.content}</Text></View>)}</ScrollView><Text style={s.disclaimer}>{NativeVoice?'Tap Talk to speak and hear a response.':'Voice needs an iOS development build. Expo Go supports text chat only.'}</Text>
-<TextInput style={s.input} multiline placeholder="Tell your Superdot what's on your mind..." placeholderTextColor="#9D91A9" value={chatText} onChangeText={setChatText}/>
-<View style={{flexDirection:'row',gap:10}}>
- {NativeVoice?<NativeVoice busy={busy} color={color} onResult={setChatText} onSubmit={(message:string)=>send(message,true)} messages={messages}/>:<TouchableOpacity style={[s.button,{backgroundColor:color,flex:1}]} onPress={()=>Alert.alert('Voice conversations need a development build','Expo Go cannot load the native speech-recognition engine. Run npx expo run:ios to use Siri-style conversations. Text chat is available here.')}><Text style={s.buttonText}>🎙 Talk</Text></TouchableOpacity>}
- <TouchableOpacity disabled={busy} onPress={()=>void send()} style={[s.button,{backgroundColor:'#EDE6FF',flex:1}]}>{busy?<ActivityIndicator color={color}/>:<Text style={[s.buttonText,{color}]}>Send text</Text>}</TouchableOpacity>
+ {view==='chat'?<View style={s.card}><Text style={s.heading}>Your private conversation</Text><Text style={s.disclaimer}>Powered by Gemini. The AI can use your private journal, mood and activity history to help you reflect. It is not a therapist or medical diagnosis.</Text><ScrollView style={{maxHeight:360}} contentContainerStyle={{gap:10}}>{messages.map(m=><View key={m.id} style={[s.message,{alignSelf:m.role==='user'?'flex-end':'flex-start',backgroundColor:m.role==='user'?'#EDE4FF':'#F2F4F4'}]}><Text style={s.messageText}>{m.content}</Text></View>)}</ScrollView><TextInput style={s.input} multiline placeholder="Tell your Superdot what's on your mind..." placeholderTextColor="#9D91A9" value={chatText} onChangeText={setChatText}/>
+<TouchableOpacity disabled={busy||!chatText.trim()} onPress={()=>void send()} style={[s.button,{backgroundColor:color,opacity:busy||!chatText.trim()?0.6:1}]}>{busy?<ActivityIndicator color="#fff"/>:<Text style={s.buttonText}>Send message</Text>}</TouchableOpacity>
 </View></View>:null}
  {view==='history'?<View style={s.card}><Text style={s.heading}>Your journal entries</Text><Text style={s.disclaimer}>Your own notes are saved privately. Use Trends → Export wellness report to share your records when you choose.</Text>{events.length===0?<Text style={s.sub}>No reflections saved yet.</Text>:events.map(e=><View key={e.id} style={s.entry}><Text style={s.entryTitle}>{e.mood||'Reflection'} {e.intensity?('· '+e.intensity+'/10'):''}</Text><Text style={s.sub}>{new Date(e.occurred_at).toLocaleString()}</Text><Text style={s.messageText}>{e.body}</Text>{e.energy_level?<Text style={s.sub}>Energy: {e.energy_level}</Text>:null}{e.stress_factors?.length?<Text style={s.sub}>Possible contributors: {e.stress_factors.join(', ')}</Text>:null}</View>)}</View>:null}
  <Text style={s.disclaimer}>Superdots is for emotional reflection, not diagnosis or emergency care.</Text></View>
