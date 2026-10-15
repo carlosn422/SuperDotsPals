@@ -238,30 +238,53 @@ final class WatchThemeSync: ObservableObject {
     }
 }
 
+import CoreImage.CIFilterBuiltins
+
 struct WatchSyncView: View {
-    @ObservedObject var sync: WatchThemeSync
-    @EnvironmentObject var store: WatchStore
-    @State private var email=""
-    @State private var password=""
-    var body: some View {
-        ScrollView {
-            VStack(spacing:12) {
-                if sync.connected {
-                    Text("Connected").font(.headline)
-                    Text(sync.message).font(.caption2).multilineTextAlignment(.center)
-                    Button("Sync wellness now") { Task { await sync.refresh(store:store) } }
-                    Button("Disconnect",role:.destructive) { sync.signOut() }
-                } else {
-                    Text("Sign in to sync").font(.headline)
-                    TextField("Email",text:$email).textInputAutocapitalization(.never)
-                    SecureField("Password",text:$password)
-                    Button("Connect") { Task { await sync.signIn(email:email,password:password,store:store); password="" } }
-                    Text(sync.message).font(.caption2).multilineTextAlignment(.center)
-                }
-                if sync.busy { ProgressView() }
-                Text("Your password is not saved. A secure session token is stored in this watch's Keychain.")
-                    .font(.system(size:10)).foregroundStyle(.secondary)
-            }
-        }.navigationTitle("Cloud sync")
+ @ObservedObject var sync:WatchThemeSync
+ @EnvironmentObject var store:WatchStore
+ @State private var qr:UIImage?
+ var body:some View {
+  ScrollView {
+   VStack(spacing:12) {
+    if sync.connected {
+     Image(systemName:"checkmark.circle.fill").font(.largeTitle).foregroundStyle(.green)
+     Text("Connected").font(.headline)
+     Text(sync.message).font(.caption2).multilineTextAlignment(.center)
+     Button("Sync wellness now"){Task {await sync.refresh(store:store)}}
+     Button("Disconnect",role:.destructive){sync.signOut()}
+    } else {
+     Text("Link with iPhone").font(.headline)
+     Text("Open Superdots on your iPhone → Settings → Connected Devices → Scan Apple Watch QR code.")
+      .font(.caption2).multilineTextAlignment(.center)
+     if !sync.pairingURL.isEmpty,let qr {
+      Image(uiImage:qr).interpolation(.none).resizable().scaledToFit().frame(width:150,height:150)
+       .padding(7).background(.white,in:RoundedRectangle(cornerRadius:8))
+     }
+     if !sync.pairingActive {
+      Button("Show linking QR"){Task {await sync.startPairing();makeQR()}}
+     } else {
+      Text("Code expires in 5 minutes.").font(.system(size:10)).foregroundStyle(.secondary)
+      Button("Get a new QR code"){Task {await sync.startPairing();makeQR()}}
+     }
+     Text(sync.message).font(.caption2).multilineTextAlignment(.center)
     }
+    if sync.busy {ProgressView()}
+   }
+  }.navigationTitle("Connected devices")
+   .task {
+    if !sync.connected && !sync.pairingActive {await sync.startPairing();makeQR()}
+    while !Task.isCancelled && !sync.connected && sync.pairingActive {
+     await sync.pollPairing(store:store)
+     try? await Task.sleep(for:.seconds(3))
+    }
+   }
+   .onChange(of:sync.pairingURL) {_,_ in makeQR()}
+ }
+ private func makeQR(){
+  guard let data=sync.pairingURL.data(using:.utf8) else {qr=nil;return}
+  let filter=CIFilter.qrCodeGenerator();filter.message=data;filter.correctionLevel="M"
+  guard let output=filter.outputImage,let image=CIContext().createCGImage(output,from:output.extent) else {qr=nil;return}
+  qr=UIImage(cgImage:image)
+ }
 }
