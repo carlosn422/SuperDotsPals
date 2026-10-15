@@ -89,7 +89,7 @@ export function WellnessTrends({companion,accent,period,onPeriod,mood}:{companio
 }
 export function WellnessHealth({companion,accent,onPermissions,onChat}:{companion:string;accent:string;onPermissions:()=>void;onChat:()=>void}){
  return <View style={s.page}><BrandHead companion={companion}/>
- <PageHero title="Health signals" highlight="from your day." detail="Understand your activity, recovery and body signals through real readings." companion="nori" accent="#3BA986"/>
+ <PageHero title="Health signals" highlight="from your day." detail="Understand your activity, recovery and body signals through real readings." companion={companion} accent={accent}/>
  <HealthDataPanel/>
  <RecoveryInsights companion={companion} onChat={onChat}/>
  <TouchableOpacity onPress={onPermissions} style={[s.white,{backgroundColor:'#F1EAFE'}]}><Text style={s.cardTitle}>Privacy & health permissions  →</Text><Text style={s.body}>Choose what Apple Health shares with Superdots. No measurements are requested until you tap Connect.</Text></TouchableOpacity>
