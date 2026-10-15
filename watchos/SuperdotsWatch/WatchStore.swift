@@ -29,6 +29,8 @@ final class WatchStore: ObservableObject {
         didSet { savedDot = companion.rawValue }
     }
     @Published var currentMood: String = "Calm"
+    @Published var latestHRV: Double? = nil
+    @Published var latestRestingHeartRate: Double? = nil
     @Published var sessionsCompleted: Int = 0
 
     init() {
