@@ -40,15 +40,10 @@ final class WatchThemeSync: ObservableObject {
         defer { busy = false }
         do {
             try await renewIfNeeded()
-            let data = try await request("/rest/v1/user_settings?select=companion,theme&user_id=eq.\(userId)",method:"GET")
-            guard let array = try JSONSerialization.jsonObject(with:data) as? [[String:Any]],
-                  let id = array.first?["companion"] as? String,
-                  let companion = Dot(rawValue:id) else {
-                message = "No Superdot preference found for this account."
-                return
-            }
-            store.companion = companion
-            message = "Synced: \(companion.title)."
+            let data = try await request("/rest/v1/mood_entries?select=mood,recorded_at&user_id=eq.\(userId)&order=recorded_at.desc&limit=1",method:"GET")
+            let rows = try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
+            store.currentMood = (rows.first?["mood"] as? String) ?? "Calm"
+            message = "Mood synced: \(store.currentMood)."
         } catch { message = "Sync failed: \(error.localizedDescription)" }
     }
 
