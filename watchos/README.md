@@ -21,7 +21,8 @@ Native watchOS 10+ SwiftUI app. Uses the **same six mascot animation packs as th
    open SuperdotsWatch.xcodeproj
    ```
 4. Select the **SuperdotsWatch** scheme and a watchOS simulator, then **Cmd+R**.
-5. Tap **Connect account**, sign in using the *same* Supabase email/password as the iPhone app, then tap **Sync wellness now**. This standalone prototype does not silently inherit the iPhone's Supabase session.
+5. The watch displays **Link with iPhone** and a short-lived QR code. On your signed-in Superdots iPhone app, open **Settings → Connected Devices → Scan Apple Watch QR code** and scan. Confirm approval. The watch polls for approval and automatically signs in. The code expires after five minutes. Use a physical phone to scan the watch simulator if camera scanning isn't supported in an iOS simulator.
+6. To build the iPhone QR scanner, run `npx expo install expo-camera` at the repository root to install the SDK-matched native dependency, then rebuild your iOS development app if necessary. The camera permission is configured in `app.json`. The native module isn't available in an old binary until rebuilt.
 
 ## Current features to test
 
@@ -39,7 +40,7 @@ Native watchOS 10+ SwiftUI app. Uses the **same six mascot animation packs as th
 2. Choose Sad, answer the personalized questions, and confirm the verse and reflection load. Save the verse to Favorites; reopen Favorites to verify persistence.
 3. Open the iPhone app, sync Apple Health from the Health tab, then return to watch and tap **Sync wellness now**. Compare HRV, resting heart rate, steps and sleep. Missing data should display **No data**, not fabricated values.
 4. Record a new watch mood check-in and verify it appears in the iPhone mood history after refresh. Save a quick journal note and verify it in the iPhone app.
-5. Disconnect and reconnect the watch; check that private actions require authentication.
+5. Open iPhone **Settings → Connected Devices**, disconnect the watch, then refresh the watch and verify it clears its local session. Try linking again with a new QR; old codes must not work.
 6. Test with poor connectivity to inspect error feedback; Gemini can fall back to curated questions and Scripture, but authenticated Supabase connectivity is still required.
 
 ## Limitations
@@ -49,4 +50,5 @@ Native watchOS 10+ SwiftUI app. Uses the **same six mascot animation packs as th
 - Full lock-screen notifications, interactive watch-face complications and background syncing require additional **WidgetKit / UserNotifications / WatchConnectivity** work and are **not implemented**.
 - The Health snapshot reflects iPhone-synced measurements, not live watch sensors. Sleep and steps refresh after the iPhone has synced them.
 - The Scripture catalog currently contains six verified WEB passages, not the entire Bible.
-- The watch's existing Supabase login uses email/password entry; a polished phone-to-watch auth handoff is future work.
+- The watch uses QR approval to establish its own Supabase session. The phone lists linked watches, and a revoked link is checked by the watch on sync. Revocation is **not equivalent to immediate server-wide JWT invalidation**; existing access tokens can continue working until expiry. Before production, enforce revoked device sessions in server-side authorization and add anti-abuse rate limiting for pairing requests.
+- Device scans require a camera-enabled iPhone; Apple Watch Simulator is display-only. QR scan with a real iPhone or watch hardware.
