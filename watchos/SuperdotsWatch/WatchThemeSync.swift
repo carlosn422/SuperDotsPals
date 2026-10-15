@@ -246,7 +246,8 @@ final class WatchThemeSync: ObservableObject {
     }
 }
 
-import CoreImage.CIFilterBuiltins
+import CoreImage
+import CoreImage
 
 struct WatchSyncView: View {
  @ObservedObject var sync:WatchThemeSync
