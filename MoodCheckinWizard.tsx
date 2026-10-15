@@ -12,14 +12,20 @@ const fallback:Record<string,string[]>={
  Anxious:['Is there something upcoming you are worried about?','Have responsibilities felt overwhelming?','Could rest or reassurance help?'],
  Tired:['Did you sleep less than you wanted?','Has your day been physically or mentally demanding?','Have you had enough time to recover?']
 };
-const choices=['Yes','A little','No','Not sure','Prefer not to say'];
+type MoodQuestion={question:string;choices:string[]};
+const defaultChoices=['Something specific happened','An ongoing situation','My energy or rest','I am not sure yet'];
 export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJournal,onInsights,onFindVerse,onNavigate}:{color:string;onSaved:(mood:string)=>void;onExploreAI:(mood:string)=>void;onDone:()=>void;onJournal:()=>void;onInsights:()=>void;onFindVerse:(mood:string,answers:Record<string,string>)=>void;onNavigate?:()=>void}){
  const [savedAnswers,setSavedAnswers]=useState<Record<string,string>>({});
- const [step,setStep]=useState<0|1|2|3>(0),[mood,setMood]=useState<string>(''),[questions,setQuestions]=useState<string[]>([]),[answers,setAnswers]=useState<Record<string,string>>({}),[note,setNote]=useState(''),[questionIndex,setQuestionIndex]=useState(0),[busy,setBusy]=useState(false);
- useEffect(()=>{if(!mood)return;let active=true;setQuestions(fallback[mood]||[]);setAnswers({});setQuestionIndex(0);
- (async()=>{const {data,error}=await supabase.from('mood_questions').select('question').eq('mood',mood).eq('is_active',true).order('sort_order',{ascending:true}).limit(3);
- if(active&&!error&&data?.length)setQuestions(data.map(q=>q.question));})();
+ const [step,setStep]=useState<0|1|2|3>(0),[mood,setMood]=useState<string>(''),[questions,setQuestions]=useState<MoodQuestion[]>([]),[answers,setAnswers]=useState<Record<string,string>>({}),[note,setNote]=useState(''),[questionIndex,setQuestionIndex]=useState(0),[busy,setBusy]=useState(false);
+ useEffect(()=>{if(!mood)return;let active=true;setQuestions((fallback[mood]||[]).map(question=>({question,choices:defaultChoices})));setAnswers({});setQuestionIndex(0);
+ (async()=>{try{
+ const {data,error}=await supabase.functions.invoke('spiritual-reading',{body:{action:'questions',mood,useHistory:false}});
+ if(error||!Array.isArray(data?.items)||!data.items.length)throw Error('Questions unavailable');
+ const items=data.items.filter((item:any)=>typeof item?.question==='string'&&Array.isArray(item.choices)&&item.choices.length===4).slice(0,3);
+ if(active&&items.length)setQuestions(items);
+ }catch(e){console.warn('Using local reflection questions',e)}})();
  return()=>{active=false}},[mood]);
+
  async function save(withDetails:boolean){
   if(!mood||busy)return;
   setBusy(true);
@@ -32,10 +38,11 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJo
    onFindVerse(mood,completedAnswers);
   }catch(e:any){Alert.alert('Could not save your mood',e.message||'Please try again.')}finally{setBusy(false)}
  }
- const shownQuestions=questions.length?questions:(fallback[mood]||[]);
+ const shownQuestions=questions.length?questions:(fallback[mood]||[]).map(question=>({question,choices:defaultChoices}));
 
 
- const currentQuestion=shownQuestions[questionIndex]||'What might have contributed to this feeling?';
+ const currentItem=shownQuestions[questionIndex]||{question:'What might have contributed to this feeling?',choices:defaultChoices};
+ const currentQuestion=currentItem.question;
  const changeStep=(n:0|1|2|3)=>{setStep(n);onNavigate?.()};
  const nextQuestion=()=>{setQuestionIndex(n=>Math.min(n+1,shownQuestions.length-1));onNavigate?.()};
  const backQuestion=()=>{if(questionIndex===0)changeStep(1);else {setQuestionIndex(n=>n-1);onNavigate?.()}};
@@ -63,7 +70,7 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJo
    <View style={{alignItems:'center',paddingTop:9}}><SuperdotMascot id={mood} size={116}/></View>
    <Text style={{fontSize:21,fontWeight:'900',color:'#251C45',textAlign:'center'}}>Would you like to share more?</Text>
    <Text style={{color:'#817892',fontSize:13,lineHeight:20,textAlign:'center'}}>Save your mood now or answer a few optional questions to explore what may have contributed.</Text>
-   <TouchableOpacity onPress={()=>changeStep(2)} style={{padding:14,borderRadius:14,borderWidth:1,borderColor:color,backgroundColor:'#F6F3FF'}}><Text style={{color:color,fontSize:14,fontWeight:'800'}}>Yes, ask me a few questions  →</Text><Text style={{color:'#8C82A3',fontSize:11,marginTop:3}}>2–3 short questions, no AI required</Text></TouchableOpacity>
+   <TouchableOpacity onPress={()=>changeStep(2)} style={{padding:14,borderRadius:14,borderWidth:1,borderColor:color,backgroundColor:'#F6F3FF'}}><Text style={{color:color,fontSize:14,fontWeight:'800'}}>Yes, ask me a few questions  →</Text><Text style={{color:'#8C82A3',fontSize:11,marginTop:3}}>3 personalized questions, powered by AI when available</Text></TouchableOpacity>
    <TouchableOpacity onPress={()=>void save(false)} disabled={busy} style={{padding:14,borderRadius:14,borderWidth:1,borderColor:'#EDEAF2'}}><Text style={{fontSize:14,fontWeight:'800',color:'#342B52'}}>Just save my mood  →</Text><Text style={{fontSize:11,color:'#8C82A3',marginTop:3}}>Skip questions and finish now</Text></TouchableOpacity>
    {secondary('Back to moods',()=>changeStep(0))}
   </View>:null}
@@ -71,7 +78,7 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJo
    <View style={{flexDirection:'row',alignItems:'center',gap:10}}><SuperdotMascot id={mood} size={56}/><View style={{flex:1}}><Text style={{fontWeight:'800',fontSize:14,color:'#281F49'}}>{mood}</Text><Text style={{fontSize:11,color:'#8980A0'}}>Let's explore this feeling</Text></View><Text style={{fontSize:11,color:'#817892'}}>{questionIndex+1} of {shownQuestions.length}</Text></View>
    <View style={{height:4,backgroundColor:'#EDEAF4',borderRadius:3,overflow:'hidden'}}><View style={{width:`${(questionIndex+1)/Math.max(shownQuestions.length,1)*100}%` as `${number}%`,height:4,backgroundColor:color,borderRadius:3}}/></View>
    <Text style={{fontSize:17,fontWeight:'900',color:'#251C45',lineHeight:24}}>{currentQuestion}</Text>
-   <View accessibilityRole="radiogroup" style={{gap:7}}>{choices.map(c=>option(c,()=>setAnswers(v=>({...v,[currentQuestion]:c})),answers[currentQuestion]===c))}</View>
+   <View accessibilityRole="radiogroup" style={{gap:7}}>{[...currentItem.choices,'Other / prefer not to say'].map(c=>option(c,()=>setAnswers(v=>({...v,[currentQuestion]:c})),answers[currentQuestion]===c))}</View>
    {questionIndex===shownQuestions.length-1?<TextInput placeholder="Add a note (optional)" placeholderTextColor="#A59DB5" multiline maxLength={1000} value={note} onChangeText={setNote} style={{minHeight:63,borderWidth:1,borderColor:'#ECE8F3',borderRadius:13,padding:11,textAlignVertical:'top',color:'#30284C'}}/>:null}
    <View style={{flexDirection:'row',gap:8}}>
     <View style={{flex:1}}>{secondary('Back',backQuestion)}</View>
