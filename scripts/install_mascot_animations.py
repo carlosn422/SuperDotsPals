@@ -21,13 +21,16 @@ for mood,archive_name in NAMES.items():
         if fps!=12 or len(frames)!=36:raise SystemExit(f'Unexpected frames/fps in {archive}')
         output=dest/mood
         (output/'ios').mkdir(parents=True,exist_ok=True)
-        watch=ROOT/'watchos'/'SuperdotsWatch'/'AnimationFrames'/mood
+        watch=ROOT/'watchos'/'SuperdotsWatch'/'AnimationFrames.xcassets'
         watch.mkdir(parents=True,exist_ok=True)
-        for frame in frames:
+        for index,frame in enumerate(frames):
             ios=zipf.read('ios_512/'+frame)
             smaller=zipf.read('watchos_256/'+frame)
             (output/'ios'/frame).write_bytes(ios)
-            (watch/frame).write_bytes(smaller)
+            imageset=watch/(f'{mood}_frame_{index:03d}.imageset')
+            imageset.mkdir(parents=True,exist_ok=True)
+            (imageset/frame).write_bytes(smaller)
+            (imageset/'Contents.json').write_text(json.dumps({'images':[{'filename':frame,'idiom':'universal'}],'info':{'author':'xcode','version':1}}))
     source_map[mood]=[f"require('./assets/mascot-animations/{mood}/ios/{frame}')" for frame in frames]
     print('Installed',mood,len(frames),'frames')
 js="import type {ImageSourcePropType} from 'react-native';\n"
