@@ -6,9 +6,9 @@ import SuperdotMascot from './SuperdotMascot';
 type Passage={id:number;reference:string;verse_text:string;translation:string;source_url:string};
 const moods=['Joyful','Calm','Sad','Angry','Anxious','Tired'];
 const purple='#6C56D3',ink='#251C45',muted='#817899';
-export default function SpiritualReading(){
- const [step,setStep]=useState<'start'|'mood'|'questions'|'result'|'favorites'>('start');
- const [mood,setMood]=useState(''),[useHistory,setUseHistory]=useState(false);
+export default function SpiritualReading({initialCheckin}:{initialCheckin?:{mood:string;answers:Record<string,string>}}){
+ const [step,setStep]=useState<'start'|'mood'|'questions'|'result'|'favorites'>(initialCheckin?'result':'start');
+ const [mood,setMood]=useState(initialCheckin?.mood||''),[useHistory,setUseHistory]=useState(false);
  const [questions,setQuestions]=useState<string[]>([]),[index,setIndex]=useState(0),[answers,setAnswers]=useState<Record<string,string>>({});
  const [passage,setPassage]=useState<Passage|null>(null),[reflection,setReflection]=useState(''),[busy,setBusy]=useState(false);
  const [favorites,setFavorites]=useState<{passage_id:number;scripture_passages:Passage}[]>([]);
@@ -21,6 +21,8 @@ export default function SpiritualReading(){
  }
  async function generateQuestions(){setBusy(true);try{const data=await invoke('questions');setQuestions(data.questions||[]);setAnswers({});setIndex(0);setStep('questions')}catch(e:any){Alert.alert('Unable to prepare questions',e.message)}finally{setBusy(false)}}
  async function recommend(skip=false){setBusy(true);try{const data=await invoke('recommend',{questions,answers:skip?{}:answers});setPassage(data.passage);setReflection(data.reflection);setIsFavorite(false);setStep('result')}catch(e:any){Alert.alert('Unable to find Scripture',e.message)}finally{setBusy(false)}}
+ useEffect(()=>{if(initialCheckin)void recommendFromCheckin(initialCheckin)},[]);
+ async function recommendFromCheckin(checkin:{mood:string;answers:Record<string,string>}){setBusy(true);try{const {data,error}=await supabase.functions.invoke('spiritual-reading',{body:{action:'recommend',mood:checkin.mood,answers:checkin.answers,useHistory:false}});if(error||data?.error||!data?.passage)throw Error(data?.error||'Unable to load passage');setPassage(data.passage);setReflection(data.reflection||'');setIsFavorite(false);setStep('result')}catch(e:any){Alert.alert('Unable to find Scripture',e?.message||'Try again.');setStep('start')}finally{setBusy(false)}}
  async function saveFavorite(){if(!passage)return;setBusy(true);try{const {data:{user}}=await supabase.auth.getUser();if(!user)throw Error('Please sign in.');
  if(isFavorite){const {error}=await supabase.from('scripture_favorites').delete().eq('user_id',user.id).eq('passage_id',passage.id);if(error)throw error;setIsFavorite(false)}
  else{const {error}=await supabase.from('scripture_favorites').upsert({user_id:user.id,passage_id:passage.id},{onConflict:'user_id,passage_id'});if(error)throw error;setIsFavorite(true)}
@@ -32,6 +34,7 @@ export default function SpiritualReading(){
  const radio=(label:string,selected:boolean,onPress:()=>void)=><TouchableOpacity key={label} onPress={onPress} style={{padding:13,borderRadius:14,borderWidth:1,borderColor:selected?purple:'#EAE5F3',backgroundColor:selected?'#EEE9FF':'white',flexDirection:'row',alignItems:'center',gap:10}}><Ionicons name={selected?'radio-button-on':'radio-button-off'} size={20} color={selected?purple:'#A49CB4'}/><Text style={{color:ink,flex:1}}>{label}</Text></TouchableOpacity>;
  return <View style={{gap:15,paddingBottom:25}}>
  <View style={{flexDirection:'row',alignItems:'center',gap:10,justifyContent:'space-between'}}><Text style={{fontSize:25,fontWeight:'900',color:ink}}>Spiritual Reading</Text><TouchableOpacity onPress={()=>void showFavorites()} accessibilityLabel="Favorite verses"><Ionicons name="bookmark-outline" color={purple} size={25}/></TouchableOpacity></View>
+ {step==='result'&&!passage&&busy?<View style={{padding:22,backgroundColor:'#F2EEFF',borderRadius:20,gap:10,alignItems:'center'}}><ActivityIndicator color={purple}/><Text style={{color:ink,fontWeight:'800'}}>Finding Scripture for your check-in…</Text></View>:null}
  {step==='start'?<View style={{backgroundColor:'#EFEBFF',borderRadius:24,padding:18,gap:15}}>
   <View style={{alignItems:'center'}}><SuperdotMascot id="Calm" size={110}/></View>
   <Text style={{fontSize:22,fontWeight:'900',color:ink}}>Let's find encouragement for how you feel.</Text>
