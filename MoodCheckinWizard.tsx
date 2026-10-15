@@ -13,7 +13,7 @@ const fallback:Record<string,string[]>={
  Tired:['Did you sleep less than you wanted?','Has your day been physically or mentally demanding?','Have you had enough time to recover?']
 };
 const choices=['Yes','A little','No','Not sure','Prefer not to say'];
-export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone}:{color:string;onSaved:(mood:string)=>void;onExploreAI:(mood:string)=>void;onDone:()=>void}){
+export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onNavigate}:{color:string;onSaved:(mood:string)=>void;onExploreAI:(mood:string)=>void;onDone:()=>void;onNavigate?:()=>void}){
  const [step,setStep]=useState<0|1|2|3>(0),[mood,setMood]=useState<string>(''),[questions,setQuestions]=useState<string[]>([]),[answers,setAnswers]=useState<Record<string,string>>({}),[note,setNote]=useState(''),[questionIndex,setQuestionIndex]=useState(0),[busy,setBusy]=useState(false);
  useEffect(()=>{if(!mood)return;let active=true;setQuestions(fallback[mood]||[]);setAnswers({});setQuestionIndex(0);
  (async()=>{const {data,error}=await supabase.from('mood_questions').select('question').eq('mood',mood).eq('is_active',true).order('sort_order',{ascending:true}).limit(3);
@@ -25,31 +25,64 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone}:{co
   try{const {data:{user},error:authError}=await supabase.auth.getUser();if(authError||!user)throw Error('Please sign in.');
    const {error}=await supabase.from('wellness_journal').insert({user_id:user.id,entry_type:'reflection',body:note.trim()||'Mood check-in',mood,reflection_answers:withDetails?answers:{},stress_factors:[]});
    if(error)throw error;
-   setStep(3);onSaved(mood);
+   changeStep(3);onSaved(mood);
   }catch(e:any){Alert.alert('Could not save your mood',e.message||'Please try again.')}finally{setBusy(false)}
  }
  const shownQuestions=questions.length?questions:(fallback[mood]||[]);
- const button=(title:string,onPress:()=>void,filled=true,disabled=false)=><TouchableOpacity accessibilityRole="button" disabled={disabled||busy} onPress={onPress} style={{backgroundColor:filled?color:'#F3EFFB',padding:15,borderRadius:16,alignItems:'center',opacity:disabled?0.5:1}}><Text style={{fontWeight:'800',color:filled?'white':'#514079'}}>{title}</Text></TouchableOpacity>;
- return <View style={{backgroundColor:'white',borderRadius:24,padding:18,gap:15,minHeight:440}}>
-  <Text style={{fontWeight:'900',fontSize:22,color:'#251C45'}}>{step===0?'How are you feeling?':step===1?'Would you like to share more?':step===2?'Let’s explore that feeling':'Mood saved!'}</Text>
-  {step<3?<View style={{gap:9}}><Text style={{fontSize:12,color:'#82799C',textAlign:'center'}}>Step {step+1} of 3</Text><View style={{flexDirection:'row',gap:5}}>{[0,1,2].map(i=><View key={i} style={{flex:1,height:5,borderRadius:4,backgroundColor:i<=step?color:'#EDEAF3'}}/>)}</View></View>:null}
-  {mood&&step!==0?<View style={{alignItems:'center',gap:4}}><SuperdotMascot id={mood} size={step===1?130:94}/><Text style={{color:'#5C4B83',fontWeight:'700'}}>{mood}</Text></View>:null}
-  {step===0?<><Text style={{color:'#7B728C'}}>Select the feeling that fits best right now.</Text>
-   <View style={{flexDirection:'row',flexWrap:'wrap',gap:9}}>{moods.map(m=><TouchableOpacity key={m} onPress={()=>setMood(m)} style={{width:'30%',minWidth:80,paddingVertical:12,alignItems:'center',backgroundColor:mood===m?'#E9E3FF':'#F7F5FA',borderRadius:16,borderWidth:mood===m?2:1,borderColor:mood===m?color:'#F0EDF4'}}><SuperdotMascot id={m} size={57}/><Text style={{fontSize:12,fontWeight:'800',color:'#342957'}}>{m}</Text></TouchableOpacity>)}</View>
-   {mood?<View style={{backgroundColor:'#F7F5FC',borderRadius:14,padding:12,flexDirection:'row',alignItems:'center',gap:11}}><SuperdotMascot id={mood} size={66}/><View style={{flex:1}}><Text style={{fontWeight:'800',color:'#342957'}}>{mood}</Text><Text style={{fontSize:11,color:'#7D748F'}}>Your companion reflects how you feel.</Text></View></View>:null}
-   {button('Continue →',()=>setStep(1),true,!mood)}</>:null}
-  {step===1?<><Text style={{color:'#726989',lineHeight:20}}>You can save your mood now, or answer a few short questions to understand what might have contributed.</Text>
-   {button('Yes, ask me a few questions',()=>setStep(2))}
-   {button('Just save my mood',()=>void save(false),false)}
-   {button('Back',()=>setStep(0),false)}</>:null}
-  {step===2?<><Text style={{color:'#8B82A0'}}>Question {questionIndex+1} of {shownQuestions.length||3}</Text>
-   <Text style={{fontSize:17,fontWeight:'800',color:'#2C2350'}}>{shownQuestions[questionIndex]}</Text>
-   {choices.map(choice=><TouchableOpacity key={choice} onPress={()=>setAnswers(prev=>({...prev,[shownQuestions[questionIndex]]:choice}))} style={{padding:13,borderRadius:13,borderWidth:1,borderColor:answers[shownQuestions[questionIndex]]===choice?color:'#EEEAF3',backgroundColor:answers[shownQuestions[questionIndex]]===choice?'#ECE7FF':'white'}}><Text style={{color:'#382C5F'}}>{choice}</Text></TouchableOpacity>)}
-   {questionIndex===(shownQuestions.length||3)-1?<><TextInput placeholder="Add a note (optional)" multiline maxLength={1000} value={note} onChangeText={setNote} style={{minHeight:68,borderWidth:1,borderColor:'#EEEAF3',borderRadius:13,padding:12,textAlignVertical:'top'}}/>{button('Save check-in',()=>void save(true))}</>:button('Next question →',()=>setQuestionIndex(i=>Math.min(i+1,shownQuestions.length-1)))}
-   {button('Skip questions & save',()=>void save(true),false)}
-   {button('Back',()=>questionIndex?setQuestionIndex(i=>i-1):setStep(1),false)}
-  </>:null}
-  {step===3?<><Text style={{color:'#766B8C'}}>Your check-in is saved privately in Superdots.</Text>{button('Back to Today',onDone)}{button('Explore this feeling with AI (optional)',()=>onExploreAI(mood),false)}<Text style={{fontSize:11,color:'#8F87A0'}}>AI is only used if you choose to explore further.</Text></>:null}
+
+
+ const currentQuestion=shownQuestions[questionIndex]||'What might have contributed to this feeling?';
+ const changeStep=(n:0|1|2|3)=>{setStep(n);onNavigate?.()};
+ const nextQuestion=()=>{setQuestionIndex(n=>Math.min(n+1,shownQuestions.length-1));onNavigate?.()};
+ const backQuestion=()=>{if(questionIndex===0)changeStep(1);else {setQuestionIndex(n=>n-1);onNavigate?.()}};
+ const primary=(label:string,onPress:()=>void,disabled=false)=><TouchableOpacity accessibilityRole="button" disabled={disabled||busy} onPress={onPress} style={{backgroundColor:color,paddingVertical:14,paddingHorizontal:16,borderRadius:13,alignItems:'center',opacity:disabled||busy?0.55:1}}><Text style={{color:'#fff',fontWeight:'800',fontSize:14}}>{label}</Text></TouchableOpacity>;
+ const secondary=(label:string,onPress:()=>void)=><TouchableOpacity accessibilityRole="button" disabled={busy} onPress={onPress} style={{paddingVertical:13,paddingHorizontal:12,borderWidth:1,borderColor:'#ECE8F6',borderRadius:13,alignItems:'center'}}><Text style={{color:'#574780',fontWeight:'800',fontSize:13}}>{label}</Text></TouchableOpacity>;
+ const option=(label:string,action:()=>void,selected=false)=><TouchableOpacity key={label} accessibilityRole="radio" accessibilityState={{selected}} onPress={action} style={{flexDirection:'row',alignItems:'center',minHeight:42,borderWidth:1,borderColor:selected?color:'#EDEAF2',backgroundColor:selected?'#F0ECFC':'#FFFFFF',borderRadius:13,paddingHorizontal:11,gap:8}}><View style={{width:16,height:16,borderRadius:8,borderWidth:1.5,borderColor:selected?color:'#C8C4D2',justifyContent:'center',alignItems:'center'}}>{selected?<View style={{width:8,height:8,borderRadius:4,backgroundColor:color}}/>:null}</View><Text style={{color:'#342B52',fontWeight:selected?'700':'500',fontSize:13}}>{label}</Text></TouchableOpacity>;
+ return <View style={{backgroundColor:'#FFFFFF',paddingHorizontal:17,paddingTop:16,paddingBottom:17,borderRadius:22,gap:13}}>
+  {step<3?<View style={{gap:8}}>
+   <Text style={{fontSize:11,color:'#81799A',textAlign:'center'}}>Step {step+1} of 3</Text>
+   <View style={{flexDirection:'row',gap:5}}>{[0,1,2].map(i=><View key={i} style={{height:4,borderRadius:3,flex:1,backgroundColor:step>=i?color:'#E8E5F0'}}/>)}</View>
+  </View>:null}
+  {step===0?<View style={{gap:13}}>
+   <Text style={{fontSize:23,fontWeight:'900',color:'#251C45'}}>How are you feeling today?</Text>
+   <Text style={{color:'#817892',fontSize:12}}>Choose the mood that best fits right now.</Text>
+   <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
+    {moods.map(m=><TouchableOpacity key={m} accessibilityRole="radio" accessibilityState={{selected:mood===m}} onPress={()=>setMood(m)} style={{width:'48.7%',alignItems:'center',borderWidth:mood===m?1.5:1,borderColor:mood===m?color:'#EEEAF3',borderRadius:14,backgroundColor:mood===m?'#F3EFFD':'#F8F7FB',paddingVertical:8,gap:2}}>
+     <SuperdotMascot id={m} size={68}/>
+     <Text style={{fontWeight:'800',fontSize:12,color:'#352C56'}}>{m}</Text>
+    </TouchableOpacity>)}
+   </View>
+   {mood?<View style={{flexDirection:'row',alignItems:'center',padding:9,gap:10,backgroundColor:'#F8F6FC',borderRadius:13}}><SuperdotMascot id={mood} size={44}/><View style={{flex:1}}><Text style={{fontWeight:'800',color:'#332655',fontSize:13}}>{mood}</Text><Text style={{fontSize:11,color:'#817892'}}>This Superdot reflects your selected mood.</Text></View></View>:null}
+   {primary('Continue →',()=>changeStep(1),!mood)}
+  </View>:null}
+  {step===1?<View style={{gap:13,alignItems:'stretch'}}>
+   <View style={{alignItems:'center',paddingTop:9}}><SuperdotMascot id={mood} size={116}/></View>
+   <Text style={{fontSize:21,fontWeight:'900',color:'#251C45',textAlign:'center'}}>Would you like to share more?</Text>
+   <Text style={{color:'#817892',fontSize:13,lineHeight:20,textAlign:'center'}}>Save your mood now or answer a few optional questions to explore what may have contributed.</Text>
+   <TouchableOpacity onPress={()=>changeStep(2)} style={{padding:14,borderRadius:14,borderWidth:1,borderColor:color,backgroundColor:'#F6F3FF'}}><Text style={{color:color,fontSize:14,fontWeight:'800'}}>Yes, ask me a few questions  →</Text><Text style={{color:'#8C82A3',fontSize:11,marginTop:3}}>2–3 short questions, no AI required</Text></TouchableOpacity>
+   <TouchableOpacity onPress={()=>void save(false)} disabled={busy} style={{padding:14,borderRadius:14,borderWidth:1,borderColor:'#EDEAF2'}}><Text style={{fontSize:14,fontWeight:'800',color:'#342B52'}}>Just save my mood  →</Text><Text style={{fontSize:11,color:'#8C82A3',marginTop:3}}>Skip questions and finish now</Text></TouchableOpacity>
+   {secondary('Back to moods',()=>changeStep(0))}
+  </View>:null}
+  {step===2?<View style={{gap:12}}>
+   <View style={{flexDirection:'row',alignItems:'center',gap:10}}><SuperdotMascot id={mood} size={56}/><View style={{flex:1}}><Text style={{fontWeight:'800',fontSize:14,color:'#281F49'}}>{mood}</Text><Text style={{fontSize:11,color:'#8980A0'}}>Let's explore this feeling</Text></View><Text style={{fontSize:11,color:'#817892'}}>{questionIndex+1} of {shownQuestions.length}</Text></View>
+   <View style={{height:4,backgroundColor:'#EDEAF4',borderRadius:3,overflow:'hidden'}}><View style={{width:((questionIndex+1)/Math.max(shownQuestions.length,1)*100)+'%',height:4,backgroundColor:color,borderRadius:3}}/></View>
+   <Text style={{fontSize:17,fontWeight:'900',color:'#251C45',lineHeight:24}}>{currentQuestion}</Text>
+   <View accessibilityRole="radiogroup" style={{gap:7}}>{choices.map(c=>option(c,()=>setAnswers(v=>({...v,[currentQuestion]:c})),answers[currentQuestion]===c))}</View>
+   {questionIndex===shownQuestions.length-1?<TextInput placeholder="Add a note (optional)" placeholderTextColor="#A59DB5" multiline maxLength={1000} value={note} onChangeText={setNote} style={{minHeight:63,borderWidth:1,borderColor:'#ECE8F3',borderRadius:13,padding:11,textAlignVertical:'top',color:'#30284C'}}/>:null}
+   <View style={{flexDirection:'row',gap:8}}>
+    <View style={{flex:1}}>{secondary('Back',backQuestion)}</View>
+    <View style={{flex:2}}>{primary(questionIndex===shownQuestions.length-1?'Finish check-in':'Next →',()=>questionIndex===shownQuestions.length-1?void save(true):nextQuestion())}</View>
+   </View>
+   <TouchableOpacity onPress={()=>void save(true)} disabled={busy} style={{alignItems:'center',paddingVertical:6}}><Text style={{fontSize:12,color:'#766A95'}}>Skip remaining questions & save</Text></TouchableOpacity>
+  </View>:null}
+  {step===3?<View style={{gap:13,alignItems:'stretch',paddingTop:11}}>
+   <View style={{alignItems:'center',gap:7}}><Text style={{fontSize:35,color:color}}>✓</Text><SuperdotMascot id={mood} size={107}/><Text style={{fontSize:22,fontWeight:'900',color:'#251C45'}}>Check-in complete!</Text><Text style={{color:'#827892',textAlign:'center',fontSize:12,lineHeight:18}}>Your mood has been saved privately.</Text></View>
+   <View style={{backgroundColor:'#F2EFFB',borderRadius:13,padding:12,flexDirection:'row',alignItems:'center',gap:9}}><SuperdotMascot id={mood} size={54}/><View style={{flex:1}}><Text style={{fontSize:11,color:'#817892'}}>Your mood today</Text><Text style={{fontSize:15,fontWeight:'900',color:'#30264D'}}>{mood}</Text><Text style={{fontSize:11,color:'#817892'}}>{new Date().toLocaleString()}</Text></View></View>
+   <Text style={{fontSize:14,fontWeight:'900',color:'#30264D'}}>What's next?</Text>
+   {secondary('Talk to your Superdot  →',()=>onExploreAI(mood))}
+   {primary('Back to Today',onDone)}
+  </View>:null}
   {busy?<ActivityIndicator color={color}/>:null}
  </View>;
+
 }
