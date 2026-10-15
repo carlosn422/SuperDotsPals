@@ -13,38 +13,16 @@ import {WatchThemesCard,SettingsItem} from './SettingsComponents';
 import {APP_THEME} from './MoodMascot';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Svg, { Circle, Line, Path, Rect, Defs, LinearGradient, Stop, Polygon } from 'react-native-svg';
-import {LifestyleOverview, ThemePicker} from './LifestyleFeatures';
-import {CurrentHRV,ExtraWellness,EmotionCheckin,CoachDemo,WidgetPreview} from './ExtraFeatures';
 
 type Tab = 'Today' | 'Actions' | 'Trends' | 'Health' | 'Settings';
 type Period = 'Day' | 'Week' | 'Month' | 'Year';
 type Mood = 'Calm' | 'Okay' | 'Anxious' | 'Happy' | 'Tired';
 const C = { ink:APP_THEME.ink, muted:APP_THEME.muted, green:APP_THEME.primary, deep:APP_THEME.primary, surface:APP_THEME.surface, bg:APP_THEME.background, mint:APP_THEME.primarySoft, peach:'#FFF0DE', orange:'#F4A570', lilac:APP_THEME.primarySoft, purple:APP_THEME.primary, line:APP_THEME.border, red:'#EC7D8C' };
-const hrvDay = [40,48,44,58,53,64,48,74,62,55,67,58,78,71,57,60,82,69];
-const hrvWeek = [42,48,55,44,63,59,72,67,61,74,70,78,64,76];
-const hrvMonth = [41,46,44,49,54,50,61,58,55,66,63,72,67,73];
-const hrvYear = [38,42,40,49,45,54,57,53,60,63,61,69];
-const stressDay = [16,20,14,12,23,17,26,39,61,49,70,55,42,32,57,48,28,22,35,16,19,14,10,17];
 const tabs: {name:Tab;icon:'home'|'sparkles'|'stats-chart'|'heart'|'settings';outline:'home-outline'|'sparkles-outline'|'stats-chart-outline'|'heart-outline'|'settings-outline'}[] = [{name:'Today',icon:'home',outline:'home-outline'},{name:'Actions',icon:'sparkles',outline:'sparkles-outline'},{name:'Trends',icon:'stats-chart',outline:'stats-chart-outline'},{name:'Health',icon:'heart',outline:'heart-outline'},{name:'Settings',icon:'settings',outline:'settings-outline'}];
 
 function Card({children,style}: {children:React.ReactNode;style?:any}) { return <View style={[s.card,style]}>{children}</View>; }
 function Chip({label,active,onPress}: {label:string;active:boolean;onPress:()=>void}) { return <TouchableOpacity onPress={onPress} style={[s.chip,active&&s.chipActive]}><Text style={[s.chipText,active&&s.chipTextActive]}>{label}</Text></TouchableOpacity>; }
 function Heading({title,detail}: {title:string;detail?:string}) {return <View style={s.sectionHeader}><Text style={s.sectionTitle}>{title}</Text>{detail?<Text style={s.sectionDetail}>{detail}</Text>:null}</View>;}
-function Sparkline({values,color=C.green,height=112,filled=false}: {values:number[];color?:string;height?:number;filled?:boolean}) {
- const width=310,pad=12,min=Math.min(...values)-8,max=Math.max(...values)+8;
- const p=values.map((v,i)=>[pad+(i/(values.length-1))*(width-pad*2), height-pad-(v-min)/(max-min)*(height-pad*2)]);
- const d=p.map(([x,y],i)=>(i?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)).join(' ');
- return <Svg viewBox={'0 0 '+width+' '+height} width="100%" height={height}>
-  {[0.25,0.5,0.75].map((v,i)=><Line key={i} x1="0" y1={height*v} x2={width} y2={height*v} stroke={C.line} strokeDasharray="4 5"/>)}
-  {filled?<Path d={d+' L '+p[p.length-1][0]+' '+height+' L '+p[0][0]+' '+height+' Z'} fill={C.mint} opacity={0.7}/>:null}
-  <Path d={d} stroke={color} strokeWidth="3.2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-  <Circle cx={p[p.length-1][0]} cy={p[p.length-1][1]} r="5" fill={color} stroke="#fff" strokeWidth="2"/>
- </Svg>;
-}
-function StressChart() {return <Svg width="100%" height="104" viewBox="0 0 310 104">
- {[0,1,2].map(i=><Line key={i} x1="0" y1={20+i*30} x2="310" y2={20+i*30} stroke={C.line} strokeDasharray="4 5"/>)}
- {stressDay.map((v,i)=><Rect key={i} x={5+i*12.6} y={99-v*.88} width={7.5} height={v*.88} rx="3" fill={v>55?C.orange:C.purple} opacity=".87"/>)}
- </Svg>;}
 function Metric({value,unit,label,sub,color=C.deep}:{value:string;unit:string;label:string;sub:string;color?:string}) {return <View style={s.metric}><Text style={s.metricLabel}>{label}</Text><View style={s.metricRow}><Text style={[s.metricValue,{color}]}>{value}</Text><Text style={s.metricUnit}>{unit}</Text></View><Text style={s.metricSub}>{sub}</Text></View>;}
 function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChanged}:{selectedTheme:string;selectedCompanion:string;onEditProfile:()=>void;onThemeChanged:(theme:string,companion:string)=>void}) {
  const colors={accent:APP_THEME.primary,pale:APP_THEME.primarySoft};
@@ -86,7 +64,6 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  const [companion,setCompanion]=useState<'happy'|'sleepy'>('happy');
  const [seconds,setSeconds]=useState(60);
  useEffect(()=>{if(!breathing)return;const id=setInterval(()=>setSeconds(v=>{if(v<=1){setBreathing(false);return 60;}return v-1;}),1000);return()=>clearInterval(id);},[breathing]);
- const values=useMemo(()=>period==='Day'?hrvDay:period==='Week'?hrvWeek:period==='Month'?hrvMonth:hrvYear,[period]);
  const go=(t:Tab)=>{const index=tabs.findIndex(item=>item.name===t);if(index<0)return;pager.current?.scrollTo({x:index*pageWidth,animated:true});setTab(t);setPeriod('Day');setSettingsPage('main');Animated.timing(activePosition,{toValue:index,duration:250,useNativeDriver:true}).start();};
  const onPageSettled=(event:NativeSyntheticEvent<NativeScrollEvent>)=>{
   const index=Math.max(0,Math.min(tabs.length-1,Math.round(event.nativeEvent.contentOffset.x/pageWidth)));
@@ -123,7 +100,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
    </>:<>
     <TouchableOpacity style={s.settingsBack} onPress={()=>setSettingsPage('main')}><Ionicons name="chevron-back" size={18} color={colors.accent}/><Text style={{color:colors.accent,fontWeight:'800'}}>Settings</Text></TouchableOpacity>
     <Text style={s.mainTitle}>{({watch:'Apple Watch & Widgets',health:'Apple Health',notifications:'Notifications',privacy:'Privacy & Data',help:'Help & Support'} as const)[settingsPage]}</Text>
-    {settingsPage==='watch'?<><Card><Heading title="Watch connection"/><Text style={s.bodyMuted}>The watch app offers optional watch companion synchronization. Apple Watch health readings are accessed through Apple Health on your iPhone after permission. Live WatchConnectivity is not connected yet.</Text></Card><WidgetPreview/></>:null}
+    {settingsPage==='watch'?<><Card><Heading title="Watch connection"/><Text style={s.bodyMuted}>The Apple Watch can sync your latest saved mood when you sign in on the watch. Apple Health measurements require iPhone permission and synchronization; live WatchConnectivity is not connected.</Text></Card></>:null}
     {settingsPage==='health'?<Card><Heading title="Health data access"/><Text style={s.bodyMuted}>Superdots can read real Apple Health measurements after you explicitly approve access. Syncing uploads selected HRV, resting heart rate, steps and sleep summaries to your private account. Permission is controlled in the Apple Health app. No clinical diagnosis is made.</Text><TouchableOpacity onPress={()=>go('Health')} style={[s.settingsAction,{backgroundColor:colors.pale}]}><Text style={[s.settingsActionText,{color:colors.accent}]}>Open Health and sync  →</Text></TouchableOpacity></Card>:null}
     {settingsPage==='notifications'?<WellnessReminders/>:null}
     {settingsPage==='privacy'?<Card><Heading title="Your information"/><Text style={s.bodyMuted}>Your profile, mood logs and habit entries are stored in Supabase under user-specific access policies. Choosing Connect and sync on the Health screen also stores selected HealthKit measurements in your account.</Text><Text style={[s.bodyMuted,{marginTop:10}]}>For account data requests or deletion, contact the app operator. An in-app export and deletion flow has not yet been implemented.</Text></Card>:null}
