@@ -67,7 +67,7 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
  return <View style={s.root}><ScrollView key={step} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
   <Text style={s.brand}>✦ superdots.</Text>{editing?<TouchableOpacity onPress={onCancel}><Text style={s.skip}>Cancel editing</Text></TouchableOpacity>:null}
   <Text style={s.progress}>STEP {step+1} OF {stepTitles.length}</Text>
-  <View style={s.track}><View style={[s.fill,{width:((step+1)/stepTitles.length*100)+'%',backgroundColor:picked.color}]}/></View>
+  <View style={s.track}><View style={[s.fill,{width:`${((step+1)/stepTitles.length*100)}%` as `${number}%`,backgroundColor:picked.color}]}/></View>
   <Text style={s.title}>{stepTitles[step]}</Text>
   {step===0?<View style={s.explainer}><SuperdotMascot id={dot} color={picked.color} size={168}/><Text style={s.explainerTitle}>Little steps. A calmer day.</Text><Text style={s.sub}>Meet your Superdot — a thoughtful wellness companion to help you reflect on mood, hydration, activity and recovery.</Text><Text style={s.hint}>This is not a medical diagnosis or a substitute for professional care.</Text></View>:null}
   {step===1?<View style={s.explainer}><SuperdotMascot id="nori" color="#3BA986" size={144}/><Text style={s.explainerTitle}>Your watch can tell part of the story.</Text><Text style={s.sub}>With your permission, Superdots can read Apple Health heart-rate variability, resting heart rate, sleep and steps, and help you reflect on possible patterns.</Text><Text style={s.hint}>You can use Superdots without an Apple Watch. No readings are requested during this introduction.</Text></View>:null}
