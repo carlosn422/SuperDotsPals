@@ -59,14 +59,25 @@ Deno.serve(async req=>{
    return json({status:"approved",deviceName:row.device_name});
   }
   if(action==="list"){
-   const {data,error}=await admin.from("connected_devices").select("id,name,platform,linked_at,last_seen_at,revoked_at").eq("user_id",user.id).order("linked_at",{ascending:false}).limit(50);
+   const {data,error}=await admin.from("connected_devices").select("id,name,platform,linked_at,last_seen_at,revoked_at").eq("user_id",user.id).is("revoked_at",null).order("linked_at",{ascending:false}).limit(50);
    return error?json({error:"Unable to list"},500):json({devices:data||[]});
   }
-  if(action==="revoke"){
-   const {data,error}=await admin.from("connected_devices").update({revoked_at:new Date().toISOString()}).eq("user_id",user.id).eq("id",String(p.deviceId||"")).is("revoked_at",null).select("pairing_id").maybeSingle();
-   if(error||!data)return json({error:"Device not found"},404);
-   if(data.pairing_id)await admin.from("watch_pairing_requests").update({status:"expired",login_token_hash:null}).eq("id",data.pairing_id);
-   return json({revoked:true});
+  if(action==="remove"){
+   const deviceId=String(p.deviceId||"");
+   const {data:device, error:lookupError}=await admin.from("connected_devices").select("pairing_id").eq("user_id",user.id).eq("id",deviceId).maybeSingle();
+   if(lookupError||!device)return json({error:"Device not found"},404);
+   // Invalidate the pairing first, then permanently delete the device and pairing records.
+   if(device.pairing_id){
+    const {error:invalidateError}=await admin.from("watch_pairing_requests").update({status:"expired",login_token_hash:null}).eq("id",device.pairing_id).eq("owner_id",user.id);
+    if(invalidateError)return json({error:"Unable to invalidate device"},500);
+   }
+   const {error:removeError}=await admin.from("connected_devices").delete().eq("id",deviceId).eq("user_id",user.id);
+   if(removeError)return json({error:"Unable to remove device"},500);
+   if(device.pairing_id){
+    const {error:pairingError}=await admin.from("watch_pairing_requests").delete().eq("id",device.pairing_id).eq("owner_id",user.id);
+    if(pairingError)console.error("Unable to delete pairing record",pairingError.code);
+   }
+   return json({removed:true});
   }
   if(action==="status"){
    const {data}=await admin.from("connected_devices").select("revoked_at").eq("user_id",user.id).eq("pairing_id",String(p.id||"")).maybeSingle();
