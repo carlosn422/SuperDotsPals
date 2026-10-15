@@ -18,11 +18,11 @@ export function SectionHeading({title,detail}:{title:string;detail?:string}){ret
 export function PastelCard({title,detail,emoji,tint,onPress}:{title:string;detail:string;emoji:string;tint:string;onPress?:()=>void}){return <TouchableOpacity disabled={!onPress} onPress={onPress} style={[s.action,{backgroundColor:tint}]}><Text style={s.actionEmoji}>{emoji}</Text><View style={{flex:1,gap:5}}><Text style={s.actionTitle}>{title}</Text><Text style={s.actionText}>{detail}</Text></View><Ionicons name="chevron-forward" color={P} size={16}/></TouchableOpacity>}
 export function StatCard({title,value,detail,icon,tint,onPress}:{title:string;value:string;detail:string;icon:any;tint:string;onPress?:()=>void}){return <TouchableOpacity disabled={!onPress} onPress={onPress} style={s.stat}><View style={[s.statIcon,{backgroundColor:tint}]}><Ionicons name={icon} size={20} color={P}/></View><Text style={s.statTitle}>{title}</Text><Text style={s.statValue}>{value}</Text><Text style={s.statDetail}>{detail}</Text></TouchableOpacity>}
 const moodGuides=[
- {mood:'Happy',id:'joy',detail:'Happy and energized'},
+ {mood:'Calm',id:'joy',detail:'Calm and energized'},
  {mood:'Sad',id:'sadness',detail:'Feeling a little low'},
  {mood:'Angry',id:'anger',detail:'Frustrated or upset'},
  {mood:'Anxious',id:'fear',detail:'Worried or stressed'},
- {mood:'Calm',id:'disgust',detail:'Calm and balanced'},
+ {mood:'Joy',id:'disgust',detail:'Joyful and balanced'},
 ] as const;
 export function MeetYourMoods({onCheckin}:{onCheckin:()=>void}){
  return <View style={{backgroundColor:'#FFFFFF',borderRadius:24,padding:17,gap:11,borderWidth:1,borderColor:APP_THEME.border}}>
