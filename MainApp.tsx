@@ -62,7 +62,18 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  const [settingsPage,setSettingsPage]=useState<'main'|'watch'|'health'|'notifications'|'privacy'|'help'>('main');
  const [period,setPeriod]=useState<Period>('Day');
  const [mood,setMood]=useState<string>('');
- useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data,error}=await supabase.from('mood_entries').select('mood').eq('user_id',user.id).gte('recorded_at',new Date(new Date().setHours(0,0,0,0)).toISOString()).order('recorded_at',{ascending:false}).limit(1).maybeSingle();if(error){console.warn('Loading mood failed:',error.message);return;}if(alive&&data?.mood)setMood(data.mood)})();return()=>{alive=false}},[]);
+ useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;
+  const today=new Date();today.setHours(0,0,0,0);
+  const [journal,checkins]=await Promise.all([
+   supabase.from('wellness_journal').select('mood,occurred_at').eq('user_id',user.id).gte('occurred_at',today.toISOString()).not('mood','is',null).order('occurred_at',{ascending:false}).limit(1).maybeSingle(),
+   supabase.from('mood_entries').select('mood,recorded_at').eq('user_id',user.id).gte('recorded_at',today.toISOString()).order('recorded_at',{ascending:false}).limit(1).maybeSingle()
+  ]);
+  if(journal.error)console.warn('Journal mood load:',journal.error.message);
+  if(checkins.error)console.warn('Mood check-in load:',checkins.error.message);
+  const a=journal.data,b=checkins.data;
+  const latest=a&&b?(new Date(a.occurred_at)>=new Date(b.recorded_at)?a.mood:b.mood):(a?.mood||b?.mood||'');
+  if(alive)setMood(latest||'');
+ })();return()=>{alive=false}},[]);
  const [water,setWater]=useState(0);
  const [coffee,setCoffee]=useState(0);
  useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;
@@ -96,7 +107,6 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
    {settingsPage==='main'?<>
     <WellnessSettingsIntro companion={mood} accent={colors.accent}/>
     <Text style={s.mainTitle}>Settings</Text>
-    <WatchThemesCard onOpen={()=>setSettingsPage('watch')}/>
 
     <SettingsItem title="Health Data" subtitle="Permissions and wearable readings" status="Open Health to connect or sync" icon="heart-outline" accent={colors.accent} onPress={()=>setSettingsPage('health')}/>
     <SettingsItem title="Notifications" subtitle="Reminders and preferences" status="Manage daily iPhone reminders" icon="notifications-outline" accent={colors.accent} onPress={()=>setSettingsPage('notifications')}/>
