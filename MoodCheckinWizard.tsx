@@ -30,12 +30,13 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone}:{co
  }
  const shownQuestions=questions.length?questions:(fallback[mood]||[]);
  const button=(title:string,onPress:()=>void,filled=true,disabled=false)=><TouchableOpacity accessibilityRole="button" disabled={disabled||busy} onPress={onPress} style={{backgroundColor:filled?color:'#F3EFFB',padding:15,borderRadius:16,alignItems:'center',opacity:disabled?0.5:1}}><Text style={{fontWeight:'800',color:filled?'white':'#514079'}}>{title}</Text></TouchableOpacity>;
- return <View style={{backgroundColor:'white',borderRadius:24,padding:18,gap:15}}>
+ return <View style={{backgroundColor:'white',borderRadius:24,padding:18,gap:15,minHeight:440}}>
   <Text style={{fontWeight:'900',fontSize:22,color:'#251C45'}}>{step===0?'How are you feeling?':step===1?'Would you like to share more?':step===2?'Let’s explore that feeling':'Mood saved!'}</Text>
-  {step<3?<Text style={{fontSize:12,color:'#82799C'}}>Step {step+1} of 3 · All details are optional</Text>:null}
-  {mood?<View style={{alignItems:'center',gap:4}}><SuperdotMascot id={mood} size={94}/><Text style={{color:'#5C4B83',fontWeight:'700'}}>{mood}</Text></View>:null}
+  {step<3?<View style={{gap:9}}><Text style={{fontSize:12,color:'#82799C',textAlign:'center'}}>Step {step+1} of 3</Text><View style={{flexDirection:'row',gap:5}}>{[0,1,2].map(i=><View key={i} style={{flex:1,height:5,borderRadius:4,backgroundColor:i<=step?color:'#EDEAF3'}}/>)}</View></View>:null}
+  {mood&&step!==0?<View style={{alignItems:'center',gap:4}}><SuperdotMascot id={mood} size={step===1?130:94}/><Text style={{color:'#5C4B83',fontWeight:'700'}}>{mood}</Text></View>:null}
   {step===0?<><Text style={{color:'#7B728C'}}>Select the feeling that fits best right now.</Text>
    <View style={{flexDirection:'row',flexWrap:'wrap',gap:9}}>{moods.map(m=><TouchableOpacity key={m} onPress={()=>setMood(m)} style={{width:'30%',minWidth:80,paddingVertical:12,alignItems:'center',backgroundColor:mood===m?'#E9E3FF':'#F7F5FA',borderRadius:16,borderWidth:mood===m?2:1,borderColor:mood===m?color:'#F0EDF4'}}><SuperdotMascot id={m} size={57}/><Text style={{fontSize:12,fontWeight:'800',color:'#342957'}}>{m}</Text></TouchableOpacity>)}</View>
+   {mood?<View style={{backgroundColor:'#F7F5FC',borderRadius:14,padding:12,flexDirection:'row',alignItems:'center',gap:11}}><SuperdotMascot id={mood} size={66}/><View style={{flex:1}}><Text style={{fontWeight:'800',color:'#342957'}}>{mood}</Text><Text style={{fontSize:11,color:'#7D748F'}}>Your companion reflects how you feel.</Text></View></View>:null}
    {button('Continue →',()=>setStep(1),true,!mood)}</>:null}
   {step===1?<><Text style={{color:'#726989',lineHeight:20}}>You can save your mood now, or answer a few short questions to understand what might have contributed.</Text>
    {button('Yes, ask me a few questions',()=>setStep(2))}
