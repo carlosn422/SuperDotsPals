@@ -1,61 +1,40 @@
 import SwiftUI
-import Charts
 
 struct ContentView: View {
-    @EnvironmentObject var store: WatchStore
-    @StateObject private var themeSync = WatchThemeSync()
-    @Environment(\.scenePhase) private var scenePhase
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 13) {
-                    Text("superdots.").font(.headline.bold()).foregroundStyle(store.companion.color)
-                    AnimatedMoodMascot(mood: store.currentMood, size: 100, isActive: scenePhase == .active)
-                    Text("Your wellness companion").font(.headline).multilineTextAlignment(.center)
-                    Text("Your mood companion: " + store.currentMood).font(.caption2).foregroundStyle(.secondary)
-
-                    if store.latestHRV != nil || store.latestRestingHeartRate != nil {
-                        HStack(spacing: 8) {
-                            if let hrv = store.latestHRV { metric("HRV", value: String(Int(hrv.rounded())), unit: "ms") }
-                            if let heartRate = store.latestRestingHeartRate { metric("Resting HR", value: String(Int(heartRate.rounded())), unit: "bpm") }
-                        }
-                        Text("Latest readings synced from Apple Health via Superdots.")
-                            .font(.system(size: 10)).foregroundStyle(.secondary)
-                    } else {
-                        Text("No Apple Health readings synced yet. Connect and sync on your iPhone.")
-                            .font(.caption2).foregroundStyle(.secondary)
-                    }
-                    NavigationLink { BreathingView() } label: { Label("Take a breath", systemImage: "wind") }
-                    NavigationLink { WatchSyncView(sync: themeSync) } label: { Label("Mood sync", systemImage: "arrow.triangle.2.circlepath") }
-                    Text(themeSync.connected ? "Mood sync connected" : "Connect to sync your latest mood")
-                        .font(.system(size: 10)).foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 5)
-            }
-        }
-        .task { await themeSync.refresh(store:store) }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await themeSync.refresh(store:store) } }
-        }
-    }
-
-    private func metric(_ title: String, value: String, unit: String) -> some View {
-        VStack(spacing: 3) {
-            Text(title).font(.system(size: 10)).foregroundStyle(.secondary)
-            Text(value).font(.title3.bold()).foregroundStyle(store.companion.color)
-            Text(unit).font(.system(size: 9)).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 10)
-        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 13))
-    }
-}
-
-struct TrendsView: View {
-    var body: some View {
-        Text("Real HRV trends will appear after Apple Health is connected on your iPhone.")
-            .font(.caption).foregroundStyle(.secondary)
-            .navigationTitle("Trends")
-    }
+ @EnvironmentObject var store:WatchStore
+ @StateObject private var sync=WatchThemeSync()
+ @Environment(\.scenePhase) private var scenePhase
+ private let purple=Color(red:0.43,green:0.32,blue:0.85)
+ var body:some View {
+  NavigationStack {
+   ScrollView {
+    VStack(spacing:10) {
+     Text("superdots.").font(.headline.bold()).foregroundStyle(purple)
+     AnimatedMoodMascot(mood:store.currentMood,size:88,isActive:scenePhase == .active)
+     Text("How are you feeling today?").font(.headline).multilineTextAlignment(.center)
+     NavigationLink {WatchCheckIn(sync:sync)} label: {
+      Label("Check In",systemImage:"heart.text.square.fill").frame(maxWidth:.infinity)
+     }.buttonStyle(.borderedProminent).tint(purple)
+     NavigationLink {WatchFavorites(sync:sync)} label: {Label("Favorite verses",systemImage:"book.closed.fill")}
+     NavigationLink {WatchHealth()} label: {Label("Health snapshot",systemImage:"heart.fill")}
+     NavigationLink {WatchJournal(sync:sync)} label: {Label("Quick journal",systemImage:"square.and.pencil")}
+     NavigationLink {WatchMoodInsights(sync:sync)} label: {Label("Mood insights",systemImage:"chart.line.uptrend.xyaxis")}
+     if let hrv=store.latestHRV {
+      Text("Latest HRV: \(Int(hrv.rounded())) ms").font(.caption2).foregroundStyle(.secondary)
+     }
+     NavigationLink {WatchSyncView(sync:sync)} label: {
+      Label(sync.connected ? "Account & sync":"Connect account",systemImage:"person.crop.circle")
+     }
+     if !sync.connected {
+      Text("Connect your Superdots account to save check-ins and see your data.").font(.caption2).foregroundStyle(.secondary).multilineTextAlignment(.center)
+     }
+    }.padding(.horizontal,4)
+   }
+   .navigationBarTitleDisplayMode(.inline)
+  }
+  .task {await sync.refresh(store:store)}
+  .onChange(of:scenePhase) {_,phase in
+   if phase == .active {Task {await sync.refresh(store:store)}}
+  }
+ }
 }
