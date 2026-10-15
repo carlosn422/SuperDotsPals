@@ -104,18 +104,18 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onBre
  </View>;
 }
 export function WellnessTrends({companion,accent,period,onPeriod,mood}:{companion:string;accent:string;period:string;onPeriod:(p:'Day'|'Week'|'Month'|'Year')=>void;mood:string}){
- const [entries,setEntries]=React.useState<{mood:string;recorded_at:string}[]>([]);
+ const [entries,setEntries]=React.useState<{mood:string;occurred_at:string}[]>([]);
  const [loading,setLoading]=React.useState(true);
- React.useEffect(()=>{let active=true;(async()=>{try{const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data,error}=await supabase.from('mood_entries').select('mood,recorded_at').eq('user_id',user.id).order('recorded_at',{ascending:false}).limit(365);if(error)throw error;if(active)setEntries(data||[])}catch(error){console.warn('Mood trends unavailable',error)}finally{if(active)setLoading(false)}})();return()=>{active=false}},[]);
+ React.useEffect(()=>{let active=true;(async()=>{try{const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data,error}=await supabase.from('wellness_journal').select('mood,occurred_at').eq('user_id',user.id).not('mood','is',null).order('occurred_at',{ascending:false}).limit(365);if(error)throw error;if(active)setEntries(data||[])}catch(error){console.warn('Mood trends unavailable',error)}finally{if(active)setLoading(false)}})();return()=>{active=false}},[]);
  const days=period==='Day'?1:period==='Week'?7:period==='Month'?30:365;
  const today=new Date();const start=new Date(today);start.setHours(0,0,0,0);start.setDate(start.getDate()-days+1);
- const values={Happy:5,Calm:4,Okay:3,Tired:2,Anxious:1,Sad:1,Stressed:1,Overwhelmed:1,Good:4};
- const filtered=entries.filter(e=>new Date(e.recorded_at)>=start);
+ const values:Record<string,number>={Happy:5,Joyful:5,Good:4,Calm:4,Okay:3,Tired:2,Sad:2,Anxious:1,Stressed:1,Overwhelmed:1,Angry:1,Frustrated:1};
+ const filtered=entries.filter(e=>new Date(e.occurred_at)>=start);
  const periods=period==='Day'?1:period==='Week'?7:period==='Month'?6:12;
  const groups=Array.from({length:periods},(_,i)=>{
   const d=new Date(start);d.setDate(start.getDate()+Math.floor(i*days/periods));
   const next=new Date(start);next.setDate(start.getDate()+Math.floor((i+1)*days/periods));
-  const bucket=filtered.filter(e=>{const t=new Date(e.recorded_at);return t>=d&&t<next});
+  const bucket=filtered.filter(e=>{const t=new Date(e.occurred_at);return t>=d&&t<next});
   const score=bucket.length?bucket.reduce((sum,e)=>sum+(values[e.mood as keyof typeof values]||3),0)/bucket.length:null;
   return {label:period==='Week'?['S','M','T','W','T','F','S'][d.getDay()]:period==='Day'?'Today':String(d.getDate()),score,count:bucket.length};
  });
