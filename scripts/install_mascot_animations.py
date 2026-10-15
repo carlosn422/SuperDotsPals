@@ -13,7 +13,7 @@ source_map={}
 for mood,archive_name in NAMES.items():
     candidates=list(SOURCE.glob(f'{archive_name}_mascot_animation_frames*.zip'))
     if not candidates:raise SystemExit(f'Missing {archive_name} animation ZIP in {SOURCE}')
-    archive=candidates[-1]
+    archive=max(candidates,key=lambda p:p.stat().st_mtime) # use newest supplied revision, including (1).zip
     with zipfile.ZipFile(archive) as zipf:
         manifest=json.loads(zipf.read('manifest.json'))
         fps=manifest['animation']['fps']
