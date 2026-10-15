@@ -1,3 +1,4 @@
+import QRCode from "npm:qrcode@1.5.4";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {createClient} from "npm:@supabase/supabase-js@2";
 const url=Deno.env.get("SUPABASE_URL")||"",anon=Deno.env.get("SUPABASE_ANON_KEY")||"",service=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
@@ -7,6 +8,17 @@ async function hash(s:string){return Array.from(new Uint8Array(await crypto.subt
 function random(){const a=crypto.getRandomValues(new Uint8Array(32));return Array.from(a).map(x=>x.toString(16).padStart(2,"0")).join("")}
 async function authed(req:Request){const bearer=req.headers.get("Authorization")||"";if(!bearer.startsWith("Bearer "))return null;const client=createClient(url,anon,{global:{headers:{Authorization:bearer}},auth:{persistSession:false,autoRefreshToken:false}});const {data:{user}}=await client.auth.getUser(bearer.slice(7));return user||null}
 Deno.serve(async req=>{
+ if(req.method==="GET"){
+  try {
+   const requestUrl=new URL(req.url),id=requestUrl.searchParams.get("id")||"",secret=requestUrl.searchParams.get("secret")||"";
+   if(!/^[0-9a-f-]{36}$/i.test(id)||!/^[0-9a-f]{64}$/i.test(secret))return json({error:"Invalid QR"},400);
+   const {data:row}=await admin.from("watch_pairing_requests").select("secret_hash,status,expires_at").eq("id",id).maybeSingle();
+   if(!row||row.secret_hash!==await hash(secret)||row.status!=="pending"||Date.parse(row.expires_at)<Date.now())return json({error:"Expired QR"},404);
+   const content="superdots://pair?id="+id+"&secret="+secret;
+   const svg=await QRCode.toString(content,{type:"svg",margin:2,errorCorrectionLevel:"M",color:{dark:"#14102B",light:"#FFFFFF"}});
+   return new Response(svg,{headers:{"Content-Type":"image/svg+xml","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"}});
+  }catch(e){console.error("QR render failed",String(e));return json({error:"QR unavailable"},500)}
+ }
  if(req.method!=="POST"||!url||!anon||!service)return json({error:"Not available"},503);
  try{
   const p=await req.json();const action=String(p.action||"");
