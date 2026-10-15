@@ -55,7 +55,7 @@ Deno.serve(async(req:Request)=>{
   }
   if(action==="questions"){
    const items=Array.isArray(aiResult?.items)?aiResult.items.filter((x:any)=>typeof x?.question==="string"&&x.question.length>10&&x.question.length<=120&&Array.isArray(x.choices)&&x.choices.length===4&&x.choices.every((c:unknown)=>typeof c==="string"&&(c as string).length>1&&(c as string).length<=55)).slice(0,3):[];
-   const fallbackItems=simpleQuestions[mood].map(q=>({question:q,choices:["Something happening today","An ongoing situation","My physical energy or rest","I am not sure yet"]}));
+   const fallbackItems=[...simpleQuestions[mood], 'What would feel most supportive for you right now?'].map(q=>({question:q,choices:["Something happening today","An ongoing situation","My physical energy or rest","I am not sure yet"]}));
    return out({items:items.length===3?items:fallbackItems,usedAI:items.length===3&&usedAI});
   }
   const selected=catalog.find(p=>p.reference===aiResult?.reference)||catalog.find(p=>p.reference===fallback[mood])||catalog[0];
