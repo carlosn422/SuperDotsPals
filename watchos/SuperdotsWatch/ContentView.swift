@@ -9,6 +9,11 @@ struct ContentView: View {
   NavigationStack {
    ScrollView {
     VStack(spacing:10) {
+     if !sync.connected {
+      NavigationLink {WatchSyncView(sync:sync)} label: {
+       Label("Connect Account",systemImage:"link").frame(maxWidth:.infinity)
+      }.buttonStyle(.borderedProminent).tint(purple)
+     } else {
      AnimatedMoodMascot(mood:store.currentMood,size:88,isActive:scenePhase == .active)
      Text("How are you feeling today?").font(.headline).multilineTextAlignment(.center)
      NavigationLink {WatchCheckIn(sync:sync)} label: {
@@ -24,8 +29,6 @@ struct ContentView: View {
      NavigationLink {WatchSyncView(sync:sync)} label: {
       Label(sync.connected ? "Account & sync":"Connect account",systemImage:"person.crop.circle")
      }
-     if !sync.connected {
-      Text("Connect your Superdots account to save check-ins and see your data.").font(.caption2).foregroundStyle(.secondary).multilineTextAlignment(.center)
      }
     }.padding(.horizontal,4)
    }
