@@ -109,22 +109,21 @@ export function WellnessTrends({companion,accent,period,onPeriod,mood}:{companio
  React.useEffect(()=>{let active=true;(async()=>{try{const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data,error}=await supabase.from('wellness_journal').select('mood,occurred_at').eq('user_id',user.id).not('mood','is',null).order('occurred_at',{ascending:false}).limit(365);if(error)throw error;if(active)setEntries(data||[])}catch(error){console.warn('Mood trends unavailable',error)}finally{if(active)setLoading(false)}})();return()=>{active=false}},[mood]);
  const days=period==='Day'?1:period==='Week'?7:period==='Month'?30:365;
  const today=new Date();const start=new Date(today);start.setHours(0,0,0,0);start.setDate(start.getDate()-days+1);
- const values:Record<string,number>={Happy:5,Joyful:5,Good:4,Calm:4,Okay:3,Tired:2,Sad:2,Anxious:1,Stressed:1,Overwhelmed:1,Angry:1,Frustrated:1};
  const filtered=entries.filter(e=>new Date(e.occurred_at)>=start);
  const periods=period==='Day'?1:period==='Week'?7:period==='Month'?6:12;
  const groups=Array.from({length:periods},(_,i)=>{
   const d=new Date(start);d.setDate(start.getDate()+Math.floor(i*days/periods));
   const next=new Date(start);next.setDate(start.getDate()+Math.floor((i+1)*days/periods));
   const bucket=filtered.filter(e=>{const t=new Date(e.occurred_at);return t>=d&&t<next});
-  const score=bucket.length?bucket.reduce((sum,e)=>sum+(values[e.mood as keyof typeof values]||3),0)/bucket.length:null;
-  return {label:period==='Week'?['S','M','T','W','T','F','S'][d.getDay()]:period==='Day'?'Today':String(d.getDate()),score,count:bucket.length};
+  return {label:period==='Week'?['S','M','T','W','T','F','S'][d.getDay()]:period==='Day'?'Today':String(d.getDate()),count:bucket.length};
  });
+ const maxCount=Math.max(1,...groups.map(g=>g.count));
  return <View style={s.page}><BrandHead companion={companion}/><PageHero title="Understand your" highlight="patterns." detail="See how your habits and mood connect over time." companion={companion} accent={accent}/>
  <View style={s.segment}>{(['Day','Week','Month','Year'] as const).map(p=><TouchableOpacity key={p} onPress={()=>onPeriod(p)} style={[s.seg,period===p&&{backgroundColor:accent}]}><Text style={{color:period===p?'#fff':MUTED,fontWeight:'800',fontSize:12}}>{p}</Text></TouchableOpacity>)}</View>
  <SectionHeading title="Mood trend"/><View style={s.white}><Text style={s.cardTitle}>How you've been feeling</Text>
  <Text style={s.big}>{loading?'Loading…':filtered.length?filtered.length+' check-ins':'No check-ins yet'}</Text>
- <Text style={s.body}>{filtered.length?'These bars represent your saved mood check-ins, not watch measurements.':'Start checking in to see your own mood history.'}</Text>
- <View style={s.bars}>{groups.map((g,i)=><View key={i} style={{flex:1,alignItems:'center',gap:6,justifyContent:'flex-end',height:105}}><View style={{width:'58%',minWidth:8,height:g.score?Math.round(g.score*15):5,borderRadius:9,backgroundColor:g.score?accent:'#EDE9F4'}}/><Text style={{fontSize:9,color:MUTED}}>{g.label}</Text></View>)}</View>
+ <Text style={s.body}>{filtered.length?'These bars show how many mood check-ins you logged, not a stress or health score.':'Start checking in to see your own mood history.'}</Text>
+ <View style={s.bars}>{groups.map((g,i)=><View key={i} style={{flex:1,alignItems:'center',gap:6,justifyContent:'flex-end',height:105}}><View style={{width:'58%',minWidth:8,height:g.count?Math.max(10,Math.round(g.count/maxCount*75)):5,borderRadius:9,backgroundColor:g.count?accent:'#EDE9F4'}}/><Text style={{fontSize:9,color:MUTED}}>{g.label}</Text></View>)}</View>
  </View>
  <HealthTrendOverview period={period}/>
  <View style={[s.white,{backgroundColor:'#FFF8E9'}]}><Text style={s.celebrateTitle}>💡 Your wellness insights</Text><Text style={s.body}>These are your recorded check-ins. Any connection between sleep, activity and mood needs real synchronized data before conclusions can be drawn.</Text></View></View>;
