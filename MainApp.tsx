@@ -16,7 +16,6 @@ import Svg, { Circle, Line, Path, Rect, Defs, LinearGradient, Stop, Polygon } fr
 
 type Tab = 'Today' | 'Actions' | 'Trends' | 'Health' | 'Settings';
 type Period = 'Day' | 'Week' | 'Month' | 'Year';
-type Mood = 'Calm' | 'Okay' | 'Anxious' | 'Happy' | 'Tired';
 const C = { ink:APP_THEME.ink, muted:APP_THEME.muted, green:APP_THEME.primary, deep:APP_THEME.primary, surface:APP_THEME.surface, bg:APP_THEME.background, mint:APP_THEME.primarySoft, peach:'#FFF0DE', orange:'#F4A570', lilac:APP_THEME.primarySoft, purple:APP_THEME.primary, line:APP_THEME.border, red:'#EC7D8C' };
 const tabs: {name:Tab;icon:'home'|'sparkles'|'stats-chart'|'heart'|'settings';outline:'home-outline'|'sparkles-outline'|'stats-chart-outline'|'heart-outline'|'settings-outline'}[] = [{name:'Today',icon:'home',outline:'home-outline'},{name:'Actions',icon:'sparkles',outline:'sparkles-outline'},{name:'Trends',icon:'stats-chart',outline:'stats-chart-outline'},{name:'Health',icon:'heart',outline:'heart-outline'},{name:'Settings',icon:'settings',outline:'settings-outline'}];
 
@@ -40,18 +39,12 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  const [settingsPage,setSettingsPage]=useState<'main'|'watch'|'health'|'notifications'|'privacy'|'help'>('main');
  const [period,setPeriod]=useState<Period>('Day');
  const [mood,setMood]=useState<string>('');
- useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;
-  const today=new Date();today.setHours(0,0,0,0);
-  const [journal,checkins]=await Promise.all([
-   supabase.from('wellness_journal').select('mood,occurred_at').eq('user_id',user.id).gte('occurred_at',today.toISOString()).not('mood','is',null).order('occurred_at',{ascending:false}).limit(1).maybeSingle(),
-   supabase.from('mood_entries').select('mood,recorded_at').eq('user_id',user.id).gte('recorded_at',today.toISOString()).order('recorded_at',{ascending:false}).limit(1).maybeSingle()
-  ]);
-  if(journal.error)console.warn('Journal mood load:',journal.error.message);
-  if(checkins.error)console.warn('Mood check-in load:',checkins.error.message);
-  const a=journal.data,b=checkins.data;
-  const latest=a&&b?(new Date(a.occurred_at)>=new Date(b.recorded_at)?a.mood:b.mood):(a?.mood||b?.mood||'');
-  if(alive)setMood(latest||'');
- })();return()=>{alive=false}},[]);
+ useEffect(()=>{let active=true;(async()=>{
+  const {data:{user}}=await supabase.auth.getUser();if(!user)return;
+  const {data,error}=await supabase.from('wellness_journal').select('mood').eq('user_id',user.id).not('mood','is',null).order('occurred_at',{ascending:false}).limit(1).maybeSingle();
+  if(error)console.warn('Latest mood unavailable',error.message);
+  if(active&&!error)setMood(data?.mood||'');
+ })();return()=>{active=false}},[]);
  const [water,setWater]=useState(0);
  const [coffee,setCoffee]=useState(0);
  useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;
@@ -72,7 +65,6 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  };
  useEffect(()=>{const index=Math.max(0,tabs.findIndex(t=>t.name===tab));pager.current?.scrollTo({x:index*pageWidth,animated:false});},[pageWidth]);
  async function saveHabit(habit:'water'|'caffeine',amount:number){try{const {data:{user}}=await supabase.auth.getUser();if(!user)throw Error('Sign in first');const {error}=await supabase.from('habit_entries').insert({user_id:user.id,habit,amount,unit:'cups'});if(error)throw error;}catch(e:any){console.warn('Save habit failed:',e?.message);Alert.alert('Could not save',e?.message||'Please retry');}}
- async function saveMood(m:Mood){const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {error}=await supabase.from('mood_entries').insert({user_id:user.id,mood:m});if(error)console.warn('Save mood failed:',error.message);}
  return <View style={[s.safe,{paddingTop:Platform.OS==='ios'?insets.top:StatusBar.currentHeight || 0}]}><StatusBar barStyle="dark-content" backgroundColor={C.bg}/>
   <View style={s.top}><View style={s.brand}><View style={[s.logo,{backgroundColor:colors.accent}]}><Text style={s.logoText}>✦</Text></View><Text style={s.brandText}>superdots<Text style={{color:colors.accent}}>.</Text></Text></View><TouchableOpacity accessibilityLabel="Open profile" onPress={()=>go('Settings')} style={s.avatar}><Text style={{fontSize:18}}>☺</Text></TouchableOpacity></View>
   <ScrollView ref={pager} horizontal pagingEnabled bounces={false} showsHorizontalScrollIndicator={false} scrollEventThrottle={16} onMomentumScrollEnd={onPageSettled} directionalLockEnabled style={{flex:1}} keyboardShouldPersistTaps="handled">
