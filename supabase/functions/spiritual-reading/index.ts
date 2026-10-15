@@ -33,7 +33,7 @@ Deno.serve(async(req:Request)=>{
   const {data:catalog,error:catalogError}=await db.from("scripture_passages").select("id,reference,translation,verse_text,topics,source_url").order("id");
   if(catalogError||!catalog?.length)return out({error:"Scripture catalog unavailable"},503);
   const key=Deno.env.get("GEMINI_API_KEY");
-  const model=Deno.env.get("SPIRITUAL_GEMINI_MODEL")||"gemini-2.5-flash-lite";
+  const models=[...new Set([Deno.env.get("SPIRITUAL_GEMINI_MODEL"),"gemini-2.5-flash","gemini-2.5-flash-lite"].filter(Boolean))] as string[];
   let aiResult:any=null,usedAI=false;
   let aiAllowed=Boolean(key);
   if(aiAllowed){const since=new Date(Date.now()-24*60*60*1000).toISOString();const {count,error:usageError}=await db.from("spiritual_ai_usage").select("id",{head:true,count:"exact"}).eq("user_id",user.id).gte("created_at",since);if(usageError||Number(count||0)>=10)aiAllowed=false;}
@@ -42,16 +42,20 @@ Deno.serve(async(req:Request)=>{
    "Generate THREE thoughtful and DISTINCT emotionally supportive questions that help understand WHY a person feels their selected mood, in a wellness app. Tailor to the mood and available history, without claiming health data caused the feeling. Favor open exploration of real-life events, relationships, stressors and hopes. For EACH question provide FOUR short, specific multiple choice answers (never generic Yes/No) plus an optional Other option handled by the app. Do not diagnose or pressure faith. Return JSON only: {\"items\":[{\"question\":\"...\",\"choices\":[\"...\",\"...\",\"...\",\"...\"]}, ...]}. Question max 120 characters, choice max 55.":
    "Select ONE reference from the provided verified Bible catalog ONLY. Never invent Bible text or a reference. Offer a warm two-sentence reflection that does not diagnose or promise a cure. Return JSON only: {\"reference\":\"exact supplied reference\",\"reflection\":\"...\"}. Reflection <=300 characters.";
    const context={mood,answers,history,availableReferences:action==="recommend"?catalog.map(p=>({reference:p.reference,topics:p.topics})):undefined};
-   const abort=new AbortController();const timer=setTimeout(()=>abort.abort(),12000);
-   try{
-    const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{
-     method:"POST",signal:abort.signal,headers:{"Content-Type":"application/json","x-goog-api-key":key},
-     body:JSON.stringify({systemInstruction:{parts:[{text:instruction}]},contents:[{role:"user",parts:[{text:JSON.stringify(context).slice(0,3300)}]}],generationConfig:{temperature:0.3,maxOutputTokens:230,responseMimeType:"application/json"}})
-    });
-    if(response.ok){const json=await response.json();const text=(json.candidates?.[0]?.content?.parts||[]).map((x:{text?:string})=>x.text||"").join("");aiResult=safeJson(text);usedAI=true;await db.from("spiritual_ai_usage").insert({user_id:user.id,action,input_tokens:json.usageMetadata?.promptTokenCount||null,output_tokens:json.usageMetadata?.candidatesTokenCount||null});}
-    else console.warn("Spiritual Gemini unavailable",response.status);
-   }catch(e){console.warn("Spiritual Gemini failed",String(e))}
-   finally{clearTimeout(timer)}
+   for(const model of models){
+    const abort=new AbortController();const timer=setTimeout(()=>abort.abort(),12000);
+    try{
+     const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{
+      method:"POST",signal:abort.signal,headers:{"Content-Type":"application/json","x-goog-api-key":key},
+      body:JSON.stringify({systemInstruction:{parts:[{text:instruction}]},contents:[{role:"user",parts:[{text:JSON.stringify(context).slice(0,3300)}]}],generationConfig:{temperature:0.3,maxOutputTokens:650,responseMimeType:"application/json"}})
+     });
+     if(response.ok){const json=await response.json();const generated=(json.candidates?.[0]?.content?.parts||[]).map((x:{text?:string})=>x.text||"").join("");aiResult=safeJson(generated);usedAI=true;await db.from("spiritual_ai_usage").insert({user_id:user.id,action,input_tokens:json.usageMetadata?.promptTokenCount||null,output_tokens:json.usageMetadata?.candidatesTokenCount||null});break;}
+     const detail=await response.text();
+     console.warn("Spiritual Gemini unavailable",model,response.status,detail.slice(0,220));
+     if(response.status!==404)break;
+    }catch(e){console.warn("Spiritual Gemini failed",model,String(e))}
+    finally{clearTimeout(timer)}
+   }
   }
   if(action==="questions"){
    const items=Array.isArray(aiResult?.items)?aiResult.items.filter((x:any)=>typeof x?.question==="string"&&x.question.length>10&&x.question.length<=120&&Array.isArray(x.choices)&&x.choices.length===4&&x.choices.every((c:unknown)=>typeof c==="string"&&(c as string).length>1&&(c as string).length<=55)).slice(0,3):[];
