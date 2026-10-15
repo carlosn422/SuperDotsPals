@@ -65,7 +65,7 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onNa
   </View>:null}
   {step===2?<View style={{gap:12}}>
    <View style={{flexDirection:'row',alignItems:'center',gap:10}}><SuperdotMascot id={mood} size={56}/><View style={{flex:1}}><Text style={{fontWeight:'800',fontSize:14,color:'#281F49'}}>{mood}</Text><Text style={{fontSize:11,color:'#8980A0'}}>Let's explore this feeling</Text></View><Text style={{fontSize:11,color:'#817892'}}>{questionIndex+1} of {shownQuestions.length}</Text></View>
-   <View style={{height:4,backgroundColor:'#EDEAF4',borderRadius:3,overflow:'hidden'}}><View style={{width:((questionIndex+1)/Math.max(shownQuestions.length,1)*100)+'%',height:4,backgroundColor:color,borderRadius:3}}/></View>
+   <View style={{height:4,backgroundColor:'#EDEAF4',borderRadius:3,overflow:'hidden'}}><View style={{width:`${(questionIndex+1)/Math.max(shownQuestions.length,1)*100}%` as `${number}%`,height:4,backgroundColor:color,borderRadius:3}}/></View>
    <Text style={{fontSize:17,fontWeight:'900',color:'#251C45',lineHeight:24}}>{currentQuestion}</Text>
    <View accessibilityRole="radiogroup" style={{gap:7}}>{choices.map(c=>option(c,()=>setAnswers(v=>({...v,[currentQuestion]:c})),answers[currentQuestion]===c))}</View>
    {questionIndex===shownQuestions.length-1?<TextInput placeholder="Add a note (optional)" placeholderTextColor="#A59DB5" multiline maxLength={1000} value={note} onChangeText={setNote} style={{minHeight:63,borderWidth:1,borderColor:'#ECE8F3',borderRadius:13,padding:11,textAlignVertical:'top',color:'#30284C'}}/>:null}
