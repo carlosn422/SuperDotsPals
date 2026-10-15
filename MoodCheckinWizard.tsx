@@ -28,6 +28,7 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone}:{co
    setStep(3);onSaved(mood);
   }catch(e:any){Alert.alert('Could not save your mood',e.message||'Please try again.')}finally{setBusy(false)}
  }
+ const shownQuestions=questions.length?questions:(fallback[mood]||[]);
  const button=(title:string,onPress:()=>void,filled=true,disabled=false)=><TouchableOpacity accessibilityRole="button" disabled={disabled||busy} onPress={onPress} style={{backgroundColor:filled?color:'#F3EFFB',padding:15,borderRadius:16,alignItems:'center',opacity:disabled?0.5:1}}><Text style={{fontWeight:'800',color:filled?'white':'#514079'}}>{title}</Text></TouchableOpacity>;
  return <View style={{backgroundColor:'white',borderRadius:24,padding:18,gap:15}}>
   <Text style={{fontWeight:'900',fontSize:22,color:'#251C45'}}>{step===0?'How are you feeling?':step===1?'Would you like to share more?':step===2?'Let’s explore that feeling':'Mood saved!'}</Text>
@@ -40,10 +41,10 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone}:{co
    {button('Yes, ask me a few questions',()=>setStep(2))}
    {button('Just save my mood',()=>void save(false),false)}
    {button('Back',()=>setStep(0),false)}</>:null}
-  {step===2?<><Text style={{color:'#8B82A0'}}>Question {questionIndex+1} of {questions.length||3}</Text>
-   <Text style={{fontSize:17,fontWeight:'800',color:'#2C2350'}}>{questions[questionIndex]}</Text>
+  {step===2?<><Text style={{color:'#8B82A0'}}>Question {questionIndex+1} of {shownQuestions.length||3}</Text>
+   <Text style={{fontSize:17,fontWeight:'800',color:'#2C2350'}}>{shownQuestions[questionIndex]}</Text>
    {choices.map(choice=><TouchableOpacity key={choice} onPress={()=>setAnswers(prev=>({...prev,[questions[questionIndex]]:choice}))} style={{padding:13,borderRadius:13,borderWidth:1,borderColor:answers[questions[questionIndex]]===choice?color:'#EEEAF3',backgroundColor:answers[questions[questionIndex]]===choice?'#ECE7FF':'white'}}><Text style={{color:'#382C5F'}}>{choice}</Text></TouchableOpacity>)}
-   {questionIndex===(questions.length||3)-1?<><TextInput placeholder="Add a note (optional)" multiline maxLength={1000} value={note} onChangeText={setNote} style={{minHeight:68,borderWidth:1,borderColor:'#EEEAF3',borderRadius:13,padding:12,textAlignVertical:'top'}}/>{button('Save check-in',()=>void save(true))}</>:button('Next question →',()=>setQuestionIndex(i=>i+1))}
+   {questionIndex===(questions.length||3)-1?<><TextInput placeholder="Add a note (optional)" multiline maxLength={1000} value={note} onChangeText={setNote} style={{minHeight:68,borderWidth:1,borderColor:'#EEEAF3',borderRadius:13,padding:12,textAlignVertical:'top'}}/>{button('Save check-in',()=>void save(true))}</>:button('Next question →',()=>setQuestionIndex(i=>Math.min(i+1,shownQuestions.length-1)))}
    {button('Skip questions & save',()=>void save(true),false)}
    {button('Back',()=>questionIndex?setQuestionIndex(i=>i-1):setStep(1),false)}
   </>:null}
