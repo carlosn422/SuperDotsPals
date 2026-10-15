@@ -50,7 +50,7 @@ export function WellnessToday({companion,accent,water,mood,onCheckin,onChat,onAc
 }
 export function WellnessActions({companion,accent,water,onWater,onCaffeine,onBreathing,onChat,onMood,onJournal,caffeine}:{companion:string;accent:string;water:number;caffeine:number;onWater:()=>void;onCaffeine:()=>void;onBreathing:()=>void;onChat:()=>void;onMood:()=>void;onJournal:()=>void}){
  const [day,setDay]=React.useState(0);
- const [pastAmounts,setPastAmounts]=React.useState<{water:number;caffeine:number}>({water:0,caffeine:0});
+ const [pastAmounts,setPastAmounts]=React.useState({water:0,caffeine:0});
  React.useEffect(()=>{let alive=true;if(day===0)return;
  (async()=>{try{const {data:{user}}=await supabase.auth.getUser();if(!user)return;
  const d=new Date();d.setDate(d.getDate()+day);d.setHours(0,0,0,0);
@@ -60,27 +60,47 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onBre
  }catch(e){console.warn('Daily habit history unavailable',e)}})();return()=>{alive=false};
  },[day]);
  const shownWater=day===0?water:pastAmounts.water,shownCaffeine=day===0?caffeine:pastAmounts.caffeine;
- const selectable=day===0;
- const dates=Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()+i-3);return d});
- const addCard=(emoji:string,title:string,description:string,info:string,action?:()=>void)=>(
- <TouchableOpacity onPress={action} disabled={!action} style={{backgroundColor:'#fff',borderRadius:22,padding:17,flexDirection:'row',alignItems:'center',gap:14}}>
-  <View style={{width:51,height:51,borderRadius:18,backgroundColor:'#E9F6F0',alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:27}}>{emoji}</Text></View>
-  <View style={{flex:1,gap:5}}><Text style={{fontSize:16,fontWeight:'900',color:INK}}>{title}</Text><Text style={{fontSize:12,color:MUTED}}>{description}</Text><Text style={{fontSize:11,color:'#3A9E7A'}}>{info}</Text></View>
-  <Ionicons name="chevron-forward" size={19} color={MUTED}/>
+ const dates=Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()+i-6);return d});
+ const item=(icon:any,title:string,detail:string,tint:string,press?:()=>void)=>(
+ <TouchableOpacity disabled={!press} onPress={press} style={{backgroundColor:'#fff',borderRadius:18,paddingHorizontal:15,paddingVertical:16,flexDirection:'row',alignItems:'center',gap:13,borderWidth:1,borderColor:'#ECEAF2'}}>
+  <View style={{width:43,height:43,backgroundColor:tint,borderRadius:15,alignItems:'center',justifyContent:'center'}}><Ionicons name={icon} size={21} color={accent}/></View>
+  <View style={{flex:1,gap:3}}><Text style={{fontSize:15,fontWeight:'800',color:INK}}>{title}</Text><Text style={{fontSize:12,color:MUTED}}>{detail}</Text></View>
+  {press?<Ionicons name="chevron-forward" size={18} color="#A6A1B5"/>:null}
  </TouchableOpacity>);
- return <View style={s.page}><BrandHead companion={companion}/>
- <SectionHeading title="Your daily actions" detail="Small steps, better days"/>
- <View style={{flexDirection:'row',justifyContent:'space-between',gap:4}}>{dates.map((d,i)=><TouchableOpacity key={i} onPress={()=>setDay(i-3)} style={{flex:1,alignItems:'center',paddingVertical:10,borderRadius:18,backgroundColor:day===i-3?'#D8F6E8':'#fff',gap:4}}><Text style={{fontSize:11,color:MUTED}}>{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]}</Text><Text style={{fontWeight:'900',fontSize:16,color:INK}}>{d.getDate()}</Text>{i===3?<View style={{width:5,height:5,borderRadius:3,backgroundColor:'#50C89E'}}/>:null}</TouchableOpacity>)}</View>
- <View style={{backgroundColor:'#E4F8EE',borderRadius:24,padding:18,flexDirection:'row',alignItems:'center',gap:12}}><View style={{flex:1,gap:7}}><Text style={{color:'#28694F',fontWeight:'900',fontSize:13}}>✦  YOUR SUPERDOT SUGGESTS</Text><Text style={{fontWeight:'900',color:INK,fontSize:18}}>A small reset can help.</Text><Text style={s.body}>How have you been sleeping and feeling lately?</Text><TouchableOpacity onPress={onChat}><Text style={{fontWeight:'800',color:accent}}>Talk to Superdots  →</Text></TouchableOpacity></View><SuperdotMascot id={companion} color={accent} size={86}/></View>
- <SectionHeading title={day===0?"Today’s wellness":day<0?"Previous day’s wellness":"Upcoming day"} detail={day===0?"Track and reflect":"Saved entries only"}/>
- {addCard('🌙','Sleep','Review sleep and recovery','Apple Health not connected')}
- {addCard('🏃','Fitness','Movement and activity','Apple Health not connected')}
- {addCard('💧','Hydration',shownWater+' cups logged',selectable?'Tap to view and edit':'Daily history',selectable?onWater:undefined)}
- {addCard('☕','Caffeine',shownCaffeine+' cups logged',selectable?'Tap to view and edit':'Daily history',selectable?onCaffeine:undefined)}
- {addCard('🌸','Mindfulness','Take a calming pause','Open guided breathing',onBreathing)}
- {addCard('🙂','Log your feelings','How are you feeling right now?','Check in with Superdots',onMood)}
- {addCard('📖','Journal','Write about your day','View your private notes',onJournal)}
- <TouchableOpacity onPress={onChat} style={[s.chat,{backgroundColor:'#EEE7FF'}]}><SuperdotMascot id={companion} color={accent} size={72}/><View style={{flex:1,gap:4}}><Text style={s.actionTitle}>Ask your Superdot</Text><Text style={s.body}>Your private AI wellness conversation</Text></View><Ionicons name="arrow-forward" size={21} color={accent}/></TouchableOpacity>
+ return <View style={[s.page,{gap:15}]}>
+  <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
+   <View><Text style={{fontSize:29,fontWeight:'900',color:INK}}>Actions</Text><Text style={{color:MUTED,fontSize:12,marginTop:2}}>Small steps for feeling better</Text></View>
+   <SuperdotMascot id={companion} size={53}/>
+  </View>
+  <View style={{flexDirection:'row',gap:5}}>{dates.map((d,i)=><TouchableOpacity key={i} onPress={()=>setDay(i-6)} style={{flex:1,alignItems:'center',paddingVertical:11,borderRadius:17,backgroundColor:day===i-6?APP_THEME.primarySoft:'#FFFFFF',gap:4,borderWidth:day===i-6?1.5:1,borderColor:day===i-6?accent:'#ECEAF2'}}>
+    <Text style={{fontSize:10,fontWeight:'700',color:MUTED}}>{['Su','Mo','Tu','We','Th','Fr','Sa'][d.getDay()]}</Text><Text style={{fontWeight:'900',fontSize:15,color:day===i-6?accent:INK}}>{d.getDate()}</Text>
+   </TouchableOpacity>)}</View>
+  {day!==0?<Text style={{color:MUTED,fontSize:12}}>Viewing past entries. Choose today to log new actions.</Text>:null}
+  <TouchableOpacity onPress={onMood} style={{backgroundColor:'#E8F5EF',borderRadius:23,padding:18,flexDirection:'row',alignItems:'center',gap:13}}>
+   <View style={{flex:1,gap:7}}><Text style={{fontSize:11,letterSpacing:1,fontWeight:'900',color:'#3B8A6A'}}>YOUR DAILY CHECK-IN</Text>
+    <Text style={{fontSize:20,fontWeight:'900',color:INK}}>How are you feeling?</Text>
+    <Text style={{fontSize:12,color:MUTED,lineHeight:18}}>Name the emotion, then add details only if you want to.</Text>
+    <Text style={{fontSize:13,fontWeight:'800',color:accent,marginTop:3}}>Check in  →</Text></View>
+   <SuperdotMascot id={companion} size={91}/>
+  </TouchableOpacity>
+  <View style={{gap:9}}><SectionHeading title="Daily essentials"/>
+   <View style={{flexDirection:'row',gap:10}}>
+    <TouchableOpacity onPress={day===0?onWater:undefined} disabled={day!==0} style={{flex:1,backgroundColor:'#FFFFFF',borderRadius:20,padding:16,borderWidth:1,borderColor:'#ECEAF2',gap:7}}>
+     <Ionicons name="water-outline" size={24} color="#4B9DCF"/><Text style={{fontSize:14,fontWeight:'800',color:INK}}>Water</Text>
+     <Text style={{fontSize:20,fontWeight:'900',color:INK}}>{shownWater} cups</Text><Text style={{fontSize:11,color:MUTED}}>{day===0?'Tap to log':'Recorded that day'}</Text>
+    </TouchableOpacity>
+    <TouchableOpacity onPress={day===0?onCaffeine:undefined} disabled={day!==0} style={{flex:1,backgroundColor:'#FFFFFF',borderRadius:20,padding:16,borderWidth:1,borderColor:'#ECEAF2',gap:7}}>
+     <Ionicons name="cafe-outline" size={24} color="#B58756"/><Text style={{fontSize:14,fontWeight:'800',color:INK}}>Caffeine</Text>
+     <Text style={{fontSize:20,fontWeight:'900',color:INK}}>{shownCaffeine} cups</Text><Text style={{fontSize:11,color:MUTED}}>{day===0?'Tap to log':'Recorded that day'}</Text>
+    </TouchableOpacity>
+   </View>
+  </View>
+  <View style={{gap:9}}><SectionHeading title="Mind & reflection"/>
+   {item('leaf-outline','Take a breath','A short guided breathing exercise','#E7F5ED',onBreathing)}
+   {item('book-outline','Your journal','Review your private reflections','#F4EBFF',onJournal)}
+   {item('chatbubble-ellipses-outline','Talk to Superdots','Private text conversation','#EFE9FF',onChat)}
+  </View>
+  <View style={{backgroundColor:'#F1F3F5',padding:13,borderRadius:15}}><Text style={{fontSize:11,color:MUTED,lineHeight:17}}>Sleep, steps, and recovery readings are available in Health after connecting Apple Health. They aren't shown here as actions until data is available.</Text></View>
  </View>;
 }
 export function WellnessTrends({companion,accent,period,onPeriod,mood}:{companion:string;accent:string;period:string;onPeriod:(p:'Day'|'Week'|'Month'|'Year')=>void;mood:string}){
