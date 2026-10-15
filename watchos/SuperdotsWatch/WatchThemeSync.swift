@@ -126,6 +126,49 @@ final class WatchThemeSync: ObservableObject {
         return try await request("/functions/v1/spiritual-reading",method:"POST",body:JSONSerialization.data(withJSONObject:object))
     }
 
+    @Published var pairingURL = ""
+    @Published var pairingActive = false
+    private var pairingId = ""
+    private var pairingSecret = ""
+
+    func startPairing() async {
+        busy=true
+        defer {busy=false}
+        do {
+            let body=try JSONSerialization.data(withJSONObject:["action":"start","deviceName":"Apple Watch"])
+            let data=try await request("/functions/v1/watch-pairing",method:"POST",body:body,authenticated:false)
+            guard let obj=try JSONSerialization.jsonObject(with:data) as? [String:Any],
+              let id=obj["id"] as? String,let secret=obj["secret"] as? String else {throw SyncError.badResponse}
+            pairingId=id;pairingSecret=secret
+            pairingURL="superdots://pair?id=\(id)&secret=\(secret)"
+            pairingActive=true
+            message="Scan with Superdots on your iPhone."
+        }catch{message="Pairing failed: \(error.localizedDescription)"}
+    }
+
+    func pollPairing(store:WatchStore) async {
+        guard pairingActive,!pairingId.isEmpty else{return}
+        do {
+            let body=try JSONSerialization.data(withJSONObject:["action":"poll","id":pairingId,"secret":pairingSecret])
+            let data=try await request("/functions/v1/watch-pairing",method:"POST",body:body,authenticated:false)
+            guard let obj=try JSONSerialization.jsonObject(with:data) as? [String:Any] else{return}
+            let status=obj["status"] as? String ?? ""
+            if status=="expired" {pairingActive=false;message="QR expired. Generate a new code.";return}
+            if status=="approved",let hash=obj["tokenHash"] as? String {
+                let verify=try JSONSerialization.data(withJSONObject:["token_hash":hash,"type":"magiclink"])
+                let session=try await request("/auth/v1/verify",method:"POST",body:verify,authenticated:false)
+                try loadSession(session)
+                connected=true
+                pairingActive=false
+                let completed=try JSONSerialization.data(withJSONObject:["action":"complete","id":pairingId,"secret":pairingSecret])
+                _ = try? await request("/functions/v1/watch-pairing",method:"POST",body:completed)
+                pairingURL="";pairingSecret=""
+                message="Watch connected to your Superdots account."
+                await refresh(store:store)
+            }
+        }catch{message="Waiting for connection: \(error.localizedDescription)"}
+    }
+
     private func renewIfNeeded() async throws {
         guard !refreshToken.isEmpty else { throw SyncError.notSignedIn }
         let payload = try JSONSerialization.data(withJSONObject:["refresh_token":refreshToken])
