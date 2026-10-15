@@ -10,6 +10,7 @@ struct ContentView: View {
    ScrollView {
     VStack(spacing:10) {
      if !sync.connected {
+      AnimatedMoodMascot(mood:"Calm",size:105,isActive:scenePhase == .active)
       NavigationLink {WatchSyncView(sync:sync)} label: {
        Label("Connect Account",systemImage:"link").frame(maxWidth:.infinity)
       }.buttonStyle(.borderedProminent).tint(purple)
