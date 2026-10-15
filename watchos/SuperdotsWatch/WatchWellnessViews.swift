@@ -115,6 +115,8 @@ struct WatchHealth:View {
    Text("Your health").font(.headline)
    metric("HRV",store.latestHRV.map{String(Int($0.rounded()))+" ms"})
    metric("Resting heart rate",store.latestRestingHeartRate.map{String(Int($0.rounded()))+" bpm"})
+   metric("Steps",store.latestSteps.map{String(Int($0.rounded()))})
+   metric("Sleep",store.latestSleepMinutes.map{String(Int($0.rounded()))+" min"})
    Text("Synced measurements from your iPhone's Apple Health. Missing data is not estimated.").font(.caption2).foregroundStyle(.secondary)
   }}.navigationTitle("Health")
  }
