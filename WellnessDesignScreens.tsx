@@ -17,9 +17,32 @@ export function BrandHead({companion}:{companion:string}){return <View style={s.
 export function SectionHeading({title,detail}:{title:string;detail?:string}){return <View style={s.heading}><Text style={s.headingText}>{title}</Text>{detail?<Text style={s.headingDetail}>{detail}</Text>:null}</View>}
 export function PastelCard({title,detail,emoji,tint,onPress}:{title:string;detail:string;emoji:string;tint:string;onPress?:()=>void}){return <TouchableOpacity disabled={!onPress} onPress={onPress} style={[s.action,{backgroundColor:tint}]}><Text style={s.actionEmoji}>{emoji}</Text><View style={{flex:1,gap:5}}><Text style={s.actionTitle}>{title}</Text><Text style={s.actionText}>{detail}</Text></View><Ionicons name="chevron-forward" color={P} size={16}/></TouchableOpacity>}
 export function StatCard({title,value,detail,icon,tint,onPress}:{title:string;value:string;detail:string;icon:any;tint:string;onPress?:()=>void}){return <TouchableOpacity disabled={!onPress} onPress={onPress} style={s.stat}><View style={[s.statIcon,{backgroundColor:tint}]}><Ionicons name={icon} size={20} color={P}/></View><Text style={s.statTitle}>{title}</Text><Text style={s.statValue}>{value}</Text><Text style={s.statDetail}>{detail}</Text></TouchableOpacity>}
+const moodGuides=[
+ {mood:'Happy',id:'joy',detail:'Happy and energized'},
+ {mood:'Sad',id:'sadness',detail:'Feeling a little low'},
+ {mood:'Angry',id:'anger',detail:'Frustrated or upset'},
+ {mood:'Anxious',id:'fear',detail:'Worried or stressed'},
+ {mood:'Calm',id:'disgust',detail:'Calm and balanced'},
+] as const;
+export function MeetYourMoods({onCheckin}:{onCheckin:()=>void}){
+ return <View style={{backgroundColor:'#FFFFFF',borderRadius:24,padding:17,gap:11,borderWidth:1,borderColor:APP_THEME.border}}>
+   <Text style={{fontSize:19,fontWeight:'900',color:INK}}>Meet your moods</Text>
+   <Text style={{fontSize:12,color:MUTED,lineHeight:18}}>Your Superdot changes with how you're feeling. Check in to see the companion that matches your mood.</Text>
+   <View style={{flexDirection:'row',justifyContent:'space-between',gap:2}}>
+    {moodGuides.map(item=><View key={item.mood} style={{flex:1,alignItems:'center',gap:5}}>
+      <SuperdotMascot id={item.id} size={55}/>
+      <Text style={{fontSize:10,fontWeight:'800',color:INK}}>{item.mood}</Text>
+    </View>)}
+   </View>
+   <TouchableOpacity onPress={onCheckin} style={{alignSelf:'flex-start',backgroundColor:APP_THEME.primarySoft,paddingHorizontal:15,paddingVertical:10,borderRadius:18}}>
+    <Text style={{fontSize:12,fontWeight:'800',color:P}}>Check in with your mood  →</Text>
+   </TouchableOpacity>
+ </View>;
+}
 export function WellnessToday({companion,accent,water,mood,onCheckin,onChat,onActions}:{companion:string;accent:string;water:number;mood:string;onCheckin:()=>void;onChat:()=>void;onActions:()=>void}){
  return <View style={s.page}><BrandHead companion={companion}/><PageHero title="A little check-in" highlight="for you" detail="Take a moment to pause and see how you're feeling today." accent={accent} companion={companion} button="Let's check in" onPress={onCheckin}/>
  <View style={[s.celebrate,{backgroundColor:'#EDF9F3'}]}><View style={{flex:1,gap:7}}><Text style={s.celebrateTitle}>You're doing <Text style={{color:accent}}>dot-tastic!</Text></Text><Text style={s.body}>Small steps count. Your Superdot is here for you.</Text></View><SuperdotMascot id={companion} color={accent} size={103}/></View>
+ <MeetYourMoods onCheckin={onCheckin}/>
  <RecoveryInsights companion={companion} onChat={onChat}/>
  <SectionHeading title="Your daily wellness"/><View style={s.grid}><StatCard title="Water Intake" value={String(water)+' cups'} detail="Logged today" icon="water" tint="#E5F3FF" onPress={onActions}/><StatCard title="Mood" value={mood.trim()||'Not logged'} detail="Tap to check in" icon="happy-outline" tint="#FFF0D6" onPress={onCheckin}/></View><HealthMiniStats/>
  <TouchableOpacity onPress={onChat} style={s.chat}><SuperdotMascot id={companion} color={accent} size={68}/><View style={{flex:1}}><Text style={s.actionTitle}>Talk to your Superdot</Text><Text style={s.body}>Share how you're feeling and get support.</Text></View><Ionicons name="chevron-forward" size={20} color={accent}/></TouchableOpacity>
