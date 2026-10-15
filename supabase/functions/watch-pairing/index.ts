@@ -58,6 +58,7 @@ Deno.serve(async req=>{
   }
   if(action==="status"){
    const {data}=await admin.from("connected_devices").select("revoked_at").eq("user_id",user.id).eq("pairing_id",String(p.id||"")).maybeSingle();
+   if(data&&!data.revoked_at)await admin.from("connected_devices").update({last_seen_at:new Date().toISOString()}).eq("user_id",user.id).eq("pairing_id",String(p.id||""));
    return json({active:!!data&&!data.revoked_at});
   }
   return json({error:"Unknown action"},400);
