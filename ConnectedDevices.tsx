@@ -24,7 +24,7 @@ export default function ConnectedDevices(){
  useEffect(()=>{void load()},[]);
  function scanned(raw:string){setScan(false);try{setCandidate(parse(raw));setMessage('')}catch(e:any){Alert.alert('Invalid code',e.message)}}
  async function approve(){if(!candidate)return;setLoading(true);try{await call('approve',candidate);setCandidate(null);setMessage('Approved. Your watch will connect automatically.');await load()}catch(e:any){Alert.alert('Unable to pair',e.message)}finally{setLoading(false)}}
- async function revoke(device:Device){Alert.alert('Disconnect device?',device.name+' will be removed from your connected devices. Existing authentication tokens may remain valid until they expire.',[{text:'Cancel',style:'cancel'},{text:'Disconnect',style:'destructive',onPress:()=>{void (async()=>{setLoading(true);try{await call('revoke',{deviceId:device.id});await load()}catch(e:any){Alert.alert('Disconnect failed',e.message)}finally{setLoading(false)}})()}}])}
+ async function remove(device:Device){Alert.alert('Remove device?',device.name+' will be permanently removed from your connected devices. It will need a new QR code to link again. Existing access tokens may remain valid until they expire.',[{text:'Cancel',style:'cancel'},{text:'Remove Device',style:'destructive',onPress:()=>{void (async()=>{setLoading(true);try{await call('remove',{deviceId:device.id});setDevices(current=>current.filter(d=>d.id!==device.id));await load()}catch(e:any){Alert.alert('Removal failed',e.message)}finally{setLoading(false)}})()}}])}
  return <View style={{gap:13}}>
   <Text style={styles.title}>Connected devices</Text>
   <Text style={styles.sub}>Link your Apple Watch by scanning its one-time QR code. Pairing expires after 5 minutes.</Text>
@@ -34,7 +34,7 @@ export default function ConnectedDevices(){
   {loading?<ActivityIndicator color={purple}/>:null}
   {message?<Text style={styles.sub}>{message}</Text>:null}
   <TouchableOpacity onPress={()=>void load()}><Text style={{color:purple,fontWeight:'700'}}>Refresh device list ↻</Text></TouchableOpacity>
-  {devices.length===0?<Text style={styles.sub}>No connected watches yet.</Text>:devices.map(d=><View key={d.id} style={styles.card}><Text style={{fontWeight:'800',color:'#271C49'}}>{d.name}</Text><Text style={styles.sub}>{d.revoked_at?'Disconnected': 'Linked '+new Date(d.linked_at).toLocaleDateString()}</Text>{!d.revoked_at?<TouchableOpacity onPress={()=>void revoke(d)}><Text style={{color:'#C64F67',fontWeight:'800'}}>Disconnect</Text></TouchableOpacity>:null}</View>)}
+  {devices.length===0?<Text style={styles.sub}>No connected watches yet.</Text>:devices.map(d=><View key={d.id} style={styles.card}><Text style={{fontWeight:'800',color:'#271C49'}}>{d.name}</Text><Text style={styles.sub}>{'Linked '+new Date(d.linked_at).toLocaleDateString()}</Text><TouchableOpacity onPress={()=>void remove(d)}><Text style={{color:'#C64F67',fontWeight:'800'}}>Remove Device</Text></TouchableOpacity></View>)}
  </View>;
 }
 const styles=StyleSheet.create({title:{fontWeight:'900',fontSize:20,color:'#251C45'},sub:{fontSize:12,lineHeight:19,color:'#807694'},button:{backgroundColor:purple,borderRadius:14,padding:14,alignItems:'center'},buttonText:{color:'white',fontWeight:'900'},card:{backgroundColor:'white',borderRadius:16,padding:15,gap:10,borderWidth:1,borderColor:'#EDE9F3'}});
