@@ -19,7 +19,7 @@ export default function SpiritualReading({initialCheckin}:{initialCheckin?:{mood
   if(error||data?.error)throw Error(data?.error||'Could not load reading.');
   return data;
  }
- async function generateQuestions(){setBusy(true);try{const data=await invoke('questions');setQuestions(data.questions||[]);setAnswers({});setIndex(0);setStep('questions')}catch(e:any){Alert.alert('Unable to prepare questions',e.message)}finally{setBusy(false)}}
+ async function generateQuestions(){setBusy(true);try{const data=await invoke('questions');setQuestions((data.items||[]).map((x:{question:string})=>x.question));setAnswers({});setIndex(0);setStep('questions')}catch(e:any){Alert.alert('Unable to prepare questions',e.message)}finally{setBusy(false)}}
  async function recommend(skip=false){setBusy(true);try{const data=await invoke('recommend',{questions,answers:skip?{}:answers});setPassage(data.passage);setReflection(data.reflection);setIsFavorite(false);setStep('result')}catch(e:any){Alert.alert('Unable to find Scripture',e.message)}finally{setBusy(false)}}
  useEffect(()=>{if(initialCheckin)void recommendFromCheckin(initialCheckin)},[]);
  async function recommendFromCheckin(checkin:{mood:string;answers:Record<string,string>}){setBusy(true);try{const {data,error}=await supabase.functions.invoke('spiritual-reading',{body:{action:'recommend',mood:checkin.mood,answers:checkin.answers,useHistory:false}});if(error||data?.error||!data?.passage)throw Error(data?.error||'Unable to load passage');setPassage(data.passage);setReflection(data.reflection||'');setIsFavorite(false);setStep('result')}catch(e:any){Alert.alert('Unable to find Scripture',e?.message||'Try again.');setStep('start')}finally{setBusy(false)}}
