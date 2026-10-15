@@ -21,7 +21,7 @@ export default function WellnessReportExport(){
    const from=new Date();from.setDate(from.getDate()-days);from.setHours(0,0,0,0);
    const iso=from.toISOString();
    const [moods,habits,journal,readings]=await Promise.all([
-    supabase.from('mood_entries').select('mood,recorded_at').eq('user_id',user.id).gte('recorded_at',iso).order('recorded_at',{ascending:false}).limit(500),
+    supabase.from('wellness_journal').select('mood,occurred_at').eq('user_id',user.id) .not('mood','is',null).gte('occurred_at',iso).order('occurred_at',{ascending:false}).limit(500),
     supabase.from('habit_entries').select('habit,amount,unit,recorded_at').eq('user_id',user.id).gte('recorded_at',iso).order('recorded_at',{ascending:false}).limit(1000),
     supabase.from('wellness_journal').select('mood,intensity,energy_level,stress_factors,body,occurred_at').eq('user_id',user.id).gte('occurred_at',iso).order('occurred_at',{ascending:false}).limit(400),
     supabase.from('wellness_readings').select('metric,value,source,recorded_at').eq('user_id',user.id).eq('source','healthkit').gte('recorded_at',iso).order('recorded_at',{ascending:false}).limit(1500)
@@ -43,7 +43,7 @@ export default function WellnessReportExport(){
     <p class="small">Generated ${escapeHtml(new Date().toLocaleString())} · Previous ${days} days</p>
     <div class="notice">This is a user-requested export of self-reported wellness information and permitted Apple Health measurements. These records are not a medical diagnosis, clinical stress score, or proof of causation. Missing data are not estimated.</div>
     <h2>Mood check-ins (${moods.data?.length||0})</h2>
-    ${table(['Date','Reported mood'],(moods.data||[]).map(r=>[dateCell(r.recorded_at),r.mood]))}
+    ${table(['Date','Reported mood'],(moods.data||[]).map(r=>[dateCell(r.occurred_at),r.mood]))}
     <h2>Habits (latest saved total per day)</h2>
     ${table(['Date','Habit','Total','Unit'],sorted.map(r=>[dateCell(r.recorded_at),r.habit,r.amount,r.unit]))}
     <h2>Private journal and reflections</h2>
