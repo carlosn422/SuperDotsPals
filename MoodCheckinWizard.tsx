@@ -13,7 +13,8 @@ const fallback:Record<string,string[]>={
  Tired:['Did you sleep less than you wanted?','Has your day been physically or mentally demanding?','Have you had enough time to recover?']
 };
 const choices=['Yes','A little','No','Not sure','Prefer not to say'];
-export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJournal,onInsights,onNavigate}:{color:string;onSaved:(mood:string)=>void;onExploreAI:(mood:string)=>void;onDone:()=>void;onJournal:()=>void;onInsights:()=>void;onNavigate?:()=>void}){
+export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJournal,onInsights,onFindVerse,onNavigate}:{color:string;onSaved:(mood:string)=>void;onExploreAI:(mood:string)=>void;onDone:()=>void;onJournal:()=>void;onInsights:()=>void;onFindVerse:(mood:string,answers:Record<string,string>)=>void;onNavigate?:()=>void}){
+ const [savedAnswers,setSavedAnswers]=useState<Record<string,string>>({});
  const [step,setStep]=useState<0|1|2|3>(0),[mood,setMood]=useState<string>(''),[questions,setQuestions]=useState<string[]>([]),[answers,setAnswers]=useState<Record<string,string>>({}),[note,setNote]=useState(''),[questionIndex,setQuestionIndex]=useState(0),[busy,setBusy]=useState(false);
  useEffect(()=>{if(!mood)return;let active=true;setQuestions(fallback[mood]||[]);setAnswers({});setQuestionIndex(0);
  (async()=>{const {data,error}=await supabase.from('mood_questions').select('question').eq('mood',mood).eq('is_active',true).order('sort_order',{ascending:true}).limit(3);
@@ -25,7 +26,7 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJo
   try{const {data:{user},error:authError}=await supabase.auth.getUser();if(authError||!user)throw Error('Please sign in.');
    const {error}=await supabase.from('wellness_journal').insert({user_id:user.id,entry_type:'reflection',body:note.trim()||'Mood check-in',mood,reflection_answers:withDetails?answers:{},stress_factors:[]});
    if(error)throw error;
-   changeStep(3);onSaved(mood);
+   setSavedAnswers(withDetails?{...answers}:{});changeStep(3);onSaved(mood);
   }catch(e:any){Alert.alert('Could not save your mood',e.message||'Please try again.')}finally{setBusy(false)}
  }
  const shownQuestions=questions.length?questions:(fallback[mood]||[]);
@@ -80,6 +81,7 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJo
    <View style={{backgroundColor:'#F2EFFB',borderRadius:13,padding:12,flexDirection:'row',alignItems:'center',gap:9}}><SuperdotMascot id={mood} size={54}/><View style={{flex:1}}><Text style={{fontSize:11,color:'#817892'}}>Your mood today</Text><Text style={{fontSize:15,fontWeight:'900',color:'#30264D'}}>{mood}</Text><Text style={{fontSize:11,color:'#817892'}}>{new Date().toLocaleString()}</Text></View></View>
    <Text style={{fontSize:15,fontWeight:'900',color:'#30264D'}}>What's next?</Text>
    {[
+    {icon:'📜',title:'Find a Bible verse for me',sub:'Find encouragement matched to your check-in',go:()=>onFindVerse(mood,savedAnswers)},
     {icon:'💬',title:'Talk to your Superdot',sub:'Explore this feeling through AI text chat',go:()=>onExploreAI(mood)},
     {icon:'📖',title:'Write in your journal',sub:'Reflect on your thoughts',go:onJournal},
     {icon:'💡',title:'View insights',sub:'See your patterns over time',go:onInsights},
