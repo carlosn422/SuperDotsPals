@@ -7,7 +7,7 @@ import Security
 final class WatchThemeSync: ObservableObject {
     @Published var connected = false
     @Published var busy = false
-    @Published var message = "Connect your account to sync themes."
+    @Published var message = "Connect your account to sync mood and health readings."
     private let base = URL(string: "https://hzoauxxpvrgahlavxmvp.supabase.co")!
     private let publishableKey = "sb_publishable_pPPqosRo1SqwrbW-8MWURA_UxTED6Vs"
     private var accessToken = ""
@@ -59,31 +59,10 @@ final class WatchThemeSync: ObservableObject {
         } catch { message = "Sync failed: \(error.localizedDescription)" }
     }
 
-    func update(companion: Dot, store: WatchStore) async {
-        store.companion = companion
-        guard connected else { message = "Saved on watch only. Connect to sync."; return }
-        busy = true
-        defer { busy = false }
-        do {
-            try await renewIfNeeded()
-            let theme: String
-            switch companion {
-            case .bloop: theme = "grape"
-            case .poppy: theme = "coral"
-            case .mochi: theme = "sky"
-            case .zuzu: theme = "sunny"
-            case .nori: theme = "mint"
-            }
-            let data = try JSONSerialization.data(withJSONObject:["companion":companion.rawValue,"theme":theme])
-            _ = try await request("/rest/v1/user_settings?user_id=eq.\(userId)",method:"PATCH",body:data)
-            message = "Updated both devices. Open the iPhone app to refresh its theme."
-        } catch { message = "Saved locally, but cloud update failed: \(error.localizedDescription)" }
-    }
-
     func signOut() {
         for key in ["watch_access","watch_refresh","watch_user"] { storeSecret(nil,for:key) }
         accessToken = ""; refreshToken = ""; userId = ""; connected = false
-        message = "Disconnected. Watch theme is saved locally."
+        message = "Disconnected. Your watch will show local defaults."
     }
 
     private func renewIfNeeded() async throws {
@@ -165,7 +144,7 @@ struct WatchSyncView: View {
                 if sync.connected {
                     Text("Connected").font(.headline)
                     Text(sync.message).font(.caption2).multilineTextAlignment(.center)
-                    Button("Sync theme now") { Task { await sync.refresh(store:store) } }
+                    Button("Sync wellness now") { Task { await sync.refresh(store:store) } }
                     Button("Disconnect",role:.destructive) { sync.signOut() }
                 } else {
                     Text("Sign in to sync").font(.headline)
