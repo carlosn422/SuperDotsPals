@@ -41,7 +41,6 @@ export function MeetYourMoods({onCheckin}:{onCheckin:()=>void}){
 }
 export function WellnessToday({companion,accent,water,mood,onCheckin,onChat,onActions}:{companion:string;accent:string;water:number;mood:string;onCheckin:()=>void;onChat:()=>void;onActions:()=>void}){
  return <View style={s.page}><BrandHead companion={companion}/><PageHero title="A little check-in" highlight="for you" detail="Take a moment to pause and see how you're feeling today." accent={accent} companion={companion} button="Let's check in" onPress={onCheckin}/>
- <View style={[s.celebrate,{backgroundColor:'#EDF9F3'}]}><View style={{flex:1,gap:7}}><Text style={s.celebrateTitle}>You're doing <Text style={{color:accent}}>dot-tastic!</Text></Text><Text style={s.body}>Small steps count. Your Superdot is here for you.</Text></View><SuperdotMascot id={companion} color={accent} size={103}/></View>
  <MeetYourMoods onCheckin={onCheckin}/>
  <RecoveryInsights companion={companion} onChat={onChat}/>
  <SectionHeading title="Your daily wellness"/><View style={s.grid}><StatCard title="Water Intake" value={String(water)+' cups'} detail="Logged today" icon="water" tint="#E5F3FF" onPress={onActions}/><StatCard title="Mood" value={mood.trim()||'Not logged'} detail="Tap to check in" icon="happy-outline" tint="#FFF0D6" onPress={onCheckin}/></View><HealthMiniStats/>
