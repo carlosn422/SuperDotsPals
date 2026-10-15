@@ -15,8 +15,8 @@ Deno.serve(async req=>{
    const {data:row}=await admin.from("watch_pairing_requests").select("secret_hash,status,expires_at").eq("id",id).maybeSingle();
    if(!row||row.secret_hash!==await hash(secret)||row.status!=="pending"||Date.parse(row.expires_at)<Date.now())return json({error:"Expired QR"},404);
    const content="superdots://pair?id="+id+"&secret="+secret;
-   const svg=await QRCode.toString(content,{type:"svg",margin:2,errorCorrectionLevel:"M",color:{dark:"#14102B",light:"#FFFFFF"}});
-   return new Response(svg,{headers:{"Content-Type":"image/svg+xml","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"}});
+   const png=await QRCode.toBuffer(content,{type:"png",width:400,margin:2,errorCorrectionLevel:"M"});
+   return new Response(new Uint8Array(png),{headers:{"Content-Type":"image/png","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"}});
   }catch(e){console.error("QR render failed",String(e));return json({error:"QR unavailable"},500)}
  }
  if(req.method!=="POST"||!url||!anon||!service)return json({error:"Not available"},503);
