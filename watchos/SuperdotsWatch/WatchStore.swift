@@ -29,6 +29,8 @@ final class WatchStore: ObservableObject {
     @Published var currentMood: String = "Calm"
     @Published var latestHRV: Double? = nil
     @Published var latestRestingHeartRate: Double? = nil
+    @Published var latestSteps: Double? = nil
+    @Published var latestSleepMinutes: Double? = nil
     @Published var sessionsCompleted: Int = 0
 
     init() {
