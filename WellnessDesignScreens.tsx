@@ -51,6 +51,15 @@ export function WellnessToday({companion,accent,water,mood,onCheckin,onChat,onAc
 export function WellnessActions({companion,accent,water,onWater,onCaffeine,onBreathing,onChat,onMood,onJournal,caffeine}:{companion:string;accent:string;water:number;caffeine:number;onWater:()=>void;onCaffeine:()=>void;onBreathing:()=>void;onChat:()=>void;onMood:()=>void;onJournal:()=>void}){
  const [day,setDay]=React.useState(0);
  const [pastAmounts,setPastAmounts]=React.useState({water:0,caffeine:0});
+ const [activitySummary,setActivitySummary]=React.useState<{count:number;minutes:number}>({count:0,minutes:0});
+ React.useEffect(()=>{let active=true;(async()=>{
+  const {data:{user}}=await supabase.auth.getUser();if(!user)return;
+  const start=new Date();start.setDate(start.getDate()+day);start.setHours(0,0,0,0);
+  const end=new Date(start);end.setDate(end.getDate()+1);
+  const {data,error}=await supabase.from('wellness_activities').select('duration_minutes').eq('user_id',user.id).gte('occurred_at',start.toISOString()).lt('occurred_at',end.toISOString());
+  if(error){console.warn('Loading recorded activities failed',error.message);return;}
+  if(active)setActivitySummary({count:data?.length||0,minutes:(data||[]).reduce((sum,r)=>sum+Number(r.duration_minutes||0),0)});
+ })();return()=>{active=false}},[day]);
  React.useEffect(()=>{let alive=true;if(day===0)return;
  (async()=>{try{const {data:{user}}=await supabase.auth.getUser();if(!user)return;
  const d=new Date();d.setDate(d.getDate()+day);d.setHours(0,0,0,0);
@@ -96,6 +105,7 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onBre
    </View>
   </View>
   <View style={{gap:9}}><SectionHeading title="Mind & reflection"/>
+   <View style={{backgroundColor:"#FFFFFF",borderRadius:17,padding:13,borderWidth:1,borderColor:"#ECEAF2"}}><Text style={{color:INK,fontSize:13,fontWeight:"800"}}>Activities logged: {activitySummary.count}</Text><Text style={{color:MUTED,fontSize:12}}>{activitySummary.minutes} minutes recorded {day===0?"today":"on this day"}</Text></View>
    {item('leaf-outline','Take a breath','A short guided breathing exercise','#E7F5ED',onBreathing)}
    {item('book-outline','Your journal','Review your private reflections','#F4EBFF',onJournal)}
    {item('chatbubble-ellipses-outline','Talk to Superdots','Private text conversation','#EFE9FF',onChat)}
