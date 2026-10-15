@@ -1,3 +1,4 @@
+import SpiritualReading from './SpiritualReading';
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { StatusBar, ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Alert, useWindowDimensions, NativeSyntheticEvent, NativeScrollEvent, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -33,9 +34,9 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  const [tab,setTab]=useState<Tab>('Today');
  const actionScroll=useRef<ScrollView>(null);
  const [actionDetail,setActionDetail]=useState<'water'|'caffeine'|null>(null);
- const [actionView,setActionView]=useState<'checkin'|'chat'|'history'|'breathing'|null>(null);
+ const [actionView,setActionView]=useState<'checkin'|'chat'|'history'|'spiritual'|null>(null);
  const [actionVersion,setActionVersion]=useState(0);
- const openAction=(view:'checkin'|'chat'|'history'|'breathing')=>{setActionDetail(null);setActionView(view);setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});};
+ const openAction=(view:'checkin'|'chat'|'history'|'spiritual')=>{setActionDetail(null);setActionView(view);setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});};
  const [settingsPage,setSettingsPage]=useState<'main'|'watch'|'health'|'notifications'|'privacy'|'help'>('main');
  const [period,setPeriod]=useState<Period>('Day');
  const [mood,setMood]=useState<string>('');
@@ -100,9 +101,9 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   <View key="Actions" style={{width:pageWidth,flex:1}}><ScrollView ref={actionScroll} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
   {actionDetail||actionView?<TouchableOpacity onPress={()=>{setActionView(null);setActionDetail(null);actionScroll.current?.scrollTo({y:0,animated:true});}} style={{flexDirection:'row',alignItems:'center',gap:8,paddingVertical:9}}><Ionicons name="arrow-back" size={20} color={colors.accent}/><Text style={{color:colors.accent,fontWeight:'800'}}>All actions</Text></TouchableOpacity>:null}
   {actionDetail?<HabitDetails habit={actionDetail} onBack={()=>{setActionDetail(null);actionScroll.current?.scrollTo({y:0,animated:true})}} onSaved={(habit,n)=>{if(habit==='water')setWater(n);else setCoffee(n)}}/>:
-  actionView==='breathing'?<BreathingStudio accent={colors.accent} tint={colors.pale}/>:
+  actionView==='spiritual'?<SpiritualReading/>:
   actionView?<WellnessCompanion key={actionVersion} initialView={actionView} companion={mood} onMoodSaved={setMood} onWizardNavigate={()=>actionScroll.current?.scrollTo({y:0,animated:false})} onCheckinDone={()=>{setActionView(null);go('Today');}} onOpenInsights={()=>{setActionView(null);go('Trends');}} color={colors.accent}/>:
-  <WellnessActions companion={mood} accent={colors.accent} water={water} caffeine={coffee} onCaffeine={()=>{setActionView(null);setActionDetail('caffeine');actionScroll.current?.scrollTo({y:0,animated:true})}} onWater={()=>{setActionView(null);setActionDetail('water');actionScroll.current?.scrollTo({y:0,animated:true})}} onBreathing={()=>openAction('breathing')} onChat={()=>openAction('chat')} onMood={()=>openAction('checkin')} onJournal={()=>openAction('history')}/>}
+  <WellnessActions companion={mood} accent={colors.accent} water={water} caffeine={coffee} onCaffeine={()=>{setActionView(null);setActionDetail('caffeine');actionScroll.current?.scrollTo({y:0,animated:true})}} onWater={()=>{setActionView(null);setActionDetail('water');actionScroll.current?.scrollTo({y:0,animated:true})}} onSpiritual={()=>openAction('spiritual')} onChat={()=>openAction('chat')} onMood={()=>openAction('checkin')} onJournal={()=>openAction('history')}/>}
 </ScrollView></View>
   <View key="Trends" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><WellnessTrends companion={mood} accent={colors.accent} period={period} onPeriod={setPeriod} mood={mood}/><WellnessReportExport/></ScrollView></View>
   <View key="Health" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><WellnessHealth companion={mood} accent={colors.accent} onChat={()=>{go('Actions');openAction('chat')}} onPermissions={()=>{go('Settings');setSettingsPage('health')}}/></ScrollView></View>
