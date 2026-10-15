@@ -9,7 +9,6 @@ struct ContentView: View {
   NavigationStack {
    ScrollView {
     VStack(spacing:10) {
-     Text("superdots.").font(.headline.bold()).foregroundStyle(purple)
      AnimatedMoodMascot(mood:store.currentMood,size:88,isActive:scenePhase == .active)
      Text("How are you feeling today?").font(.headline).multilineTextAlignment(.center)
      NavigationLink {WatchCheckIn(sync:sync)} label: {
