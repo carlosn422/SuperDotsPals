@@ -64,11 +64,39 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   Animated.timing(activePosition,{toValue:index,duration:180,useNativeDriver:true}).start();
  };
  useEffect(()=>{const index=Math.max(0,tabs.findIndex(t=>t.name===tab));pager.current?.scrollTo({x:index*pageWidth,animated:false});},[pageWidth]);
- async function saveHabit(habit:'water'|'caffeine',amount:number){try{const {data:{user}}=await supabase.auth.getUser();if(!user)throw Error('Sign in first');const {error}=await supabase.from('habit_entries').insert({user_id:user.id,habit,amount,unit:'cups'});if(error)throw error;}catch(e:any){console.warn('Save habit failed:',e?.message);Alert.alert('Could not save',e?.message||'Please retry');}}
+ const quickAddLocks=useRef<Record<'water'|'caffeine',boolean>>({water:false,caffeine:false});
+ const [quickAdding,setQuickAdding]=useState<Record<'water'|'caffeine',boolean>>({water:false,caffeine:false});
+ async function quickAddHabit(habit:'water'|'caffeine'){
+  if(quickAddLocks.current[habit])return;
+  quickAddLocks.current[habit]=true;
+  setQuickAdding(v=>({...v,[habit]:true}));
+  try{
+   const {data:{user},error:authError}=await supabase.auth.getUser();
+   if(authError||!user)throw Error('Please sign in to log your habits.');
+   const start=new Date();start.setHours(0,0,0,0);
+   const {data:latest,error:loadError}=await supabase.from('habit_entries')
+    .select('amount').eq('user_id',user.id).eq('habit',habit)
+    .gte('recorded_at',start.toISOString())
+    .order('recorded_at',{ascending:false}).limit(1).maybeSingle();
+   if(loadError)throw loadError;
+   const next=Number(latest?.amount||0)+1;
+   const {error:saveError}=await supabase.from('habit_entries').insert({
+    user_id:user.id,habit,amount:next,unit:habit==='water'?'cups':'servings'
+   });
+   if(saveError)throw saveError;
+   if(habit==='water')setWater(next);else setCoffee(next);
+  }catch(e:any){
+   Alert.alert('Could not save',e?.message||'Please try again.');
+  }finally{
+   quickAddLocks.current[habit]=false;
+   setQuickAdding(v=>({...v,[habit]:false}));
+  }
+ }
+
  return <View style={[s.safe,{paddingTop:Platform.OS==='ios'?insets.top:StatusBar.currentHeight || 0}]}><StatusBar barStyle="dark-content" backgroundColor={C.bg}/>
   <View style={s.top}><View style={s.brand}><View style={[s.logo,{backgroundColor:colors.accent}]}><Text style={s.logoText}>✦</Text></View><Text style={s.brandText}>superdots<Text style={{color:colors.accent}}>.</Text></Text></View><TouchableOpacity accessibilityLabel="Open profile" onPress={()=>go('Settings')} style={s.avatar}><Text style={{fontSize:18}}>☺</Text></TouchableOpacity></View>
   <ScrollView ref={pager} horizontal pagingEnabled bounces={false} showsHorizontalScrollIndicator={false} scrollEventThrottle={16} onMomentumScrollEnd={onPageSettled} directionalLockEnabled style={{flex:1}} keyboardShouldPersistTaps="handled">
-  <View key="Today" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><WellnessToday companion={mood} accent={colors.accent} water={water} caffeine={coffee} mood={mood} onCheckin={()=>{go('Actions');openAction('checkin')}} onChat={()=>{go('Actions');openAction('chat')}} onActions={()=>{go('Actions');setActionView(null);setActionDetail('water')}} onCaffeine={()=>{go('Actions');setActionView(null);setActionDetail('caffeine')}} onJournal={()=>{go('Actions');openAction('history')}}/></ScrollView></View>
+  <View key="Today" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><WellnessToday companion={mood} accent={colors.accent} water={water} caffeine={coffee} mood={mood} onCheckin={()=>{go('Actions');openAction('checkin')}} onChat={()=>{go('Actions');openAction('chat')}} onActions={()=>{go('Actions');setActionView(null);setActionDetail('water')}} onCaffeine={()=>{go('Actions');setActionView(null);setActionDetail('caffeine')}} onJournal={()=>{go('Actions');openAction('history')}} onAddWater={()=>void quickAddHabit('water')} onAddCaffeine={()=>void quickAddHabit('caffeine')} addingWater={quickAdding.water} addingCaffeine={quickAdding.caffeine}/></ScrollView></View>
   <View key="Actions" style={{width:pageWidth,flex:1}}><ScrollView ref={actionScroll} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
   {actionDetail||actionView?<TouchableOpacity onPress={()=>{setActionView(null);setActionDetail(null);actionScroll.current?.scrollTo({y:0,animated:true});}} style={{flexDirection:'row',alignItems:'center',gap:8,paddingVertical:9}}><Ionicons name="arrow-back" size={20} color={colors.accent}/><Text style={{color:colors.accent,fontWeight:'800'}}>All actions</Text></TouchableOpacity>:null}
   {actionDetail?<HabitDetails habit={actionDetail} onBack={()=>{setActionDetail(null);actionScroll.current?.scrollTo({y:0,animated:true})}} onSaved={(habit,n)=>{if(habit==='water')setWater(n);else setCoffee(n)}}/>:
