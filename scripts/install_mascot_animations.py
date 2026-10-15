@@ -6,7 +6,7 @@ from pathlib import Path
 import json,sys,zipfile,shutil,hashlib
 ROOT=Path(__file__).resolve().parents[1]
 SOURCE=Path(sys.argv[1]) if len(sys.argv)>1 else ROOT
-NAMES={'joy':'joy','sadness':'sadness','anger':'anger','fear':'fear','disgust':'calm'}
+NAMES={'joy':'joy','sadness':'sadness','anger':'anger','fear':'fear','disgust':'calm','tired':'tired'}
 dest=ROOT/'assets'/'mascot-animations'
 dest.mkdir(parents=True,exist_ok=True)
 source_map={}
@@ -42,7 +42,7 @@ if len(set(first_frames.values())) != len(NAMES):
     raise SystemExit('Two mascot packs contain identical first frames. Check that Joy is yellow, Anger red, and Calm green.')
 js="import type {ImageSourcePropType} from 'react-native';\n"
 js+="export const MASCOT_FPS=12;\n"
-js+="export const MASCOT_FRAMES:Record<'joy'|'sadness'|'anger'|'fear'|'disgust',ImageSourcePropType[]>={\n"
+js+="export const MASCOT_FRAMES:Record<'joy'|'sadness'|'anger'|'fear'|'disgust'|'tired',ImageSourcePropType[]>={\n"
 for mood,frames in source_map.items():
     js+=" "+mood+":[\n  "+",\n  ".join(frames)+"\n ],\n"
 js+="};\n"
