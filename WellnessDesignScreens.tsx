@@ -2,18 +2,18 @@ import React from 'react';
 import {View,Text,TouchableOpacity,StyleSheet} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import SuperdotMascot from './SuperdotMascot';
-import {COMPANIONS} from './SettingsComponents';
+import {APP_THEME} from './MoodMascot';
 import {supabase} from './supabase';
 import HealthDataPanel,{HealthMiniStats} from './HealthDataPanel';
 import RecoveryInsights from './RecoveryInsights';
 import HealthTrendOverview from './HealthTrendOverview';
 
-const P='#7139E9',INK='#25145C',MUTED='#80749E';
+const P=APP_THEME.primary,INK=APP_THEME.ink,MUTED=APP_THEME.muted;
 type Props={companion:string;accent:string;onPress?:()=>void};
 export function PageHero({title,highlight,detail,companion,accent,onPress,button}:{title:string;highlight:string;detail:string;companion:string;accent:string;onPress?:()=>void;button?:string}){
  return <View style={s.hero}><View style={{flex:1,gap:9,zIndex:1}}><Text style={s.heroTitle}>{title}{'\n'}<Text style={{color:accent}}>{highlight}</Text></Text><Text style={s.heroText}>{detail}</Text>{button?<TouchableOpacity onPress={onPress} style={[s.heroButton,{backgroundColor:accent}]}><Text style={{fontWeight:'900',color:'#fff'}}>{button}  →</Text></TouchableOpacity>:null}</View><View style={{width:128,alignItems:'center',justifyContent:'center'}}><SuperdotMascot id={companion} color={accent} size={135}/></View></View>
 }
-export function BrandHead({companion}:{companion:string}){return <View style={s.brand}><SuperdotMascot id="bloop" color={P} size={41}/><Text style={s.brandWord}>Super<Text style={{color:P}}>dots.</Text></Text><View style={{flex:1}}/><SuperdotMascot id={companion} color={P} size={37}/></View>}
+export function BrandHead({companion}:{companion:string}){return <View style={s.brand}><SuperdotMascot id={companion} color={P} size={41}/><Text style={s.brandWord}>Super<Text style={{color:P}}>dots.</Text></Text><View style={{flex:1}}/><SuperdotMascot id={companion} color={P} size={37}/></View>}
 export function SectionHeading({title,detail}:{title:string;detail?:string}){return <View style={s.heading}><Text style={s.headingText}>{title}</Text>{detail?<Text style={s.headingDetail}>{detail}</Text>:null}</View>}
 export function PastelCard({title,detail,emoji,tint,onPress}:{title:string;detail:string;emoji:string;tint:string;onPress?:()=>void}){return <TouchableOpacity disabled={!onPress} onPress={onPress} style={[s.action,{backgroundColor:tint}]}><Text style={s.actionEmoji}>{emoji}</Text><View style={{flex:1,gap:5}}><Text style={s.actionTitle}>{title}</Text><Text style={s.actionText}>{detail}</Text></View><Ionicons name="chevron-forward" color={P} size={16}/></TouchableOpacity>}
 export function StatCard({title,value,detail,icon,tint,onPress}:{title:string;value:string;detail:string;icon:any;tint:string;onPress?:()=>void}){return <TouchableOpacity disabled={!onPress} onPress={onPress} style={s.stat}><View style={[s.statIcon,{backgroundColor:tint}]}><Ionicons name={icon} size={20} color={P}/></View><Text style={s.statTitle}>{title}</Text><Text style={s.statValue}>{value}</Text><Text style={s.statDetail}>{detail}</Text></TouchableOpacity>}
@@ -95,17 +95,16 @@ export function WellnessHealth({companion,accent,onPermissions,onChat}:{companio
  <TouchableOpacity onPress={onPermissions} style={[s.white,{backgroundColor:'#F1EAFE'}]}><Text style={s.cardTitle}>Privacy & health permissions  →</Text><Text style={s.body}>Choose what Apple Health shares with Superdots. No measurements are requested until you tap Connect.</Text></TouchableOpacity>
  </View>;
 }
-export function WellnessSettingsIntro({companion,accent,onThemes}:{companion:string;accent:string;onThemes:()=>void}){
- return <View style={s.page}><BrandHead companion={companion}/><PageHero title="Make it" highlight="yours." detail="Personalize your Superdots experience and make wellness feel more like you." companion={companion} accent={accent} button="Explore themes" onPress={onThemes}/>
- <SectionHeading title="Choose your Superdot theme"/><View style={[s.white,{flexDirection:'row',justifyContent:'space-around'}]}>{COMPANIONS.map(c=><View key={c.id} style={{alignItems:'center',gap:4}}><SuperdotMascot id={c.id} color={c.color} size={43}/><Text style={{fontSize:10,color:INK,fontWeight:'700'}}>{c.name}</Text></View>)}</View></View>
+export function WellnessSettingsIntro({companion,accent}:{companion:string;accent:string}){
+ return <View style={s.page}><BrandHead companion={companion}/><View style={[s.hero,{backgroundColor:APP_THEME.mint,minHeight:145}]}><View style={{flex:1,gap:8}}><Text style={s.heroTitle}>Your wellness,\n<Text style={{color:accent}}>your way.</Text></Text><Text style={s.heroText}>Your companion reflects how you feel. App colors remain calm and consistent.</Text></View><SuperdotMascot id={companion} size={105}/></View></View>;
 }
 const s=StyleSheet.create({
  page:{gap:14,paddingBottom:12},brand:{flexDirection:'row',alignItems:'center',gap:7,marginBottom:4},brandWord:{fontSize:25,fontWeight:'900',color:INK},
- hero:{borderRadius:26,backgroundColor:'#EDE5FF',padding:20,flexDirection:'row',minHeight:202,alignItems:'center',overflow:'hidden'},heroTitle:{fontSize:29,lineHeight:34,fontWeight:'900',color:INK},heroText:{fontSize:13,lineHeight:19,color:MUTED},heroButton:{alignSelf:'flex-start',paddingVertical:11,paddingHorizontal:16,borderRadius:25,marginTop:7},
+ hero:{borderRadius:26,backgroundColor:'#EAE6FA',padding:20,flexDirection:'row',minHeight:202,alignItems:'center',overflow:'hidden'},heroTitle:{fontSize:29,lineHeight:34,fontWeight:'900',color:INK},heroText:{fontSize:13,lineHeight:19,color:MUTED},heroButton:{alignSelf:'flex-start',paddingVertical:11,paddingHorizontal:16,borderRadius:25,marginTop:7},
  heading:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:5},headingText:{fontSize:22,fontWeight:'900',color:INK},headingDetail:{fontSize:11,color:P},
  celebrate:{borderRadius:24,padding:18,flexDirection:'row',gap:10,alignItems:'center'},celebrateTitle:{fontWeight:'900',fontSize:20,color:INK,lineHeight:24},body:{color:MUTED,fontSize:12,lineHeight:18},
  grid:{flexDirection:'row',flexWrap:'wrap',gap:10},stat:{backgroundColor:'#fff',borderRadius:21,padding:15,width:'48%',minHeight:137,gap:6},statIcon:{width:38,height:38,borderRadius:20,alignItems:'center',justifyContent:'center'},statTitle:{fontSize:12,fontWeight:'800',color:INK},statValue:{fontWeight:'900',fontSize:18,color:INK},statDetail:{fontSize:11,color:MUTED},
- chat:{borderRadius:23,padding:16,backgroundColor:'#EFE6FF',flexDirection:'row',gap:10,alignItems:'center'},
+ chat:{borderRadius:23,padding:16,backgroundColor:'#EAE6FA',flexDirection:'row',gap:10,alignItems:'center'},
  action:{width:'48%',minHeight:135,borderRadius:21,padding:15,gap:7},actionEmoji:{fontSize:32},actionTitle:{fontSize:16,fontWeight:'900',color:INK},actionText:{fontSize:11,lineHeight:16,color:MUTED},
  segment:{flexDirection:'row',backgroundColor:'#EFEAFA',padding:5,borderRadius:25},seg:{flex:1,borderRadius:22,padding:11,alignItems:'center'},white:{backgroundColor:'#fff',borderRadius:22,padding:19,gap:9},cardTitle:{fontSize:15,fontWeight:'900',color:INK},big:{fontSize:23,fontWeight:'900',color:P},bars:{height:95,flexDirection:'row',alignItems:'flex-end',justifyContent:'space-around'},bar:{width:22,borderRadius:10},caption:{fontSize:10,color:MUTED}
 });
