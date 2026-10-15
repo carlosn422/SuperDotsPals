@@ -40,7 +40,7 @@ final class WatchThemeSync: ObservableObject {
         defer { busy = false }
         do {
             try await renewIfNeeded()
-            let data = try await request("/rest/v1/mood_entries?select=mood,recorded_at&user_id=eq.\(userId)&order=recorded_at.desc&limit=1",method:"GET")
+            let data = try await request("/rest/v1/wellness_journal?select=mood,occurred_at&user_id=eq.\(userId)&mood=not.is.null&order=occurred_at.desc&limit=1",method:"GET")
             let rows = try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
             store.currentMood = (rows.first?["mood"] as? String) ?? "Calm"
             message = "Mood synced: \(store.currentMood)."
