@@ -43,8 +43,8 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone}:{co
    {button('Back',()=>setStep(0),false)}</>:null}
   {step===2?<><Text style={{color:'#8B82A0'}}>Question {questionIndex+1} of {shownQuestions.length||3}</Text>
    <Text style={{fontSize:17,fontWeight:'800',color:'#2C2350'}}>{shownQuestions[questionIndex]}</Text>
-   {choices.map(choice=><TouchableOpacity key={choice} onPress={()=>setAnswers(prev=>({...prev,[questions[questionIndex]]:choice}))} style={{padding:13,borderRadius:13,borderWidth:1,borderColor:answers[questions[questionIndex]]===choice?color:'#EEEAF3',backgroundColor:answers[questions[questionIndex]]===choice?'#ECE7FF':'white'}}><Text style={{color:'#382C5F'}}>{choice}</Text></TouchableOpacity>)}
-   {questionIndex===(questions.length||3)-1?<><TextInput placeholder="Add a note (optional)" multiline maxLength={1000} value={note} onChangeText={setNote} style={{minHeight:68,borderWidth:1,borderColor:'#EEEAF3',borderRadius:13,padding:12,textAlignVertical:'top'}}/>{button('Save check-in',()=>void save(true))}</>:button('Next question →',()=>setQuestionIndex(i=>Math.min(i+1,shownQuestions.length-1)))}
+   {choices.map(choice=><TouchableOpacity key={choice} onPress={()=>setAnswers(prev=>({...prev,[shownQuestions[questionIndex]]:choice}))} style={{padding:13,borderRadius:13,borderWidth:1,borderColor:answers[shownQuestions[questionIndex]]===choice?color:'#EEEAF3',backgroundColor:answers[shownQuestions[questionIndex]]===choice?'#ECE7FF':'white'}}><Text style={{color:'#382C5F'}}>{choice}</Text></TouchableOpacity>)}
+   {questionIndex===(shownQuestions.length||3)-1?<><TextInput placeholder="Add a note (optional)" multiline maxLength={1000} value={note} onChangeText={setNote} style={{minHeight:68,borderWidth:1,borderColor:'#EEEAF3',borderRadius:13,padding:12,textAlignVertical:'top'}}/>{button('Save check-in',()=>void save(true))}</>:button('Next question →',()=>setQuestionIndex(i=>Math.min(i+1,shownQuestions.length-1)))}
    {button('Skip questions & save',()=>void save(true),false)}
    {button('Back',()=>questionIndex?setQuestionIndex(i=>i-1):setStep(1),false)}
   </>:null}
