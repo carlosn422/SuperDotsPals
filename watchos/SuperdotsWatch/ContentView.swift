@@ -11,9 +11,9 @@ struct ContentView: View {
             ScrollView {
                 VStack(spacing: 13) {
                     Text("superdots.").font(.headline.bold()).foregroundStyle(store.companion.color)
-                    MascotView(dot: store.companion, size: 100)
+                    AnimatedMoodMascot(mood: store.currentMood, size: 100, isActive: scenePhase == .active)
                     Text("You're doing dot-tastic!").font(.headline).multilineTextAlignment(.center)
-                    Text("Your tiny wellness buddy").font(.caption2).foregroundStyle(.secondary)
+                    Text("Your mood companion: \\(store.currentMood)").font(.caption2).foregroundStyle(.secondary)
 
                     HStack(spacing: 8) {
                         metric("HRV", value: "\(store.sampleHRV)", unit: "ms")
@@ -31,8 +31,8 @@ struct ContentView: View {
                     NavigationLink { TrendsView() } label: { Label("HRV trends", systemImage: "chart.xyaxis.line") }
                     NavigationLink { BreathingView() } label: { Label("Take a breath", systemImage: "wind") }
                     NavigationLink { CompanionPicker(sync: themeSync) } label: { Label("My Superdot", systemImage: "paintpalette") }
-                    NavigationLink { WatchSyncView(sync: themeSync) } label: { Label("Theme sync", systemImage: "arrow.triangle.2.circlepath") }
-                    Text(themeSync.connected ? "Cloud theme sync connected" : "Watch theme saved locally")
+                    NavigationLink { WatchSyncView(sync: themeSync) } label: { Label("Mood sync", systemImage: "arrow.triangle.2.circlepath") }
+                    Text(themeSync.connected ? "Mood sync connected" : "Connect to sync your latest mood")
                         .font(.system(size: 10)).foregroundStyle(.secondary)
                     Text("SAMPLE DATA · NOT MEDICAL ADVICE").font(.system(size: 9)).foregroundStyle(.secondary)
                 }
@@ -81,26 +81,3 @@ struct TrendsView: View {
     }
 }
 
-struct CompanionPicker: View {
-    @EnvironmentObject var store: WatchStore
-    @ObservedObject var sync: WatchThemeSync
-
-    var body: some View {
-        List(Dot.allCases) { dot in
-            Button {
-                Task { await sync.update(companion: dot,store:store) }
-            } label: {
-                HStack(spacing: 10) {
-                    MascotView(dot: dot, size: 36)
-                        .frame(width: 42, height: 42)
-                    Text(dot.title).font(.subheadline.weight(.semibold))
-                    Spacer(minLength: 4)
-                    if store.companion == dot { Image(systemName: "checkmark.circle.fill").foregroundStyle(dot.color) }
-                }
-                .frame(minHeight: 49)
-                .contentShape(Rectangle())
-            }
-        }
-        .navigationTitle("My Superdot")
-    }
-}
