@@ -54,8 +54,8 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
   <View style={{gap:10}}>
    <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={{fontWeight:'900',fontSize:19,color:INK}}>Today</Text><Text style={{color:MUTED,fontSize:12}}>{date}</Text></View>
    <View style={{borderRadius:20,overflow:'hidden',borderColor:APP_THEME.border,borderWidth:1}}>
-    {row('water-outline','Water',water+' cups logged today',onActions)}
-    {row('cafe-outline','Caffeine',caffeine+' cups logged today',onCaffeine)}
+    {row('water-outline','Water',water+' of 8 cups · daily goal',onActions)}
+    {row('cafe-outline','Caffeine',caffeine+' '+(caffeine===1?'serving':'servings')+' logged today',onCaffeine)}
     {row('book-outline','Journal','View your private reflections',onJournal)}
     {row('happy-outline','Mood',mood||'Not checked in yet',onCheckin)}
    </View>
@@ -112,11 +112,11 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onBre
    <View style={{flexDirection:'row',gap:10}}>
     <TouchableOpacity onPress={day===0?onWater:undefined} disabled={day!==0} style={{flex:1,backgroundColor:'#FFFFFF',borderRadius:20,padding:16,borderWidth:1,borderColor:'#ECEAF2',gap:7}}>
      <Ionicons name="water-outline" size={24} color="#4B9DCF"/><Text style={{fontSize:14,fontWeight:'800',color:INK}}>Water</Text>
-     <Text style={{fontSize:20,fontWeight:'900',color:INK}}>{shownWater} cups</Text><Text style={{fontSize:11,color:MUTED}}>{day===0?'Tap to log':'Recorded that day'}</Text>
+     <Text style={{fontSize:20,fontWeight:'900',color:INK}}>{shownWater} / 8 cups</Text><Text style={{fontSize:11,color:MUTED}}>{day===0?'Tap to log':'Recorded that day'}</Text>
     </TouchableOpacity>
     <TouchableOpacity onPress={day===0?onCaffeine:undefined} disabled={day!==0} style={{flex:1,backgroundColor:'#FFFFFF',borderRadius:20,padding:16,borderWidth:1,borderColor:'#ECEAF2',gap:7}}>
      <Ionicons name="cafe-outline" size={24} color="#B58756"/><Text style={{fontSize:14,fontWeight:'800',color:INK}}>Caffeine</Text>
-     <Text style={{fontSize:20,fontWeight:'900',color:INK}}>{shownCaffeine} cups</Text><Text style={{fontSize:11,color:MUTED}}>{day===0?'Tap to log':'Recorded that day'}</Text>
+     <Text style={{fontSize:20,fontWeight:'900',color:INK}}>{shownCaffeine} {shownCaffeine===1?'serving':'servings'}</Text><Text style={{fontSize:11,color:MUTED}}>{day===0?'Tap to log':'Recorded that day'}</Text>
     </TouchableOpacity>
    </View>
   </View>
