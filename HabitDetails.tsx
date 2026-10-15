@@ -39,7 +39,6 @@ export default function HabitDetails({habit,onBack,onSaved}:{habit:Habit;onBack:
  const barValues=days.map(d=>{const row=records.find(r=>dayKey(r.recorded_at)===dayKey(d));return row?Number(row.amount):0});
  const goal=habit==='water'?8:3;
  return <View style={s.page}>
- <TouchableOpacity onPress={onBack} style={s.back}><Ionicons name="chevron-back" size={22} color={c.purple}/><Text style={s.backText}>Actions</Text></TouchableOpacity>
  <Text style={s.title}>{habit==='water'?'💧 Hydration':'☕ Caffeine'}</Text>
  <Text style={s.body}>{habit==='water'?'Keep track of the glasses of water you choose to drink.':'Track cups of caffeinated beverages and reflect on how you feel.'}</Text>
  <View style={s.dateRow}><TouchableOpacity onPress={()=>setOffset(v=>Math.max(-34,v-1))} style={s.arrow}><Ionicons name="chevron-back" size={22} color={c.ink}/></TouchableOpacity><Text style={s.date}>{current===today?'Today · ':''}{chosen.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}</Text><TouchableOpacity disabled={offset>=0} onPress={()=>setOffset(v=>Math.min(0,v+1))} style={s.arrow}><Ionicons name="chevron-forward" size={22} color={offset>=0?'#CCC':c.ink}/></TouchableOpacity></View>
