@@ -44,7 +44,7 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
  const date=today.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
  const row=(icon:any,label:string,detail:string,onPress:()=>void,quickAdd?:()=>void,adding=false)=>(
   <TouchableOpacity onPress={onPress} style={{backgroundColor:'#FFFFFF',paddingVertical:13,paddingHorizontal:13,flexDirection:'row',alignItems:'center',gap:12,borderBottomColor:'#F0EEF5',borderBottomWidth:1}}>
-   <View style={{width:39,height:39,borderRadius:13,backgroundColor:APP_THEME.primarySoft,alignItems:'center',justifyContent:'center'}}><Ionicons name={icon} color={accent} size={19}/></View>
+   <View style={{width:39,height:39,borderRadius:13,backgroundColor:label==='Water'?'#EEF5FF':label==='Caffeine'?'#FFF7E8':APP_THEME.primarySoft,alignItems:'center',justifyContent:'center'}}><Ionicons name={icon} color={label==='Water'?'#4A8CFF':label==='Caffeine'?'#F4B400':accent} size={21}/></View>
    <View style={{flex:1,gap:3}}><Text style={{fontWeight:'800',color:INK,fontSize:14}}>{label}</Text><Text style={{color:MUTED,fontSize:11}}>{detail}</Text></View>
    {quickAdd?<TouchableOpacity accessibilityRole="button" accessibilityLabel={'Add one '+(label==='Water'?'cup of water':'caffeine serving')} disabled={adding} onPress={quickAdd} style={{width:38,height:38,borderRadius:19,backgroundColor:APP_THEME.primarySoft,alignItems:'center',justifyContent:'center',opacity:adding?0.5:1}}><Ionicons name={adding?'ellipsis-horizontal':'add'} color={accent} size={23}/></TouchableOpacity>:<Ionicons name="chevron-forward" color={accent} size={18}/>}
   </TouchableOpacity>
@@ -54,8 +54,8 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
   <View style={{gap:10}}>
    <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={{fontWeight:'900',fontSize:19,color:INK}}>Today</Text><Text style={{color:MUTED,fontSize:12}}>{date}</Text></View>
    <View style={{borderRadius:20,overflow:'hidden',borderColor:APP_THEME.border,borderWidth:1}}>
-    {row('water-outline','Water',water+' of 8 cups · daily goal',onActions,onAddWater,addingWater)}
-    {row('cafe-outline','Caffeine',caffeine+' '+(caffeine===1?'serving':'servings')+' logged today',onCaffeine,onAddCaffeine,addingCaffeine)}
+    {row('water','Water',water+' of 8 cups · daily goal',onActions,onAddWater,addingWater)}
+    {row('cafe','Caffeine',caffeine+' '+(caffeine===1?'serving':'servings')+' logged today',onCaffeine,onAddCaffeine,addingCaffeine)}
     {row('book-outline','Journal','View your private reflections',onJournal)}
     {row('happy-outline','Mood',mood||'Not checked in yet',onCheckin)}
    </View>
@@ -111,11 +111,11 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onBre
   <View style={{gap:9}}><SectionHeading title="Daily essentials"/>
    <View style={{flexDirection:'row',gap:10}}>
     <TouchableOpacity onPress={day===0?onWater:undefined} disabled={day!==0} style={{flex:1,backgroundColor:'#FFFFFF',borderRadius:20,padding:16,borderWidth:1,borderColor:'#ECEAF2',gap:7}}>
-     <Ionicons name="water-outline" size={24} color="#4B9DCF"/><Text style={{fontSize:14,fontWeight:'800',color:INK}}>Water</Text>
+     <Ionicons name="water" size={24} color="#4A8CFF"/><Text style={{fontSize:14,fontWeight:'800',color:INK}}>Water</Text>
      <Text style={{fontSize:20,fontWeight:'900',color:INK}}>{shownWater} / 8 cups</Text><Text style={{fontSize:11,color:MUTED}}>{day===0?'Tap to log':'Recorded that day'}</Text>
     </TouchableOpacity>
     <TouchableOpacity onPress={day===0?onCaffeine:undefined} disabled={day!==0} style={{flex:1,backgroundColor:'#FFFFFF',borderRadius:20,padding:16,borderWidth:1,borderColor:'#ECEAF2',gap:7}}>
-     <Ionicons name="cafe-outline" size={24} color="#B58756"/><Text style={{fontSize:14,fontWeight:'800',color:INK}}>Caffeine</Text>
+     <Ionicons name="cafe" size={24} color="#F4B400"/><Text style={{fontSize:14,fontWeight:'800',color:INK}}>Caffeine</Text>
      <Text style={{fontSize:20,fontWeight:'900',color:INK}}>{shownCaffeine} {shownCaffeine===1?'serving':'servings'}</Text><Text style={{fontSize:11,color:MUTED}}>{day===0?'Tap to log':'Recorded that day'}</Text>
     </TouchableOpacity>
    </View>
