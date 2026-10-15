@@ -44,26 +44,9 @@ struct ContentView: View {
 }
 
 struct TrendsView: View {
-    @EnvironmentObject var store: WatchStore
-
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("HRV today").font(.headline)
-                Text("61 ms average · sample").font(.caption).foregroundStyle(.secondary)
-                Chart(store.readings) { reading in
-                    LineMark(x: .value("Hour", reading.hour), y: .value("HRV", reading.hrv))
-                        .foregroundStyle(store.companion.color)
-                    PointMark(x: .value("Hour", reading.hour), y: .value("HRV", reading.hrv))
-                        .foregroundStyle(store.companion.color)
-                }
-                .chartYScale(domain: 30...80)
-                .frame(height: 130)
-                Text("HRV changes naturally over time. This display uses fictional measurements.")
-                    .font(.caption2).foregroundStyle(.secondary)
-            }.padding(.horizontal, 6)
-        }
-        .navigationTitle("Trends")
+        Text("Real HRV trends will appear after Apple Health is connected on your iPhone.")
+            .font(.caption).foregroundStyle(.secondary)
+            .navigationTitle("Trends")
     }
 }
-
