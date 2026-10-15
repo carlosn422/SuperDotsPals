@@ -64,7 +64,7 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
   <HealthMiniStats/>
  </View>;
 }
-export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpiritual,onChat,onMood,onJournal,caffeine}:{companion:string;accent:string;water:number;caffeine:number;onWater:()=>void;onCaffeine:()=>void;onBreathing:()=>void;onChat:()=>void;onMood:()=>void;onJournal:()=>void}){
+export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpiritual,onChat,onMood,onJournal,caffeine}:{companion:string;accent:string;water:number;caffeine:number;onWater:()=>void;onCaffeine:()=>void;onSpiritual:()=>void;onChat:()=>void;onMood:()=>void;onJournal:()=>void}){
  const [day,setDay]=React.useState(0);
  const [pastAmounts,setPastAmounts]=React.useState({water:0,caffeine:0});
  const [activitySummary,setActivitySummary]=React.useState<{count:number;minutes:number}>({count:0,minutes:0});
@@ -122,7 +122,7 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpi
   </View>
   <View style={{gap:9}}><SectionHeading title="Mind & reflection"/>
    <View style={{backgroundColor:"#FFFFFF",borderRadius:17,padding:13,borderWidth:1,borderColor:"#ECEAF2"}}><Text style={{color:INK,fontSize:13,fontWeight:"800"}}>Activities logged: {activitySummary.count}</Text><Text style={{color:MUTED,fontSize:12}}>{activitySummary.minutes} minutes recorded {day===0?"today":"on this day"}</Text></View>
-   {item('leaf-outline','Take a breath','A short guided breathing exercise','#E7F5ED',onBreathing)}
+   {item('book-outline','Spiritual Reading','Personalized Scripture and encouragement','#E7F5ED',onSpiritual)}
    {item('book-outline','Your journal','Review your private reflections','#F4EBFF',onJournal)}
    {item('chatbubble-ellipses-outline','Talk to Superdots','Private text conversation','#EFE9FF',onChat)}
   </View>
