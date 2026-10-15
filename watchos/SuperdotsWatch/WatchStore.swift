@@ -28,7 +28,7 @@ final class WatchStore: ObservableObject {
     @Published var companion: Dot = .bloop {
         didSet { savedDot = companion.rawValue }
     }
-    @Published var sessionsCompleted: Int = 0
+    @Published var currentMood: String = "Calm"\n    @Published var sessionsCompleted: Int = 0
 
     let sampleHRV = 61
     let sampleRestingHeartRate = 67
