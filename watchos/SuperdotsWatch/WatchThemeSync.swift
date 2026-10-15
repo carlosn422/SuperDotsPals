@@ -246,13 +246,13 @@ final class WatchThemeSync: ObservableObject {
     }
 }
 
-import CoreImage
-import CoreImage
-
 struct WatchSyncView: View {
  @ObservedObject var sync:WatchThemeSync
  @EnvironmentObject var store:WatchStore
- @State private var qr:UIImage?
+ private var qrImageURL:URL? {
+  guard let components=URLComponents(string:sync.pairingURL),let query=components.percentEncodedQuery else{return nil}
+  return URL(string:"https://hzoauxxpvrgahlavxmvp.supabase.co/functions/v1/watch-pairing?"+query)
+ }
  var body:some View {
   ScrollView {
    VStack(spacing:12) {
@@ -264,17 +264,22 @@ struct WatchSyncView: View {
      Button("Disconnect",role:.destructive){sync.signOut()}
     } else {
      Text("Link with iPhone").font(.headline)
-     Text("Open Superdots on your iPhone → Settings → Connected Devices → Scan Apple Watch QR code.")
-      .font(.caption2).multilineTextAlignment(.center)
-     if !sync.pairingURL.isEmpty,let qr {
-      Image(uiImage:qr).interpolation(.none).resizable().scaledToFit().frame(width:150,height:150)
-       .padding(7).background(.white,in:RoundedRectangle(cornerRadius:8))
+     Text("On your iPhone: Superdots → Settings → Connected Devices → Scan Apple Watch QR code")
+       .font(.caption2).multilineTextAlignment(.center)
+     if let qrImageURL {
+      AsyncImage(url:qrImageURL){phase in
+       switch phase {
+       case .success(let image): image.resizable().interpolation(.none).scaledToFit()
+       case .failure: Image(systemName:"exclamationmark.triangle").foregroundStyle(.orange)
+       default: ProgressView()
+       }
+      }.frame(width:150,height:150).padding(6).background(.white,in:RoundedRectangle(cornerRadius:8))
      }
      if !sync.pairingActive {
-      Button("Show linking QR"){Task {await sync.startPairing();makeQR()}}
+      Button("Show linking QR"){Task {await sync.startPairing()}}
      } else {
-      Text("Code expires in 5 minutes.").font(.system(size:10)).foregroundStyle(.secondary)
-      Button("Get a new QR code"){Task {await sync.startPairing();makeQR()}}
+      Text("Code expires in 5 minutes").font(.system(size:10)).foregroundStyle(.secondary)
+      Button("New QR code"){Task {await sync.startPairing()}}
      }
      Text(sync.message).font(.caption2).multilineTextAlignment(.center)
     }
@@ -282,18 +287,11 @@ struct WatchSyncView: View {
    }
   }.navigationTitle("Connected devices")
    .task {
-    if !sync.connected && !sync.pairingActive {await sync.startPairing();makeQR()}
+    if !sync.connected && !sync.pairingActive {await sync.startPairing()}
     while !Task.isCancelled && !sync.connected && sync.pairingActive {
      await sync.pollPairing(store:store)
      try? await Task.sleep(for:.seconds(3))
     }
    }
-   .onChange(of:sync.pairingURL) {_,_ in makeQR()}
- }
- private func makeQR(){
-  guard let data=sync.pairingURL.data(using:.utf8) else {qr=nil;return}
-  let filter=CIFilter.qrCodeGenerator();filter.message=data;filter.correctionLevel="M"
-  guard let output=filter.outputImage,let image=CIContext().createCGImage(output,from:output.extent) else {qr=nil;return}
-  qr=UIImage(cgImage:image)
  }
 }
