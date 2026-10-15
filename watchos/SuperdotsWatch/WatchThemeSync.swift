@@ -43,6 +43,18 @@ final class WatchThemeSync: ObservableObject {
             let data = try await request("/rest/v1/wellness_journal?select=mood,occurred_at&user_id=eq.\(userId)&mood=not.is.null&order=occurred_at.desc&limit=1",method:"GET")
             let rows = try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
             store.currentMood = (rows.first?["mood"] as? String) ?? "Calm"
+            let healthData = try await request("/rest/v1/wellness_readings?select=metric,value,recorded_at&user_id=eq.\\(userId)&source=eq.healthkit&metric=in.(hrv,resting_heart_rate)&order=recorded_at.desc&limit=100",method:"GET")
+            let healthRows = try JSONSerialization.jsonObject(with:healthData) as? [[String:Any]] ?? []
+            store.latestHRV = nil
+            store.latestRestingHeartRate = nil
+            for reading in healthRows {
+                guard let metric = reading["metric"] as? String else { continue }
+                let raw = reading["value"]
+                let number = (raw as? NSNumber)?.doubleValue ?? Double(String(describing: raw ?? ""))
+                guard let number else { continue }
+                if metric == "hrv" && store.latestHRV == nil { store.latestHRV = number }
+                if metric == "resting_heart_rate" && store.latestRestingHeartRate == nil { store.latestRestingHeartRate = number }
+            }
             message = "Mood synced: \(store.currentMood)."
         } catch { message = "Sync failed: \(error.localizedDescription)" }
     }
