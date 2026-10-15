@@ -13,7 +13,7 @@ const fallback:Record<string,string[]>={
  Tired:['Did you sleep less than you wanted?','Has your day been physically or mentally demanding?','Have you had enough time to recover?']
 };
 const choices=['Yes','A little','No','Not sure','Prefer not to say'];
-export default function MoodCheckinWizard({color,onSaved,onExploreAI}:{color:string;onSaved:(mood:string)=>void;onExploreAI:(mood:string)=>void}){
+export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone}:{color:string;onSaved:(mood:string)=>void;onExploreAI:(mood:string)=>void;onDone:()=>void}){
  const [step,setStep]=useState<0|1|2|3>(0),[mood,setMood]=useState<string>(''),[questions,setQuestions]=useState<string[]>([]),[answers,setAnswers]=useState<Record<string,string>>({}),[note,setNote]=useState(''),[questionIndex,setQuestionIndex]=useState(0),[busy,setBusy]=useState(false);
  useEffect(()=>{if(!mood)return;let active=true;setQuestions(fallback[mood]||[]);setAnswers({});setQuestionIndex(0);
  (async()=>{const {data,error}=await supabase.from('mood_questions').select('question').eq('mood',mood).eq('is_active',true).order('sort_order',{ascending:true}).limit(3);
@@ -47,7 +47,7 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI}:{color:str
    {button('Skip questions & save',()=>void save(true),false)}
    {button('Back',()=>questionIndex?setQuestionIndex(i=>i-1):setStep(1),false)}
   </>:null}
-  {step===3?<><Text style={{color:'#766B8C'}}>Your check-in is saved privately in Superdots.</Text>{button('Explore this feeling with AI (optional)',()=>onExploreAI(mood),false)}<Text style={{fontSize:11,color:'#8F87A0'}}>AI is only used if you choose to explore further.</Text></>:null}
+  {step===3?<><Text style={{color:'#766B8C'}}>Your check-in is saved privately in Superdots.</Text>{button('Back to Today',onDone)}{button('Explore this feeling with AI (optional)',()=>onExploreAI(mood),false)}<Text style={{fontSize:11,color:'#8F87A0'}}>AI is only used if you choose to explore further.</Text></>:null}
   {busy?<ActivityIndicator color={color}/>:null}
  </View>;
 }
