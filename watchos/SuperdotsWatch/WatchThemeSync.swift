@@ -18,6 +18,7 @@ final class WatchThemeSync: ObservableObject {
         accessToken = secret("watch_access") ?? ""
         refreshToken = secret("watch_refresh") ?? ""
         userId = secret("watch_user") ?? ""
+        pairingId = secret("watch_pairing_id") ?? ""
         connected = !refreshToken.isEmpty && !userId.isEmpty
     }
 
@@ -40,6 +41,12 @@ final class WatchThemeSync: ObservableObject {
         defer { busy = false }
         do {
             try await renewIfNeeded()
+            if !pairingId.isEmpty {
+                let body=try JSONSerialization.data(withJSONObject:["action":"status","id":pairingId])
+                let statusData=try await request("/functions/v1/watch-pairing",method:"POST",body:body)
+                let status=try JSONSerialization.jsonObject(with:statusData) as? [String:Any]
+                if status?["active"] as? Bool != true { signOut();message="This watch was disconnected from your iPhone.";return }
+            }
             let data = try await request("/rest/v1/wellness_journal?select=mood,occurred_at&user_id=eq.\(userId)&mood=not.is.null&order=occurred_at.desc&limit=1",method:"GET")
             let rows = try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
             store.currentMood = (rows.first?["mood"] as? String) ?? "Calm"
@@ -64,8 +71,8 @@ final class WatchThemeSync: ObservableObject {
     }
 
     func signOut() {
-        for key in ["watch_access","watch_refresh","watch_user"] { storeSecret(nil,for:key) }
-        accessToken = ""; refreshToken = ""; userId = ""; connected = false
+        for key in ["watch_access","watch_refresh","watch_user","watch_pairing_id"] { storeSecret(nil,for:key) }
+        accessToken = ""; refreshToken = ""; userId = ""; pairingId = ""; pairingSecret = ""; pairingURL = ""; pairingActive = false; connected = false
         message = "Disconnected. Your watch will show local defaults."
     }
 
@@ -159,6 +166,7 @@ final class WatchThemeSync: ObservableObject {
                 let session=try await request("/auth/v1/verify",method:"POST",body:verify,authenticated:false)
                 try loadSession(session)
                 connected=true
+                storeSecret(pairingId,for:"watch_pairing_id")
                 pairingActive=false
                 let completed=try JSONSerialization.data(withJSONObject:["action":"complete","id":pairingId,"secret":pairingSecret])
                 _ = try? await request("/functions/v1/watch-pairing",method:"POST",body:completed)
