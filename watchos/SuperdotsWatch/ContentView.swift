@@ -13,10 +13,19 @@ struct ContentView: View {
                     Text("superdots.").font(.headline.bold()).foregroundStyle(store.companion.color)
                     AnimatedMoodMascot(mood: store.currentMood, size: 100, isActive: scenePhase == .active)
                     Text("Your wellness companion").font(.headline).multilineTextAlignment(.center)
-                    Text("Your mood companion: \\(store.currentMood)").font(.caption2).foregroundStyle(.secondary)
+                    Text("Your mood companion: " + store.currentMood).font(.caption2).foregroundStyle(.secondary)
 
-                    Text("Health readings will appear after real Apple Health data is connected.")
-                        .font(.caption2).foregroundStyle(.secondary)
+                    if store.latestHRV != nil || store.latestRestingHeartRate != nil {
+                        HStack(spacing: 8) {
+                            if let hrv = store.latestHRV { metric("HRV", value: String(Int(hrv.rounded())), unit: "ms") }
+                            if let heartRate = store.latestRestingHeartRate { metric("Resting HR", value: String(Int(heartRate.rounded())), unit: "bpm") }
+                        }
+                        Text("Latest readings synced from Apple Health via Superdots.")
+                            .font(.system(size: 10)).foregroundStyle(.secondary)
+                    } else {
+                        Text("No Apple Health readings synced yet. Connect and sync on your iPhone.")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
                     NavigationLink { BreathingView() } label: { Label("Take a breath", systemImage: "wind") }
                     NavigationLink { WatchSyncView(sync: themeSync) } label: { Label("Mood sync", systemImage: "arrow.triangle.2.circlepath") }
                     Text(themeSync.connected ? "Mood sync connected" : "Connect to sync your latest mood")
