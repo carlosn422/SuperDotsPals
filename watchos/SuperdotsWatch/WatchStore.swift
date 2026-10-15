@@ -28,13 +28,8 @@ final class WatchStore: ObservableObject {
     @Published var companion: Dot = .bloop {
         didSet { savedDot = companion.rawValue }
     }
-    @Published var currentMood: String = "Calm"\n    @Published var sessionsCompleted: Int = 0
-
-    let sampleHRV = 61
-    let sampleRestingHeartRate = 67
-    let sampleStress = 26
-    let readings = [42, 48, 51, 45, 62, 56, 68, 61, 73, 64, 70, 61]
-        .enumerated().map { SampleReading(hour: $0.offset + 7, hrv: Double($0.element)) }
+    @Published var currentMood: String = "Calm"
+    @Published var sessionsCompleted: Int = 0
 
     init() {
         companion = Dot(rawValue: UserDefaults.standard.string(forKey: "chosen_dot") ?? "") ?? .bloop
