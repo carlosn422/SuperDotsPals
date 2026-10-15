@@ -24,16 +24,14 @@ struct SampleReading: Identifiable {
 
 @MainActor
 final class WatchStore: ObservableObject {
-    @AppStorage("chosen_dot") private var savedDot = Dot.bloop.rawValue
-    @Published var companion: Dot = .bloop {
-        didSet { savedDot = companion.rawValue }
-    }
+    // Brand colors are consistent; the mood controls the animated mascot, not the theme.
+    @Published var companion: Dot = .bloop
     @Published var currentMood: String = "Calm"
     @Published var latestHRV: Double? = nil
     @Published var latestRestingHeartRate: Double? = nil
     @Published var sessionsCompleted: Int = 0
 
     init() {
-        companion = Dot(rawValue: UserDefaults.standard.string(forKey: "chosen_dot") ?? "") ?? .bloop
+        companion = .bloop
     }
 }
