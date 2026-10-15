@@ -249,6 +249,7 @@ final class WatchThemeSync: ObservableObject {
 struct WatchSyncView: View {
  @ObservedObject var sync:WatchThemeSync
  @EnvironmentObject var store:WatchStore
+ @Environment(\.dismiss) private var dismiss
  private var qrImageURL:URL? {
   guard let components=URLComponents(string:sync.pairingURL),let query=components.percentEncodedQuery else{return nil}
   return URL(string:"https://hzoauxxpvrgahlavxmvp.supabase.co/functions/v1/watch-pairing?"+query)
@@ -260,7 +261,10 @@ struct WatchSyncView: View {
      Image(systemName:"checkmark.circle.fill").font(.largeTitle).foregroundStyle(.green)
      Text("Connected").font(.headline)
      Text(sync.message).font(.caption2).multilineTextAlignment(.center)
-     Button("Sync wellness now"){Task {await sync.refresh(store:store)}}
+     Button("Continue") {dismiss()}
+      .buttonStyle(.borderedProminent)
+      .tint(Color(red:0.43,green:0.32,blue:0.85))
+     Button("Sync again") {Task {await sync.refresh(store:store)}}.disabled(sync.busy)
      Button("Disconnect",role:.destructive){sync.signOut()}
     } else {
      Text("Link with iPhone").font(.headline)
