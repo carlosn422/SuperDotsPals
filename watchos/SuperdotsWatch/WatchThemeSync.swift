@@ -65,6 +65,63 @@ final class WatchThemeSync: ObservableObject {
         message = "Disconnected. Your watch will show local defaults."
     }
 
+    // All requests use the current watch user's token; Supabase RLS restricts records.
+    func submitMood(_ mood:String, answers:[String:String] = [:], store:WatchStore) async throws {
+        try await renewIfNeeded()
+        let payload = try JSONSerialization.data(withJSONObject:[
+            "user_id":userId, "entry_type":"reflection", "body":"Watch mood check-in",
+            "mood":mood, "reflection_answers":answers, "stress_factors":[]] as [String:Any])
+        _ = try await request("/rest/v1/wellness_journal", method:"POST", body:payload)
+        store.currentMood = mood
+    }
+
+    func questions(for mood:String) async throws -> [[String:Any]] {
+        let data = try await spiritualCall(["action":"questions", "mood":mood, "useHistory":false])
+        let obj = try JSONSerialization.jsonObject(with:data) as? [String:Any] ?? [:]
+        return obj["items"] as? [[String:Any]] ?? []
+    }
+
+    func recommend(for mood:String, answers:[String:String]) async throws -> [String:Any] {
+        let data = try await spiritualCall(["action":"recommend", "mood":mood, "answers":answers, "useHistory":false])
+        return try JSONSerialization.jsonObject(with:data) as? [String:Any] ?? [:]
+    }
+
+    func savedVerses() async throws -> [[String:Any]] {
+        try await renewIfNeeded()
+        let path="/rest/v1/scripture_favorites?select=passage_id,scripture_passages(id,reference,verse_text,translation,source_url)&user_id=eq.\(userId)&order=created_at.desc&limit=30"
+        let data=try await request(path, method:"GET")
+        return try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
+    }
+
+    func saveVerse(_ passageId:Int) async throws {
+        try await renewIfNeeded()
+        let payload=try JSONSerialization.data(withJSONObject:["user_id":userId,"passage_id":passageId])
+        _ = try await request("/rest/v1/scripture_favorites?on_conflict=user_id,passage_id",method:"POST",body:payload,extraHeaders:["Prefer":"resolution=merge-duplicates"])
+    }
+
+    func latestVerse() async throws -> [String:Any]? {
+        let saved=try await savedVerses()
+        if let row=saved.first,let p=row["scripture_passages"] as? [String:Any] { return p }
+        return nil
+    }
+
+    func journal(_ note:String) async throws {
+        try await renewIfNeeded()
+        let payload=try JSONSerialization.data(withJSONObject:["user_id":userId,"entry_type":"reflection","body":String(note.prefix(1000))])
+        _ = try await request("/rest/v1/wellness_journal",method:"POST",body:payload)
+    }
+
+    func moodHistory() async throws -> [[String:Any]] {
+        try await renewIfNeeded()
+        let data=try await request("/rest/v1/wellness_journal?select=mood,occurred_at&user_id=eq.\(userId)&mood=not.is.null&order=occurred_at.desc&limit=14",method:"GET")
+        return try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
+    }
+
+    private func spiritualCall(_ object:[String:Any]) async throws -> Data {
+        try await renewIfNeeded()
+        return try await request("/functions/v1/spiritual-reading",method:"POST",body:JSONSerialization.data(withJSONObject:object))
+    }
+
     private func renewIfNeeded() async throws {
         guard !refreshToken.isEmpty else { throw SyncError.notSignedIn }
         let payload = try JSONSerialization.data(withJSONObject:["refresh_token":refreshToken])
@@ -84,7 +141,7 @@ final class WatchThemeSync: ObservableObject {
         storeSecret(id,for:"watch_user")
     }
 
-    private func request(_ path: String,method: String,body: Data? = nil,authenticated: Bool = true) async throws -> Data {
+    private func request(_ path: String,method: String,body: Data? = nil,authenticated: Bool = true,extraHeaders:[String:String] = [:]) async throws -> Data {
         guard let url = URL(string: path,relativeTo:base) else { throw SyncError.badResponse }
         var req = URLRequest(url:url)
         req.httpMethod = method
@@ -94,6 +151,7 @@ final class WatchThemeSync: ObservableObject {
             guard !accessToken.isEmpty else { throw SyncError.notSignedIn }
             req.setValue("Bearer \(accessToken)",forHTTPHeaderField:"Authorization")
         }
+        for (name,value) in extraHeaders { req.setValue(value,forHTTPHeaderField:name) }
         req.httpBody = body
         let (data,response) = try await URLSession.shared.data(for:req)
         guard let http = response as? HTTPURLResponse,(200...299).contains(http.statusCode) else {
