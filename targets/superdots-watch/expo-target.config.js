@@ -5,4 +5,6 @@ module.exports = {
   bundleIdentifier: '.watchkitapp',
   deploymentTarget: '10.0',
   frameworks: ['SwiftUI', 'Security'],
+  icon: '../../assets/icon.png',
+  infoPlist: { CFBundleIconName: 'AppIcon' },
 };
