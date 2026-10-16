@@ -1,13 +1,30 @@
-const { withInfoPlist } = require('@expo/config-plugins');
+const { withInfoPlist, withXcodeProject } = require('@expo/config-plugins');
 
-// Force the native iOS Info.plist to include HealthKit purpose strings even
-// when other config plugins alter permissions during prebuild.
+const share = 'Superdots reads heart rate variability, resting heart rate, steps, and sleep to provide wellness insights when you grant access.';
+const update = 'Superdots integrates with Apple Health to support wellness features. The app currently reads health data and does not modify health records.';
+
 module.exports = function withHealthPrivacy(config) {
-  return withInfoPlist(config, (config) => {
-    config.modResults.NSHealthShareUsageDescription =
-      'Superdots reads heart rate variability, resting heart rate, steps, and sleep to provide wellness insights when you grant access.';
-    config.modResults.NSHealthUpdateUsageDescription =
-      'Superdots uses Apple Health integration for wellness features. Superdots currently reads health information and does not add or change health records.';
-    return config;
+  config = withInfoPlist(config, (c) => {
+    c.modResults.NSHealthShareUsageDescription = share;
+    c.modResults.NSHealthUpdateUsageDescription = update;
+    return c;
+  });
+  return withXcodeProject(config, (c) => {
+    // Also set generated Info.plist keys at the iOS app target build-setting level.
+    // This covers Xcode projects where the effective plist is generated at build time.
+    const project = c.modResults;
+    const target = project.getFirstTarget();
+    const configs = project.pbxXCBuildConfigurationSection();
+    for (const entry of Object.values(configs)) {
+      if (!entry || typeof entry !== 'object' || !entry.buildSettings) continue;
+      const settings = entry.buildSettings;
+      // Restrict the settings to the main iPhone app target configurations.
+      if (typeof settings.PRODUCT_BUNDLE_IDENTIFIER !== 'string' ||
+          !settings.PRODUCT_BUNDLE_IDENTIFIER.includes('com.superdotspals.wellnest') ||
+          settings.PRODUCT_BUNDLE_IDENTIFIER.includes('watchkitapp')) continue;
+      settings.INFOPLIST_KEY_NSHealthShareUsageDescription = JSON.stringify(share);
+      settings.INFOPLIST_KEY_NSHealthUpdateUsageDescription = JSON.stringify(update);
+    }
+    return c;
   });
 };
