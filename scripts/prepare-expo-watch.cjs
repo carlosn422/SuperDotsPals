@@ -11,6 +11,9 @@ for(const item of fs.readdirSync(src,{withFileTypes:true})){
  if(item.name.startsWith('.')||item.name.endsWith('.xcodeproj'))continue;
  fs.cpSync(path.join(src,item.name),path.join(dest,item.name),{recursive:true,force:true});
 }
+if(!fs.existsSync(path.join(root,'assets','icon.png'))){
+ console.warn('WARNING: assets/icon.png is missing. Supply an opaque 1024x1024 PNG icon before release.');
+}
 fs.writeFileSync(path.join(dest,'expo-target.config.js'),`module.exports = {
   type: 'watch',
   name: 'SuperdotsWatch',
@@ -18,6 +21,8 @@ fs.writeFileSync(path.join(dest,'expo-target.config.js'),`module.exports = {
   bundleIdentifier: '.watchkitapp',
   deploymentTarget: '10.0',
   frameworks: ['SwiftUI', 'Security'],
+  icon: '../../assets/icon.png',
+  infoPlist: { CFBundleIconName: 'AppIcon' },
 };\n`);
 const appPath=path.join(root,'app.json');
 const app=JSON.parse(fs.readFileSync(appPath,'utf8'));
