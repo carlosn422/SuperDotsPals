@@ -28,6 +28,19 @@ for(const p of watchPlists.filter(fs.existsSync)){
  try{exec(['-c','Add :CFBundleIconFiles:0 string AppIcon',p])}catch{set(p,':CFBundleIconFiles:0','string','AppIcon')}
  console.log('Verified watch icon metadata:',path.relative(root,p));
 }
+// The Expo watch target generates Info.plist during compilation. Patch the watch
+// target's Xcode build settings, not only source plist files that may be ignored.
+const projectPath=path.join(ios,'Superdots.xcodeproj','project.pbxproj');
+if(!fs.existsSync(projectPath))throw new Error('Missing generated Xcode project');
+let pbx=fs.readFileSync(projectPath,'utf8');
+const blocks=pbx.split(/(?=\/\* Begin XCBuildConfiguration section \*\/)/);
+const updated=pbx.replace(/(buildSettings = \{[\s\S]*?PRODUCT_BUNDLE_IDENTIFIER = "?com\.superdotspals\.wellnest\.watchkitapp"?;[\s\S]*?\};)/g,block=>{
+  if(!block.includes('ASSETCATALOG_COMPILER_APPICON_NAME'))block=block.replace('buildSettings = {','buildSettings = {\n                ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;');
+  if(!block.includes('INFOPLIST_KEY_CFBundleIconName'))block=block.replace('buildSettings = {','buildSettings = {\n                INFOPLIST_KEY_CFBundleIconName = AppIcon;');
+  return block;
+});
+if(updated===pbx)console.warn('Watch build settings already set or target structure differs; inspect Xcode Build Settings.');
+else{fs.writeFileSync(projectPath,updated);console.log('Added watch icon settings to generated Xcode project.')}
 const assetDir=path.join(root,'targets','superdots-watch','Assets.xcassets','AppIcon.appiconset');
 if(!fs.existsSync(assetDir))throw new Error('Missing watch AppIcon.appiconset source directory');
 const manifest=JSON.parse(fs.readFileSync(path.join(assetDir,'Contents.json'),'utf8'));
