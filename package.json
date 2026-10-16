@@ -8,7 +8,9 @@
     "ios": "expo run:ios",
     "android": "expo run:android",
     "web": "expo start --web",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "eas-build-post-install": "node scripts/verify-ios-release.cjs",
+    "verify:ios-release": "node scripts/verify-ios-release.cjs"
   },
   "dependencies": {
     "@appeeky/expo-healthkit": "^0.4.1",
