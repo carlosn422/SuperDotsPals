@@ -1,0 +1,66 @@
+{
+  "expo": {
+    "name": "Superdots",
+    "slug": "superdotspals",
+    "scheme": "wellnest",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.superdotspals.wellnest",
+      "appleTeamId": "Y355786FS4",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "Allow Superdots to read heart rate variability, resting heart rate, steps and sleep when you choose to sync health data.",
+        "NSCameraUsageDescription": "Allow Superdots to scan your Apple Watch pairing QR code.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSHealthUpdateUsageDescription": "Superdots reads your health data for wellness insights and does not write to Apple Health."
+      }
+    },
+    "android": {
+      "package": "com.superdotspals.wellnest",
+      "permissions": [
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_HEART_RATE",
+        "android.permission.health.READ_SLEEP",
+        "android.permission.health.READ_HEALTH_DATA_HISTORY",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "plugins": [
+      [
+        "@appeeky/expo-healthkit",
+        {
+          "healthSharePermission": "Allow Superdots to read heart rate variability, resting heart rate, steps and sleep with your permission.",
+          "healthUpdatePermission": false,
+          "isBackgroundDeliveryEnabled": false,
+          "healthConnectPermissions": [
+            "READ_STEPS",
+            "READ_HEART_RATE",
+            "READ_SLEEP",
+            "READ_HEALTH_DATA_HISTORY"
+          ]
+        }
+      ],
+      [
+        "expo-notifications",
+        {}
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Superdots to scan an Apple Watch pairing QR code."
+        }
+      ],
+      "@bacons/apple-targets",
+      "./scripts/with-health-privacy.cjs"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "7fce274d-e6b2-4944-a9b0-ef08fa13f871"
+      }
+    },
+    "owner": "carlosnvr422"
+  }
+}
