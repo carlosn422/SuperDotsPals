@@ -24,8 +24,10 @@ const watchPlists=[
 ];
 for(const p of watchPlists.filter(fs.existsSync)){
  set(p,'CFBundleIconName','string','AppIcon');
- set(p,'CFBundleIconFiles','array','');
- try{exec(['-c','Add :CFBundleIconFiles:0 string AppIcon',p])}catch{set(p,':CFBundleIconFiles:0','string','AppIcon')}
+ // Replace the array atomically instead of trying to Add an existing key.
+ try { exec(['-c','Delete :CFBundleIconFiles',p]); } catch {}
+ exec(['-c','Add :CFBundleIconFiles array',p]);
+ exec(['-c','Add :CFBundleIconFiles:0 string AppIcon',p]);
  console.log('Verified watch icon metadata:',path.relative(root,p));
 }
 // The Expo watch target generates Info.plist during compilation. Patch the watch
