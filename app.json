@@ -53,7 +53,8 @@
           "cameraPermission": "Allow Superdots to scan an Apple Watch pairing QR code."
         }
       ],
-      "@bacons/apple-targets"
+      "@bacons/apple-targets",
+      "./scripts/with-health-privacy.cjs"
     ],
     "extra": {
       "eas": {
