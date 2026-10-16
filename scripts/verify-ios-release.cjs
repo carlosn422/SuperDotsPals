@@ -33,8 +33,7 @@ for(const p of watchPlists.filter(fs.existsSync)){
 const projectPath=path.join(ios,'Superdots.xcodeproj','project.pbxproj');
 if(!fs.existsSync(projectPath))throw new Error('Missing generated Xcode project');
 let pbx=fs.readFileSync(projectPath,'utf8');
-const blocks=pbx.split(/(?=\/\* Begin XCBuildConfiguration section \*\/)/);
-const updated=pbx.replace(/(buildSettings = \{[\s\S]*?PRODUCT_BUNDLE_IDENTIFIER = "?com\.superdotspals\.wellnest\.watchkitapp"?;[\s\S]*?\};)/g,block=>{
+const updated=pbx.replace(/buildSettings = \{[^}]*PRODUCT_BUNDLE_IDENTIFIER = "?com\.superdotspals\.wellnest\.watchkitapp"?;[^}]*\};/g,block=>{
   if(!block.includes('ASSETCATALOG_COMPILER_APPICON_NAME'))block=block.replace('buildSettings = {','buildSettings = {\n                ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;');
   if(!block.includes('INFOPLIST_KEY_CFBundleIconName'))block=block.replace('buildSettings = {','buildSettings = {\n                INFOPLIST_KEY_CFBundleIconName = AppIcon;');
   return block;
