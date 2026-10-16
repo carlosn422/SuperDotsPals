@@ -13,7 +13,8 @@
       "infoPlist": {
         "NSHealthShareUsageDescription": "Allow Superdots to read heart rate variability, resting heart rate, steps and sleep when you choose to sync health data.",
         "NSCameraUsageDescription": "Allow Superdots to scan your Apple Watch pairing QR code.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSHealthUpdateUsageDescription": "Superdots reads your health data for wellness insights and does not write to Apple Health."
       }
     },
     "android": {
