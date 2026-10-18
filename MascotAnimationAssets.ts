@@ -1,5 +1,7 @@
 import type {ImageSourcePropType} from 'react-native';
-export const MASCOT_FPS=12;
+// Frame sequences are exported from After Effects at approximately 29.97 FPS.
+// Keep playback aligned to the source timeline rather than slowing it to 12 FPS.
+export const MASCOT_FPS=30000/1001;
 export const MASCOT_FRAMES:Record<'joy'|'sadness'|'anger'|'fear'|'disgust'|'tired',ImageSourcePropType[]>={
  joy:[
   require('./assets/mascot-animations/joy/ios/frame_000.png'),
