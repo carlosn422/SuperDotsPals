@@ -36,7 +36,14 @@ export function AnimatedMascotFrames({frames,size,label}:{frames:import('react-n
  },[frames]);
  useEffect(()=>{
   if(!ready||!active||reduceMotion||frames.length<2)return;
-  const timer=setInterval(()=>setFrame(i=>(i+1)%frames.length),1000/MASCOT_FPS);
+  // Derive frame from elapsed time so stalled JS ticks do not slow the animation.
+  // If the device cannot sustain the target rate, skip delayed frames instead
+  // of extending the clip duration.
+  const started=Date.now()-frame*1000/MASCOT_FPS;
+  const timer=setInterval(()=>{
+   const next=Math.floor((Date.now()-started)*MASCOT_FPS/1000)%frames.length;
+   setFrame(current=>current===next?current:next);
+  },1000/MASCOT_FPS);
   return()=>clearInterval(timer);
  },[frames,ready,active,reduceMotion]);
  if(!frames.length)return null;
