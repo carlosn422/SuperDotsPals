@@ -10,6 +10,9 @@ private func displayMood(_ value:String) -> String {
 struct WatchCheckIn:View {
  @ObservedObject var sync:WatchThemeSync
  @EnvironmentObject var store:WatchStore
+ @Environment(\.dismiss) private var dismiss
+ @State private var isFavoriteSaved=false
+ @State private var savingFavorite=false
  @State private var mood=""
  @State private var questions:[[String:Any]]=[]
  @State private var answers:[String:String]=[:]
@@ -75,9 +78,16 @@ struct WatchCheckIn:View {
       Text(passage["reference"] as? String ?? "").font(.headline).foregroundStyle(violet)
       Text(passage["verse_text"] as? String ?? "").font(.caption)
       Text(result["reflection"] as? String ?? "").font(.caption2).foregroundStyle(.secondary)
-      Button("♡ Save favorite"){Task {await save(passage)}}.tint(violet)
+      Button {
+       Task {await save(passage)}
+      } label: {
+       Label(isFavoriteSaved ? "Saved favorite" : "Save favorite",
+             systemImage:isFavoriteSaved ? "heart.fill" : "heart")
+      }
+      .tint(isFavoriteSaved ? .pink : violet)
+      .disabled(isFavoriteSaved || savingFavorite)
      }
-     Button("New check-in"){phase=0;index=0;answers=[:];result=[:]}
+     Button("Close"){dismiss()}
     }
     if loading {ProgressView("Finding encouragement…").font(.caption2)}
     if !errorMessage.isEmpty {Text(errorMessage).font(.caption2).foregroundStyle(.orange)}
@@ -98,13 +108,16 @@ struct WatchCheckIn:View {
   do {
    try await sync.submitMood(mood,answers:answers,store:store)
    result=try await sync.recommend(for:mood,answers:answers)
+   isFavoriteSaved=false
    phase=2
   }catch {errorMessage=error.localizedDescription}
   loading=false
  }
  private func save(_ p:[String:Any]) async {
-  guard let id=p["id"] as? Int else {return}
-  do {try await sync.saveVerse(id);errorMessage="Saved to favorites"}
+  guard let id=p["id"] as? Int, !isFavoriteSaved, !savingFavorite else {return}
+  savingFavorite=true
+  defer {savingFavorite=false}
+  do {try await sync.saveVerse(id);isFavoriteSaved=true;errorMessage=""}
   catch {errorMessage=error.localizedDescription}
  }
 }
