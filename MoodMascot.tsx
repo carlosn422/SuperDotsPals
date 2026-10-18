@@ -41,7 +41,8 @@ export function AnimatedMascotFrames({frames,size,label}:{frames:import('react-n
  },[frames,ready,active,reduceMotion]);
  if(!frames.length)return null;
  const first=frames[0];
- return <Image source={frames[frame]} defaultSource={first}
+ const fallback=Array.isArray(first)?first[0]:first;
+ return <Image source={frames[frame]} defaultSource={fallback}
   onLoad={()=>{if(!ready)setReady(true)}}
   fadeDuration={0}
   style={{width:size,height:size}} resizeMode="contain" accessibilityLabel={label}/>;
