@@ -7,6 +7,7 @@ import Security
 final class WatchThemeSync: ObservableObject {
     @Published var connected = false
     @Published var busy = false
+    @Published var moodLoaded = false
     @Published var message = "Connect your account to sync mood and health readings."
     private let base = URL(string: "https://hzoauxxpvrgahlavxmvp.supabase.co")!
     private let publishableKey = "sb_publishable_pPPqosRo1SqwrbW-8MWURA_UxTED6Vs"
@@ -51,6 +52,7 @@ final class WatchThemeSync: ObservableObject {
             let rows = try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
             let savedMood = (rows.first?["mood"] as? String) ?? "Calm"
             store.currentMood = ["disgust","disgusted"].contains(savedMood.lowercased()) ? "Calm" : savedMood
+            moodLoaded = true
             let healthData = try await request("/rest/v1/wellness_readings?select=metric,value,recorded_at&user_id=eq.\(userId)&source=eq.healthkit&metric=in.(hrv,resting_heart_rate,steps,sleep_minutes)&order=recorded_at.desc&limit=500",method:"GET")
             let healthRows = try JSONSerialization.jsonObject(with:healthData) as? [[String:Any]] ?? []
             store.hrvHistory = []
@@ -85,7 +87,7 @@ final class WatchThemeSync: ObservableObject {
 
     func signOut() {
         for key in ["watch_access","watch_refresh","watch_user","watch_pairing_id"] { storeSecret(nil,for:key) }
-        accessToken = ""; refreshToken = ""; userId = ""; pairingId = ""; pairingSecret = ""; pairingURL = ""; pairingActive = false; pairingConnecting = false; connected = false
+        accessToken = ""; refreshToken = ""; userId = ""; pairingId = ""; pairingSecret = ""; pairingURL = ""; pairingActive = false; pairingConnecting = false; connected = false; moodLoaded = false
         message = "Disconnected. Your watch will show local defaults."
     }
 
@@ -97,6 +99,7 @@ final class WatchThemeSync: ObservableObject {
             "mood":mood, "reflection_answers":answers, "stress_factors":[]] as [String:Any])
         _ = try await request("/rest/v1/wellness_journal", method:"POST", body:payload)
         store.currentMood = mood
+        moodLoaded = true
     }
 
     func questions(for mood:String) async throws -> [[String:Any]] {
