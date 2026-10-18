@@ -5,7 +5,7 @@ struct ContentView: View {
  @StateObject private var sync = WatchThemeSync()
  @Environment(\.scenePhase) private var scenePhase
  @State private var contentBottom: CGFloat = .greatestFiniteMagnitude
- private let purple = Color(red:0.43,green:0.32,blue:0.85)
+ private let purple = Color(red:0.47,green:0.38,blue:0.91)
  private let mascotSize: CGFloat = 105 // Joyful is the canonical mascot display size.
 
  var body: some View {
