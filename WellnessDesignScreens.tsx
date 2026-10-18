@@ -67,7 +67,7 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
   </TouchableOpacity>
  );
  return <View style={[s.page,{gap:17}]}>
-  <PageHero title="A little check-in" highlight="for you" detail="Take a moment to pause and see how you're feeling today." accent={accent} companion={companion} button="Let's check in" onPress={onCheckin}/>
+  <PageHero title="How are you feeling" highlight="today?" detail="Your friendly MoodPal is here for you. Every feeling counts." accent={accent} companion={companion} button="Check in with MoodPals" onPress={onCheckin}/>
   <View style={{gap:10}}>
    <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={{fontWeight:'900',fontSize:19,color:INK}}>Today</Text><Text style={{color:MUTED,fontSize:12}}>{date}</Text></View>
    <View style={{borderRadius:20,overflow:'hidden',borderColor:APP_THEME.border,borderWidth:1}}>
@@ -141,7 +141,7 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpi
    <View style={{backgroundColor:"#FFFFFF",borderRadius:17,padding:13,borderWidth:1,borderColor:"#ECEAF2"}}><Text style={{color:INK,fontSize:13,fontWeight:"800"}}>Activities logged: {activitySummary.count}</Text><Text style={{color:MUTED,fontSize:12}}>{activitySummary.minutes} minutes recorded {day===0?"today":"on this day"}</Text></View>
    {item('book-outline','Spiritual Reading','Personalized Scripture and encouragement','#E7F5ED',onSpiritual)}
    {item('book-outline','Your journal','Review your private reflections','#F4EBFF',onJournal)}
-   {item('chatbubble-ellipses-outline','Talk to Superdots','Private text conversation','#EFE9FF',onChat)}
+   {item('chatbubble-ellipses-outline','Talk to MoodPals','Private text conversation','#EFE9FF',onChat)}
   </View>
   <View style={{backgroundColor:'#F1F3F5',padding:13,borderRadius:15}}><Text style={{fontSize:11,color:MUTED,lineHeight:17}}>Sleep, steps, and recovery readings are available in Health after connecting Apple Health. They aren't shown here as actions until data is available.</Text></View>
  </View>;
