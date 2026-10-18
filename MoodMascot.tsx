@@ -25,6 +25,7 @@ export function AnimatedMascotFrames({frames,size,label}:{frames:import('react-n
  const [active,setActive]=useState(AppState.currentState==='active');
  const [reduceMotion,setReduceMotion]=useState(false);
  const visibleRef=useRef<0|1>(0);
+ const buffersRef=useRef<[number,number]>([0,0]);
  const pendingRef=useRef(false);
  const targetRef=useRef(0);
  const startRef=useRef(Date.now());
@@ -40,6 +41,7 @@ export function AnimatedMascotFrames({frames,size,label}:{frames:import('react-n
   visibleRef.current=0;
   startRef.current=Date.now();
   setVisible(0);
+  buffersRef.current=[0,0];
   setBuffers([0,0]);
  },[frames]);
  useEffect(()=>{
@@ -51,8 +53,14 @@ export function AnimatedMascotFrames({frames,size,label}:{frames:import('react-n
    if(pendingRef.current)return;
    const next=Math.floor((Date.now()-startRef.current)*MASCOT_FPS/1000)%frames.length;
    const hidden:0|1=visibleRef.current===0?1:0;
+   if(buffersRef.current[hidden]===next){
+    visibleRef.current=hidden;
+    setVisible(hidden);
+    return;
+   }
    pendingRef.current=true;
    targetRef.current=hidden;
+   buffersRef.current[hidden]=next;
    setBuffers(previous=>{
     const copy:[number,number]=[...previous] as [number,number];
     copy[hidden]=next;
