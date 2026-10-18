@@ -221,7 +221,7 @@ struct WatchMoodInsights:View {
      .font(.system(size:10)).foregroundStyle(.secondary)
     if showingCalendar {
      DatePicker("View date",selection:$selectedDate,in:...Date(),displayedComponents:.date)
-      .datePickerStyle(.compact)
+      .datePickerStyle(.wheel)
       .labelsHidden()
       .tint(violet)
      Button("Done"){showingCalendar=false}
