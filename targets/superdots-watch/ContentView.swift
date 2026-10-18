@@ -11,8 +11,13 @@ struct ContentView: View {
   NavigationStack {
    ScrollView {
     VStack(spacing:10) {
+     Text("Superdots · Wellness")
+      .font(.caption2).foregroundStyle(.secondary)
      if !sync.connected {
       AnimatedMoodMascot(mood:"Calm",size:mascotSize,isActive:scenePhase == .active)
+      Text("HRV · — ms").font(.headline).foregroundStyle(purple)
+      Text("Connect to sync your Apple Health readings").font(.system(size:10)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+      wellnessTrack(score:nil)
       NavigationLink {WatchSyncView(sync:sync)} label: {
        Label("Connect Account",systemImage:"link").frame(maxWidth:.infinity)
       }.buttonStyle(.borderedProminent).tint(purple)
@@ -51,6 +56,7 @@ struct ContentView: View {
          .font(.system(size:9)).foregroundStyle(.secondary).multilineTextAlignment(.center)
        }.padding(8).background(.white.opacity(0.08),in:RoundedRectangle(cornerRadius:12))
       } else {
+       wellnessTrack(score:nil)
        Text("Wellness meter waiting for enough Apple Health history")
         .font(.caption2).foregroundStyle(.secondary).multilineTextAlignment(.center)
       }
@@ -77,5 +83,17 @@ struct ContentView: View {
   .onChange(of:scenePhase) {_,phase in
    if phase == .active {Task {await sync.refresh(store:store)}}
   }
+ }
+ private func wellnessTrack(score:Double?) -> some View {
+  GeometryReader { geometry in
+   ZStack(alignment:.leading) {
+    LinearGradient(colors:[.green,.cyan,.purple,.orange,.pink],startPoint:.leading,endPoint:.trailing)
+     .frame(height:9).clipShape(Capsule())
+    if let score {
+     Circle().fill(.white).frame(width:14,height:14)
+      .offset(x:max(0,(geometry.size.width-14)*min(100,max(0,score))/100))
+    }
+   }
+  }.frame(height:16).accessibilityLabel(score == nil ? "Wellness meter awaiting data" : "Estimated wellness meter")
  }
 }
