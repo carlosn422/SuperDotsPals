@@ -1,6 +1,6 @@
-import React,{useEffect,useState} from 'react';
+import React,{useEffect,useState,useRef} from 'react';
 import {MASCOT_FRAMES,MASCOT_FPS} from './MascotAnimationAssets';
-import {Image,AppState,AccessibilityInfo} from 'react-native';
+import {Image,AppState,AccessibilityInfo,View} from 'react-native';
 
 
 export type Emotion='joy'|'sadness'|'anger'|'fear'|'disgust';
@@ -20,10 +20,14 @@ const imageData:Record<Emotion,string>={"joy":"data:image/png;base64,iVBORw0KGgo
 // Never leave the mascot blank while the next animation frame is being decoded.
 // The packaged first frame is rendered immediately and retained as the native fallback.
 export function AnimatedMascotFrames({frames,size,label}:{frames:import('react-native').ImageSourcePropType[];size:number;label:string}){
- const [frame,setFrame]=useState(0);
- const [ready,setReady]=useState(false);
+ const [buffers,setBuffers]=useState<[number,number]>([0,0]);
+ const [visible,setVisible]=useState<0|1>(0);
  const [active,setActive]=useState(AppState.currentState==='active');
  const [reduceMotion,setReduceMotion]=useState(false);
+ const visibleRef=useRef<0|1>(0);
+ const pendingRef=useRef(false);
+ const targetRef=useRef(0);
+ const startRef=useRef(Date.now());
  useEffect(()=>{
   const a=AppState.addEventListener('change',s=>setActive(s==='active'));
   const m=AccessibilityInfo.addEventListener('reduceMotionChanged',setReduceMotion);
@@ -31,28 +35,50 @@ export function AnimatedMascotFrames({frames,size,label}:{frames:import('react-n
   return()=>{a.remove();m.remove()};
  },[]);
  useEffect(()=>{
-  setFrame(0);
-  setReady(false);
+  pendingRef.current=false;
+  targetRef.current=0;
+  visibleRef.current=0;
+  startRef.current=Date.now();
+  setVisible(0);
+  setBuffers([0,0]);
  },[frames]);
  useEffect(()=>{
-  if(!ready||!active||reduceMotion||frames.length<2)return;
-  // Derive frame from elapsed time so stalled JS ticks do not slow the animation.
-  // If the device cannot sustain the target rate, skip delayed frames instead
-  // of extending the clip duration.
-  const started=Date.now()-frame*1000/MASCOT_FPS;
+  if(!active||reduceMotion||frames.length<2)return;
+  // Keep one fully decoded frame visible while decoding into the hidden layer.
+  // Never replace the visible Image's source until its replacement has loaded.
+  startRef.current=Date.now();
   const timer=setInterval(()=>{
-   const next=Math.floor((Date.now()-started)*MASCOT_FPS/1000)%frames.length;
-   setFrame(current=>current===next?current:next);
+   if(pendingRef.current)return;
+   const next=Math.floor((Date.now()-startRef.current)*MASCOT_FPS/1000)%frames.length;
+   const hidden:0|1=visibleRef.current===0?1:0;
+   pendingRef.current=true;
+   targetRef.current=hidden;
+   setBuffers(previous=>{
+    const copy:[number,number]=[...previous] as [number,number];
+    copy[hidden]=next;
+    return copy;
+   });
   },1000/MASCOT_FPS);
-  return()=>clearInterval(timer);
- },[frames,ready,active,reduceMotion]);
+  return()=>{clearInterval(timer);pendingRef.current=false};
+ },[frames,active,reduceMotion]);
+ const onFrameLoaded=(slot:0|1)=>{
+  if(!pendingRef.current||targetRef.current!==slot)return;
+  visibleRef.current=slot;
+  setVisible(slot);
+  pendingRef.current=false;
+ };
  if(!frames.length)return null;
- const first=frames[0];
- const fallback=Array.isArray(first)?first[0]:first;
- return <Image source={frames[frame]} defaultSource={fallback}
-  onLoad={()=>{if(!ready)setReady(true)}}
-  fadeDuration={0}
-  style={{width:size,height:size}} resizeMode="contain" accessibilityLabel={label}/>;
+ const initial=frames[0];
+ const fallback=Array.isArray(initial)?initial[0]:initial;
+ return <View style={{width:size,height:size}} accessibilityLabel={label}>
+  {([0,1] as const).map(slot=><Image key={slot}
+   source={frames[buffers[slot]]}
+   defaultSource={fallback}
+   onLoad={()=>onFrameLoaded(slot)}
+   fadeDuration={0}
+   style={{position:'absolute',width:size,height:size,opacity:visible===slot?1:0}}
+   resizeMode="contain" />)}
+ </View>;
 }
 export default function MoodMascot({mood,size=102}:{mood?:string|null;size?:number}){
  const emotion=moodToEmotion(mood);
