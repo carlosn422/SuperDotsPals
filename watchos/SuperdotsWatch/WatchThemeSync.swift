@@ -79,7 +79,8 @@ final class WatchThemeSync: ObservableObject {
             let rows = try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
             if let mood = rows.first?["mood"] as? String { store.currentMood = mood }
         } catch {
-            // Retain the most recently known mood while offline.
+            message = "Mood refresh failed: \\(error.localizedDescription)"
+            // Keep the previously displayed mood while offline.
         }
     }
 
