@@ -52,6 +52,7 @@ struct ContentView: View {
       }
      }
      }.padding(.horizontal,4)
+      .padding(.bottom,30)
       .background(alignment:.bottom) {
        GeometryReader { marker in
         Color.clear.preference(key: WatchContentBottomKey.self,
@@ -61,14 +62,14 @@ struct ContentView: View {
     }
     .coordinateSpace(name:"wellnessScroll")
     .onPreferenceChange(WatchContentBottomKey.self) { contentBottom = $0 }
-    .safeAreaInset(edge:.bottom,spacing:0) {
+    .overlay(alignment:.bottom) {
      if contentBottom > viewport.size.height + 8 {
       Image(systemName:"chevron.down")
        .font(.system(size:12,weight:.bold))
        .foregroundStyle(.white.opacity(0.85))
        .frame(maxWidth:.infinity)
-       .frame(height:18)
-       .background(.black)
+       .frame(height:16)
+       .offset(y:0)
        .allowsHitTesting(false)
        .accessibilityLabel("Scroll down for more options")
      }
@@ -91,7 +92,7 @@ struct ContentView: View {
       .offset(x:max(0,(geometry.size.width-14)*min(100,max(0,score))/100))
     }
    }
-  }.frame(height:16).accessibilityLabel(score == nil ? "Wellness meter awaiting data" : "Estimated wellness meter")
+  }.frame(height:16).padding(.bottom,16).accessibilityLabel(score == nil ? "Wellness meter awaiting data" : "Estimated wellness meter")
  }
 }
 
