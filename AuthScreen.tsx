@@ -1,6 +1,7 @@
 import React,{useState,useEffect,useRef} from 'react';
 import {View,Text,TextInput,TouchableOpacity,StyleSheet,KeyboardAvoidingView,ScrollView,Platform,ActivityIndicator,AppState} from 'react-native';
 import {supabase} from './supabase';
+import {Image} from 'react-native';
 import MoodPalMascot from './MoodPalMascot';
 import MoodPalsWelcomeArt from './MoodPalsWelcomeArt';
 import Svg,{Path} from 'react-native-svg';
@@ -53,7 +54,9 @@ export default function AuthScreen(){
   <View style={s.welcomeArt}>
    <View style={s.welcomeGlowLeft}/>
    <View style={s.welcomeGlowRight}/>
-   <MoodPalsWelcomeArt width={340}/>
+      <Image source={require('./assets/branding/moodpals-welcome.png')}
+    style={{width:'100%',height:'100%'}} resizeMode="contain"
+    accessibilityLabel="Purple and mint MoodPals smiling together"/>
   </View>
   <View style={s.welcomeActions}>
    <TouchableOpacity accessibilityRole="button" onPress={()=>setMode('signup')} style={s.welcomePrimary}><Text style={s.welcomePrimaryText}>Get Started</Text></TouchableOpacity>
