@@ -14,13 +14,17 @@ struct ContentView: View {
     ScrollView {
      VStack(spacing:14) {
      if !sync.connected {
-      AnimatedMoodMascot(mood:"Calm",size:mascotSize,isActive:scenePhase == .active)
+      ProgressView().frame(width:mascotSize,height:mascotSize)
       wellnessTrack(score:nil)
       NavigationLink {WatchSyncView(sync:sync)} label: {
        Label("Connect Account",systemImage:"link").frame(maxWidth:.infinity)
       }.buttonStyle(.borderedProminent).tint(purple)
      } else {
-      AnimatedMoodMascot(mood:store.wellnessMood,size:mascotSize,isActive:scenePhase == .active)
+      if sync.moodLoaded {
+       AnimatedMoodMascot(mood:store.wellnessMood,size:mascotSize,isActive:scenePhase == .active)
+      } else {
+       ProgressView().frame(width:mascotSize,height:mascotSize)
+      }
       VStack(spacing:2) {
        if let hrv=store.latestHRV, hrv.isFinite, hrv >= 0 {
         Text("HRV · \\(Int(hrv.rounded())) ms")
@@ -50,19 +54,18 @@ struct ContentView: View {
       NavigationLink {WatchSyncView(sync:sync)} label: {
        Label("Account & sync",systemImage:"person.crop.circle")
       }
+      Color.clear.frame(height:1)
+       .background(GeometryReader { marker in
+        Color.clear.preference(key:WatchContentBottomKey.self,
+         value:marker.frame(in:.named("wellnessScroll")).maxY)
+       })
      }
      }.padding(.horizontal,4)
-      .background(alignment:.bottom) {
-       GeometryReader { marker in
-        Color.clear.preference(key: WatchContentBottomKey.self,
-         value:marker.frame(in:.named("wellnessScroll")).maxY)
-       }
-      }
     }
     .coordinateSpace(name:"wellnessScroll")
     .onPreferenceChange(WatchContentBottomKey.self) { contentBottom = $0 }
     .overlay(alignment:.bottom) {
-     if contentBottom.isFinite && contentBottom > viewport.size.height + 32 {
+     if sync.connected && contentBottom.isFinite && contentBottom > viewport.size.height + 5 {
       Image(systemName:"chevron.down")
        .font(.system(size:12,weight:.bold))
        .foregroundStyle(.white.opacity(0.85))
