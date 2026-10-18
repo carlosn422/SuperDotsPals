@@ -52,7 +52,6 @@ struct ContentView: View {
       }
      }
      }.padding(.horizontal,4)
-      .padding(.bottom,30)
       .background(alignment:.bottom) {
        GeometryReader { marker in
         Color.clear.preference(key: WatchContentBottomKey.self,
@@ -63,7 +62,7 @@ struct ContentView: View {
     .coordinateSpace(name:"wellnessScroll")
     .onPreferenceChange(WatchContentBottomKey.self) { contentBottom = $0 }
     .overlay(alignment:.bottom) {
-     if contentBottom > viewport.size.height + 8 {
+     if contentBottom.isFinite && contentBottom > viewport.size.height + 32 {
       Image(systemName:"chevron.down")
        .font(.system(size:12,weight:.bold))
        .foregroundStyle(.white.opacity(0.85))
