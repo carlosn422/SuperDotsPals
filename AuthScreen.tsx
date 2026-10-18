@@ -46,12 +46,12 @@ export default function AuthScreen(){
  if(mode==='welcome')return <View style={s.welcomePage}>
   <View style={s.welcomeBrand}>
    <Text style={s.welcomeLogo}>Mood<Text style={s.logoMint}>Pals</Text></Text>
-   <Text style={s.welcomeTagline}>A kinder you,{'\\n'}brighter days. 🌈</Text>
+   <Text style={s.welcomeTagline}>A kinder you,{'\n'}brighter days. 🌈</Text>
   </View>
   <View style={s.welcomeArt}>
    <View style={s.welcomeGlowLeft}/>
    <View style={s.welcomeGlowRight}/>
-   <View style={s.welcomeBuddyBack}><MoodPalMascot id="anxious" size={220} animate={false}/></View>
+   <View style={s.welcomeBuddyBack}><MoodPalMascot id="buddy" size={220} animate={false}/></View>
    <View style={s.welcomeBuddyFront}><MoodPalMascot id="calm" size={208} animate={false}/></View>
   </View>
   <View style={s.welcomeActions}>
