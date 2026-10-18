@@ -92,7 +92,7 @@ struct ContentView: View {
       .offset(x:max(0,(geometry.size.width-14)*min(100,max(0,score))/100))
     }
    }
-  }.frame(height:16).padding(.bottom,16).accessibilityLabel(score == nil ? "Wellness meter awaiting data" : "Estimated wellness meter")
+  }.frame(height:16).padding(.bottom,16).offset(y:-9).accessibilityLabel(score == nil ? "Wellness meter awaiting data" : "Estimated wellness meter")
  }
 }
 
