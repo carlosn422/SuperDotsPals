@@ -2,6 +2,8 @@ import React,{useState,useEffect,useRef} from 'react';
 import {View,Text,TextInput,TouchableOpacity,StyleSheet,KeyboardAvoidingView,ScrollView,Platform,ActivityIndicator,AppState} from 'react-native';
 import {supabase} from './supabase';
 import MoodPalMascot from './MoodPalMascot';
+import MoodPalsWelcomeArt from './MoodPalsWelcomeArt';
+import Svg,{Path} from 'react-native-svg';
 export default function AuthScreen(){
  const [mode,setMode]=useState<'welcome'|'signin'|'signup'|'reset'>('welcome'),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[name,setName]=useState(''),[loading,setLoading]=useState(false),[message,setMessage]=useState('');
  const [waitingForConfirmation,setWaitingForConfirmation]=useState(false);
@@ -45,14 +47,13 @@ export default function AuthScreen(){
  }
  if(mode==='welcome')return <View style={s.welcomePage}>
   <View style={s.welcomeBrand}>
-   <Text style={s.welcomeLogo}>Mood<Text style={s.logoMint}>Pals</Text></Text>
+   <View style={s.welcomeWordmark}><Svg width={34} height={40} viewBox="0 0 34 40"><Path d="M 20 13 L 7 2" stroke="#F59FCF" strokeWidth="7" strokeLinecap="round"/><Path d="M 14 25 L 3 29" stroke="#83B6FF" strokeWidth="7" strokeLinecap="round"/></Svg><Text style={s.welcomeLogo}>Mood<Text style={s.logoMint}>Pals</Text></Text><Svg width={36} height={40} viewBox="0 0 36 40"><Path d="M 7 14 L 23 2" stroke="#FFD15D" strokeWidth="7" strokeLinecap="round"/><Path d="M 16 28 L 32 23" stroke="#FFB86B" strokeWidth="7" strokeLinecap="round"/></Svg></View>
    <Text style={s.welcomeTagline}>A kinder you,{'\n'}brighter days. 🌈</Text>
   </View>
   <View style={s.welcomeArt}>
    <View style={s.welcomeGlowLeft}/>
    <View style={s.welcomeGlowRight}/>
-   <View style={s.welcomeBuddyBack}><MoodPalMascot id="buddy" size={220} animate={false}/></View>
-   <View style={s.welcomeBuddyFront}><MoodPalMascot id="calm" size={208} animate={false}/></View>
+   <MoodPalsWelcomeArt width={340}/>
   </View>
   <View style={s.welcomeActions}>
    <TouchableOpacity accessibilityRole="button" onPress={()=>setMode('signup')} style={s.welcomePrimary}><Text style={s.welcomePrimaryText}>Get Started</Text></TouchableOpacity>
@@ -90,6 +91,7 @@ export default function AuthScreen(){
 const s=StyleSheet.create({
  welcomePage:{flex:1,backgroundColor:'#FFFFFF',paddingHorizontal:26,paddingTop:65,paddingBottom:36},
  welcomeBrand:{alignItems:'center',gap:22,marginTop:14},
+ welcomeWordmark:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5},
  welcomeLogo:{fontSize:39,fontWeight:'900',letterSpacing:-2,color:'#32217D'},
  welcomeTagline:{fontSize:21,fontWeight:'700',lineHeight:28,color:'#7260A6',textAlign:'center'},
  welcomeArt:{flex:1,minHeight:260,alignItems:'center',justifyContent:'center',overflow:'hidden'},
