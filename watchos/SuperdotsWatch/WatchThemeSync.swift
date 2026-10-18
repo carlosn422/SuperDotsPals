@@ -1,4 +1,3 @@
-import WatchKit
 import SwiftUI
 import Security
 
@@ -51,8 +50,10 @@ final class WatchThemeSync: ObservableObject {
             let data = try await request("/rest/v1/wellness_journal?select=mood,occurred_at&user_id=eq.\(userId)&mood=not.is.null&order=occurred_at.desc&limit=1",method:"GET")
             let rows = try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
             store.currentMood = (rows.first?["mood"] as? String) ?? "Calm"
-            let healthData = try await request("/rest/v1/wellness_readings?select=metric,value,recorded_at&user_id=eq.\(userId)&source=eq.healthkit&metric=in.(hrv,resting_heart_rate,steps,sleep_minutes)&order=recorded_at.desc&limit=100",method:"GET")
+            let healthData = try await request("/rest/v1/wellness_readings?select=metric,value,recorded_at&user_id=eq.\(userId)&source=eq.healthkit&metric=in.(hrv,resting_heart_rate,steps,sleep_minutes)&order=recorded_at.desc&limit=500",method:"GET")
             let healthRows = try JSONSerialization.jsonObject(with:healthData) as? [[String:Any]] ?? []
+            store.hrvHistory = []
+            store.restingHeartHistory = []
             store.latestHRV = nil
             store.latestRestingHeartRate = nil
             store.latestSteps = nil
@@ -62,6 +63,16 @@ final class WatchThemeSync: ObservableObject {
                 let raw = reading["value"]
                 let number = (raw as? NSNumber)?.doubleValue ?? Double(String(describing: raw ?? ""))
                 guard let number else { continue }
+                if let dateText = reading["recorded_at"] as? String {
+                    let formatter = ISO8601DateFormatter()
+                    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                    let timestamp = formatter.date(from: dateText)
+                        ?? ISO8601DateFormatter().date(from: dateText)
+                    if let date = timestamp {
+                        if metric == "hrv" { store.hrvHistory.append((value:number,date:date)) }
+                        if metric == "resting_heart_rate" { store.restingHeartHistory.append((value:number,date:date)) }
+                    }
+                }
                 if metric == "hrv" && store.latestHRV == nil { store.latestHRV = number }
                 if metric == "resting_heart_rate" && store.latestRestingHeartRate == nil { store.latestRestingHeartRate = number }
                 if metric == "steps" && store.latestSteps == nil { store.latestSteps = number }
@@ -69,23 +80,6 @@ final class WatchThemeSync: ObservableObject {
             }
             message = "Mood synced: \(store.currentMood)."
         } catch { message = "Sync failed: \(error.localizedDescription)" }
-    }
-
-    // Poll only when the app is active. WatchKit cannot deliver a reliable
-    // always-on custom watch-face refresh; real background push requires APNs.
-    func refreshMood(store: WatchStore) async {
-        guard connected, !busy else { return }
-        do {
-            try await renewIfNeeded()
-            let data = try await request("/rest/v1/wellness_journal?select=mood,occurred_at&user_id=eq.\(userId)&mood=not.is.null&order=occurred_at.desc&limit=1",method:"GET")
-            let rows = try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
-            if let mood = rows.first?["mood"] as? String, mood != store.currentMood {
-                store.currentMood = mood
-                WKInterfaceDevice.current().play(.notification)
-            }
-        } catch {
-            // Keep the last displayed mood when offline.
-        }
     }
 
     func signOut() {
