@@ -2,6 +2,10 @@ import SwiftUI
 
 private let violet=Color(red:0.43,green:0.32,blue:0.85)
 private let moodNames=["Joyful","Calm","Sad","Angry","Anxious","Tired"]
+private func displayMood(_ value:String) -> String {
+ let mood=value.trimmingCharacters(in:.whitespacesAndNewlines)
+ return mood.lowercased()=="disgust" || mood.lowercased()=="disgusted" ? "Calm" : mood
+}
 
 struct WatchCheckIn:View {
  @ObservedObject var sync:WatchThemeSync
@@ -171,8 +175,8 @@ struct WatchMoodInsights:View {
    if entries.isEmpty {Text(message.isEmpty ? "No check-ins yet":message).font(.caption)}
    ForEach(Array(entries.enumerated()),id:\.offset){_,entry in
     HStack {
-     AnimatedMoodMascot(mood:entry["mood"] as? String ?? "Calm",size:32,isActive:false)
-     Text(entry["mood"] as? String ?? "Mood").font(.caption)
+     AnimatedMoodMascot(mood:displayMood(entry["mood"] as? String ?? "Calm"),size:32,isActive:false)
+     Text(displayMood(entry["mood"] as? String ?? "Mood")).font(.caption).fixedSize(horizontal:false,vertical:true)
      Spacer()
      Text(String((entry["occurred_at"] as? String ?? "").prefix(10))).font(.system(size:9)).foregroundStyle(.secondary)
     }
