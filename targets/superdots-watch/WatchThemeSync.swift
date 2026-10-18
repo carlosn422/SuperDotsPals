@@ -137,7 +137,7 @@ final class WatchThemeSync: ObservableObject {
 
     func moodHistory() async throws -> [[String:Any]] {
         try await renewIfNeeded()
-        let data=try await request("/rest/v1/wellness_journal?select=mood,occurred_at&user_id=eq.\(userId)&mood=not.is.null&order=occurred_at.desc&limit=14",method:"GET")
+        let data=try await request("/rest/v1/wellness_journal?select=mood,occurred_at&user_id=eq.\(userId)&mood=not.is.null&order=occurred_at.desc&limit=365",method:"GET")
         return try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
     }
 
