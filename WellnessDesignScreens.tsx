@@ -30,7 +30,7 @@ export function PageHero({title,highlight,detail,companion,accent,onPress,button
   {button?<TouchableOpacity accessibilityRole="button" onPress={onPress} style={[s.heroButton,{backgroundColor:accent}]}><Text style={{fontWeight:'900',fontSize:17,color:'#fff'}}>{button}  →</Text></TouchableOpacity>:null}
  </View>;
 }
-export function BrandHead({companion}:{companion:string}){return <View style={s.brand}><SuperdotMascot id={companion} color={P} size={41}/><Text style={s.brandWord}>Super<Text style={{color:P}}>dots.</Text></Text><View style={{flex:1}}/><SuperdotMascot id={companion} color={P} size={37}/></View>}
+export function BrandHead({companion}:{companion:string}){return <View style={s.brand}><SuperdotMascot id={companion} color={P} size={41}/><Text style={s.brandWord}>Mood<Text style={{color:'#19AAA4'}}>Pals</Text></Text><View style={{flex:1}}/><SuperdotMascot id={companion} color={P} size={37}/></View>}
 export function SectionHeading({title,detail}:{title:string;detail?:string}){return <View style={s.heading}><Text style={s.headingText}>{title}</Text>{detail?<Text style={s.headingDetail}>{detail}</Text>:null}</View>}
 export function PastelCard({title,detail,emoji,tint,onPress}:{title:string;detail:string;emoji:string;tint:string;onPress?:()=>void}){return <TouchableOpacity disabled={!onPress} onPress={onPress} style={[s.action,{backgroundColor:tint}]}><Text style={s.actionEmoji}>{emoji}</Text><View style={{flex:1,gap:5}}><Text style={s.actionTitle}>{title}</Text><Text style={s.actionText}>{detail}</Text></View><Ionicons name="chevron-forward" color={P} size={16}/></TouchableOpacity>}
 export function StatCard({title,value,detail,icon,tint,onPress}:{title:string;value:string;detail:string;icon:any;tint:string;onPress?:()=>void}){return <TouchableOpacity disabled={!onPress} onPress={onPress} style={s.stat}><View style={[s.statIcon,{backgroundColor:tint}]}><Ionicons name={icon} size={20} color={P}/></View><Text style={s.statTitle}>{title}</Text><Text style={s.statValue}>{value}</Text><Text style={s.statDetail}>{detail}</Text></TouchableOpacity>}
@@ -43,8 +43,8 @@ const moodGuides=[
 ] as const;
 export function MeetYourMoods({onCheckin}:{onCheckin:()=>void}){
  return <View style={{backgroundColor:'#FFFFFF',borderRadius:24,padding:17,gap:11,borderWidth:1,borderColor:APP_THEME.border}}>
-   <Text style={{fontSize:19,fontWeight:'900',color:INK}}>Meet your moods</Text>
-   <Text style={{fontSize:12,color:MUTED,lineHeight:18}}>Your Superdot changes with how you're feeling. Check in to see the companion that matches your mood.</Text>
+   <Text style={{fontSize:19,fontWeight:'900',color:INK}}>Meet your MoodPals</Text>
+   <Text style={{fontSize:12,color:MUTED,lineHeight:18}}>Your MoodPal changes with how you're feeling. Check in to see the companion that matches your mood.</Text>
    <View style={{flexDirection:'row',justifyContent:'space-between',gap:2}}>
     {moodGuides.map(item=><View key={item.mood} style={{flex:1,alignItems:'center',gap:5}}>
       <SuperdotMascot id={item.id} size={55}/>
