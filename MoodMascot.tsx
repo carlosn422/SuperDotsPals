@@ -4,7 +4,7 @@ import {Image,AppState,AccessibilityInfo} from 'react-native';
 
 
 export type Emotion='joy'|'sadness'|'anger'|'fear'|'disgust';
-export const APP_THEME={primary:'#6957C8',primarySoft:'#EAE6FA',background:'#F7F7F5',surface:'#FFFFFF',ink:'#283246',muted:'#758196',mint:'#E6F4EA',border:'#E8E9ED'} as const;
+export const APP_THEME={primary:'#7861E8',primarySoft:'#EEE8FF',background:'#FAF8FF',surface:'#FFFFFF',ink:'#26165C',muted:'#77739A',mint:'#E1FAF1',border:'#EAE5F5'} as const;
 export function moodToEmotion(value?:string|null):Emotion{
  const m=(value||'').trim().toLowerCase();
  // Direct mascot identifiers must resolve before human mood synonyms.
