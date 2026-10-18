@@ -48,6 +48,25 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   if(error)console.warn('Latest mood unavailable',error.message);
   if(active&&!error)setMood(data?.mood||'');
  })();return()=>{active=false}},[]);
+ // One user-scoped realtime channel while this screen is mounted; no AI calls or push blasts.
+ useEffect(()=>{
+  let active=true;
+  let channel:ReturnType<typeof supabase.channel>|null=null;
+  const syncLatest=async(userId:string)=>{
+   const {data,error}=await supabase.from('wellness_journal').select('mood')
+    .eq('user_id',userId).not('mood','is',null)
+    .order('occurred_at',{ascending:false}).limit(1).maybeSingle();
+   if(active&&!error)setMood(data?.mood||'');
+  };
+  void supabase.auth.getUser().then(({data:{user}})=>{
+   if(!active||!user)return;
+   channel=supabase.channel('mood-sync:'+user.id)
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'wellness_journal',filter:'user_id=eq.'+user.id},()=>{void syncLatest(user.id)})
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'wellness_journal',filter:'user_id=eq.'+user.id},()=>{void syncLatest(user.id)})
+    .subscribe();
+  });
+  return()=>{active=false;if(channel)void supabase.removeChannel(channel)};
+ },[]);
  const [water,setWater]=useState(0);
  const [coffee,setCoffee]=useState(0);
  useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;
