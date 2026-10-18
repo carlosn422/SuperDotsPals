@@ -37,12 +37,30 @@ struct WatchCheckIn:View {
      if questions.indices.contains(index) {
       let q=questions[index]
       let question=q["question"] as? String ?? "How are you feeling?"
-      Text(question).font(.headline).multilineTextAlignment(.center)
+      Text(question)
+       .font(.system(size:16,weight:.semibold))
+       .foregroundStyle(.white)
+       .multilineTextAlignment(.center)
+       .fixedSize(horizontal:false,vertical:true)
+       .frame(maxWidth:.infinity)
+       .padding(.horizontal,6)
+       .padding(.bottom,5)
       ForEach((q["choices"] as? [String] ?? [])+["Prefer not to say"],id:\.self){choice in
        Button {
         answers[question]=choice
         if index+1<questions.count {index+=1} else {Task {await finish()}}
-       } label:{Text(choice).font(.caption).frame(maxWidth:.infinity,alignment:.leading)}
+       } label:{
+        Text(choice)
+         .font(.system(size:15,weight:.semibold))
+         .foregroundStyle(.white)
+         .multilineTextAlignment(.leading)
+         .fixedSize(horizontal:false,vertical:true)
+         .frame(maxWidth:.infinity,minHeight:30,alignment:.leading)
+         .padding(.horizontal,13)
+         .padding(.vertical,10)
+         .background(Color(red:0.24,green:0.16,blue:0.39),in:RoundedRectangle(cornerRadius:14))
+       }
+       .buttonStyle(.plain)
       }
      }
      Button("Skip to verse"){Task {await finish()}}.font(.caption2)
