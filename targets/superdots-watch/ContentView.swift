@@ -61,14 +61,14 @@ struct ContentView: View {
     }
     .coordinateSpace(name:"wellnessScroll")
     .onPreferenceChange(WatchContentBottomKey.self) { contentBottom = $0 }
-    .overlay(alignment:.bottom) {
+    .safeAreaInset(edge:.bottom,spacing:0) {
      if contentBottom > viewport.size.height + 8 {
       Image(systemName:"chevron.down")
        .font(.system(size:12,weight:.bold))
        .foregroundStyle(.white.opacity(0.85))
-       .padding(5)
-       .background(.black.opacity(0.75),in:Circle())
-       .padding(.bottom,2)
+       .frame(maxWidth:.infinity)
+       .frame(height:18)
+       .background(.black)
        .allowsHitTesting(false)
        .accessibilityLabel("Scroll down for more options")
      }
