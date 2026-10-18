@@ -1,11 +1,8 @@
 import React from 'react';
-import MoodMascot,{AnimatedMascotFrames} from './MoodMascot';
-import {MASCOT_FRAMES} from './MascotAnimationAssets';
+import MoodPalMascot from './MoodPalMascot';
 
-export default function SuperdotMascot({id,size=102}:{id:string;color?:string;size?:number;mood?:'happy'|'calm'|'sleepy'|'excited'}){
- const tired=['tired','sleepy','exhausted','fatigued'].some(v=>id.toLowerCase().includes(v));
- if(tired&&MASCOT_FRAMES.tired.length){
-  return <AnimatedMascotFrames frames={MASCOT_FRAMES.tired} size={size} label="Tired mood mascot"/>;
- }
- return <MoodMascot mood={tired?'sadness':id} size={size}/>;
+// Compatibility wrapper for existing screens. MoodPals uses one silhouette and
+// varies its palette/expression instead of switching between unrelated characters.
+export default function SuperdotMascot(props:{id:string;color?:string;size?:number;mood?:'happy'|'calm'|'sleepy'|'excited'}) {
+ return <MoodPalMascot id={props.id} size={props.size??102}/>;
 }
