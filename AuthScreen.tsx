@@ -3,7 +3,7 @@ import {View,Text,TextInput,TouchableOpacity,StyleSheet,KeyboardAvoidingView,Scr
 import {supabase} from './supabase';
 import MoodPalMascot from './MoodPalMascot';
 export default function AuthScreen(){
- const [mode,setMode]=useState<'signin'|'signup'|'reset'>('signin'),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[name,setName]=useState(''),[loading,setLoading]=useState(false),[message,setMessage]=useState('');
+ const [mode,setMode]=useState<'welcome'|'signin'|'signup'|'reset'>('welcome'),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[name,setName]=useState(''),[loading,setLoading]=useState(false),[message,setMessage]=useState('');
  const [waitingForConfirmation,setWaitingForConfirmation]=useState(false);
  const currentCredentials=useRef<{email:string;password:string}|null>(null);
  const checking=useRef(false);
@@ -43,9 +43,26 @@ export default function AuthScreen(){
    }
   }catch(e:any){setMessage(e.message || 'Something went wrong. Please try again.');}finally{setLoading(false);}
  }
+ if(mode==='welcome')return <View style={s.welcomePage}>
+  <View style={s.welcomeBrand}>
+   <Text style={s.welcomeLogo}>Mood<Text style={s.logoMint}>Pals</Text></Text>
+   <Text style={s.welcomeTagline}>A kinder you,{'\\n'}brighter days. 🌈</Text>
+  </View>
+  <View style={s.welcomeArt}>
+   <View style={s.welcomeGlowLeft}/>
+   <View style={s.welcomeGlowRight}/>
+   <View style={s.welcomeBuddyBack}><MoodPalMascot id="anxious" size={220} animate={false}/></View>
+   <View style={s.welcomeBuddyFront}><MoodPalMascot id="calm" size={208} animate={false}/></View>
+  </View>
+  <View style={s.welcomeActions}>
+   <TouchableOpacity accessibilityRole="button" onPress={()=>setMode('signup')} style={s.welcomePrimary}><Text style={s.welcomePrimaryText}>Get Started</Text></TouchableOpacity>
+   <TouchableOpacity accessibilityRole="button" onPress={()=>setMode('signin')} style={s.welcomeSecondary}><Text style={s.welcomeSecondaryText}>Already have an account?</Text></TouchableOpacity>
+  </View>
+ </View>;
  return <KeyboardAvoidingView style={s.page} behavior={Platform.OS==='ios'?'padding':undefined}>
   <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
    <View style={s.brand}>
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back to welcome" onPress={()=>{setMode('welcome');setMessage('')}} style={s.authBack}><Text style={s.authBackText}>‹  Back</Text></TouchableOpacity>
     <Text style={s.logo}>Mood<Text style={s.logoMint}>Pals</Text></Text>
     <Text style={s.tagline}>A little check-in. A brighter day.</Text>
    </View>
@@ -71,6 +88,22 @@ export default function AuthScreen(){
  </KeyboardAvoidingView>
 }
 const s=StyleSheet.create({
+ welcomePage:{flex:1,backgroundColor:'#FFFFFF',paddingHorizontal:26,paddingTop:65,paddingBottom:36},
+ welcomeBrand:{alignItems:'center',gap:22,marginTop:14},
+ welcomeLogo:{fontSize:39,fontWeight:'900',letterSpacing:-2,color:'#32217D'},
+ welcomeTagline:{fontSize:21,fontWeight:'700',lineHeight:28,color:'#7260A6',textAlign:'center'},
+ welcomeArt:{flex:1,minHeight:260,alignItems:'center',justifyContent:'center',overflow:'hidden'},
+ welcomeGlowLeft:{position:'absolute',width:230,height:230,borderRadius:115,backgroundColor:'#F4E8FF',left:-105,top:'23%'},
+ welcomeGlowRight:{position:'absolute',width:260,height:260,borderRadius:130,backgroundColor:'#DDFBF4',right:-125,bottom:'15%'},
+ welcomeBuddyBack:{position:'absolute',left:'9%',top:'21%'},
+ welcomeBuddyFront:{position:'absolute',right:'7%',top:'37%'},
+ welcomeActions:{gap:14,paddingBottom:10},
+ welcomePrimary:{backgroundColor:'#8466ED',borderRadius:28,paddingVertical:18,alignItems:'center',shadowColor:'#8466ED',shadowOpacity:.17,shadowRadius:10,shadowOffset:{width:0,height:4}},
+ welcomePrimaryText:{color:'#FFFFFF',fontSize:17,fontWeight:'800'},
+ welcomeSecondary:{backgroundColor:'#FFFFFF',borderColor:'#CFC5EA',borderWidth:1.4,borderRadius:28,paddingVertical:17,alignItems:'center'},
+ welcomeSecondaryText:{color:'#55468B',fontSize:15,fontWeight:'700'},
+ authBack:{alignSelf:'flex-start',paddingVertical:7,paddingHorizontal:4},
+ authBackText:{color:'#7861E8',fontWeight:'800',fontSize:13},
  page:{flex:1,backgroundColor:'#FAF8FF'},
  content:{flexGrow:1,paddingHorizontal:22,paddingTop:50,paddingBottom:34,justifyContent:'center',gap:19},
  brand:{alignItems:'center',gap:5},
