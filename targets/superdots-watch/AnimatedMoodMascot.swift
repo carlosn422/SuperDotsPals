@@ -1,40 +1,63 @@
 import SwiftUI
+import UIKit
 
-/// Same mood-driven frame sequence used by the iPhone app.
-/// Images are installed by scripts/install_mascot_animations.py as watchOS assets.
+/// Plays the 12 FPS watch-specific PNG assets. Missing or temporarily unavailable
+/// frames never cause the mascot to flash to a system symbol.
 struct AnimatedMoodMascot: View {
     let mood: String
     var size: CGFloat = 100
     var isActive: Bool = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var lastImage: UIImage?
+    @State private var lastEmotion = ""
+
+    private let framesPerSecond = 12.0
+    private let frameCount = 36
 
     private var emotion: String {
         let value = mood.lowercased()
-        if ["happy","good","great","joy","excited","proud"].contains(where:value.contains) { return "joy" }
-        if ["anger","angry","frustrated","mad","irritated"].contains(where:value.contains) { return "anger" }
-        if ["fear","anxious","stress","worried","nervous","overwhelmed"].contains(where:value.contains) { return "fear" }
-        if ["tired","sleepy","exhausted","fatigued"].contains(where:value.contains) { return "tired" }
-        if ["sad","down","depressed","lonely"].contains(where:value.contains) { return "sadness" }
+        if ["happy","good","great","joy","excited","proud"].contains(where: value.contains) { return "joy" }
+        if ["anger","angry","frustrated","mad","irritated"].contains(where: value.contains) { return "anger" }
+        if ["fear","anxious","stress","worried","nervous","overwhelmed"].contains(where: value.contains) { return "fear" }
+        if ["tired","sleepy","exhausted","fatigued"].contains(where: value.contains) { return "tired" }
+        if ["sad","down","depressed","lonely"].contains(where: value.contains) { return "sadness" }
         return "disgust"
     }
 
+    private func frame(_ index: Int) -> UIImage? {
+        UIImage(named: String(format: "%@_frame_%03d", emotion, index))
+    }
+
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0/12.0, paused: !isActive || reduceMotion)) { context in
-            let elapsed = context.date.timeIntervalSinceReferenceDate
-            let index = reduceMotion ? 0 : Int(elapsed * 12) % 36
-            let name = String(format: "%@_frame_%03d", emotion, index)
+        TimelineView(.animation(minimumInterval: 1.0 / framesPerSecond,
+                                paused: !isActive || reduceMotion)) { context in
+            let index = reduceMotion ? 0 :
+                Int(context.date.timeIntervalSinceReferenceDate * framesPerSecond) % frameCount
+            let image = frame(index) ?? lastImage ?? frame(0)
             Group {
-                if let image = UIImage(named: name) {
+                if let image {
                     Image(uiImage: image).resizable().scaledToFit()
+                        .onAppear { lastImage = image; lastEmotion = emotion }
+                        .onChange(of: index) { _, _ in
+                            // Only retain a successfully loaded frame.
+                            if let current = frame(index) { lastImage = current }
+                        }
                 } else {
-                    // Until uploaded animation frames are installed, show a neutral icon.
-                    Image(systemName: "face.smiling.fill")
-                        .resizable().scaledToFit().foregroundStyle(Color(red: 0.4, green: 0.35, blue: 0.78))
-                        .padding(15)
+                    // Assets were not bundled. Show a stable placeholder, not
+                    // a rapidly alternating placeholder/mascot.
+                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            .frame(width:size,height:size)
+            .frame(width: size, height: size)
         }
-        .accessibilityLabel("\(emotion) mood companion")
+        .onChange(of: emotion) { _, next in
+            lastEmotion = next
+            lastImage = UIImage(named: "\(next)_frame_000")
+        }
+        .onAppear {
+            lastEmotion = emotion
+            lastImage = frame(0)
+        }
+        .accessibilityLabel("\(mood) MoodPal")
     }
 }
