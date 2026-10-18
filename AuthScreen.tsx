@@ -52,8 +52,6 @@ export default function AuthScreen(){
    <Text style={s.welcomeTagline}>A kinder you,{'\n'}brighter days. 🌈</Text>
   </View>
   <View style={s.welcomeArt}>
-   <View style={s.welcomeGlowLeft}/>
-   <View style={s.welcomeGlowRight}/>
       <Image source={require('./assets/branding/moodpals-welcome.png')}
     style={{width:'100%',height:'100%'}} resizeMode="contain"
     accessibilityLabel="Purple and mint MoodPals smiling together"/>
