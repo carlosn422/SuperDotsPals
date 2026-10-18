@@ -35,7 +35,16 @@ struct ContentView: View {
    }
    .navigationBarTitleDisplayMode(.inline)
   }
-  .task {await sync.refresh(store:store)}
+  .task {
+   await sync.refresh(store:store)
+   // watchOS cannot rely on silent push for instant UI updates. Refresh only
+   // while the home screen is active; stop automatically in the background.
+   while !Task.isCancelled {
+    try? await Task.sleep(for:.seconds(30))
+    if Task.isCancelled {break}
+    if scenePhase == .active {await sync.refreshMood(store:store)}
+   }
+  }
   .onChange(of:scenePhase) {_,phase in
    if phase == .active {Task {await sync.refresh(store:store)}}
   }
