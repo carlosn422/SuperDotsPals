@@ -31,7 +31,7 @@ final class WatchThemeSync: ObservableObject {
             let response = try await request("/auth/v1/token?grant_type=password",method:"POST",body:payload,authenticated:false)
             try loadSession(response)
             connected = true
-            message = "Connected to Superdots."
+            message = "Connected to MoodPals."
             await refresh(store:store)
         } catch { message = "Sign-in failed: \(error.localizedDescription)" }
     }
@@ -166,7 +166,7 @@ final class WatchThemeSync: ObservableObject {
             pairingId=id;pairingSecret=secret
             pairingURL="superdots://pair?id=\(id)&secret=\(secret)"
             pairingActive=true
-            message="Scan with Superdots on your iPhone."
+            message="Scan with MoodPals on your iPhone."
         }catch{message="Pairing failed: \(error.localizedDescription)"}
     }
 
@@ -191,7 +191,7 @@ final class WatchThemeSync: ObservableObject {
                 let completed=try JSONSerialization.data(withJSONObject:["action":"complete","id":pairingId,"secret":pairingSecret])
                 _ = try? await request("/functions/v1/watch-pairing",method:"POST",body:completed)
                 pairingURL="";pairingSecret=""
-                message="Watch connected to your Superdots account."
+                message="Watch connected to your MoodPals account."
                 await refresh(store:store)
                 let remaining=3.0-Date().timeIntervalSince(started)
                 if remaining>0 {try? await Task.sleep(for:.seconds(remaining))}
@@ -289,12 +289,12 @@ struct WatchSyncView: View {
      Text(sync.message).font(.caption2).multilineTextAlignment(.center)
      Button("Continue") {dismiss()}
       .buttonStyle(.borderedProminent)
-      .tint(Color(red:0.43,green:0.32,blue:0.85))
+      .tint(Color(red:0.47,green:0.38,blue:0.91))
      Button("Sync again") {Task {await sync.refresh(store:store)}}.disabled(sync.busy)
      Button("Disconnect",role:.destructive){sync.signOut()}
     } else {
      Text("Link with iPhone").font(.headline)
-     Text("On your iPhone: Superdots → Settings → Connected Devices → Scan Apple Watch QR code")
+     Text("On your iPhone: MoodPals → Settings → Connected Devices → Scan Apple Watch QR code")
        .font(.caption2).multilineTextAlignment(.center)
      if let qrImageURL {
       AsyncImage(url:qrImageURL){phase in
