@@ -51,7 +51,7 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJo
  const primary=(label:string,onPress:()=>void,disabled=false)=><TouchableOpacity accessibilityRole="button" disabled={disabled||busy||loadingQuestions} onPress={onPress} style={{backgroundColor:color,paddingVertical:14,paddingHorizontal:16,borderRadius:13,alignItems:'center',opacity:disabled||busy?0.55:1}}><Text style={{color:'#fff',fontWeight:'800',fontSize:14}}>{label}</Text></TouchableOpacity>;
  const secondary=(label:string,onPress:()=>void)=><TouchableOpacity accessibilityRole="button" disabled={busy} onPress={onPress} style={{paddingVertical:13,paddingHorizontal:12,borderWidth:1,borderColor:'#ECE8F6',borderRadius:13,alignItems:'center'}}><Text style={{color:'#574780',fontWeight:'800',fontSize:13}}>{label}</Text></TouchableOpacity>;
  const option=(label:string,action:()=>void,selected=false)=><TouchableOpacity key={label} accessibilityRole="radio" accessibilityState={{selected}} onPress={action} style={{flexDirection:'row',alignItems:'center',minHeight:42,borderWidth:1,borderColor:selected?color:'#EDEAF2',backgroundColor:selected?'#F0ECFC':'#FFFFFF',borderRadius:13,paddingHorizontal:11,gap:8}}><View style={{width:16,height:16,borderRadius:8,borderWidth:1.5,borderColor:selected?color:'#C8C4D2',justifyContent:'center',alignItems:'center'}}>{selected?<View style={{width:8,height:8,borderRadius:4,backgroundColor:color}}/>:null}</View><Text style={{color:'#342B52',fontWeight:selected?'700':'500',fontSize:13}}>{label}</Text></TouchableOpacity>;
- return <View style={{backgroundColor:'#FFFFFF',paddingHorizontal:17,paddingTop:16,paddingBottom:17,borderRadius:22,gap:13}}>
+ return <View style={{backgroundColor:'#FFFFFF',paddingHorizontal:17,paddingTop:18,paddingBottom:20,borderRadius:28,gap:13}}>
   {step<3?<View style={{gap:8}}>
    <Text style={{fontSize:11,color:'#81799A',textAlign:'center'}}>Step {step+1} of 3</Text>
    <View style={{flexDirection:'row',gap:5}}>{[0,1,2].map(i=><View key={i} style={{height:4,borderRadius:3,flex:1,backgroundColor:step>=i?color:'#E8E5F0'}}/>)}</View>
@@ -60,12 +60,12 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJo
    <Text style={{fontSize:23,fontWeight:'900',color:'#251C45'}}>How are you feeling today?</Text>
    <Text style={{color:'#817892',fontSize:12}}>Choose the mood that best fits right now.</Text>
    <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
-    {moods.map(m=><TouchableOpacity key={m} accessibilityRole="radio" accessibilityState={{selected:mood===m}} onPress={()=>setMood(m)} style={{width:'48.7%',alignItems:'center',borderWidth:mood===m?1.5:1,borderColor:mood===m?color:'#EEEAF3',borderRadius:14,backgroundColor:mood===m?'#F3EFFD':'#F8F7FB',paddingVertical:8,gap:2}}>
-     <SuperdotMascot id={m} size={68}/>
-     <Text style={{fontWeight:'800',fontSize:12,color:'#352C56'}}>{m}</Text>
+    {moods.map(m=><TouchableOpacity key={m} accessibilityRole="radio" accessibilityState={{selected:mood===m}} onPress={()=>setMood(m)} style={{width:'48.7%',alignItems:'center',borderWidth:mood===m?1.5:1,borderColor:mood===m?color:'#EEEAF3',borderRadius:22,backgroundColor:mood===m?'#EEE8FF':'#FBF9FF',paddingVertical:13,gap:7}}>
+     <SuperdotMascot id={m} size={96}/>
+     <Text style={{fontWeight:'800',fontSize:15,color:'#26165C'}}>{m}</Text>
     </TouchableOpacity>)}
    </View>
-   {mood?<View style={{flexDirection:'row',alignItems:'center',padding:9,gap:10,backgroundColor:'#F8F6FC',borderRadius:13}}><SuperdotMascot id={mood} size={44}/><View style={{flex:1}}><Text style={{fontWeight:'800',color:'#332655',fontSize:13}}>{mood}</Text><Text style={{fontSize:11,color:'#817892'}}>This Superdot reflects your selected mood.</Text></View></View>:null}
+   {mood?<View style={{flexDirection:'row',alignItems:'center',padding:9,gap:10,backgroundColor:'#F8F6FC',borderRadius:13}}><SuperdotMascot id={mood} size={44}/><View style={{flex:1}}><Text style={{fontWeight:'800',color:'#332655',fontSize:13}}>{mood}</Text><Text style={{fontSize:11,color:'#817892'}}>Your MoodPal reflects how you feel.</Text></View></View>:null}
    {primary('Continue →',()=>changeStep(1),!mood)}
   </View>:null}
   {step===1?<View style={{gap:13,alignItems:'stretch'}}>
