@@ -1,6 +1,6 @@
 import SwiftUI
 
-private let violet=Color(red:0.43,green:0.32,blue:0.85)
+private let violet=Color(red:0.47,green:0.38,blue:0.91)
 private let moodNames=["Joyful","Calm","Sad","Angry","Anxious","Tired"]
 private func displayMood(_ value:String) -> String {
  let mood=value.trimmingCharacters(in:.whitespacesAndNewlines)
@@ -25,7 +25,7 @@ struct WatchCheckIn:View {
   ScrollView {
    VStack(spacing:10) {
     if !sync.connected {
-     Text("Connect your Superdots account first to save a check-in.").font(.caption)
+     Text("Connect your MoodPals account first to save a check-in.").font(.caption)
     } else if phase==0 {
      Text("How do you feel?").font(.headline)
      LazyVGrid(columns:[GridItem(.flexible()),GridItem(.flexible())],spacing:7) {
@@ -98,7 +98,7 @@ struct WatchCheckIn:View {
   loading=true;errorMessage=""
   do {
    questions=try await sync.questions(for:mood)
-   if questions.isEmpty { throw NSError(domain:"Superdots",code:1,userInfo:[NSLocalizedDescriptionKey:"No questions available"]) }
+   if questions.isEmpty { throw NSError(domain:"MoodPals",code:1,userInfo:[NSLocalizedDescriptionKey:"No questions available"]) }
    answers=[:];index=0;phase=1
   }catch {errorMessage=error.localizedDescription}
   loading=false
