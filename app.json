@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Superdots",
+    "name": "MoodPals",
     "slug": "superdotspals",
     "scheme": "wellnest",
     "version": "1.0.0",
@@ -11,10 +11,10 @@
       "bundleIdentifier": "com.superdotspals.wellnest",
       "appleTeamId": "Y355786FS4",
       "infoPlist": {
-        "NSHealthShareUsageDescription": "Allow Superdots to read heart rate variability, resting heart rate, steps and sleep when you choose to sync health data.",
-        "NSCameraUsageDescription": "Allow Superdots to scan your Apple Watch pairing QR code.",
+        "NSHealthShareUsageDescription": "Allow MoodPals to read heart rate variability, resting heart rate, steps and sleep when you choose to sync health data.",
+        "NSCameraUsageDescription": "Allow MoodPals to scan your Apple Watch pairing QR code.",
         "ITSAppUsesNonExemptEncryption": false,
-        "NSHealthUpdateUsageDescription": "Superdots reads your health data for wellness insights and does not write to Apple Health."
+        "NSHealthUpdateUsageDescription": "MoodPals reads your health data for wellness insights and does not write to Apple Health."
       }
     },
     "android": {
@@ -32,7 +32,7 @@
       [
         "@appeeky/expo-healthkit",
         {
-          "healthSharePermission": "Allow Superdots to read heart rate variability, resting heart rate, steps and sleep with your permission.",
+          "healthSharePermission": "Allow MoodPals to read heart rate variability, resting heart rate, steps and sleep with your permission.",
           "healthUpdatePermission": false,
           "isBackgroundDeliveryEnabled": false,
           "healthConnectPermissions": [
@@ -50,7 +50,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Superdots to scan an Apple Watch pairing QR code."
+          "cameraPermission": "Allow MoodPals to scan an Apple Watch pairing QR code."
         }
       ],
       "@bacons/apple-targets",
