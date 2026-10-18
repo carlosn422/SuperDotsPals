@@ -3,6 +3,7 @@ import {Animated,AccessibilityInfo} from 'react-native';
 import Svg,{Defs,LinearGradient,Stop,Path,Ellipse,Circle,G} from 'react-native-svg';
 
 const PALETTE={
+ buddy:{light:'#E5C5FF',main:'#B994FF',deep:'#9272E6',face:'#4C266D',cheek:'#F8B6E9'},
  joyful:{light:'#FFF5AC',main:'#FFD45D',deep:'#FFB94E',face:'#4C204C',cheek:'#FFABC1'},
  calm:{light:'#D0FFE0',main:'#76E8C4',deep:'#40C7BB',face:'#244C57',cheek:'#80EFC2'},
  sad:{light:'#C5E5FF',main:'#78B8FF',deep:'#5086FF',face:'#243769',cheek:'#FFBDD7'},
@@ -13,6 +14,7 @@ const PALETTE={
 type Mood=keyof typeof PALETTE;
 function resolveMood(id:string):Mood {
  const x=(id||'').toLowerCase();
+ if(/buddy|purple-pal/.test(x))return 'buddy';
  if(/sad|down|cry/.test(x))return 'sad';
  if(/angry|anger|mad|frustrat/.test(x))return 'angry';
  if(/anxious|fear|worr|stress|overwhelm/.test(x))return 'anxious';
@@ -36,8 +38,8 @@ export default function MoodPalMascot({id='calm',size=102,animate=true}:{id?:str
   return()=>{alive=false;loop?.stop();pulse.setValue(0)};
  },[animate,pulse]);
  const scale=pulse.interpolate({inputRange:[0,1],outputRange:[1,1.012]});
- const closed=mood==='joyful'||mood==='calm'||mood==='tired';
- const mouth=mood==='joyful'?'M 75 86 Q 90 105 105 86 Z':mood==='calm'?'M 81 88 Q 90 96 99 88':mood==='sad'?'M 78 98 Q 90 83 102 98':mood==='angry'?'M 79 95 Q 90 82 101 95':mood==='anxious'?'M 79 94 Q 84 85 90 94 Q 96 85 101 94':'M 87 88 Q 90 96 94 88';
+ const closed=mood==='joyful'||mood==='buddy'||mood==='calm'||mood==='tired';
+ const mouth=mood==='buddy'?'M 81 85 Q 90 98 99 85':mood==='joyful'?'M 75 86 Q 90 105 105 86 Z':mood==='calm'?'M 81 88 Q 90 96 99 88':mood==='sad'?'M 78 98 Q 90 83 102 98':mood==='angry'?'M 79 95 Q 90 82 101 95':mood==='anxious'?'M 79 94 Q 84 85 90 94 Q 96 85 101 94':'M 87 88 Q 90 96 94 88';
  return <Animated.View accessibilityLabel={mood+' MoodPal mascot'} style={{width:size,height:size,transform:[{scale}]}}>
   <Svg width={size} height={size} viewBox="0 0 180 180">
    <Defs><LinearGradient id="palBody" x1="0" y1="0" x2="0.9" y2="1"><Stop offset="0" stopColor={p.light}/><Stop offset=".52" stopColor={p.main}/><Stop offset="1" stopColor={p.deep}/></LinearGradient><LinearGradient id="palFoot" x1="0" y1="0" x2="0.7" y2="1"><Stop offset="0" stopColor={p.light}/><Stop offset="1" stopColor={p.deep}/></LinearGradient></Defs>
