@@ -70,6 +70,19 @@ final class WatchThemeSync: ObservableObject {
         } catch { message = "Sync failed: \(error.localizedDescription)" }
     }
 
+    // Small foreground-only mood fetch: no Gemini calls, health query or notification cost.
+    func refreshMood(store: WatchStore) async {
+        guard connected, !busy else { return }
+        do {
+            try await renewIfNeeded()
+            let data = try await request("/rest/v1/wellness_journal?select=mood,occurred_at&user_id=eq.\\(userId)&mood=not.is.null&order=occurred_at.desc&limit=1",method:"GET")
+            let rows = try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
+            if let mood = rows.first?["mood"] as? String { store.currentMood = mood }
+        } catch {
+            // Retain the most recently known mood while offline.
+        }
+    }
+
     func signOut() {
         for key in ["watch_access","watch_refresh","watch_user","watch_pairing_id"] { storeSecret(nil,for:key) }
         accessToken = ""; refreshToken = ""; userId = ""; pairingId = ""; pairingSecret = ""; pairingURL = ""; pairingActive = false; pairingConnecting = false; connected = false
