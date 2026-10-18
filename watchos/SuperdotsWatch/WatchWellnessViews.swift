@@ -169,20 +169,83 @@ struct WatchMoodInsights:View {
  @ObservedObject var sync:WatchThemeSync
  @State private var entries:[[String:Any]]=[]
  @State private var message=""
+ @State private var selectedDate=Date()
+ @State private var showingCalendar=false
+ private let calendar=Calendar.current
+
+ private var dailyEntries:[[String:Any]] {
+  entries.filter { entry in
+   guard let raw=entry["occurred_at"] as? String,
+         let date=parseDate(raw) else {return false}
+   return calendar.isDate(date,inSameDayAs:selectedDate)
+  }
+ }
+ private func parseDate(_ text:String)->Date? {
+  let fractional=ISO8601DateFormatter()
+  fractional.formatOptions=[.withInternetDateTime,.withFractionalSeconds]
+  if let date=fractional.date(from:text) {return date}
+  let plain=ISO8601DateFormatter()
+  return plain.date(from:text)
+ }
+ private var isToday:Bool {calendar.isDateInToday(selectedDate)}
+
  var body:some View {
-  ScrollView {VStack(alignment:.leading,spacing:8) {
-   Text("Recent feelings").font(.headline)
-   if entries.isEmpty {Text(message.isEmpty ? "No check-ins yet":message).font(.caption)}
-   ForEach(Array(entries.enumerated()),id:\.offset){_,entry in
+  ScrollView(.vertical) {
+   VStack(alignment:.leading,spacing:10) {
     HStack {
-     AnimatedMoodMascot(mood:displayMood(entry["mood"] as? String ?? "Calm"),size:32,isActive:false)
-     Text(displayMood(entry["mood"] as? String ?? "Mood")).font(.caption).fixedSize(horizontal:false,vertical:true)
-     Spacer()
-     Text(String((entry["occurred_at"] as? String ?? "").prefix(10))).font(.system(size:9)).foregroundStyle(.secondary)
+     Text(isToday ? "Today" : selectedDate.formatted(.dateTime.month(.abbreviated).day()))
+      .font(.headline)
+     Spacer(minLength:3)
+     Button { showingCalendar.toggle() } label: {
+      Image(systemName:"calendar")
+       .font(.system(size:15,weight:.semibold))
+       .foregroundStyle(.white)
+     }
+     .buttonStyle(.plain)
+     .accessibilityLabel("Choose a date")
+    }
+    Text("Swipe sideways to choose a date")
+     .font(.system(size:10)).foregroundStyle(.secondary)
+    if showingCalendar {
+     DatePicker("View date",selection:$selectedDate,in:...Date(),displayedComponents:.date)
+      .datePickerStyle(.compact)
+      .labelsHidden()
+      .tint(violet)
+     Button("Done"){showingCalendar=false}
+      .font(.caption2)
+    }
+    if dailyEntries.isEmpty {
+     Text(message.isEmpty ? "No feelings recorded for this day." : message)
+      .font(.caption).foregroundStyle(.secondary)
+      .fixedSize(horizontal:false,vertical:true)
+    }
+    ForEach(Array(dailyEntries.enumerated()),id:\.offset){_,entry in
+     HStack(spacing:9) {
+      AnimatedMoodMascot(mood:displayMood(entry["mood"] as? String ?? "Calm"),size:34,isActive:false)
+      Text(displayMood(entry["mood"] as? String ?? "Mood"))
+       .font(.system(size:14,weight:.medium))
+       .fixedSize(horizontal:false,vertical:true)
+      Spacer(minLength:2)
+      if let raw=entry["occurred_at"] as? String,let date=parseDate(raw) {
+       Text(date,format:.dateTime.hour().minute())
+        .font(.system(size:9)).foregroundStyle(.secondary)
+      }
+     }
+     .padding(.vertical,3)
     }
    }
-  }}.navigationTitle("Insights").task {
-   do{entries=try await sync.moodHistory()}catch{message=error.localizedDescription}
+   .padding(.horizontal,5)
+  }
+  .simultaneousGesture(DragGesture(minimumDistance:28).onEnded { motion in
+   if abs(motion.translation.width)>55 &&
+      abs(motion.translation.width)>abs(motion.translation.height)*1.5 {
+    showingCalendar=true
+   }
+  })
+  .navigationTitle("Insights")
+  .task {
+   do {entries=try await sync.moodHistory()}
+   catch {message=error.localizedDescription}
   }
  }
 }
