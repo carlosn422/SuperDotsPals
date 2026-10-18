@@ -1,3 +1,4 @@
+import WatchKit
 import SwiftUI
 import Security
 
@@ -70,17 +71,20 @@ final class WatchThemeSync: ObservableObject {
         } catch { message = "Sync failed: \(error.localizedDescription)" }
     }
 
-    // Small foreground-only mood fetch: no Gemini calls, health query or notification cost.
+    // Poll only when the app is active. WatchKit cannot deliver a reliable
+    // always-on custom watch-face refresh; real background push requires APNs.
     func refreshMood(store: WatchStore) async {
         guard connected, !busy else { return }
         do {
             try await renewIfNeeded()
-            let data = try await request("/rest/v1/wellness_journal?select=mood,occurred_at&user_id=eq.\\(userId)&mood=not.is.null&order=occurred_at.desc&limit=1",method:"GET")
+            let data = try await request("/rest/v1/wellness_journal?select=mood,occurred_at&user_id=eq.\(userId)&mood=not.is.null&order=occurred_at.desc&limit=1",method:"GET")
             let rows = try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
-            if let mood = rows.first?["mood"] as? String { store.currentMood = mood }
+            if let mood = rows.first?["mood"] as? String, mood != store.currentMood {
+                store.currentMood = mood
+                WKInterfaceDevice.current().play(.notification)
+            }
         } catch {
-            message = "Mood refresh failed: \\(error.localizedDescription)"
-            // Keep the previously displayed mood while offline.
+            // Keep the last displayed mood when offline.
         }
     }
 
