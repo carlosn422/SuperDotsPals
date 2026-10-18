@@ -10,7 +10,7 @@ struct ContentView: View {
  var body: some View {
   NavigationStack {
    ScrollView {
-    VStack(spacing:10) {
+    VStack(spacing:14) {
      if !sync.connected {
       AnimatedMoodMascot(mood:"Calm",size:mascotSize,isActive:scenePhase == .active)
       wellnessTrack(score:nil)
@@ -35,7 +35,9 @@ struct ContentView: View {
       } else {
        wellnessTrack(score:nil)
       }
-      Text("How are you feeling today?").font(.headline).multilineTextAlignment(.center)
+      Text("How are you feeling today?")
+       .font(.headline).multilineTextAlignment(.center)
+       .padding(.top,18)
       NavigationLink {WatchCheckIn(sync:sync)} label: {
        Label("Check In",systemImage:"heart.text.square.fill").frame(maxWidth:.infinity)
       }.buttonStyle(.borderedProminent).tint(purple)
@@ -48,6 +50,17 @@ struct ContentView: View {
       }
      }
     }.padding(.horizontal,4)
+   }
+   .safeAreaInset(edge:.bottom,spacing:0) {
+    // Keep the scroll hint visible on every watch size without covering content.
+    Image(systemName:"chevron.down")
+     .font(.system(size:12,weight:.bold))
+     .foregroundStyle(.white.opacity(0.7))
+     .frame(maxWidth:.infinity)
+     .padding(.top,5)
+     .padding(.bottom,2)
+     .background(.black.opacity(0.88))
+     .accessibilityLabel("Scroll down for more options")
    }
    .navigationBarTitleDisplayMode(.inline)
   }
