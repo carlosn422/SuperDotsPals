@@ -4,14 +4,31 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import SuperdotMascot from './SuperdotMascot';
 import {APP_THEME} from './MoodMascot';
 import {supabase} from './supabase';
-import HealthDataPanel,{HealthMiniStats} from './HealthDataPanel';
+import HealthDataPanel,{HealthMiniStats,useSavedHealth} from './HealthDataPanel';
 import RecoveryInsights from './RecoveryInsights';
 import HealthTrendOverview from './HealthTrendOverview';
 
 const P=APP_THEME.primary,INK=APP_THEME.ink,MUTED=APP_THEME.muted;
 type Props={companion:string;accent:string;onPress?:()=>void};
 export function PageHero({title,highlight,detail,companion,accent,onPress,button}:{title:string;highlight:string;detail:string;companion:string;accent:string;onPress?:()=>void;button?:string}){
- return <View style={[s.hero,{flexDirection:'column',alignItems:'stretch',gap:15}]}><View style={{flexDirection:'row',alignItems:'center',gap:8}}><View style={{flex:1,gap:9,zIndex:1}}><Text style={s.heroTitle}>{title}{'\n'}<Text style={{color:accent}}>{highlight}</Text></Text><Text style={s.heroText}>{detail}</Text></View><View style={{width:128,alignItems:'center',justifyContent:'center'}}><SuperdotMascot id={companion} color={accent} size={135}/></View></View>{button?<TouchableOpacity accessibilityRole="button" onPress={onPress} style={[s.heroButton,{backgroundColor:accent}]}><Text style={{fontWeight:'900',fontSize:17,color:'#fff'}}>{button}  →</Text></TouchableOpacity>:null}</View>
+ const {latest,loading}=useSavedHealth();
+ const hrv=latest('hrv');
+ const valid=hrv&&Number.isFinite(hrv.value)&&hrv.value>=0&&!Number.isNaN(Date.parse(hrv.recorded_at));
+ const updated=valid?new Date(hrv.recorded_at).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):null;
+ return <View style={[s.hero,{flexDirection:'column',alignItems:'stretch',gap:15}]}>
+  <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
+   <View style={{flex:1,gap:9,zIndex:1}}>
+    <Text style={s.heroTitle}>{title}{'\n'}<Text style={{color:accent}}>{highlight}</Text></Text>
+    <Text style={s.heroText}>{detail}</Text>
+   </View>
+   <View style={{width:138,alignItems:'center',justifyContent:'center',gap:3}}>
+    <SuperdotMascot id={companion} color={accent} size={128}/>
+    <Text style={{fontSize:14,fontWeight:'900',color:accent}}>{valid?`HRV · ${Math.round(hrv.value)} ms`:'HRV · — ms'}</Text>
+    <Text style={{fontSize:9,color:MUTED,textAlign:'center'}}>{updated?`Last read ${updated}`:loading?'Loading Apple Health…':'No synced HRV reading'}</Text>
+   </View>
+  </View>
+  {button?<TouchableOpacity accessibilityRole="button" onPress={onPress} style={[s.heroButton,{backgroundColor:accent}]}><Text style={{fontWeight:'900',fontSize:17,color:'#fff'}}>{button}  →</Text></TouchableOpacity>:null}
+ </View>;
 }
 export function BrandHead({companion}:{companion:string}){return <View style={s.brand}><SuperdotMascot id={companion} color={P} size={41}/><Text style={s.brandWord}>Super<Text style={{color:P}}>dots.</Text></Text><View style={{flex:1}}/><SuperdotMascot id={companion} color={P} size={37}/></View>}
 export function SectionHeading({title,detail}:{title:string;detail?:string}){return <View style={s.heading}><Text style={s.headingText}>{title}</Text>{detail?<Text style={s.headingDetail}>{detail}</Text>:null}</View>}
