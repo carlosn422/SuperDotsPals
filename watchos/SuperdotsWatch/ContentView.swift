@@ -4,13 +4,15 @@ struct ContentView: View {
  @EnvironmentObject var store: WatchStore
  @StateObject private var sync = WatchThemeSync()
  @Environment(\.scenePhase) private var scenePhase
+ @State private var contentBottom: CGFloat = .greatestFiniteMagnitude
  private let purple = Color(red:0.43,green:0.32,blue:0.85)
  private let mascotSize: CGFloat = 105 // Joyful is the canonical mascot display size.
 
  var body: some View {
   NavigationStack {
-   ScrollView {
-    VStack(spacing:14) {
+   GeometryReader { viewport in
+    ScrollView {
+     VStack(spacing:14) {
      if !sync.connected {
       AnimatedMoodMascot(mood:"Calm",size:mascotSize,isActive:scenePhase == .active)
       wellnessTrack(score:nil)
@@ -49,18 +51,28 @@ struct ContentView: View {
        Label("Account & sync",systemImage:"person.crop.circle")
       }
      }
-    }.padding(.horizontal,4)
-   }
-   .safeAreaInset(edge:.bottom,spacing:0) {
-    // Keep the scroll hint visible on every watch size without covering content.
-    Image(systemName:"chevron.down")
-     .font(.system(size:12,weight:.bold))
-     .foregroundStyle(.white.opacity(0.7))
-     .frame(maxWidth:.infinity)
-     .padding(.top,5)
-     .padding(.bottom,2)
-     .background(.black.opacity(0.88))
-     .accessibilityLabel("Scroll down for more options")
+     }.padding(.horizontal,4)
+      .background(alignment:.bottom) {
+       GeometryReader { marker in
+        Color.clear.preference(key: WatchContentBottomKey.self,
+         value:marker.frame(in:.named("wellnessScroll")).maxY)
+       }
+      }
+    }
+    .coordinateSpace(name:"wellnessScroll")
+    .onPreferenceChange(WatchContentBottomKey.self) { contentBottom = $0 }
+    .overlay(alignment:.bottom) {
+     if contentBottom > viewport.size.height + 8 {
+      Image(systemName:"chevron.down")
+       .font(.system(size:12,weight:.bold))
+       .foregroundStyle(.white.opacity(0.85))
+       .padding(5)
+       .background(.black.opacity(0.75),in:Circle())
+       .padding(.bottom,2)
+       .allowsHitTesting(false)
+       .accessibilityLabel("Scroll down for more options")
+     }
+    }
    }
    .navigationBarTitleDisplayMode(.inline)
   }
@@ -81,4 +93,9 @@ struct ContentView: View {
    }
   }.frame(height:16).accessibilityLabel(score == nil ? "Wellness meter awaiting data" : "Estimated wellness meter")
  }
+}
+
+private struct WatchContentBottomKey: PreferenceKey {
+ static var defaultValue: CGFloat = .greatestFiniteMagnitude
+ static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
