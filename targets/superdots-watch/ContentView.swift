@@ -18,6 +18,19 @@ struct ContentView: View {
       }.buttonStyle(.borderedProminent).tint(purple)
      } else {
       AnimatedMoodMascot(mood:store.wellnessMood,size:mascotSize,isActive:scenePhase == .active)
+      VStack(spacing:2) {
+       if let hrv=store.latestHRV, hrv.isFinite, hrv >= 0 {
+        Text("HRV · \\(Int(hrv.rounded())) ms")
+         .font(.headline).foregroundStyle(purple)
+        if let measuredAt=store.hrvHistory.max(by: { $0.date < $1.date })?.date {
+         Text("Last read \\(measuredAt, format:.dateTime.month(.abbreviated).day().hour().minute())")
+          .font(.system(size:9)).foregroundStyle(.secondary)
+        }
+       } else {
+        Text("HRV · — ms").font(.headline).foregroundStyle(.secondary)
+        Text("No synced HRV reading").font(.system(size:9)).foregroundStyle(.secondary)
+       }
+      }
       if let score=store.strainScore {
        VStack(spacing:5) {
         HStack {
