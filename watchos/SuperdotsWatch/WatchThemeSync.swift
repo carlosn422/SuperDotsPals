@@ -9,6 +9,7 @@ final class WatchThemeSync: ObservableObject {
     @Published var busy = false
     @Published var moodLoaded = false
     @Published var sessionVerified = false
+    @Published var needsReconnect = false
     @Published var syncWarning: String? = nil
     @Published var message = "Connect your account to sync mood and health readings."
     private let base = URL(string: "https://hzoauxxpvrgahlavxmvp.supabase.co")!
@@ -52,8 +53,16 @@ final class WatchThemeSync: ObservableObject {
                 throw SyncError.badResponse
             }
             sessionVerified = true
+            needsReconnect = false
         } catch {
             sessionVerified = false
+            if case SyncError.server(400, _, let detail) = error,
+               detail.contains("refresh_token_not_found") {
+                needsReconnect = true
+                message = "Session expired. Reconnect using a new QR code."
+                NSLog("[WatchSync] Stored refresh token expired; new pairing required")
+                return
+            }
             syncWarning = "Account verification failed: \(error.localizedDescription)"
             message = syncWarning ?? "Account verification failed"
             NSLog("[WatchSync] Auth verification failed: %@", error.localizedDescription)
@@ -124,7 +133,7 @@ final class WatchThemeSync: ObservableObject {
 
     func signOut() {
         for key in ["watch_access","watch_refresh","watch_user","watch_pairing_id"] { storeSecret(nil,for:key) }
-        accessToken = ""; refreshToken = ""; userId = ""; pairingId = ""; pairingSecret = ""; pairingURL = ""; pairingActive = false; pairingConnecting = false; connected = false; moodLoaded = false; sessionVerified = false; syncWarning = nil
+        accessToken = ""; refreshToken = ""; userId = ""; pairingId = ""; pairingSecret = ""; pairingURL = ""; pairingActive = false; pairingConnecting = false; connected = false; moodLoaded = false; sessionVerified = false; needsReconnect = false; syncWarning = nil
         message = "Disconnected. Your watch will show local defaults."
     }
 
@@ -201,6 +210,7 @@ final class WatchThemeSync: ObservableObject {
             guard let obj=try JSONSerialization.jsonObject(with:data) as? [String:Any],
               let id=obj["id"] as? String,let secret=obj["secret"] as? String else {throw SyncError.badResponse}
             pairingId=id;pairingSecret=secret
+            pairingConnecting=false
             pairingURL="superdots://pair?id=\(id)&secret=\(secret)"
             pairingActive=true
             message="Scan with MoodPals on your iPhone."
@@ -223,6 +233,8 @@ final class WatchThemeSync: ObservableObject {
                 let session=try await request("/auth/v1/verify",method:"POST",body:verify,authenticated:false)
                 try loadSession(session)
                 connected=true
+                sessionVerified=true
+                needsReconnect=false
                 storeSecret(pairingId,for:"watch_pairing_id")
                 pairingActive=false
                 let completed=try JSONSerialization.data(withJSONObject:["action":"complete","id":pairingId,"secret":pairingSecret])
@@ -234,7 +246,10 @@ final class WatchThemeSync: ObservableObject {
                 if remaining>0 {try? await Task.sleep(for:.seconds(remaining))}
                 pairingConnecting=false
             }
-        }catch{message="Waiting for connection: \(error.localizedDescription)"}
+        }catch{
+            pairingConnecting=false
+            message="Pairing still pending: \(error.localizedDescription)"
+        }
     }
 
     private func renewIfNeeded() async throws {
@@ -323,14 +338,18 @@ struct WatchSyncView: View {
     if sync.pairingConnecting {
      ProgressView().controlSize(.large).tint(.purple)
      Text("Connecting Apple Watch…").font(.headline).multilineTextAlignment(.center)
-    } else if sync.connected {
-     Image(systemName:"checkmark.circle.fill").font(.largeTitle).foregroundStyle(.green)
-     Text(sync.sessionVerified ? "Account verified" : "Account saved · checking").font(.headline)
+    } else if sync.connected && !sync.pairingActive {
+     Image(systemName:sync.needsReconnect ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+       .font(.largeTitle).foregroundStyle(sync.needsReconnect ? .orange : .green)
+     Text(sync.needsReconnect ? "Session expired" : (sync.sessionVerified ? "Account verified" : "Account saved · checking")).font(.headline)
      Text(sync.message).font(.caption2).multilineTextAlignment(.center)
-     Button("Continue") {dismiss()}
-      .buttonStyle(.borderedProminent)
-      .tint(Color(red:0.47,green:0.38,blue:0.91))
-     Button("Sync again") {Task {await sync.refresh(store:store)}}.disabled(sync.busy)
+     if sync.needsReconnect {
+       Button("Reconnect iPhone") {Task {await sync.startPairing()}}
+        .buttonStyle(.borderedProminent).tint(Color(red:0.47,green:0.38,blue:0.91))
+     } else {
+       Button("Continue") {dismiss()}.buttonStyle(.borderedProminent)
+       Button("Sync again") {Task {await sync.refresh(store:store)}}.disabled(sync.busy)
+     }
      Button("Disconnect",role:.destructive){sync.signOut()}
     } else {
      Text("Link with iPhone").font(.headline)
@@ -358,7 +377,7 @@ struct WatchSyncView: View {
   }.navigationTitle("Connected devices")
    .task {
     if !sync.connected && !sync.pairingActive {await sync.startPairing()}
-    while !Task.isCancelled && !sync.connected && sync.pairingActive {
+    while !Task.isCancelled && sync.pairingActive {
      await sync.pollPairing(store:store)
      try? await Task.sleep(for:.seconds(3))
     }
