@@ -375,7 +375,7 @@ struct WatchSyncView: View {
     if sync.busy {ProgressView()}
    }
   }.navigationTitle("Connected devices")
-   .task {
+   .task(id: sync.pairingActive) {
     if !sync.connected && !sync.pairingActive {await sync.startPairing()}
     while !Task.isCancelled && sync.pairingActive {
      await sync.pollPairing(store:store)
