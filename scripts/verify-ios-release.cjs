@@ -4,6 +4,9 @@
 // silently drop keys from Expo config or the apple-targets watch target.
 const fs=require('node:fs'),path=require('node:path'),cp=require('node:child_process');
 const root=path.resolve(__dirname,'..');
+// Always regenerate watch artwork from the exact iPhone frames before release.
+// Prevents older watch asset catalogs from silently shipping different mascots.
+cp.execFileSync('python3',[path.join(root,'scripts','sync_watch_mascots.py')],{stdio:'inherit'});
 const ios=path.join(root,'ios');
 if(!fs.existsSync(ios)){console.log('Skipping plist validation: native iOS project not generated yet.');process.exit(0)}
 const exec=(args)=>cp.execFileSync('/usr/libexec/PlistBuddy',args,{encoding:'utf8',stdio:['ignore','pipe','pipe']});
