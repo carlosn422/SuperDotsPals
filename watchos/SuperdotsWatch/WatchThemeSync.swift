@@ -1,5 +1,6 @@
 import SwiftUI
 import Security
+import WatchKit
 
 /// Authenticated direct sync for the standalone watchOS prototype.
 /// The publishable key is public; tokens are stored in the user's Keychain.
@@ -59,6 +60,7 @@ final class WatchThemeSync: ObservableObject {
             if case SyncError.server(400, _, let detail) = error,
                detail.contains("refresh_token_not_found") {
                 needsReconnect = true
+                connected = false
                 message = "Session expired. Reconnect using a new QR code."
                 NSLog("[WatchSync] Stored refresh token expired; new pairing required")
                 return
@@ -205,11 +207,12 @@ final class WatchThemeSync: ObservableObject {
         busy=true
         defer {busy=false}
         do {
-            let body=try JSONSerialization.data(withJSONObject:["action":"start","deviceName":"Apple Watch"])
+            let body=try JSONSerialization.data(withJSONObject:["action":"start","deviceName":WKInterfaceDevice.current().name.isEmpty ? "Apple Watch" : WKInterfaceDevice.current().name])
             let data=try await request("/functions/v1/watch-pairing",method:"POST",body:body,authenticated:false)
             guard let obj=try JSONSerialization.jsonObject(with:data) as? [String:Any],
               let id=obj["id"] as? String,let secret=obj["secret"] as? String else {throw SyncError.badResponse}
             pairingId=id;pairingSecret=secret
+            needsReconnect=false
             pairingConnecting=false
             pairingURL="superdots://pair?id=\(id)&secret=\(secret)"
             pairingActive=true
@@ -336,8 +339,8 @@ struct WatchSyncView: View {
   ScrollView {
    VStack(spacing:12) {
     if sync.pairingConnecting {
-     ProgressView().controlSize(.large).tint(.purple)
-     Text("Connecting Apple Watch…").font(.headline).multilineTextAlignment(.center)
+     ProgressView().controlSize(.small).tint(.purple)
+     Text("Connecting…").font(.caption).multilineTextAlignment(.center)
     } else if sync.connected && !sync.pairingActive {
      Image(systemName:sync.needsReconnect ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
        .font(.largeTitle).foregroundStyle(sync.needsReconnect ? .orange : .green)
@@ -352,9 +355,9 @@ struct WatchSyncView: View {
      }
      Button("Disconnect",role:.destructive){sync.signOut()}
     } else {
-     Text("Link with iPhone").font(.headline)
-     Text("On your iPhone: MoodPals → Settings → Connected Devices → Scan Apple Watch QR code")
-       .font(.caption2).multilineTextAlignment(.center)
+     Text("Pair with iPhone").font(.headline)
+     Text("MoodPals → Devices → Scan")
+       .font(.system(size:10)).foregroundStyle(.secondary).multilineTextAlignment(.center)
      if let qrImageURL {
       AsyncImage(url:qrImageURL){phase in
        switch phase {
@@ -362,7 +365,7 @@ struct WatchSyncView: View {
        case .failure: Image(systemName:"exclamationmark.triangle").foregroundStyle(.orange)
        default: ProgressView()
        }
-      }.frame(width:150,height:150).padding(6).background(.white,in:RoundedRectangle(cornerRadius:8))
+      }.frame(width:118,height:118).padding(4).background(.white,in:RoundedRectangle(cornerRadius:8))
      }
      if !sync.pairingActive {
       Button("Show linking QR"){Task {await sync.startPairing()}}
@@ -370,13 +373,13 @@ struct WatchSyncView: View {
       Text("Code expires in 5 minutes").font(.system(size:10)).foregroundStyle(.secondary)
       Button("New QR code"){Task {await sync.startPairing()}}
      }
-     Text(sync.message).font(.caption2).multilineTextAlignment(.center)
+     if !sync.pairingActive { Text(sync.message).font(.caption2).multilineTextAlignment(.center) }
     }
     if sync.busy {ProgressView()}
    }
-  }.navigationTitle("Connected devices")
+  }.navigationTitle("Pair Watch")
    .task(id: sync.pairingActive) {
-    if !sync.connected && !sync.pairingActive {await sync.startPairing()}
+    if (!sync.connected || sync.needsReconnect) && !sync.pairingActive {await sync.startPairing()}
     while !Task.isCancelled && sync.pairingActive {
      await sync.pollPairing(store:store)
      try? await Task.sleep(for:.seconds(3))
