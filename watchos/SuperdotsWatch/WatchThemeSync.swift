@@ -41,7 +41,7 @@ final class WatchThemeSync: ObservableObject {
     }
 
     func refresh(store: WatchStore) async {
-        guard connected else { return }
+        guard connected, !busy else { return }
         busy = true
         defer { busy = false }
         syncWarning = nil
@@ -57,8 +57,10 @@ final class WatchThemeSync: ObservableObject {
             needsReconnect = false
         } catch {
             sessionVerified = false
-            if case SyncError.server(400, _, let detail) = error,
-               detail.contains("refresh_token_not_found") {
+            if case SyncError.server(let status, let endpoint, let detail) = error,
+               endpoint.contains("/auth/v1/token"),
+               (status == 400 || status == 401),
+               (detail.contains("refresh_token_not_found") || detail.contains("invalid_grant") || detail.contains("Invalid Refresh Token")) {
                 needsReconnect = true
                 connected = false
                 message = "Session expired. Reconnect using a new QR code."
