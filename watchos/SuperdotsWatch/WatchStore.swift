@@ -71,13 +71,7 @@ final class WatchStore: ObservableObject {
 
     // Use existing animated mascot frames. This describes physiological signals,
     // not an inferred emotional mood or a medical diagnosis.
-    var wellnessMood: String {
-        guard let score = strainScore else { return currentMood }
-        if score < 30 { return "Joyful" }
-        if score < 60 { return "Calm" }
-        if score < 80 { return "Anxious" }
-        return "Overwhelmed"
-    }
+    var wellnessMood: String { currentMood }
 
     init() {
         companion = .bloop
