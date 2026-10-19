@@ -92,6 +92,7 @@ final class WatchThemeSync: ObservableObject {
             let data = try await request("/rest/v1/wellness_journal?select=mood,occurred_at&user_id=eq.\(userId)&mood=not.is.null&order=occurred_at.desc&limit=1",method:"GET")
             let rows = try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
             let savedMood = (rows.first?["mood"] as? String) ?? store.currentMood
+            NSLog("[WatchSync] Latest mood from account: %@", savedMood)
             store.currentMood = ["disgust","disgusted"].contains(savedMood.lowercased()) ? "Calm" : savedMood
             moodLoaded = true
         } catch {
@@ -246,7 +247,8 @@ final class WatchThemeSync: ObservableObject {
                 _ = try? await request("/functions/v1/watch-pairing",method:"POST",body:completed)
                 pairingURL="";pairingSecret=""
                 message="Watch connected to your MoodPals account."
-                await refresh(store:store)
+                // The root view owns refreshing after the pairing screen disappears.
+                // Refreshing here inherits cancellation from the QR polling task.
                 let remaining=3.0-Date().timeIntervalSince(started)
                 if remaining>0 {try? await Task.sleep(for:.seconds(remaining))}
                 pairingConnecting=false
