@@ -8,6 +8,8 @@ final class WatchThemeSync: ObservableObject {
     @Published var connected = false
     @Published var busy = false
     @Published var moodLoaded = false
+    @Published var sessionVerified = false
+    @Published var syncWarning: String? = nil
     @Published var message = "Connect your account to sync mood and health readings."
     private let base = URL(string: "https://hzoauxxpvrgahlavxmvp.supabase.co")!
     private let publishableKey = "sb_publishable_pPPqosRo1SqwrbW-8MWURA_UxTED6Vs"
@@ -40,54 +42,89 @@ final class WatchThemeSync: ObservableObject {
         guard connected else { return }
         busy = true
         defer { busy = false }
+        syncWarning = nil
+        // Auth success is independent of journal, health or pairing API health.
         do {
             try await renewIfNeeded()
-            if !pairingId.isEmpty {
-                let body=try JSONSerialization.data(withJSONObject:["action":"status","id":pairingId])
-                let statusData=try await request("/functions/v1/watch-pairing",method:"POST",body:body)
-                let status=try JSONSerialization.jsonObject(with:statusData) as? [String:Any]
-                if status?["active"] as? Bool != true { signOut();message="This watch was disconnected from your iPhone.";return }
+            let profile = try await request("/auth/v1/user",method:"GET")
+            let identity = try JSONSerialization.jsonObject(with:profile) as? [String:Any]
+            guard let verifiedID = identity?["id"] as? String, verifiedID == userId else {
+                throw SyncError.badResponse
             }
-            let data = try await request("/rest/v1/wellness_journal?select=mood,occurred_at&user_id=eq.\(userId)&mood=not.is.null&order=occurred_at.desc&limit=1",method:"GET")
+            sessionVerified = true
+        } catch {
+            sessionVerified = false
+            syncWarning = "Account verification failed: \\(error.localizedDescription)"
+            message = syncWarning ?? "Account verification failed"
+            NSLog("[WatchSync] Auth verification failed: %@", error.localizedDescription)
+            return
+        }
+        if !pairingId.isEmpty {
+            do {
+                let body = try JSONSerialization.data(withJSONObject:["action":"status","id":pairingId])
+                let statusData = try await request("/functions/v1/watch-pairing",method:"POST",body:body)
+                let status = try JSONSerialization.jsonObject(with:statusData) as? [String:Any]
+                if status?["active"] as? Bool == false {
+                    // Only an explicit inactive response is a revocation.
+                    signOut()
+                    message = "This watch was disconnected from your iPhone."
+                    return
+                }
+            } catch {
+                NSLog("[WatchSync] Pairing status unavailable: %@", error.localizedDescription)
+                syncWarning = "Pairing check: \\(error.localizedDescription)"
+            }
+        }
+        do {
+            let data = try await request("/rest/v1/wellness_journal?select=mood,occurred_at&user_id=eq.\\(userId)&mood=not.is.null&order=occurred_at.desc&limit=1",method:"GET")
             let rows = try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
-            let savedMood = (rows.first?["mood"] as? String) ?? "Calm"
+            let savedMood = (rows.first?["mood"] as? String) ?? store.currentMood
             store.currentMood = ["disgust","disgusted"].contains(savedMood.lowercased()) ? "Calm" : savedMood
             moodLoaded = true
-            let healthData = try await request("/rest/v1/wellness_readings?select=metric,value,recorded_at&user_id=eq.\(userId)&source=eq.healthkit&metric=in.(hrv,resting_heart_rate,steps,sleep_minutes)&order=recorded_at.desc&limit=500",method:"GET")
-            let healthRows = try JSONSerialization.jsonObject(with:healthData) as? [[String:Any]] ?? []
-            store.hrvHistory = []
-            store.restingHeartHistory = []
-            store.latestHRV = nil
-            store.latestRestingHeartRate = nil
-            store.latestSteps = nil
-            store.latestSleepMinutes = nil
-            for reading in healthRows {
-                guard let metric = reading["metric"] as? String else { continue }
-                let raw = reading["value"]
-                let number = (raw as? NSNumber)?.doubleValue ?? Double(String(describing: raw ?? ""))
-                guard let number else { continue }
-                if let dateText = reading["recorded_at"] as? String {
-                    let formatter = ISO8601DateFormatter()
-                    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                    let timestamp = formatter.date(from: dateText)
-                        ?? ISO8601DateFormatter().date(from: dateText)
-                    if let date = timestamp {
-                        if metric == "hrv" { store.hrvHistory.append((value:number,date:date)) }
-                        if metric == "resting_heart_rate" { store.restingHeartHistory.append((value:number,date:date)) }
+        } catch {
+            NSLog("[WatchSync] Mood sync failed: %@", error.localizedDescription)
+            syncWarning = [syncWarning, "Mood: \\(error.localizedDescription)"].compactMap{$0}.joined(separator:"; ")
+        }
+        do {
+                let healthData = try await request("/rest/v1/wellness_readings?select=metric,value,recorded_at&user_id=eq.\(userId)&source=eq.healthkit&metric=in.(hrv,resting_heart_rate,steps,sleep_minutes)&order=recorded_at.desc&limit=500",method:"GET")
+                let healthRows = try JSONSerialization.jsonObject(with:healthData) as? [[String:Any]] ?? []
+                store.hrvHistory = []
+                store.restingHeartHistory = []
+                store.latestHRV = nil
+                store.latestRestingHeartRate = nil
+                store.latestSteps = nil
+                store.latestSleepMinutes = nil
+                for reading in healthRows {
+                    guard let metric = reading["metric"] as? String else { continue }
+                    let raw = reading["value"]
+                    let number = (raw as? NSNumber)?.doubleValue ?? Double(String(describing: raw ?? ""))
+                    guard let number else { continue }
+                    if let dateText = reading["recorded_at"] as? String {
+                        let formatter = ISO8601DateFormatter()
+                        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                        let timestamp = formatter.date(from: dateText)
+                            ?? ISO8601DateFormatter().date(from: dateText)
+                        if let date = timestamp {
+                            if metric == "hrv" { store.hrvHistory.append((value:number,date:date)) }
+                            if metric == "resting_heart_rate" { store.restingHeartHistory.append((value:number,date:date)) }
+                        }
                     }
+                    if metric == "hrv" && store.latestHRV == nil { store.latestHRV = number }
+                    if metric == "resting_heart_rate" && store.latestRestingHeartRate == nil { store.latestRestingHeartRate = number }
+                    if metric == "steps" && store.latestSteps == nil { store.latestSteps = number }
+                    if metric == "sleep_minutes" && store.latestSleepMinutes == nil { store.latestSleepMinutes = number }
                 }
-                if metric == "hrv" && store.latestHRV == nil { store.latestHRV = number }
-                if metric == "resting_heart_rate" && store.latestRestingHeartRate == nil { store.latestRestingHeartRate = number }
-                if metric == "steps" && store.latestSteps == nil { store.latestSteps = number }
-                if metric == "sleep_minutes" && store.latestSleepMinutes == nil { store.latestSleepMinutes = number }
-            }
-            message = "Mood synced: \(store.currentMood)."
-        } catch { message = "Sync failed: \(error.localizedDescription)" }
+    
+        } catch {
+            NSLog("[WatchSync] Health sync failed: %@", error.localizedDescription)
+            syncWarning = [syncWarning, "Health: \\(error.localizedDescription)"].compactMap{$0}.joined(separator:"; ")
+        }
+        message = syncWarning.map { "Account verified. Sync issue: \\($0)" } ?? "Connected and synced: \\(store.currentMood)."
     }
 
     func signOut() {
         for key in ["watch_access","watch_refresh","watch_user","watch_pairing_id"] { storeSecret(nil,for:key) }
-        accessToken = ""; refreshToken = ""; userId = ""; pairingId = ""; pairingSecret = ""; pairingURL = ""; pairingActive = false; pairingConnecting = false; connected = false; moodLoaded = false
+        accessToken = ""; refreshToken = ""; userId = ""; pairingId = ""; pairingSecret = ""; pairingURL = ""; pairingActive = false; pairingConnecting = false; connected = false; moodLoaded = false; sessionVerified = false; syncWarning = nil
         message = "Disconnected. Your watch will show local defaults."
     }
 
@@ -233,7 +270,10 @@ final class WatchThemeSync: ObservableObject {
         req.httpBody = body
         let (data,response) = try await URLSession.shared.data(for:req)
         guard let http = response as? HTTPURLResponse,(200...299).contains(http.statusCode) else {
-            throw SyncError.server((response as? HTTPURLResponse)?.statusCode ?? 0)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let detail = String(data:data,encoding:.utf8) ?? ""
+            NSLog("[WatchSync] HTTP %ld %@ %@: %@", status, method, path.components(separatedBy:"?")[0], String(detail.prefix(350)))
+            throw SyncError.server(status, path.components(separatedBy:"?")[0], String(detail.prefix(120)))
         }
         return data
     }
@@ -258,7 +298,7 @@ final class WatchThemeSync: ObservableObject {
     }
 
     enum SyncError:LocalizedError {
-        case notSignedIn,badResponse,server(Int)
+        case notSignedIn,badResponse,server(Int,String,String)
         var errorDescription:String? {
             switch self {
             case .notSignedIn: return "Please sign in on the watch."
