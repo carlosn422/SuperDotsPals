@@ -41,7 +41,7 @@ struct ContentView: View {
                 VStack(spacing: 3) {
                     if choosingMood {
                         Text("How do you feel?").font(.system(size: 12, weight: .semibold)).lineLimit(1)
-                        ZStack {
+                        ZStack(alignment: .center) {
                             TabView(selection: $moodPage) {
                                 ForEach(moods.indices, id: \.self) { index in
                                     let mood = moods[index]
@@ -61,7 +61,8 @@ struct ContentView: View {
                                             Text(mood)
                                                 .font(.system(size: 12, weight: .semibold))
                                         }
-                                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                        .frame(height: 125, alignment: .center)
+                                        .frame(maxWidth: .infinity)
                                     }
                                     .buttonStyle(.plain)
                                     .accessibilityLabel("Select \(mood)")
@@ -69,6 +70,8 @@ struct ContentView: View {
                                 }
                             }
                             .tabViewStyle(.page(indexDisplayMode: .never))
+                            .frame(height: 125)
+                            .id(choosingMood)
                             HStack {
                                 if moodPage > 0 {
                                     Button {
@@ -103,7 +106,7 @@ struct ContentView: View {
                         Spacer(minLength: 0)
                         Button {
                             moodPage = max(0, moods.firstIndex(of: store.currentMood) ?? 0)
-                            choosingMood = true
+                            withAnimation(.none) { choosingMood = true }
                         } label: {
                             AnimatedMoodMascot(mood: store.currentMood, size: 125, isActive: scenePhase == .active)
                                 .frame(maxWidth: .infinity)
