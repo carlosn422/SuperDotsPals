@@ -61,6 +61,11 @@ struct AnimatedMoodMascot: View {
         .onAppear {
             lastEmotion = emotion
             lastImage = frame(0)
+            if lastImage == nil {
+                NSLog("[WatchMascot] Missing bundled asset: %@_frame_000", emotion)
+            } else {
+                NSLog("[WatchMascot] Local frames available for %@", emotion)
+            }
         }
         .accessibilityLabel("\(mood) MoodPal")
     }
