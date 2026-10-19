@@ -14,17 +14,13 @@ struct ContentView: View {
     ScrollView {
      VStack(spacing:14) {
      if !sync.connected {
-      ProgressView().frame(width:mascotSize,height:mascotSize)
+      AnimatedMoodMascot(mood:store.currentMood,size:mascotSize,isActive:scenePhase == .active)
       wellnessTrack(score:nil)
       NavigationLink {WatchSyncView(sync:sync)} label: {
        Label("Connect Account",systemImage:"link").frame(maxWidth:.infinity)
       }.buttonStyle(.borderedProminent).tint(purple)
      } else {
-      if sync.moodLoaded {
-       AnimatedMoodMascot(mood:store.wellnessMood,size:mascotSize,isActive:scenePhase == .active)
-      } else {
-       ProgressView().frame(width:mascotSize,height:mascotSize)
-      }
+      AnimatedMoodMascot(mood:store.currentMood,size:mascotSize,isActive:scenePhase == .active)
       VStack(spacing:2) {
        if let hrv=store.latestHRV, hrv.isFinite, hrv >= 0 {
         Text("HRV · \\(Int(hrv.rounded())) ms")
