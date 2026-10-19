@@ -38,9 +38,9 @@ struct ContentView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                VStack(spacing: 6) {
+                VStack(spacing: 3) {
                     if choosingMood {
-                        Text("How do you feel?").font(.caption).fontWeight(.semibold)
+                        Text("How do you feel?").font(.system(size: 12, weight: .semibold)).lineLimit(1)
                         ZStack {
                             TabView(selection: $moodPage) {
                                 ForEach(moods.indices, id: \.self) { index in
@@ -56,8 +56,8 @@ struct ContentView: View {
                                     } label: {
                                         VStack(spacing: 3) {
                                             // One centered mascot per page, leaving safe room for effects.
-                                            AnimatedMoodMascot(mood: mood, size: 112, isActive: false)
-                                                .frame(width: 122, height: 122)
+                                            AnimatedMoodMascot(mood: mood, size: 96, isActive: false)
+                                                .frame(width: 104, height: 104)
                                             Text(mood)
                                                 .font(.system(size: 12, weight: .semibold))
                                         }
@@ -94,8 +94,11 @@ struct ContentView: View {
                             }
                             .padding(.horizontal, 2)
                         }
-                        .frame(height: 150)
-                        Button("Back") { choosingMood = false }.font(.caption2).buttonStyle(.plain)
+                        .frame(height: 125)
+                        Button("Back") { choosingMood = false }
+                            .font(.system(size: 12, weight: .semibold))
+                            .buttonStyle(.plain)
+                            .frame(height: 24)
                     } else {
                         Spacer(minLength: 0)
                         Button {
