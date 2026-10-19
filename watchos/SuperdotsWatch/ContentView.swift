@@ -11,6 +11,16 @@ struct ContentView: View {
     private let moods = ["Joyful", "Calm", "Sad", "Angry", "Anxious", "Tired"]
     private let purple = Color(red: 0.47, green: 0.38, blue: 0.91)
 
+    private func selectMood(_ mood: String) {
+        choosingMood = false
+        store.currentMood = mood
+        WKInterfaceDevice.current().play(.click)
+        Task {
+            do { try await sync.submitMood(mood, store: store) }
+            catch { sync.message = "Mood could not sync. Please retry." }
+        }
+    }
+
     var body: some View {
         Group {
             if !sync.connected || sync.needsReconnect || sync.pairingActive {
@@ -41,44 +51,24 @@ struct ContentView: View {
                 VStack(spacing: 3) {
                     if choosingMood {
                         Text("How do you feel?").font(.system(size: 12, weight: .semibold)).lineLimit(1)
-                        ZStack(alignment: .center) {
-                            TabView(selection: $moodPage) {
-                                ForEach(moods.indices, id: \.self) { index in
-                                    let mood = moods[index]
-                                    Button {
-                                        choosingMood = false
-                                        store.currentMood = mood
-                                        WKInterfaceDevice.current().play(.click)
-                                        Task {
-                                            do { try await sync.submitMood(mood, store: store) }
-                                            catch { sync.message = "Mood could not sync. Please retry." }
-                                        }
-                                    } label: {
-                                        VStack(spacing: 3) {
-                                            // One centered mascot per page, leaving safe room for effects.
-                                            AnimatedMoodMascot(mood: mood, size: 96, isActive: false)
-                                                .frame(width: 104, height: 104)
-                                            Text(mood)
-                                                .font(.system(size: 12, weight: .semibold))
-                                        }
-                                        .frame(height: 125, alignment: .center)
-                                        .frame(maxWidth: .infinity)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel("Select \(mood)")
-                                    .tag(index)
-                                }
+                        Spacer(minLength: 0)
+                        ZStack {
+                            Button {
+                                selectMood(moods[moodPage])
+                            } label: {
+                                AnimatedMoodMascot(mood: moods[moodPage], size: 100, isActive: false)
+                                    .frame(width: 112, height: 112)
+                                    .frame(maxWidth: .infinity)
                             }
-                            .tabViewStyle(.page(indexDisplayMode: .never))
-                            .frame(height: 125)
-                            .id(choosingMood)
+                            .buttonStyle(.plain)
+                            .id(moodPage)
+                            .accessibilityLabel("Select \(moods[moodPage])")
                             HStack {
                                 if moodPage > 0 {
                                     Button {
-                                        withAnimation { moodPage -= 1 }
+                                        withAnimation(.easeInOut(duration: 0.15)) { moodPage -= 1 }
                                     } label: {
-                                        Image(systemName: "chevron.left")
-                                            .font(.system(size: 14, weight: .bold))
+                                        Image(systemName: "chevron.left").font(.system(size: 14, weight: .bold))
                                     }
                                     .buttonStyle(.plain)
                                     .accessibilityLabel("Previous mood")
@@ -86,10 +76,9 @@ struct ContentView: View {
                                 Spacer()
                                 if moodPage < moods.count - 1 {
                                     Button {
-                                        withAnimation { moodPage += 1 }
+                                        withAnimation(.easeInOut(duration: 0.15)) { moodPage += 1 }
                                     } label: {
-                                        Image(systemName: "chevron.right")
-                                            .font(.system(size: 14, weight: .bold))
+                                        Image(systemName: "chevron.right").font(.system(size: 14, weight: .bold))
                                     }
                                     .buttonStyle(.plain)
                                     .accessibilityLabel("Next mood")
@@ -97,11 +86,27 @@ struct ContentView: View {
                             }
                             .padding(.horizontal, 2)
                         }
-                        .frame(height: 125)
+                        .frame(height: 112)
+                        .contentShape(Rectangle())
+                        .gesture(
+                            DragGesture(minimumDistance: 20)
+                                .onEnded { value in
+                                    if value.translation.width < -35 && moodPage < moods.count - 1 {
+                                        withAnimation(.easeInOut(duration: 0.15)) { moodPage += 1 }
+                                    } else if value.translation.width > 35 && moodPage > 0 {
+                                        withAnimation(.easeInOut(duration: 0.15)) { moodPage -= 1 }
+                                    }
+                                }
+                        )
+                        Text(moods[moodPage])
+                            .font(.system(size: 12, weight: .semibold))
+                            .lineLimit(1)
+                            .frame(height: 17)
+                        Spacer(minLength: 0)
                         Button("Back") { choosingMood = false }
                             .font(.system(size: 12, weight: .semibold))
                             .buttonStyle(.plain)
-                            .frame(height: 24)
+                            .frame(height: 22)
                     } else {
                         Spacer(minLength: 0)
                         Button {
