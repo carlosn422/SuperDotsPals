@@ -54,7 +54,7 @@ final class WatchThemeSync: ObservableObject {
             sessionVerified = true
         } catch {
             sessionVerified = false
-            syncWarning = "Account verification failed: \\(error.localizedDescription)"
+            syncWarning = "Account verification failed: \(error.localizedDescription)"
             message = syncWarning ?? "Account verification failed"
             NSLog("[WatchSync] Auth verification failed: %@", error.localizedDescription)
             return
@@ -72,18 +72,18 @@ final class WatchThemeSync: ObservableObject {
                 }
             } catch {
                 NSLog("[WatchSync] Pairing status unavailable: %@", error.localizedDescription)
-                syncWarning = "Pairing check: \\(error.localizedDescription)"
+                syncWarning = "Pairing check: \(error.localizedDescription)"
             }
         }
         do {
-            let data = try await request("/rest/v1/wellness_journal?select=mood,occurred_at&user_id=eq.\\(userId)&mood=not.is.null&order=occurred_at.desc&limit=1",method:"GET")
+            let data = try await request("/rest/v1/wellness_journal?select=mood,occurred_at&user_id=eq.\(userId)&mood=not.is.null&order=occurred_at.desc&limit=1",method:"GET")
             let rows = try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
             let savedMood = (rows.first?["mood"] as? String) ?? store.currentMood
             store.currentMood = ["disgust","disgusted"].contains(savedMood.lowercased()) ? "Calm" : savedMood
             moodLoaded = true
         } catch {
             NSLog("[WatchSync] Mood sync failed: %@", error.localizedDescription)
-            syncWarning = [syncWarning, "Mood: \\(error.localizedDescription)"].compactMap{$0}.joined(separator:"; ")
+            syncWarning = [syncWarning, "Mood: \(error.localizedDescription)"].compactMap{$0}.joined(separator:"; ")
         }
         do {
                 let healthData = try await request("/rest/v1/wellness_readings?select=metric,value,recorded_at&user_id=eq.\(userId)&source=eq.healthkit&metric=in.(hrv,resting_heart_rate,steps,sleep_minutes)&order=recorded_at.desc&limit=500",method:"GET")
@@ -117,9 +117,9 @@ final class WatchThemeSync: ObservableObject {
     
         } catch {
             NSLog("[WatchSync] Health sync failed: %@", error.localizedDescription)
-            syncWarning = [syncWarning, "Health: \\(error.localizedDescription)"].compactMap{$0}.joined(separator:"; ")
+            syncWarning = [syncWarning, "Health: \(error.localizedDescription)"].compactMap{$0}.joined(separator:"; ")
         }
-        message = syncWarning.map { "Account verified. Sync issue: \\($0)" } ?? "Connected and synced: \\(store.currentMood)."
+        message = syncWarning.map { "Account verified. Sync issue: \($0)" } ?? "Connected and synced: \(store.currentMood)."
     }
 
     func signOut() {
