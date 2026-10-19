@@ -26,8 +26,10 @@ struct AnimatedMoodMascot: View {
             Group {
                 if let image = UIImage(named: name) {
                     Image(uiImage: image).resizable().scaledToFit()
+                } else if let still = UIImage(named: String(format: "%@_frame_%03d", emotion, 0)) {
+                    Image(uiImage: still).resizable().scaledToFit()
                 } else {
-                    // Until uploaded animation frames are installed, show a neutral icon.
+                    // Show a fallback instead of an empty mascot.
                     Image(systemName: "face.smiling.fill")
                         .resizable().scaledToFit().foregroundStyle(Color(red: 0.4, green: 0.35, blue: 0.78))
                         .padding(15)
@@ -36,5 +38,13 @@ struct AnimatedMoodMascot: View {
             .frame(width:size,height:size)
         }
         .accessibilityLabel("\(emotion) mood companion")
+        .onAppear {
+            let firstFrame = String(format: "%@_frame_%03d", emotion, 0)
+            if UIImage(named: firstFrame) == nil {
+                NSLog("[WatchMascot] Missing local asset %@. Check AnimationFrames.xcassets bundling.", firstFrame)
+            } else {
+                NSLog("[WatchMascot] Loaded local animation for %@.", emotion)
+            }
+        }
     }
 }
