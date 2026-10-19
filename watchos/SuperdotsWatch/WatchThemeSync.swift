@@ -303,7 +303,7 @@ final class WatchThemeSync: ObservableObject {
             switch self {
             case .notSignedIn: return "Please sign in on the watch."
             case .badResponse: return "Unexpected response."
-            case .server(let status): return "Server error \(status)."
+            case .server(let status,let path,let detail): return "\(path) HTTP \(status): \(detail)"
             }
         }
     }
@@ -325,7 +325,7 @@ struct WatchSyncView: View {
      Text("Connecting Apple Watch…").font(.headline).multilineTextAlignment(.center)
     } else if sync.connected {
      Image(systemName:"checkmark.circle.fill").font(.largeTitle).foregroundStyle(.green)
-     Text("Connected").font(.headline)
+     Text(sync.sessionVerified ? "Account verified" : "Account saved · checking").font(.headline)
      Text(sync.message).font(.caption2).multilineTextAlignment(.center)
      Button("Continue") {dismiss()}
       .buttonStyle(.borderedProminent)
