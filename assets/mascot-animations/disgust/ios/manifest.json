@@ -1,0 +1,13 @@
+{
+  "name": "MoodPals Mint Floating 192",
+  "frame_count": 192,
+  "fps": 24,
+  "duration_seconds": 8.0,
+  "canvas_size": [
+    512,
+    512
+  ],
+  "background": "transparent",
+  "pattern": "frame_%03d.png",
+  "description": "Transparent PNG sequence of mint mascot floating up and down with synced soft shadow."
+}
