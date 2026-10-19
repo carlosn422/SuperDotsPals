@@ -43,31 +43,29 @@ struct ContentView: View {
                         Text("How do you feel?").font(.caption).fontWeight(.semibold)
                         ZStack {
                             TabView(selection: $moodPage) {
-                                ForEach(0..<3, id: \.self) { page in
-                                    HStack(spacing: 5) {
-                                        ForEach((page * 2)..<min((page + 1) * 2, moods.count), id: \.self) { index in
-                                            let mood = moods[index]
-                                            Button {
-                                                choosingMood = false
-                                                store.currentMood = mood
-                                                WKInterfaceDevice.current().play(.click)
-                                                Task {
-                                                    do { try await sync.submitMood(mood, store: store) }
-                                                    catch { sync.message = "Mood could not sync. Please retry." }
-                                                }
-                                            } label: {
-                                                VStack(spacing: 2) {
-                                                    AnimatedMoodMascot(mood: mood, size: 76, isActive: false)
-                                                    Text(mood).font(.system(size: 11, weight: .medium))
-                                                }
-                                                .frame(maxWidth: .infinity)
-                                            }
-                                            .buttonStyle(.plain)
-                                            .accessibilityLabel("Select \(mood)")
+                                ForEach(moods.indices, id: \.self) { index in
+                                    let mood = moods[index]
+                                    Button {
+                                        choosingMood = false
+                                        store.currentMood = mood
+                                        WKInterfaceDevice.current().play(.click)
+                                        Task {
+                                            do { try await sync.submitMood(mood, store: store) }
+                                            catch { sync.message = "Mood could not sync. Please retry." }
                                         }
+                                    } label: {
+                                        VStack(spacing: 3) {
+                                            // One centered mascot per page, leaving safe room for effects.
+                                            AnimatedMoodMascot(mood: mood, size: 112, isActive: false)
+                                                .frame(width: 122, height: 122)
+                                            Text(mood)
+                                                .font(.system(size: 12, weight: .semibold))
+                                        }
+                                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                                     }
-                                    .padding(.horizontal, 17)
-                                    .tag(page)
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Select \(mood)")
+                                    .tag(index)
                                 }
                             }
                             .tabViewStyle(.page(indexDisplayMode: .never))
@@ -77,30 +75,31 @@ struct ContentView: View {
                                         withAnimation { moodPage -= 1 }
                                     } label: {
                                         Image(systemName: "chevron.left")
-                                            .font(.system(size: 12, weight: .bold))
+                                            .font(.system(size: 14, weight: .bold))
                                     }
                                     .buttonStyle(.plain)
-                                    .accessibilityLabel("Previous moods")
+                                    .accessibilityLabel("Previous mood")
                                 }
                                 Spacer()
-                                if moodPage < 2 {
+                                if moodPage < moods.count - 1 {
                                     Button {
                                         withAnimation { moodPage += 1 }
                                     } label: {
                                         Image(systemName: "chevron.right")
-                                            .font(.system(size: 12, weight: .bold))
+                                            .font(.system(size: 14, weight: .bold))
                                     }
                                     .buttonStyle(.plain)
-                                    .accessibilityLabel("Next moods")
+                                    .accessibilityLabel("Next mood")
                                 }
                             }
+                            .padding(.horizontal, 2)
                         }
-                        .frame(height: 120)
+                        .frame(height: 150)
                         Button("Back") { choosingMood = false }.font(.caption2).buttonStyle(.plain)
                     } else {
                         Spacer(minLength: 0)
                         Button {
-                            moodPage = max(0, moods.firstIndex(of: store.currentMood).map { $0 / 2 } ?? 0)
+                            moodPage = max(0, moods.firstIndex(of: store.currentMood) ?? 0)
                             choosingMood = true
                         } label: {
                             AnimatedMoodMascot(mood: store.currentMood, size: 125, isActive: scenePhase == .active)
