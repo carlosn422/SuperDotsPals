@@ -6,6 +6,7 @@ struct ContentView: View {
     @StateObject private var sync = WatchThemeSync()
     @Environment(\.scenePhase) private var scenePhase
     @State private var choosingMood = false
+    @State private var moodPage = 0
 
     private let moods = ["Joyful", "Calm", "Sad", "Angry", "Anxious", "Tired"]
     private let purple = Color(red: 0.47, green: 0.38, blue: 0.91)
@@ -40,32 +41,66 @@ struct ContentView: View {
                 VStack(spacing: 6) {
                     if choosingMood {
                         Text("How do you feel?").font(.caption).fontWeight(.semibold)
-                        ScrollView {
-                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                                ForEach(moods, id: \.self) { mood in
-                                    Button {
-                                        choosingMood = false
-                                        store.currentMood = mood
-                                        WKInterfaceDevice.current().play(.click)
-                                        Task {
-                                            do { try await sync.submitMood(mood, store: store) }
-                                            catch { sync.message = "Mood saved locally. Will retry when connected." }
-                                        }
-                                    } label: {
-                                        VStack(spacing: 2) {
-                                            AnimatedMoodMascot(mood: mood, size: 58, isActive: false)
-                                            Text(mood).font(.system(size: 10, weight: .medium))
+                        ZStack {
+                            TabView(selection: $moodPage) {
+                                ForEach(0..<3, id: \.self) { page in
+                                    HStack(spacing: 5) {
+                                        ForEach((page * 2)..<min((page + 1) * 2, moods.count), id: \.self) { index in
+                                            let mood = moods[index]
+                                            Button {
+                                                choosingMood = false
+                                                store.currentMood = mood
+                                                WKInterfaceDevice.current().play(.click)
+                                                Task {
+                                                    do { try await sync.submitMood(mood, store: store) }
+                                                    catch { sync.message = "Mood could not sync. Please retry." }
+                                                }
+                                            } label: {
+                                                VStack(spacing: 2) {
+                                                    AnimatedMoodMascot(mood: mood, size: 76, isActive: false)
+                                                    Text(mood).font(.system(size: 11, weight: .medium))
+                                                }
+                                                .frame(maxWidth: .infinity)
+                                            }
+                                            .buttonStyle(.plain)
+                                            .accessibilityLabel("Select \(mood)")
                                         }
                                     }
+                                    .padding(.horizontal, 17)
+                                    .tag(page)
+                                }
+                            }
+                            .tabViewStyle(.page(indexDisplayMode: .never))
+                            HStack {
+                                if moodPage > 0 {
+                                    Button {
+                                        withAnimation { moodPage -= 1 }
+                                    } label: {
+                                        Image(systemName: "chevron.left")
+                                            .font(.system(size: 12, weight: .bold))
+                                    }
                                     .buttonStyle(.plain)
-                                    .accessibilityLabel("Select \(mood)")
+                                    .accessibilityLabel("Previous moods")
+                                }
+                                Spacer()
+                                if moodPage < 2 {
+                                    Button {
+                                        withAnimation { moodPage += 1 }
+                                    } label: {
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 12, weight: .bold))
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Next moods")
                                 }
                             }
                         }
+                        .frame(height: 120)
                         Button("Back") { choosingMood = false }.font(.caption2).buttonStyle(.plain)
                     } else {
                         Spacer(minLength: 0)
                         Button {
+                            moodPage = max(0, moods.firstIndex(of: store.currentMood).map { $0 / 2 } ?? 0)
                             choosingMood = true
                         } label: {
                             AnimatedMoodMascot(mood: store.currentMood, size: 125, isActive: scenePhase == .active)
