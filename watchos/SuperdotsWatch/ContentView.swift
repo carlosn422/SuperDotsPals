@@ -60,8 +60,16 @@ struct ContentView: View {
             }
         }
         .tint(purple)
-        .task {
-            if sync.connected { await sync.refresh(store: store) }
+        .task(id: sync.connected) {
+            guard sync.connected else { return }
+            // The root view stays alive after QR pairing completes.
+            // Keep the latest iPhone check-in in sync while the watch is open.
+            await sync.refresh(store: store)
+            while !Task.isCancelled && sync.connected {
+                do { try await Task.sleep(for: .seconds(30)) }
+                catch { break }
+                if scenePhase == .active { await sync.refresh(store: store) }
+            }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active && sync.connected && !sync.pairingActive {
