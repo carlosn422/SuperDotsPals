@@ -47,7 +47,7 @@ export default function ConnectedDevices(){
   {loading?<ActivityIndicator color={purple}/>:null}
   {message?<Text style={styles.sub}>{message}</Text>:null}
   <TouchableOpacity onPress={()=>void load()}><Text style={{color:purple,fontWeight:'700'}}>Refresh device list ↻</Text></TouchableOpacity>
-  {devices.length===0?<Text style={styles.sub}>No connected watches yet.</Text>:devices.map(d=><View key={d.id} style={styles.card}><Text style={{fontWeight:'800',color:'#271C49'}}>{d.name}</Text><Text style={styles.sub}>{'Linked '+new Date(d.linked_at).toLocaleDateString()}</Text><TouchableOpacity onPress={()=>void remove(d)}><Text style={{color:'#C64F67',fontWeight:'800'}}>Remove Device</Text></TouchableOpacity></View>)}
+  {devices.length===0?<Text style={styles.sub}>No connected watches yet.</Text>:devices.map(d=><View key={d.id} style={styles.card}><Text style={{fontWeight:'800',color:'#271C49'}}>{d.name?.trim()||'Apple Watch'}</Text><Text style={styles.sub}>{d.platform==='watchos'?'Apple Watch · ':''}{d.last_seen_at?'Last seen '+new Date(d.last_seen_at).toLocaleString():'Paired '+new Date(d.linked_at).toLocaleDateString()}</Text><TouchableOpacity onPress={()=>void remove(d)}><Text style={{color:'#C64F67',fontWeight:'800'}}>Remove Device</Text></TouchableOpacity></View>)}
  </View>;
 }
 const styles=StyleSheet.create({title:{fontWeight:'900',fontSize:20,color:'#251C45'},sub:{fontSize:12,lineHeight:19,color:'#807694'},button:{backgroundColor:purple,borderRadius:14,padding:14,alignItems:'center'},buttonText:{color:'white',fontWeight:'900'},card:{backgroundColor:'white',borderRadius:16,padding:15,gap:10,borderWidth:1,borderColor:'#EDE9F3'}});
