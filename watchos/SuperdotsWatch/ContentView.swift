@@ -88,12 +88,12 @@ struct ContentView: View {
                         }
                         .frame(height: 112)
                         .contentShape(Rectangle())
-                        .gesture(
-                            DragGesture(minimumDistance: 20)
+                        .highPriorityGesture(
+                            DragGesture(minimumDistance: 15, coordinateSpace: .local)
                                 .onEnded { value in
-                                    if value.translation.width < -35 && moodPage < moods.count - 1 {
+                                    if abs(value.translation.width) > abs(value.translation.height) && value.translation.width < -30 && moodPage < moods.count - 1 {
                                         withAnimation(.easeInOut(duration: 0.15)) { moodPage += 1 }
-                                    } else if value.translation.width > 35 && moodPage > 0 {
+                                    } else if abs(value.translation.width) > abs(value.translation.height) && value.translation.width > 30 && moodPage > 0 {
                                         withAnimation(.easeInOut(duration: 0.15)) { moodPage -= 1 }
                                     }
                                 }
