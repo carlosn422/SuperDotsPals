@@ -14,6 +14,28 @@ struct ContentView: View {
         Group {
             if !sync.connected || sync.needsReconnect || sync.pairingActive {
                 WatchSyncView(sync: sync)
+            } else if !sync.moodLoaded {
+                VStack(spacing: 10) {
+                    if sync.syncWarning == nil {
+                        ProgressView().tint(purple)
+                        Text("Loading your mood…")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Image(systemName: "wifi.exclamationmark")
+                            .foregroundStyle(.secondary)
+                        Text("Could not load your mood")
+                            .font(.caption2)
+                            .multilineTextAlignment(.center)
+                        Button("Try again") {
+                            Task { await sync.refresh(store: store) }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(purple)
+                        .disabled(sync.busy)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 VStack(spacing: 6) {
                     if choosingMood {
