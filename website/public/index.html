@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MoodPals — Your friendly stress companion</title>
+<meta name="description" content="MoodPals turns your Apple Watch HRV into a daily stress score, explained by a friendly mascot. Join the early-subscriber list.">
+<meta property="og:title" content="MoodPals — Inner Circle Emotion Share">
+<meta property="og:description" content="A friendly stress companion for iPhone & Apple Watch. Join the early-subscriber list.">
+<meta property="og:image" content="/img/og.jpg">
+<link rel="icon" href="/img/mascots/disgust.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="nav">
+  <a class="brand" href="#top"><img src="/img/mascots/disgust.png" alt="" width="36" height="36"><span class="logo-sm"><b class="o">Mood</b><b class="t">Pals</b></span></a>
+  <nav><a href="#features">Features</a><a href="#how">How it works</a><a href="#faq">FAQ</a><a class="btn btn-sm" href="#join">Join early access</a></nav>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="sparkles" aria-hidden="true"><i>✦</i><i>✧</i><i>♥</i><i>✦</i><i>✧</i><i>♥</i><i>✦</i></div>
+    <div class="hero-copy">
+      <div class="mascot-row" aria-hidden="true">
+        <img src="/img/mascots/joy.webp" alt=""><img src="/img/mascots/fear.webp" alt=""><img src="/img/mascots/sadness.webp" alt=""><img src="/img/mascots/disgust.webp" alt=""><img src="/img/mascots/anger.webp" alt=""><img src="/img/mascots/tired.webp" alt="">
+      </div>
+      <h1 class="logo"><span class="o">Mood</span><span class="t">Pals</span></h1>
+      <p class="tagline">Inner Circle Emotion Share</p>
+      <p class="lead">Your friendly stress companion for iPhone &amp; Apple Watch. MoodPals reads your heart-rate variability, turns it into a simple daily stress level, and helps you do something about it, one breath, one note, one pal at a time.</p>
+      <form class="signup" id="join" novalidate>
+        <div class="fields">
+          <input name="firstName" type="text" placeholder="First name" autocomplete="given-name" maxlength="80" aria-label="First name">
+          <input name="email" type="email" placeholder="you@email.com" autocomplete="email" required aria-label="Email address">
+          <input name="company" type="text" tabindex="-1" autocomplete="off" class="hp" aria-hidden="true">
+          <button class="btn" type="submit">Get early access</button>
+        </div>
+        <fieldset class="interests"><legend>I'm most excited about</legend>
+          <label><input type="checkbox" name="interests" value="stress">Stress score</label>
+          <label><input type="checkbox" name="interests" value="sleep">Sleep &amp; recovery</label>
+          <label><input type="checkbox" name="interests" value="journaling">Stress diary</label>
+          <label><input type="checkbox" name="interests" value="watch">Apple Watch</label>
+          <label><input type="checkbox" name="interests" value="inner-circle">Sharing with my inner circle</label>
+        </fieldset>
+        <p class="form-msg" role="status" aria-live="polite"></p>
+        <p class="fine">No spam. Just launch news and an invite to the TestFlight beta.</p>
+      </form>
+    </div>
+    <div class="hero-phone">
+      <div class="phone" data-screen="today"></div>
+      <div class="float-card c1"><b>Great</b><span>Stress 24 / 100</span></div>
+      <div class="float-card c2"><b>HRV 58 ms</b><span>above your usual</span></div>
+    </div>
+  </section>
+
+  <section class="pals">
+    <h2>Meet your pals</h2>
+    <p class="sub">Your MoodPal changes with how your body and mind are doing, so you can see how you feel at a glance.</p>
+    <div class="pal-grid">
+      <figure><img src="/img/mascots/joy.webp" loading="lazy" alt="Joyful purple pal"><figcaption>Joyful</figcaption></figure>
+      <figure><img src="/img/mascots/disgust.webp" loading="lazy" alt="Calm mint pal"><figcaption>Calm</figcaption></figure>
+      <figure><img src="/img/mascots/fear.webp" loading="lazy" alt="Anxious yellow pal"><figcaption>Anxious</figcaption></figure>
+      <figure><img src="/img/mascots/sadness.webp" loading="lazy" alt="Sad blue pal"><figcaption>Sad</figcaption></figure>
+      <figure><img src="/img/mascots/anger.webp" loading="lazy" alt="Angry red pal"><figcaption>Angry</figcaption></figure>
+      <figure><img src="/img/mascots/tired.webp" loading="lazy" alt="Sleepy lilac pal"><figcaption>Tired</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="features" id="features">
+    <h2>What MoodPals does</h2>
+    <div class="feature-list">
+      <article class="feature">
+        <div class="phone" data-screen="today"></div>
+        <div><span class="kicker mint">Daily stress score</span><h3>Know your stress level in one glance</h3>
+        <p>MoodPals compares each Apple Watch HRV reading with <em>your own</em> last 21 days, not population averages, and shows a clear level: Great, Normal, Elevated or Overload. You also get an energy score built from your sleep, stress and activity.</p>
+        <ul><li>HRV trend coloured by stress level</li><li>Hourly heart rate and resting heart rate</li><li>Day, week, month and year stress trends</li></ul></div>
+      </article>
+      <article class="feature rev">
+        <div class="phone" data-screen="actions"></div>
+        <div><span class="kicker peach">Body &amp; recovery</span><h3>Sleep, activity and calm, all in one place</h3>
+        <p>Sleep duration and stages, Move/Exercise/Stand rings, daylight, mindful minutes, steps and noise levels come straight from Apple Health. One tap starts a guided breathing break when your pal looks worried.</p>
+        <ul><li>Sleep detail with stages and heart rate while asleep</li><li>Calm, box and unwind breathing</li><li>Water, caffeine and mood check-ins</li></ul></div>
+      </article>
+      <article class="feature">
+        <div class="phone" data-screen="diary"></div>
+        <div><span class="kicker lilac">Stress diary</span><h3>Find out what actually drives your stress</h3>
+        <p>Every diary entry is matched to your stress level at the time you wrote it. Tag what's going on (work, sleep, caffeine…) and MoodPals shows which tags come up most often on your hardest days, plus a weekly recap.</p>
+        <ul><li>Timeline coloured by stress level</li><li>"What drives your stress" insights</li><li>Prompts that change with how today is going</li></ul></div>
+      </article>
+      <article class="feature rev">
+        <div class="phone" data-screen="ask"></div>
+        <div><span class="kicker sky">Ask MoodPal</span><h3>An AI pal that knows your numbers</h3>
+        <p>Ask "Why is my stress high today?" and get an answer based on your own readings and diary, with buttons to start a breathing break, log water or open your trends. Save useful answers to your diary.</p>
+        <ul><li>Suggested questions for today</li><li>Private: your data stays in your account</li><li>Not a therapist and not a diagnosis, just a friendly pal</li></ul></div>
+      </article>
+    </div>
+  </section>
+
+  <section class="mini-grid">
+    <div class="mini"><img class="mini-pal" src="/img/mascots/disgust.png" alt="" width="56" height="56" loading="lazy"><h4>Apple Watch</h4><p>Your pal and stress level on your wrist, with mood check-ins and breathing.</p></div>
+    <div class="mini"><img class="mini-pal" src="/img/mascots/fear.png" alt="" width="56" height="56" loading="lazy"><h4>Stress alerts</h4><p>Optional nudges when your stress is well above your usual, never more than once every 3 hours.</p></div>
+    <div class="mini"><img class="mini-pal" src="/img/mascots/joy.png" alt="" width="56" height="56" loading="lazy"><h4>Widgets</h4><p>Home and lock screen widgets show today's level and energy.</p></div>
+    <div class="mini soon"><img class="mini-pal" src="/img/mascots/sadness.png" alt="" width="56" height="56" loading="lazy"><h4>Inner circle <em>coming soon</em></h4><p>Share how you're feeling, never your raw health data, with the few people you choose.</p></div>
+  </section>
+
+  <section class="how" id="how">
+    <h2>How it works</h2>
+    <ol class="steps">
+      <li><b>1</b><h4>Connect Apple Health</h4><p>Approve read-only access on your iPhone. Your Apple Watch already records HRV in the background.</p></li>
+      <li><b>2</b><h4>Build your baseline</h4><p>After about 3 days of readings, MoodPals learns what "normal" looks like for you.</p></li>
+      <li><b>3</b><h4>Check in with your pal</h4><p>See your daily level, write a quick note, take a breath, and watch your patterns get clearer week by week.</p></li>
+    </ol>
+  </section>
+
+  <section class="privacy">
+    <img loading="lazy" src="/img/hug.webp" alt="Two MoodPals hugging" width="320" height="320">
+    <div><h2>Private by design</h2>
+    <p>Your health readings and diary are stored in your own account and protected by per-user access rules. MoodPals only reads from Apple Health and never writes to it. We'll never sell your data.</p>
+    <p class="fine">MoodPals is a wellness app. Stress scores are estimates based on your own readings, not medical measurements or diagnoses. In an emergency, contact local emergency services.</p></div>
+  </section>
+
+  <section class="faq" id="faq">
+    <h2>Questions</h2>
+    <details><summary>Do I need an Apple Watch?</summary><p>For the stress score, yes. HRV is recorded by Apple Watch. Without one, you can still use mood check-ins, the stress diary, breathing and Ask MoodPal.</p></details>
+    <details><summary>When does MoodPals launch?</summary><p>We're inviting early subscribers to a TestFlight beta first. Join the list and you'll be among the first to get an invite.</p></details>
+    <details><summary>How is the stress score calculated?</summary><p>Each HRV sample is compared with the median of your previous 21 days, adjusted by your resting heart rate. Lower HRV and higher resting heart rate than your usual push the score up.</p></details>
+    <details><summary>Is it free?</summary><p>Early subscribers get the beta free. We'll share pricing well before launch.</p></details>
+  </section>
+
+  <section class="cta">
+    <div class="mascot-row small" aria-hidden="true"><img src="/img/mascots/joy.webp" alt=""><img src="/img/mascots/disgust.webp" alt=""><img src="/img/mascots/tired.webp" alt=""></div>
+    <h2>Be one of the first pals</h2>
+    <p>Join the early-subscriber list and get a beta invite.</p>
+    <a class="btn" href="#join">Join early access</a>
+  </section>
+</main>
+<footer><span>© <span id="yr"></span> MoodPals</span><span>Made with <span class="heart">♥</span> for calmer days</span></footer>
+<script src="/app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "moodpals-website",
+  "private": true,
+  "version": "1.0.0",
+  "description": "MoodPals landing page and early-subscriber waitlist",
+  "main": "server.js",
+  "type": "commonjs",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
