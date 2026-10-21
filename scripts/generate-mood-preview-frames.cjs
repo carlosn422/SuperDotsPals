@@ -34,4 +34,21 @@ const output="import type {ImageSourcePropType} from 'react-native';\n"+
 manifest.join(',\n')+"\n};\n";
 fs.writeFileSync(path.join(root,'MascotPreviewAssets.ts'),output);
 console.log('Generated '+total+' 400px frames and MascotPreviewAssets.ts');
-console.log('Next: connect the preview frames in SuperdotMascot, then verify and commit generated assets.');
+
+const mascotFile=path.join(root,'SuperdotMascot.tsx');
+let mascot=fs.readFileSync(mascotFile,'utf8');
+if(!mascot.includes("import {MASCOT_PREVIEW_FRAMES} from './MascotPreviewAssets';")){
+ mascot=mascot.replace("import {MASCOT_FRAMES} from './MascotAnimationAssets';","import {MASCOT_FRAMES} from './MascotAnimationAssets';\nimport {MASCOT_PREVIEW_FRAMES} from './MascotPreviewAssets';");
+}
+mascot=mascot.replace("animate=true,playDurationMs,startDelayMs=0}", "animate=true,preview=false,playDurationMs,startDelayMs=0}");
+mascot=mascot.replace("animate?:boolean;playDurationMs?:number", "animate?:boolean;preview?:boolean;playDurationMs?:number");
+mascot=mascot.replace(" const key=frameKey(id);", " const key=frameKey(id);\n const frames=preview?MASCOT_PREVIEW_FRAMES[key]:MASCOT_FRAMES[key];");
+mascot=mascot.replace("source={MASCOT_FRAMES[key][0]}", "source={frames[0]}");
+mascot=mascot.replace("frames={MASCOT_FRAMES[key]}", "frames={frames}");
+fs.writeFileSync(mascotFile,mascot);
+const wizardFile=path.join(root,'MoodCheckinWizard.tsx');
+let wizard=fs.readFileSync(wizardFile,'utf8');
+wizard=wizard.replace('<SuperdotMascot id={m} size={96}/>', '<SuperdotMascot id={m} size={96} preview/>');
+fs.writeFileSync(wizardFile,wizard);
+console.log('Connected 400px frames only to the six continuously animated mood tiles.');
+console.log('Next: npm run typecheck, test on iPhone, commit the new preview assets and changes.');
