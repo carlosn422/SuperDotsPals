@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-/// Plays the 12 FPS watch-specific PNG assets. Missing or temporarily unavailable
+/// Plays the 36 watch frames over the same loop length as the iPhone animation. Missing or temporarily unavailable
 /// frames never cause the mascot to flash to a system symbol.
 struct AnimatedMoodMascot: View {
     let mood: String
@@ -11,7 +11,16 @@ struct AnimatedMoodMascot: View {
     @State private var lastImage: UIImage?
     @State private var lastEmotion = ""
 
-    private let framesPerSecond = 12.0
+    // The iPhone plays every source frame at 29.97 FPS (MascotAnimationAssets.ts); the watch's 36 frames
+    // are sampled evenly from those, so stretch them over the same loop duration per mood.
+    private var sourceFrameCount: Double {
+        switch emotion {
+        case "joy": return 300
+        case "disgust": return 192
+        default: return 240
+        }
+    }
+    private var framesPerSecond: Double { Double(frameCount) / (sourceFrameCount / (30000.0 / 1001.0)) }
     private let frameCount = 36
 
     private var emotion: String {
