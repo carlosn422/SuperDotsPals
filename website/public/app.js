@@ -1,6 +1,13 @@
 // Phone mockups: show a real screenshot from /img/screens/<name>.png when present, otherwise an HTML preview of that screen.
 const scale = ['#EE6F86','#F2A56F','#8A9BEF','#4DBB7F'].map(c => `<i style="background:${c}"></i>`).join('');
-const tabbar = on => `<div class="tabbar">${['Today','Actions','Trends','Health','Settings'].map(t => `<span class="${t===on?'on':''}">${t}</span>`).join('')}</div>`;
+const NAV_ICONS = {
+  Today: '<path d="M7 2v2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zm-2 7h14v10H5V9zm2 2v3h3v-3H7z"/>',
+  Actions: '<path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z"/>',
+  Trends: '<path d="M3 3h2v16h16v2H3V3zm4 8h3v7H7v-7zm5-5h3v12h-3V6zm5 3h3v9h-3V9z"/>',
+  Health: '<path d="M12 21s-7.5-4.6-9.6-9.4C.9 8.2 3 4.5 6.6 4.5c2.1 0 3.6 1.2 4.4 2.5.8-1.3 2.3-2.5 4.4-2.5 3.6 0 5.7 3.7 4.2 7.1C19.5 16.4 12 21 12 21z"/>',
+  Settings: '<path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1l.4 2.6h4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5-2.3-1.6zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/>'
+};
+const tabbar = on => `<div class="tabbar">${Object.keys(NAV_ICONS).map(t => `<span class="${t===on?'on':''}"><svg viewBox="0 0 24 24" aria-hidden="true">${NAV_ICONS[t]}</svg>${t}</span>`).join('')}</div>`;
 const hrvDots = () => {
   const pts = [[8,40],[30,32],[52,36],[74,22],[96,26],[118,14],[140,18],[162,10],[184,16],[206,8],[228,12]];
   const col = ['#8A9BEF','#8A9BEF','#8A9BEF','#4DBB7F','#4DBB7F','#4DBB7F','#4DBB7F','#4DBB7F','#4DBB7F','#4DBB7F','#4DBB7F'];
