@@ -11,10 +11,15 @@
       "bundleIdentifier": "com.superdotspals.wellnest",
       "appleTeamId": "Y355786FS4",
       "infoPlist": {
-        "NSHealthShareUsageDescription": "Allow MoodPals to read heart rate variability, resting heart rate, steps and sleep when you choose to sync health data.",
+        "NSHealthShareUsageDescription": "Allow MoodPals to read heart rate variability, heart rate, resting heart rate, sleep, activity, daylight, mindful minutes and noise levels to estimate your stress and energy.",
         "NSCameraUsageDescription": "Allow MoodPals to scan your Apple Watch pairing QR code.",
         "ITSAppUsesNonExemptEncryption": false,
         "NSHealthUpdateUsageDescription": "MoodPals reads your health data for wellness insights and does not write to Apple Health."
+      },
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.com.superdotspals.wellnest"
+        ]
       }
     },
     "android": {
@@ -32,9 +37,9 @@
       [
         "@appeeky/expo-healthkit",
         {
-          "healthSharePermission": "Allow MoodPals to read heart rate variability, resting heart rate, steps and sleep with your permission.",
+          "healthSharePermission": "Allow MoodPals to read heart rate variability, heart rate, resting heart rate, sleep, activity, daylight, mindful minutes and noise levels to estimate your stress and energy.",
           "healthUpdatePermission": false,
-          "isBackgroundDeliveryEnabled": false,
+          "isBackgroundDeliveryEnabled": true,
           "healthConnectPermissions": [
             "READ_STEPS",
             "READ_HEART_RATE",

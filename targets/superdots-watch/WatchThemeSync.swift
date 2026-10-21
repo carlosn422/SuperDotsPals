@@ -1,4 +1,5 @@
 import SwiftUI
+import WidgetKit
 import Security
 
 /// Authenticated direct sync for the standalone watchOS prototype.
@@ -53,7 +54,7 @@ final class WatchThemeSync: ObservableObject {
             let savedMood = (rows.first?["mood"] as? String) ?? "Calm"
             store.currentMood = ["disgust","disgusted"].contains(savedMood.lowercased()) ? "Calm" : savedMood
             moodLoaded = true
-            let healthData = try await request("/rest/v1/wellness_readings?select=metric,value,recorded_at&user_id=eq.\(userId)&source=eq.healthkit&metric=in.(hrv,resting_heart_rate,steps,sleep_minutes)&order=recorded_at.desc&limit=500",method:"GET")
+            let healthData = try await request("/rest/v1/wellness_readings?select=metric,value,recorded_at&user_id=eq.\(userId)&source=in.(healthkit,computed)&metric=in.(hrv,resting_heart_rate,steps,sleep_minutes,stress_score)&order=recorded_at.desc&limit=700",method:"GET")
             let healthRows = try JSONSerialization.jsonObject(with:healthData) as? [[String:Any]] ?? []
             store.hrvHistory = []
             store.restingHeartHistory = []
@@ -61,6 +62,7 @@ final class WatchThemeSync: ObservableObject {
             store.latestRestingHeartRate = nil
             store.latestSteps = nil
             store.latestSleepMinutes = nil
+            store.phoneStress = nil
             for reading in healthRows {
                 guard let metric = reading["metric"] as? String else { continue }
                 let raw = reading["value"]
@@ -74,6 +76,7 @@ final class WatchThemeSync: ObservableObject {
                     if let date = timestamp {
                         if metric == "hrv" { store.hrvHistory.append((value:number,date:date)) }
                         if metric == "resting_heart_rate" { store.restingHeartHistory.append((value:number,date:date)) }
+                        if metric == "stress_score" && store.phoneStress == nil { store.phoneStress = (value:number,date:date) }
                     }
                 }
                 if metric == "hrv" && store.latestHRV == nil { store.latestHRV = number }
@@ -81,6 +84,13 @@ final class WatchThemeSync: ObservableObject {
                 if metric == "steps" && store.latestSteps == nil { store.latestSteps = number }
                 if metric == "sleep_minutes" && store.latestSleepMinutes == nil { store.latestSleepMinutes = number }
             }
+            let shared = UserDefaults(suiteName: "group.com.superdotspals.wellnest.watch")
+            if let stress = store.displayStress {
+                shared?.set(Int(stress.rounded()), forKey: "stressScore")
+                shared?.set(store.stressLevel, forKey: "stressLabel")
+                shared?.set(Date().timeIntervalSince1970, forKey: "stressUpdated")
+            }
+            WidgetCenter.shared.reloadAllTimelines()
             message = "Mood synced: \(store.currentMood)."
         } catch { message = "Sync failed: \(error.localizedDescription)" }
     }

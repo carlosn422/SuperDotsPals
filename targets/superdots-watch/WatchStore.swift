@@ -32,6 +32,8 @@ final class WatchStore: ObservableObject {
     @Published var latestSteps: Double? = nil
     @Published var latestSleepMinutes: Double? = nil
     @Published var sessionsCompleted: Int = 0
+    // Stress score computed on the iPhone (StressEngine.ts), preferred when fresh.
+    @Published var phoneStress: (value: Double, date: Date)? = nil
     @Published var hrvHistory: [(value: Double, date: Date)] = []
     @Published var restingHeartHistory: [(value: Double, date: Date)] = []
 
@@ -61,7 +63,18 @@ final class WatchStore: ObservableObject {
         return hrvComponent * 0.7 + restingComponent * 0.3
     }
 
+    var displayStress: Double? {
+        if let p = phoneStress, Date().timeIntervalSince(p.date) < 24 * 3600 { return p.value }
+        return strainScore
+    }
+
+    var stressLevel: String {
+        guard let s = displayStress else { return "" }
+        return s < 35 ? "Great" : s < 60 ? "Normal" : s < 80 ? "Elevated" : "Overload"
+    }
+
     var strainLabel: String {
+        if phoneStress != nil, !stressLevel.isEmpty { return "Stress: \(stressLevel)" }
         guard let score = strainScore else { return "Not enough data" }
         if score < 30 { return "Low strain" }
         if score < 60 { return "Typical" }

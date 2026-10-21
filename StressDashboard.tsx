@@ -5,11 +5,12 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import SuperdotMascot from './SuperdotMascot';
 import {supabase} from './supabase';
-import {useSavedHealth,syncNativeHealth,healthKitAvailable,Reading,Metric} from './HealthDataPanel';
+import {useSavedHealth,syncNativeHealth,healthKitAvailable,Reading,Metric,HEALTH_SYNCED_FLAG} from './HealthDataPanel';
+import {enableHealthBackgroundUpdates} from './HealthBackground';
 import {computeStressPoints,dailyStress,baselineStatus,levelFor,levelDistribution,median,sameDay,sleepQuality,noiseLabel,formatMinutes,energyScore,energyLabel,STRESS_LEVELS,LEVEL_ORDER,StressPoint,MIN_BASELINE_SAMPLES,MIN_BASELINE_DAYS} from './StressEngine';
 
 export const SW={bg:'#F4FAF6',mint:'#E4F6EA',ink:'#1D2B33',muted:'#6E7D86',green:'#34B37E',line:'#E6EEEA',card:'#FFFFFF',hr:'#9A86F2',pink:'#EE6F86'};
-const SYNC_FLAG='moodpals-health-synced';
+const SYNC_FLAG=HEALTH_SYNCED_FLAG;
 let autoSynced=false;
 
 export function useStress(){
@@ -29,7 +30,7 @@ export function StressHero({name,mood,onCheckin}:{name?:string;mood:string;onChe
  const available=healthKitAvailable();
  async function sync(silent=false){
   setSyncing(true);
-  try{await syncNativeHealth();await AsyncStorage.setItem(SYNC_FLAG,'1');await reload()}
+  try{await syncNativeHealth();await AsyncStorage.setItem(SYNC_FLAG,'1');await reload();void enableHealthBackgroundUpdates()}
   catch(e:any){if(!silent)Alert.alert('Health sync unavailable',e?.message||'Please retry in a native iOS build.')}
   finally{setSyncing(false)}
  }

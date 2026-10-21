@@ -5,10 +5,13 @@ import Constants,{ExecutionEnvironment} from 'expo-constants';
 import {supabase} from './supabase';
 import {computeStressPoints,dailyStress} from './StressEngine';
 import {maybeSendStressAlert} from './StressAlerts';
+import {publishStressSnapshot} from './WidgetBridge';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+export const HEALTH_SYNCED_FLAG='moodpals-health-synced';
 
 // HealthKit is a native module: don't require it in Expo Go.
 const inExpoGo=Constants.appOwnership==='expo'||(Constants.executionEnvironment===ExecutionEnvironment.StoreClient&&Constants.expoGoConfig!=null);
-function nativeHealth(){if(inExpoGo||Platform.OS!=='ios')return null;try{return require('@appeeky/expo-healthkit') as any}catch{return null}}
+export function nativeHealth(){if(inExpoGo||Platform.OS!=='ios')return null;try{return require('@appeeky/expo-healthkit') as any}catch{return null}}
 export type Metric='hrv'|'resting_heart_rate'|'steps'|'sleep_minutes'|'stress_score'|'heart_rate'|'active_energy_kcal'|'exercise_minutes'|'stand_hours'|'daylight_minutes'|'mindfulness_minutes'|'noise_db'|'sleep_deep_minutes'|'sleep_rem_minutes'|'sleep_core_minutes'|'sleep_awake_minutes'|'sleep_heart_rate';
 export type Reading={metric:Metric;value:number;recorded_at:string;source:string};
 type Upload={user_id:string;metric:Metric;value:number;source:'healthkit'|'computed';source_record_key:string;recorded_at:string};
@@ -131,6 +134,8 @@ export async function syncNativeHealth():Promise<number>{
   saved+=Math.min(500,extra.length-i);
  }
  const fresh=await fetchReadings(true).catch(()=>[] as Reading[]);
+ await AsyncStorage.setItem(HEALTH_SYNCED_FLAG,'1').catch(()=>{});
+ publishStressSnapshot(fresh);
  const latestStress=dailyStress(computeStressPoints(fresh));
  if(latestStress)void maybeSendStressAlert(latestStress.score,latestStress.updated);
  return saved;

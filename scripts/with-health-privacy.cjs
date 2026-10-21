@@ -1,6 +1,6 @@
 const { withInfoPlist, withXcodeProject } = require('@expo/config-plugins');
 
-const share = 'Superdots reads heart rate variability, resting heart rate, steps, and sleep to provide wellness insights when you grant access.';
+const share = 'MoodPals reads heart rate variability, heart rate, resting heart rate, sleep, activity, daylight, mindful minutes and noise levels to estimate your stress and energy.';
 const update = 'Superdots integrates with Apple Health to support wellness features. The app currently reads health data and does not modify health records.';
 
 module.exports = function withHealthPrivacy(config) {
