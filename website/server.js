@@ -12,7 +12,13 @@ const INTERESTS = ['stress', 'sleep', 'journaling', 'scripture', 'watch', 'inner
 const app = express();
 app.disable('x-powered-by');
 app.use(express.json({ limit: '10kb' }));
-app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h', extensions: ['html'] }));
+app.use(express.static(path.join(__dirname, 'public'), {
+  extensions: ['html'],
+  setHeaders: (res, file) => {
+    // Always revalidate page code so visitors never see a stale mix of HTML/JS/CSS; images can cache.
+    res.setHeader('Cache-Control', /\.(html|js|css)$/.test(file) ? 'no-cache' : 'public, max-age=3600');
+  },
+}));
 
 // Small per-IP limiter so the public form can't be used to flood the list.
 const hits = new Map();

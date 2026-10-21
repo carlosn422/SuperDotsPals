@@ -42,6 +42,14 @@ document.querySelectorAll('.phone').forEach(phone => {
   screen.className = 'screen';
   screen.innerHTML = SCREENS[name]?.() || '';
   phone.appendChild(screen);
+  const slides = (phone.dataset.slides || '').split(',').filter(Boolean);
+  if (slides.length) {
+    screen.innerHTML = slides.map((s, i) => `<img class="slide${i ? '' : ' on'}" src="/img/screens/${s}.webp" alt="MoodPals ${s.replace('-', ' ')} screen">`).join('');
+    let i = 0;
+    const imgs = screen.querySelectorAll('.slide');
+    setInterval(() => { imgs[i].classList.remove('on'); i = (i + 1) % imgs.length; imgs[i].classList.add('on'); }, 2800);
+    return;
+  }
   const img = new Image();
   img.alt = `MoodPals ${name} screen`;
   img.onload = () => { screen.innerHTML = ''; screen.appendChild(img); };

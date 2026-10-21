@@ -117,3 +117,5 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 .ui .verse{background:linear-gradient(180deg,#FFF8E1,#FFFFFF);border-radius:18px;padding:14px;text-align:center}
 .ui .verse q{display:block;font:600 13px/1.45 Fredoka,sans-serif;color:#3A2E12;quotes:none}
 .ui .ref{color:#B07D00;font-weight:800;margin-top:8px}
+.screen .slide{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top;opacity:0;transition:opacity .7s ease}
+.screen .slide.on{opacity:1}
