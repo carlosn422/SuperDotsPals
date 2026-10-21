@@ -61,7 +61,7 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJo
    <Text style={{color:'#817892',fontSize:12}}>Choose the mood that best fits right now.</Text>
    <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
     {moods.map(m=><TouchableOpacity key={m} accessibilityRole="radio" accessibilityState={{selected:mood===m}} onPress={()=>setMood(m)} style={{width:'48.7%',alignItems:'center',borderWidth:mood===m?1.5:1,borderColor:mood===m?color:'#EEEAF3',borderRadius:22,backgroundColor:mood===m?'#EEE8FF':'#FBF9FF',paddingVertical:13,gap:7}}>
-     <SuperdotMascot id={m} size={96}/>
+     <SuperdotMascot id={m} size={96} animate={false}/>
      <Text style={{fontWeight:'800',fontSize:15,color:'#26165C'}}>{m}</Text>
     </TouchableOpacity>)}
    </View>
@@ -103,7 +103,7 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJo
    <Text style={{fontSize:15,fontWeight:'900',color:'#30264D'}}>What's next?</Text>
    {[
     {icon:'📜',title:'Find a Bible verse for me',sub:'Find encouragement matched to your check-in',go:()=>onFindVerse(mood,savedAnswers)},
-    {icon:'💬',title:'Talk to your Superdot',sub:'Explore this feeling through AI text chat',go:()=>onExploreAI(mood)},
+    {icon:'💬',title:'Talk to your MoodPal',sub:'Explore this feeling through AI text chat',go:()=>onExploreAI(mood)},
     {icon:'📖',title:'Write in your journal',sub:'Reflect on your thoughts',go:onJournal},
     {icon:'💡',title:'View insights',sub:'See your patterns over time',go:onInsights},
    ].map(item=><TouchableOpacity key={item.title} accessibilityRole="button" onPress={item.go} style={{borderWidth:1,borderColor:'#ECE9F4',borderRadius:14,padding:11,flexDirection:'row',alignItems:'center',gap:11}}>
