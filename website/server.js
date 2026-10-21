@@ -7,7 +7,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL || 'https://hzoauxxpvrgahlavxmvp.s
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const LOCAL_FILE = path.join(__dirname, 'data', 'subscribers.json');
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,24}$/;
-const INTERESTS = ['stress', 'sleep', 'journaling', 'watch', 'inner-circle'];
+const INTERESTS = ['stress', 'sleep', 'journaling', 'scripture', 'watch', 'inner-circle'];
 
 const app = express();
 app.disable('x-powered-by');

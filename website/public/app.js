@@ -21,6 +21,12 @@ const SCREENS = {
     <div class="card" style="background:#E4F6EA"><h5>Your week</h5><div class="row"><div class="tile"><div class="muted">Calmest</div><b style="color:#4DBB7F">Sunday</b></div><div class="tile"><div class="muted">Hardest</div><b style="color:#F2A56F">Wednesday</b></div></div><div class="muted" style="margin-top:6px">Try a one-minute breathing break before your busiest meetings.</div></div>
     <div class="card"><h5>What drives your stress</h5><div class="muted">Work · <b style="color:#F2A56F">Elevated 71</b></div><div style="height:6px;background:#EEF3F0;border-radius:3px;margin:3px 0 6px"><div style="width:71%;height:6px;background:#F2A56F;border-radius:3px"></div></div><div class="muted">Exercise · <b style="color:#4DBB7F">Great 28</b></div><div style="height:6px;background:#EEF3F0;border-radius:3px;margin-top:3px"><div style="width:28%;height:6px;background:#4DBB7F;border-radius:3px"></div></div></div>
     <div class="card"><h5>Tuesday, Oct 21</h5><div class="entry"><i style="background:#4DBB7F"></i><div><b>Joyful · 8/10</b><div>Morning walk before work, felt clear-headed.</div><span class="chip">Stress Great · 24</span><span class="chip">Exercise</span></div></div></div>${tabbar('Actions')}</div>`,
+  verse: () => `<div class="ui"><div class="top"><span>Spiritual Reading</span></div>
+    <div class="card" style="display:flex;gap:8px;align-items:center"><img src="/img/mascots/fear.webp" alt="" style="width:42px;height:42px"><div><b>Feeling anxious</b><div class="muted">Work · Sleep</div></div></div>
+    <div class="muted" style="font-weight:800;letter-spacing:.08em">A PASSAGE FOR YOU</div>
+    <div class="verse"><q>In nothing be anxious, but in everything, by prayer and petition with thanksgiving, let your requests be made known to God. And the peace of God, which surpasses all understanding, will guard your hearts and your thoughts in Christ Jesus.</q><div class="ref">Philippians 4:6-7 · WEB</div></div>
+    <div class="card"><h5>A reflection for today</h5><div class="muted">Name one worry from today and hand it over in a short prayer, then take three slow breaths with your pal.</div></div>
+    <div><span class="chip">Save to favorites</span><span class="chip">Read from source</span></div>${tabbar('Actions')}</div>`,
   ask: () => `<div class="ui"><div class="top"><span>Ask MoodPal</span></div>
     <div><span class="chip">Elevated · 68</span><span class="chip">HRV 38 ms</span><span class="chip">Slept 5h 40m</span></div>
     <div class="bubble me">Why is my stress high today?</div>
