@@ -60,8 +60,8 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJo
    <Text style={{fontSize:23,fontWeight:'900',color:'#251C45'}}>How are you feeling today?</Text>
    <Text style={{color:'#817892',fontSize:12}}>Choose the mood that best fits right now.</Text>
    <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
-    {moods.map(m=><TouchableOpacity key={m} accessibilityRole="radio" accessibilityState={{selected:mood===m}} onPress={()=>setMood(m)} style={{width:'48.7%',alignItems:'center',borderWidth:mood===m?1.5:1,borderColor:mood===m?color:'#EEEAF3',borderRadius:22,backgroundColor:mood===m?'#EEE8FF':'#FBF9FF',paddingVertical:13,gap:7}}>
-     <SuperdotMascot id={m} size={96} animate={false}/>
+    {moods.map((m,index)=><TouchableOpacity key={m} accessibilityRole="radio" accessibilityState={{selected:mood===m}} onPress={()=>setMood(m)} style={{width:'48.7%',alignItems:'center',borderWidth:mood===m?1.5:1,borderColor:mood===m?color:'#EEEAF3',borderRadius:22,backgroundColor:mood===m?'#EEE8FF':'#FBF9FF',paddingVertical:13,gap:7}}>
+     <SuperdotMascot id={m} size={96} playDurationMs={1200} startDelayMs={index*750}/>
      <Text style={{fontWeight:'800',fontSize:15,color:'#26165C'}}>{m}</Text>
     </TouchableOpacity>)}
    </View>
