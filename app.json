@@ -59,6 +59,7 @@
         }
       ],
       "@bacons/apple-targets",
+      "./scripts/with-watch-widget-embed.cjs",
       "./scripts/with-health-privacy.cjs",
       "expo-sharing"
     ],

@@ -6,6 +6,7 @@ import WatchKit
 /// The publishable key is public; tokens are stored in the user's Keychain.
 @MainActor
 final class WatchThemeSync: ObservableObject {
+    static let shared = WatchThemeSync()
     @Published var connected = false
     @Published var busy = false
     @Published var moodLoaded = false
@@ -128,11 +129,30 @@ final class WatchThemeSync: ObservableObject {
                     if metric == "steps" && store.latestSteps == nil { store.latestSteps = number }
                     if metric == "sleep_minutes" && store.latestSleepMinutes == nil { store.latestSleepMinutes = number }
                 }
+                // Apple Watch keeps only about a week of HealthKit history, so the 21-day baseline
+                // also uses the iPhone's synced HealthKit readings.
+                WatchStressStore.saveHistory(hrv: store.hrvHistory.map { HealthPoint(value: $0.value, date: $0.date) },
+                                             rhr: store.restingHeartHistory.map { HealthPoint(value: $0.value, date: $0.date) })
     
         } catch {
             NSLog("[WatchSync] Health sync failed: %@", error.localizedDescription)
             syncWarning = [syncWarning, "Health: \(error.localizedDescription)"].compactMap{$0}.joined(separator:"; ")
         }
+        do {
+            // Latest iPhone-computed (or previously uploaded watch) score; the newest reading wins.
+            let data = try await request("/rest/v1/wellness_readings?select=value,recorded_at&user_id=eq.\(userId)&source=eq.computed&metric=eq.stress_score&order=recorded_at.desc&limit=1",method:"GET")
+            let rows = try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
+            if let row = rows.first, let text = row["recorded_at"] as? String, let at = Self.parseDate(text) {
+                let raw = row["value"]
+                if let value = (raw as? NSNumber)?.doubleValue ?? Double(String(describing: raw ?? "")) {
+                    WatchStressStore.offer(StressReading(score: Int(value.rounded()), at: at, source: .iphone))
+                }
+            }
+        } catch {
+            NSLog("[WatchSync] Stress sync failed: %@", error.localizedDescription)
+        }
+        await HealthStressMonitor.shared.recompute(upload: true)
+        store.reloadStress()
         message = syncWarning.map { "Account verified. Sync issue: \($0)" } ?? "Connected and synced: \(store.currentMood)."
     }
 
@@ -151,6 +171,34 @@ final class WatchThemeSync: ObservableObject {
         _ = try await request("/rest/v1/wellness_journal", method:"POST", body:payload)
         store.currentMood = mood
         moodLoaded = true
+    }
+
+    /// Uploads a watch-computed score as a `computed` stress_score row. Idempotent via source_record_key.
+    func uploadStress(score:Int, at:Date, key:String) async {
+        guard connected, !userId.isEmpty, !refreshToken.isEmpty else { return }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let row:[String:Any] = ["user_id":userId,"metric":"stress_score","value":score,"source":"computed",
+                                "source_record_key":key,"recorded_at":formatter.string(from:at)]
+        let path = "/rest/v1/wellness_readings?on_conflict=user_id,source,metric,source_record_key"
+        let headers = ["Prefer":"resolution=ignore-duplicates,return=minimal"]
+        do {
+            let body = try JSONSerialization.data(withJSONObject:[row])
+            do { _ = try await request(path,method:"POST",body:body,extraHeaders:headers) }
+            catch SyncError.server(401, _, _) {
+                try await renewIfNeeded()
+                _ = try await request(path,method:"POST",body:body,extraHeaders:headers)
+            }
+            NSLog("[WatchSync] Uploaded stress_score %ld (%@)", score, key)
+        } catch {
+            NSLog("[WatchSync] Stress upload failed: %@", error.localizedDescription)
+        }
+    }
+
+    static func parseDate(_ text:String) -> Date? {
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fractional.date(from:text) ?? ISO8601DateFormatter().date(from:text)
     }
 
     func questions(for mood:String) async throws -> [[String:Any]] {

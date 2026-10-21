@@ -8,5 +8,13 @@
 	</array>
 	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>MoodPals reads heart rate, heart rate variability and resting heart rate on your watch to estimate your stress level compared with your own baseline.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>MoodPals starts a short mind &amp; body session during Measure now to read your heart rate. The session is not saved as a workout.</string>
+	<key>WKBackgroundModes</key>
+	<array>
+		<string>workout-processing</string>
+	</array>
 </dict>
 </plist>
