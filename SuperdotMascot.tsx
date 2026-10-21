@@ -1,4 +1,5 @@
 import React from 'react';
+import {Image} from 'react-native';
 import {AnimatedMascotFrames} from './MoodMascot';
 import {MASCOT_FRAMES} from './MascotAnimationAssets';
 
@@ -13,7 +14,8 @@ function frameKey(id:string):keyof typeof MASCOT_FRAMES {
  if (/calm|disgust|relax|peace|nori/.test(mood))return 'disgust';
  return 'joy';
 }
-export default function SuperdotMascot({id,size=102}:{id:string;color?:string;size?:number;mood?:'happy'|'calm'|'sleepy'|'excited'}) {
+export default function SuperdotMascot({id,size=102,animate=true}:{id:string;color?:string;size?:number;animate?:boolean;mood?:'happy'|'calm'|'sleepy'|'excited'}) {
  const key=frameKey(id);
+ if(!animate)return <Image source={MASCOT_FRAMES[key][0]} style={{width:size,height:size}} resizeMode="contain" accessibilityLabel={key+' MoodPal preview'}/>;
  return <AnimatedMascotFrames key={key} frames={MASCOT_FRAMES[key]} size={size} label={key==='disgust'?'Calm MoodPal':key+' MoodPal'}/>;
 }
