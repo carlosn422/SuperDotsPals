@@ -5,7 +5,7 @@
 const fs=require('node:fs'),path=require('node:path'),cp=require('node:child_process');
 const root=path.resolve(__dirname,'..');
 const ios=path.join(root,'ios');
-if(!fs.existsSync(ios)){console.log('Skipping plist validation: native iOS project not generated yet.');process.exit(0)}
+if(!fs.existsSync(ios)){console.log('EAS prebuild not started: skipping native plist patch; Expo config plugin will apply native settings.');process.exit(0)}
 const exec=(args)=>cp.execFileSync('/usr/libexec/PlistBuddy',args,{encoding:'utf8',stdio:['ignore','pipe','pipe']});
 const get=(p,key)=>{try{return exec(['-c','Print '+key,p]).trim()}catch{return ''}};
 const set=(p,key,type,value)=>{
@@ -13,7 +13,7 @@ const set=(p,key,type,value)=>{
  catch{exec(['-c','Add '+key+' '+type+' '+value,p])}
 };
 const app=path.join(ios,'Superdots','Info.plist');
-if(!fs.existsSync(app))throw new Error('Missing generated iOS Info.plist: '+app);
+if(!fs.existsSync(app)){console.log('Native iOS Info.plist not generated yet. Skipping native patch at EAS post-install; Expo config plugin will apply the settings during prebuild.');process.exit(0)}
 set(app,'NSHealthShareUsageDescription','string','Superdots reads heart rate variability, resting heart rate, steps, and sleep for personal wellness insights.');
 set(app,'NSHealthUpdateUsageDescription','string','Superdots integrates with Apple Health for personal wellness features. It currently reads health data and does not write or modify health records.');
 if(!get(app,'NSHealthUpdateUsageDescription'))throw new Error('iOS health purpose string absent after patch');
