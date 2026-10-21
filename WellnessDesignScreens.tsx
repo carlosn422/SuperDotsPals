@@ -7,6 +7,7 @@ import {supabase} from './supabase';
 import HealthDataPanel,{HealthMiniStats,useSavedHealth} from './HealthDataPanel';
 import RecoveryInsights from './RecoveryInsights';
 import HealthTrendOverview from './HealthTrendOverview';
+import {StressHero,HrvTrendCard,HeartRateCard,HealthActionsGrid,StressTrendCard} from './StressDashboard';
 
 const P=APP_THEME.primary,INK=APP_THEME.ink,MUTED=APP_THEME.muted;
 type Props={companion:string;accent:string;onPress?:()=>void};
@@ -67,7 +68,9 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
   </TouchableOpacity>
  );
  return <View style={[s.page,{gap:17}]}>
-  <PageHero title="How are you feeling" highlight="today?" detail="Your friendly MoodPal is here for you. Every feeling counts." accent={accent} companion={companion} button="Check in with MoodPals" onPress={onCheckin}/>
+  <StressHero mood={companion} onCheckin={onCheckin}/>
+  <HrvTrendCard/>
+  <HeartRateCard/>
   <View style={{gap:10}}>
    <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={{fontWeight:'900',fontSize:19,color:INK}}>Today</Text><Text style={{color:MUTED,fontSize:12}}>{date}</Text></View>
    <View style={{borderRadius:20,overflow:'hidden',borderColor:APP_THEME.border,borderWidth:1}}>
@@ -78,10 +81,9 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
    </View>
   </View>
   <RecoveryInsights companion={companion} onChat={onChat}/>
-  <HealthMiniStats/>
- </View>;
+</View>;
 }
-export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpiritual,onChat,onMood,onJournal,caffeine}:{companion:string;accent:string;water:number;caffeine:number;onWater:()=>void;onCaffeine:()=>void;onSpiritual:()=>void;onChat:()=>void;onMood:()=>void;onJournal:()=>void}){
+export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpiritual,onChat,onMood,onJournal,onBreathing,caffeine}:{companion:string;accent:string;water:number;caffeine:number;onWater:()=>void;onCaffeine:()=>void;onSpiritual:()=>void;onChat:()=>void;onMood:()=>void;onJournal:()=>void;onBreathing:()=>void}){
  const [day,setDay]=React.useState(0);
  const [pastAmounts,setPastAmounts]=React.useState({water:0,caffeine:0});
  const [activitySummary,setActivitySummary]=React.useState<{count:number;minutes:number}>({count:0,minutes:0});
@@ -111,7 +113,7 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpi
  </TouchableOpacity>);
  return <View style={[s.page,{gap:15}]}>
   <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
-   <View><Text style={{fontSize:29,fontWeight:'900',color:INK}}>Actions</Text><Text style={{color:MUTED,fontSize:12,marginTop:2}}>Small steps for feeling better</Text></View>
+   <View><Text style={{fontSize:29,fontWeight:'900',color:INK}}>Actions</Text><Text style={{color:MUTED,fontSize:12,marginTop:2}}>Actions to relieve stress and build healthy habits</Text></View>
    <SuperdotMascot id={companion} size={53}/>
   </View>
   <View style={{flexDirection:'row',gap:5}}>{dates.map((d,i)=><TouchableOpacity key={i} onPress={()=>setDay(i-6)} style={{flex:1,alignItems:'center',paddingVertical:11,borderRadius:17,backgroundColor:day===i-6?APP_THEME.primarySoft:'#FFFFFF',gap:4,borderWidth:day===i-6?1.5:1,borderColor:day===i-6?accent:'#ECEAF2'}}>
@@ -141,9 +143,10 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpi
    <View style={{backgroundColor:"#FFFFFF",borderRadius:17,padding:13,borderWidth:1,borderColor:"#ECEAF2"}}><Text style={{color:INK,fontSize:13,fontWeight:"800"}}>Activities logged: {activitySummary.count}</Text><Text style={{color:MUTED,fontSize:12}}>{activitySummary.minutes} minutes recorded {day===0?"today":"on this day"}</Text></View>
    {item('book-outline','Spiritual Reading','Personalized Scripture and encouragement','#E7F5ED',onSpiritual)}
    {item('book-outline','Your journal','Review your private reflections','#F4EBFF',onJournal)}
-   {item('chatbubble-ellipses-outline','Talk to MoodPals','Private text conversation','#EFE9FF',onChat)}
+   {item('chatbubble-ellipses-outline','Ask AI about your stress','Chat with MoodPals about your readings','#EFE9FF',onChat)}
+   {item('leaf-outline','Breathing break','Calm, box and unwind exercises','#E4F6EA',onBreathing)}
   </View>
-  <View style={{backgroundColor:'#F1F3F5',padding:13,borderRadius:15}}><Text style={{fontSize:11,color:MUTED,lineHeight:17}}>Sleep, steps, and recovery readings are available in Health after connecting Apple Health. They aren't shown here as actions until data is available.</Text></View>
+  {day===0?<View style={{gap:9}}><SectionHeading title="Body & recovery" detail="Apple Health"/><HealthActionsGrid onMindfulness={onBreathing}/></View>:null}
  </View>;
 }
 export function WellnessTrends({companion,accent,period,onPeriod,mood}:{companion:string;accent:string;period:string;onPeriod:(p:'Day'|'Week'|'Month'|'Year')=>void;mood:string}){
@@ -161,9 +164,10 @@ export function WellnessTrends({companion,accent,period,onPeriod,mood}:{companio
   return {label:period==='Week'?['S','M','T','W','T','F','S'][d.getDay()]:period==='Day'?'Today':String(d.getDate()),count:bucket.length};
  });
  const maxCount=Math.max(1,...groups.map(g=>g.count));
- return <View style={s.page}><BrandHead companion={companion}/><PageHero title="Understand your" highlight="patterns." detail="See how your habits and mood connect over time." companion={companion} accent={accent}/>
+ return <View style={s.page}><BrandHead companion={companion}/><PageHero title="Your stress," highlight="visualized." detail="Hourly, daily, monthly and yearly trends from your own readings." companion={companion} accent={accent}/>
  <View style={s.segment}>{(['Day','Week','Month','Year'] as const).map(p=><TouchableOpacity key={p} onPress={()=>onPeriod(p)} style={[s.seg,period===p&&{backgroundColor:accent}]}><Text style={{color:period===p?'#fff':MUTED,fontWeight:'800',fontSize:12}}>{p}</Text></TouchableOpacity>)}</View>
- <SectionHeading title="Mood trend"/><View style={s.white}><Text style={s.cardTitle}>How you've been feeling</Text>
+ <StressTrendCard period={period as any}/>
+<SectionHeading title="Mood trend"/><View style={s.white}><Text style={s.cardTitle}>How you've been feeling</Text>
  <Text style={s.big}>{loading?'Loading…':filtered.length?filtered.length+' check-ins':'No check-ins yet'}</Text>
  <Text style={s.body}>{filtered.length?'These bars show how many mood check-ins you logged, not a stress or health score.':'Start checking in to see your own mood history.'}</Text>
  <View style={s.bars}>{groups.map((g,i)=><View key={i} style={{flex:1,alignItems:'center',gap:6,justifyContent:'flex-end',height:105}}><View style={{width:'58%',minWidth:8,height:g.count?Math.max(10,Math.round(g.count/maxCount*75)):5,borderRadius:9,backgroundColor:g.count?accent:'#EDE9F4'}}/><Text style={{fontSize:9,color:MUTED}}>{g.label}</Text></View>)}</View>
@@ -184,7 +188,7 @@ export function WellnessSettingsIntro({companion,accent}:{companion:string;accen
 }
 const s=StyleSheet.create({
  page:{gap:14,paddingBottom:12},brand:{flexDirection:'row',alignItems:'center',gap:7,marginBottom:4},brandWord:{fontSize:25,fontWeight:'900',color:INK},
- hero:{borderRadius:26,backgroundColor:'#EAE6FA',padding:20,flexDirection:'row',minHeight:202,alignItems:'center',overflow:'hidden'},heroTitle:{fontSize:29,lineHeight:34,fontWeight:'900',color:INK},heroText:{fontSize:13,lineHeight:19,color:MUTED},heroButton:{alignSelf:'stretch',minHeight:56,paddingVertical:14,paddingHorizontal:16,borderRadius:15,alignItems:'center',justifyContent:'center'},
+ hero:{borderRadius:26,backgroundColor:APP_THEME.mint,padding:20,flexDirection:'row',minHeight:202,alignItems:'center',overflow:'hidden'},heroTitle:{fontSize:29,lineHeight:34,fontWeight:'900',color:INK},heroText:{fontSize:13,lineHeight:19,color:MUTED},heroButton:{alignSelf:'stretch',minHeight:56,paddingVertical:14,paddingHorizontal:16,borderRadius:15,alignItems:'center',justifyContent:'center'},
  heading:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:5},headingText:{fontSize:22,fontWeight:'900',color:INK},headingDetail:{fontSize:11,color:P},
  celebrate:{borderRadius:24,padding:18,flexDirection:'row',gap:10,alignItems:'center'},celebrateTitle:{fontWeight:'900',fontSize:20,color:INK,lineHeight:24},body:{color:MUTED,fontSize:12,lineHeight:18},
  grid:{flexDirection:'row',flexWrap:'wrap',gap:10},stat:{backgroundColor:'#fff',borderRadius:21,padding:15,width:'48%',minHeight:137,gap:6},statIcon:{width:38,height:38,borderRadius:20,alignItems:'center',justifyContent:'center'},statTitle:{fontSize:12,fontWeight:'800',color:INK},statValue:{fontWeight:'900',fontSize:18,color:INK},statDetail:{fontSize:11,color:MUTED},

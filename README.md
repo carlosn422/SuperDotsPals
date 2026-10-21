@@ -11,10 +11,12 @@ npx expo start --ios
 
 ## Included
 
-- Today with tappable companion and fictional HRV and stress readings
-- Trends with day/week/month/year charts and sample insights
-- Sleep stages, workouts, steps, daylight, mood, water and caffeine trackers
-- One-minute breathing activity and theme selector
-- iOS-first Expo app (no Apple Health/Watch integration yet)
+- Today: StressWatch-style stress hero (daily stress level from HRV and resting heart rate vs your own 21-day baseline), HRV trend and hourly heart-rate cards
+- Actions: sleep, fitness rings, daylight, mindfulness, steps and noise from Apple Health; water, caffeine, mood check-ins, journal, breathing, spiritual reading and AI chat
+- Trends: stress trend by day/week/month/year, mood check-ins, Apple Health trends, PDF report export
+- Apple Health sync (native iOS build only) to the user's private Supabase rows; opt-in stress alerts and daily reminders
+- watchOS companion (see `watchos/`)
 
-**Important:** No real physiological data is used. All health values and recommendations are fictional demonstrations, not medical advice. Habit entries and theme previews are session-local. App has not yet been tested on an iPhone simulator.
+See [docs/STRESSWATCH_COMPARISON.md](docs/STRESSWATCH_COMPARISON.md) for the feature comparison.
+
+**Important:** Stress scores are a wellness estimate based on your own readings, not a medical measurement or diagnosis. HealthKit isn't available in Expo Go.

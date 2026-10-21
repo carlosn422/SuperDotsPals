@@ -8,6 +8,25 @@ import {supabase} from './supabase';
 Notifications.setNotificationHandler({handleNotification:async()=>({shouldShowBanner:true,shouldShowList:true,shouldPlaySound:false,shouldSetBadge:false})});
 const TIMES=[{hour:8,name:'8 AM'},{hour:9,name:'9 AM'},{hour:12,name:'12 PM'},{hour:18,name:'6 PM'},{hour:21,name:'9 PM'}];
 const prefs={enabled:false,hour:9,minute:0};
+const THRESHOLDS=[{value:60,name:'Elevated'},{value:75,name:'High'},{value:85,name:'Overload'}];
+function StressAlertSettings({account}:{account:string|null}){
+ const [enabled,setEnabled]=useState(false),[threshold,setThreshold]=useState(75),[busy,setBusy]=useState(false),[available,setAvailable]=useState(true);
+ useEffect(()=>{if(!account)return;void supabase.from('user_settings').select('stress_alerts_enabled,stress_alert_threshold').eq('user_id',account).maybeSingle().then(({data,error})=>{if(error){setAvailable(false);return}setEnabled(!!data?.stress_alerts_enabled);setThreshold(Number(data?.stress_alert_threshold??75))})},[account]);
+ async function save(nextEnabled:boolean,nextThreshold=threshold){
+  if(!account)return;setBusy(true);
+  try{
+   if(nextEnabled){const p=await Notifications.getPermissionsAsync();if(!p.granted&&!(await Notifications.requestPermissionsAsync()).granted)throw Error('Notifications were not allowed. Enable them in iPhone Settings.');}
+   const {error}=await supabase.from('user_settings').update({stress_alerts_enabled:nextEnabled,stress_alert_threshold:nextThreshold}).eq('user_id',account);if(error)throw error;
+   setEnabled(nextEnabled);setThreshold(nextThreshold);
+  }catch(e:any){Alert.alert('Could not update stress alerts',e?.message||'Please try again')}finally{setBusy(false)}
+ }
+ if(!available)return <Text style={s.foot}>Stress alerts will be available after the latest database update is applied.</Text>;
+ return <View style={{gap:12}}>
+  <TouchableOpacity disabled={busy} onPress={()=>void save(!enabled)} style={s.toggle}><View style={{flex:1,gap:4}}><Text style={s.name}>Stress alerts</Text><Text style={s.sub}>{enabled?'Notify me when my stress score is high':'Off'}</Text></View><Ionicons name={enabled?'pulse':'pulse-outline'} size={26} color={enabled?'#EE6F86':'#A99FC0'}/></TouchableOpacity>
+  <View style={s.grid}>{THRESHOLDS.map(t=><TouchableOpacity key={t.value} disabled={busy} onPress={()=>void save(enabled,t.value)} style={[s.chip,{backgroundColor:threshold===t.value?'#34B37E':'#E4F6EA'}]}><Text style={{color:threshold===t.value?'#fff':'#1D2B33',fontWeight:'800'}}>{t.name} · {t.value}+</Text></TouchableOpacity>)}</View>
+  <Text style={s.foot}>Checked each time MoodPals syncs Apple Health, at most once every 3 hours. Alerts never include your health values and are not medical advice.</Text>
+ </View>;
+}
 export default function WellnessReminders(){
  const [enabled,setEnabled]=useState(false),[hour,setHour]=useState(9);
  const [busy,setBusy]=useState(false),[loading,setLoading]=useState(true);
@@ -40,11 +59,12 @@ export default function WellnessReminders(){
    setEnabled(shouldEnable);setHour(nextHour);
   }catch(e:any){Alert.alert('Could not update reminders',e?.message||'Please try again')}finally{setBusy(false)}
  }
- return <View style={s.root}><Text style={s.title}>Gentle daily reminders</Text><Text style={s.sub}>Schedule a local iPhone notification to check in with your Superdot. It won't send your health readings in a notification.</Text>
+ return <View style={s.root}><Text style={s.title}>Reminders & stress alerts</Text><Text style={s.sub}>Schedule a local iPhone notification to check in with your Superdot. It won't send your health readings in a notification.</Text>
  {loading?<ActivityIndicator color="#7139E9"/>:<><TouchableOpacity disabled={busy} onPress={()=>void apply(!enabled)} style={s.toggle}><View style={{flex:1,gap:4}}><Text style={s.name}>Daily wellness check-in</Text><Text style={s.sub}>{enabled?'Scheduled on this device':'Off on this device'}</Text></View><Ionicons name={enabled?'notifications':'notifications-off-outline'} size={26} color={enabled?'#3BA986':'#A99FC0'}/></TouchableOpacity>
  <Text style={s.name}>Reminder time</Text><View style={s.grid}>{TIMES.map(t=><TouchableOpacity key={t.hour} disabled={busy} onPress={()=>void apply(enabled,t.hour)} style={[s.chip,{backgroundColor:hour===t.hour?'#7139E9':'#F1EBFD'}]}><Text style={{color:hour===t.hour?'#fff':'#5D4199',fontWeight:'800'}}>{t.name}</Text></TouchableOpacity>)}</View>
  <Text style={s.foot}>{enabled?'A reminder is scheduled every day at '+TIMES.find(x=>x.hour===hour)?.name+'.':'Enable reminders to schedule daily check-ins.'} Times follow your phone's local time.</Text>
- {busy?<ActivityIndicator color="#7139E9"/>:null}</>}
+ {busy?<ActivityIndicator color="#7139E9"/>:null}
+ <StressAlertSettings account={account}/></>}
  </View>
 }
 const s=StyleSheet.create({root:{backgroundColor:'#fff',borderRadius:23,padding:18,gap:16},title:{fontSize:20,color:'#25145C',fontWeight:'900'},name:{fontSize:15,color:'#25145C',fontWeight:'800'},sub:{color:'#8276A5',fontSize:12,lineHeight:18},toggle:{borderWidth:1,borderColor:'#EEE8FA',borderRadius:16,padding:15,flexDirection:'row',alignItems:'center'},grid:{flexDirection:'row',flexWrap:'wrap',gap:9},chip:{padding:11,borderRadius:15},foot:{color:'#8276A5',fontSize:11,lineHeight:16}});

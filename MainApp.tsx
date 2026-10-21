@@ -14,6 +14,7 @@ import {WellnessToday,WellnessActions,WellnessTrends,WellnessHealth,WellnessSett
 import {WatchThemesCard,SettingsItem} from './SettingsComponents';
 import {APP_THEME} from './MoodMascot';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as Notifications from 'expo-notifications';
 import Svg, { Circle, Line, Path, Rect, Defs, LinearGradient, Stop, Polygon } from 'react-native-svg';
 
 type Tab = 'Today' | 'Actions' | 'Trends' | 'Health' | 'Settings';
@@ -35,10 +36,10 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  const [tab,setTab]=useState<Tab>('Today');
  const actionScroll=useRef<ScrollView>(null);
  const [actionDetail,setActionDetail]=useState<'water'|'caffeine'|null>(null);
- const [actionView,setActionView]=useState<'checkin'|'chat'|'history'|'spiritual'|null>(null);
+ const [actionView,setActionView]=useState<'checkin'|'chat'|'history'|'spiritual'|'breathing'|null>(null);
  const [actionVersion,setActionVersion]=useState(0);
  const [spiritualCheckin,setSpiritualCheckin]=useState<{mood:string;answers:Record<string,string>}|undefined>(undefined);
- const openAction=(view:'checkin'|'chat'|'history'|'spiritual')=>{if(view==='spiritual')setSpiritualCheckin(undefined);setActionDetail(null);setActionView(view);setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});};
+ const openAction=(view:'checkin'|'chat'|'history'|'spiritual'|'breathing')=>{if(view==='spiritual')setSpiritualCheckin(undefined);setActionDetail(null);setActionView(view);setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});};
  const [settingsPage,setSettingsPage]=useState<'main'|'watch'|'devices'|'health'|'notifications'|'privacy'|'help'>('main');
  const [period,setPeriod]=useState<Period>('Day');
  const [mood,setMood]=useState<string>('');
@@ -67,6 +68,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   });
   return()=>{active=false;if(channel)void supabase.removeChannel(channel)};
  },[]);
+ useEffect(()=>{const sub=Notifications.addNotificationResponseReceivedListener(r=>{if(r.notification.request.content.data?.action==='breathing'){go('Actions');openAction('breathing')}});return()=>sub.remove()},[pageWidth]);
  const [water,setWater]=useState(0);
  const [coffee,setCoffee]=useState(0);
  useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;
@@ -123,8 +125,9 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   {actionDetail||actionView?<TouchableOpacity onPress={()=>{setActionView(null);setActionDetail(null);actionScroll.current?.scrollTo({y:0,animated:true});}} style={{flexDirection:'row',alignItems:'center',gap:8,paddingVertical:9}}><Ionicons name="arrow-back" size={20} color={colors.accent}/><Text style={{color:colors.accent,fontWeight:'800'}}>All actions</Text></TouchableOpacity>:null}
   {actionDetail?<HabitDetails habit={actionDetail} onBack={()=>{setActionDetail(null);actionScroll.current?.scrollTo({y:0,animated:true})}} onSaved={(habit,n)=>{if(habit==='water')setWater(n);else setCoffee(n)}}/>:
   actionView==='spiritual'?<SpiritualReading key={actionVersion} initialCheckin={spiritualCheckin}/>:
-  actionView?<WellnessCompanion key={actionVersion} initialView={actionView} companion={mood} onMoodSaved={setMood} onWizardNavigate={()=>actionScroll.current?.scrollTo({y:0,animated:false})} onCheckinDone={()=>{setActionView(null);go('Today');}} onOpenInsights={()=>{setActionView(null);go('Trends');}} onFindVerse={(selectedMood,answers)=>{setSpiritualCheckin({mood:selectedMood,answers});setActionView('spiritual');setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});}} color={colors.accent}/>:
-  <WellnessActions companion={mood} accent={colors.accent} water={water} caffeine={coffee} onCaffeine={()=>{setActionView(null);setActionDetail('caffeine');actionScroll.current?.scrollTo({y:0,animated:true})}} onWater={()=>{setActionView(null);setActionDetail('water');actionScroll.current?.scrollTo({y:0,animated:true})}} onSpiritual={()=>openAction('spiritual')} onChat={()=>openAction('chat')} onMood={()=>openAction('checkin')} onJournal={()=>openAction('history')}/>}
+  actionView==='breathing'?<BreathingStudio key={actionVersion} accent={colors.accent} tint={colors.pale}/>:
+  actionView?<WellnessCompanion key={actionVersion} initialView={actionView as 'checkin'|'chat'|'history'} companion={mood} onMoodSaved={setMood} onWizardNavigate={()=>actionScroll.current?.scrollTo({y:0,animated:false})} onCheckinDone={()=>{setActionView(null);go('Today');}} onOpenInsights={()=>{setActionView(null);go('Trends');}} onFindVerse={(selectedMood,answers)=>{setSpiritualCheckin({mood:selectedMood,answers});setActionView('spiritual');setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});}} color={colors.accent}/>:
+  <WellnessActions companion={mood} accent={colors.accent} water={water} caffeine={coffee} onCaffeine={()=>{setActionView(null);setActionDetail('caffeine');actionScroll.current?.scrollTo({y:0,animated:true})}} onWater={()=>{setActionView(null);setActionDetail('water');actionScroll.current?.scrollTo({y:0,animated:true})}} onSpiritual={()=>openAction('spiritual')} onChat={()=>openAction('chat')} onMood={()=>openAction('checkin')} onJournal={()=>openAction('history')} onBreathing={()=>openAction('breathing')}/>}
 </ScrollView></View>
   <View key="Trends" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><WellnessTrends companion={mood} accent={colors.accent} period={period} onPeriod={setPeriod} mood={mood}/><WellnessReportExport/></ScrollView></View>
   <View key="Health" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><WellnessHealth companion={mood} accent={colors.accent} onChat={()=>{go('Actions');openAction('chat')}} onPermissions={()=>{go('Settings');setSettingsPage('health')}}/></ScrollView></View>
@@ -135,7 +138,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
 
     <SettingsItem title="Connected Devices" subtitle="Link and manage Apple Watches" status="Scan watch QR code" icon="git-network-outline" accent={colors.accent} onPress={()=>setSettingsPage('devices')}/>
     <SettingsItem title="Health Data" subtitle="Permissions and wearable readings" status="Open Health to connect or sync" icon="heart-outline" accent={colors.accent} onPress={()=>setSettingsPage('health')}/>
-    <SettingsItem title="Notifications" subtitle="Reminders and preferences" status="Manage daily iPhone reminders" icon="notifications-outline" accent={colors.accent} onPress={()=>setSettingsPage('notifications')}/>
+    <SettingsItem title="Notifications" subtitle="Reminders and preferences" status="Daily reminders and stress alerts" icon="notifications-outline" accent={colors.accent} onPress={()=>setSettingsPage('notifications')}/>
     <SettingsItem title="Wellness Profile" subtitle="Goals and onboarding answers" icon="person-circle-outline" accent={colors.accent} onPress={onEditProfile}/>
     <SettingsItem title="Privacy & Data" subtitle="Account storage and security" icon="shield-checkmark-outline" accent={colors.accent} onPress={()=>setSettingsPage('privacy')}/>
     <SettingsItem title="Help & Support" subtitle="FAQs and troubleshooting" icon="help-circle-outline" accent={colors.accent} onPress={()=>setSettingsPage('help')}/>
