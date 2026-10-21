@@ -16,7 +16,7 @@ Benchmark: [StressWatch: AI Stress Monitor](https://apps.apple.com/us/app/stress
 | Alerts | Stress notifications | Daily reminder only | Opt-in **stress alerts** (threshold 60/75/85, 3 h cooldown); tapping one opens a breathing break |
 | Mood / water / caffeine | Yes | Yes | Unchanged |
 | AI | "Ask AI" chat | `superdot-chat` Edge Function (Gemini) | Unchanged; it already reads non-demo `wellness_readings`, so it now sees stress scores too |
-| Watch | Watch app + complications | watchOS app (mood, breathing, basic health) | Watch shows the iPhone-computed stress level; new **watch-face complication** (circular / rectangular / inline / corner) |
+| Watch | Watch app + complications | watchOS app (mood, breathing, basic health) | Watch shows the iPhone-computed stress level (complication pending: `@bacons/apple-targets` 5.0 embedded it in the iPhone app) |
 | Widgets | Home & lock-screen widgets | None | **Stress widget** (small / medium / lock-screen) fed through App Group `group.com.superdotspals.wellnest` |
 | Background | Updates while closed | Only when app open | **HealthKit background delivery** for HRV, resting HR, sleep, heart rate → re-sync, widget refresh, stress alerts |
 | Look | Mint/pastel, white cards, dark text | Lilac/grape | Mint theme (`APP_THEME`), white elevated cards |
