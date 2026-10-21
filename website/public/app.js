@@ -94,15 +94,9 @@ document.querySelectorAll('[data-join]').forEach(link => link.addEventListener('
   setTimeout(() => form.querySelector('input[name=email]').focus({ preventScroll: true }), 600);
 }));
 
-// Apple Watch mockups: same animated pals as the watch app, cycling through moods.
-const WATCH_MOODS = [['fear','Anxious'],['joy','Joyful'],['disgust','Calm'],['tired','Tired'],['sadness','Sad'],['anger','Angry']];
-document.querySelectorAll('[data-watch]').forEach((watch, n) => {
-  watch.innerHTML = '<div class="face"><span class="time">1:31</span><img alt=""><div class="mood"></div><div class="hint">Tap to change mood</div></div>';
-  const img = watch.querySelector('img'), label = watch.querySelector('.mood');
-  let i = n % WATCH_MOODS.length;
-  const show = () => { const [file, name] = WATCH_MOODS[i]; img.src = `/img/mascots/${file}.webp`; img.alt = `${name} pal on Apple Watch`; label.textContent = name; };
-  show();
-  setInterval(() => { img.style.opacity = 0; setTimeout(() => { i = (i + 1) % WATCH_MOODS.length; show(); img.style.opacity = 1; }, 350); }, 4500);
+// Apple Watch mockups: Calm pal, matching the watch app's default screen.
+document.querySelectorAll('[data-watch]').forEach(watch => {
+  watch.innerHTML = '<div class="band top"></div><div class="case"><div class="face"><span class="time"></span><img src="/img/mascots/disgust.webp" alt="Calm pal on Apple Watch"><div class="mood">Calm</div><div class="hint">Tap to change mood</div></div></div><div class="band bottom"></div>';
   const t = () => { const d = new Date(); watch.querySelector('.time').textContent = `${d.getHours() % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}`; };
   t(); setInterval(t, 30000);
 });
