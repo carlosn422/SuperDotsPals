@@ -31,7 +31,10 @@
     "expo-status-bar": "~57.0.1",
     "micromatch": "^4.0.8",
     "react": "19.2.3",
-    "react-native": "0.86.3"
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-svg": "15.15.4",
+    "react-native-url-polyfill": "^4.0.0"
   },
   "devDependencies": {
     "@types/react": "^19.2.0",
