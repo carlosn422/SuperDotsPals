@@ -3,6 +3,7 @@ import {ActivityIndicator,View,AppState} from 'react-native';
 import {Session} from '@supabase/supabase-js';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {supabase} from './supabase';
+import './HealthBackground';
 import AuthScreen from './AuthScreen';
 import MainApp from './MainApp';
 import Onboarding,{DOTS} from './Onboarding';

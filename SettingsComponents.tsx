@@ -14,14 +14,14 @@ export const COMPANIONS=[
 export function PromoBanner({companion}:{companion:string}){
  return <View style={s.promo}>
   <View style={s.promoCircle}/>
-  <View style={{flex:1,zIndex:1,gap:9}}><Text style={s.promoTitle}>A little more care, every day.</Text><Text style={s.promoSubtitle}>Explore what's coming to Superdots Pro.</Text><TouchableOpacity onPress={()=>Alert.alert('Superdots Pro','Plans and trials are not available yet. No purchase will be started.')} style={s.promoButton}><Text style={s.promoButtonText}>Coming soon  →</Text></TouchableOpacity></View>
+  <View style={{flex:1,zIndex:1,gap:9}}><Text style={s.promoTitle}>A little more care, every day.</Text><Text style={s.promoSubtitle}>Explore what's coming to MoodPals Pro.</Text><TouchableOpacity onPress={()=>Alert.alert('MoodPals Pro','Plans and trials are not available yet. No purchase will be started.')} style={s.promoButton}><Text style={s.promoButtonText}>Coming soon  →</Text></TouchableOpacity></View>
   <View style={{zIndex:1}}><SuperdotMascot id={companion} color={COMPANIONS.find(c=>c.id===companion)?.color||'#7139E9'} size={106}/></View>
  </View>;
 }
 export function ThemeCard({selected,onOpen}:{selected:string;onOpen:()=>void}){
  const current=COMPANIONS.find(c=>c.id===selected)||COMPANIONS[0];
  return <TouchableOpacity accessibilityRole="button" onPress={onOpen} style={s.themeCard}>
-  <View style={{flex:1,gap:4}}><Text style={s.title}>Choose your Superdot theme</Text><Text style={s.subtitle}>Meet your buddies and customize your app</Text><Text style={[s.micro,{color:current.color}]}>Current: {current.name}</Text></View>
+  <View style={{flex:1,gap:4}}><Text style={s.title}>Choose your MoodPal theme</Text><Text style={s.subtitle}>Meet your buddies and customize your app</Text><Text style={[s.micro,{color:current.color}]}>Current: {current.name}</Text></View>
   <View style={{alignItems:'center',gap:5}}><SuperdotMascot id={selected} color={current.color} size={53}/><Ionicons name="chevron-forward" size={15} color="#9E98A8"/></View>
  </TouchableOpacity>;
 }
@@ -34,7 +34,7 @@ export function WatchThemesCard({onOpen}:{onOpen:()=>void}){
  return <View style={s.watchCard}>
   <TouchableOpacity onPress={onOpen} style={s.watchTop}><View style={s.iconBadge}><Ionicons name="watch-outline" size={25} color="#6C6680"/></View><View style={{flex:1,gap:4}}><Text style={s.title}>Apple Watch Faces & Widgets</Text><Text style={s.subtitle}>Companions, complications and widgets</Text><Text style={s.micro}>Theme sync available in the watch app</Text></View><View style={s.watchMock}><Ionicons name="watch" size={32} color="#5A448C"/><Text style={{fontSize:8,color:'#6D5992'}}>♥</Text></View><Ionicons name="chevron-forward" size={17} color="#9E98A8"/></TouchableOpacity>
   <View style={s.separator}/>
-  <Text style={s.subtitle}>Choose a Superdot theme in Settings, then sync it from the watch app. Custom face creation and redemption are not available yet.</Text>
+  <Text style={s.subtitle}>Choose a MoodPal theme in Settings, then sync it from the watch app. Custom face creation and redemption are not available yet.</Text>
  </View>;
 }
 type SettingIcon='heart-outline'|'notifications-outline'|'shield-checkmark-outline'|'help-circle-outline'|'git-network-outline'|'person-circle-outline';

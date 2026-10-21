@@ -10,7 +10,7 @@ const parse=(raw:string)=>{
  const id=u.searchParams.get('id')||'',secret=u.searchParams.get('secret')||'';
  if(!/^[0-9a-f-]{36}$/i.test(id)||!/^[0-9a-f]{64}$/i.test(secret))throw Error('Invalid QR');
  return {id,secret};
- }catch{throw Error('Scan a Superdots Apple Watch QR code.')}
+ }catch{throw Error('Scan a MoodPals Apple Watch QR code.')}
 };
 export default function ConnectedDevices(){
  const [devices,setDevices]=useState<Device[]>([]),[scan,setScan]=useState(false),[connecting,setConnecting]=useState(false),[loading,setLoading]=useState(false),[message,setMessage]=useState('');

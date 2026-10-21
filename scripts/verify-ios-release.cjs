@@ -15,8 +15,12 @@ const set=(p,key,type,value)=>{
  try{exec(['-c','Set '+key+' '+value,p])}
  catch{exec(['-c','Add '+key+' '+type+' '+value,p])}
 };
-const app=path.join(ios,'Superdots','Info.plist');
-if(!fs.existsSync(app))throw new Error('Missing generated iOS Info.plist: '+app);
+// Expo names the generated iOS directory/project after expo.name.
+// Discover the main app's Info.plist instead of hard-coding the old "Superdots" name.
+const expoName=JSON.parse(fs.readFileSync(path.join(root,'app.json'),'utf8')).expo.name;
+const candidates=[path.join(ios,expoName,'Info.plist'),path.join(ios,'MoodPals','Info.plist'),path.join(ios,'Superdots','Info.plist')];
+const app=candidates.find(fs.existsSync);
+if(!app)throw new Error('No generated iPhone Info.plist found. Run `npx expo prebuild --platform ios --clean` before `npm run verify:ios-release`. Checked: '+candidates.join(', '));
 set(app,'NSHealthShareUsageDescription','string','Superdots reads heart rate variability, resting heart rate, steps, and sleep for personal wellness insights.');
 set(app,'NSHealthUpdateUsageDescription','string','Superdots integrates with Apple Health for personal wellness features. It currently reads health data and does not write or modify health records.');
 if(!get(app,'NSHealthUpdateUsageDescription'))throw new Error('iOS health purpose string absent after patch');
@@ -35,7 +39,9 @@ for(const p of watchPlists.filter(fs.existsSync)){
 }
 // The Expo watch target generates Info.plist during compilation. Patch the watch
 // target's Xcode build settings, not only source plist files that may be ignored.
-const projectPath=path.join(ios,'Superdots.xcodeproj','project.pbxproj');
+const projectCandidates=[path.join(ios,expoName+'.xcodeproj','project.pbxproj'),path.join(ios,'MoodPals.xcodeproj','project.pbxproj'),path.join(ios,'Superdots.xcodeproj','project.pbxproj')];
+const projectPath=projectCandidates.find(fs.existsSync);
+if(!projectPath)throw new Error('No generated Xcode project found. Run Expo prebuild before verification.');
 if(!fs.existsSync(projectPath))throw new Error('Missing generated Xcode project');
 let pbx=fs.readFileSync(projectPath,'utf8');
 const updated=pbx.replace(/buildSettings = \{[^}]*PRODUCT_BUNDLE_IDENTIFIER = "?com\.superdotspals\.wellnest\.watchkitapp"?;[^}]*\};/g,block=>{

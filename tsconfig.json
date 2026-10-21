@@ -5,7 +5,9 @@
   },
   "exclude": [
     "node_modules",
+    "**/node_modules",
     "supabase/functions",
-    "**/node_modules"
+    "eas-archive",
+    "build-logs"
   ]
 }

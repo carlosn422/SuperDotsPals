@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-/// Plays the 12 FPS watch-specific PNG assets. Missing or temporarily unavailable
+/// Plays the 36 watch frames over the same loop length as the iPhone animation. Missing or temporarily unavailable
 /// frames never cause the mascot to flash to a system symbol.
 struct AnimatedMoodMascot: View {
     let mood: String
@@ -11,7 +11,16 @@ struct AnimatedMoodMascot: View {
     @State private var lastImage: UIImage?
     @State private var lastEmotion = ""
 
-    private let framesPerSecond = 12.0
+    // The iPhone plays every source frame at 29.97 FPS (MascotAnimationAssets.ts); the watch's 36 frames
+    // are sampled evenly from those, so stretch them over the same loop duration per mood.
+    private var sourceFrameCount: Double {
+        switch emotion {
+        case "joy": return 300
+        case "disgust": return 192
+        default: return 240
+        }
+    }
+    private var framesPerSecond: Double { Double(frameCount) / (sourceFrameCount / (30000.0 / 1001.0)) }
     private let frameCount = 36
 
     private var emotion: String {
@@ -29,6 +38,7 @@ struct AnimatedMoodMascot: View {
     }
 
     var body: some View {
+        // The frame sequence is local; network synchronization must not gate rendering.
         TimelineView(.animation(minimumInterval: 1.0 / framesPerSecond,
                                 paused: !isActive || reduceMotion)) { context in
             let index = reduceMotion ? 0 :
@@ -45,7 +55,10 @@ struct AnimatedMoodMascot: View {
                 } else {
                     // Assets were not bundled. Show a stable placeholder, not
                     // a rapidly alternating placeholder/mascot.
-                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                    Image(systemName: "face.smiling.fill")
+                        .resizable().scaledToFit()
+                        .foregroundStyle(.purple.opacity(0.7))
+                        .padding(15)
                 }
             }
             .frame(width: size, height: size)
@@ -57,6 +70,11 @@ struct AnimatedMoodMascot: View {
         .onAppear {
             lastEmotion = emotion
             lastImage = frame(0)
+            if lastImage == nil {
+                NSLog("[WatchMascot] Missing bundled asset: %@_frame_000", emotion)
+            } else {
+                NSLog("[WatchMascot] Local frames available for %@", emotion)
+            }
         }
         .accessibilityLabel("\(mood) MoodPal")
     }

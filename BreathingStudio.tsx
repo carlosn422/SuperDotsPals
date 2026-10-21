@@ -34,7 +34,7 @@ export default function BreathingStudio({accent='#7139E9',tint='#EEE5FF'}:{accen
  }
  const state=phase();
  return <View style={[s.wrap,{backgroundColor:tint}]}>
-  <Text style={[s.eyebrow,{color:accent}]}>✦ SUPERDOTS MINDFULNESS</Text>
+  <Text style={[s.eyebrow,{color:accent}]}>✦ MOODPALS MINDFULNESS</Text>
   <Text style={s.title}>A moment for you</Text>
   <Text style={s.desc}>Follow your buddy's breathing rhythm. This is a relaxation exercise, not a medical treatment.</Text>
   <Text style={s.label}>Choose a routine</Text>
