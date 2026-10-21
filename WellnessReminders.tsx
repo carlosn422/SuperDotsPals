@@ -48,7 +48,7 @@ export default function WellnessReminders(){
    let nextId:string|null=null;
    if(shouldEnable){
     nextId=await Notifications.scheduleNotificationAsync({
-     content:{title:'A moment for you 💜',body:'How are you feeling today? Your Superdot is here for a quick check-in.',data:{screen:'Actions'},sound:false},
+     content:{title:'A moment for you 💜',body:'How are you feeling today? Your MoodPal is here for a quick check-in.',data:{screen:'Actions'},sound:false},
      trigger:{type:Notifications.SchedulableTriggerInputTypes.DAILY,hour:nextHour,minute:0}
     });
    }
@@ -59,7 +59,7 @@ export default function WellnessReminders(){
    setEnabled(shouldEnable);setHour(nextHour);
   }catch(e:any){Alert.alert('Could not update reminders',e?.message||'Please try again')}finally{setBusy(false)}
  }
- return <View style={s.root}><Text style={s.title}>Reminders & stress alerts</Text><Text style={s.sub}>Schedule a local iPhone notification to check in with your Superdot. It won't send your health readings in a notification.</Text>
+ return <View style={s.root}><Text style={s.title}>Reminders & stress alerts</Text><Text style={s.sub}>Schedule a local iPhone notification to check in with your MoodPal. It won't send your health readings in a notification.</Text>
  {loading?<ActivityIndicator color="#7139E9"/>:<><TouchableOpacity disabled={busy} onPress={()=>void apply(!enabled)} style={s.toggle}><View style={{flex:1,gap:4}}><Text style={s.name}>Daily wellness check-in</Text><Text style={s.sub}>{enabled?'Scheduled on this device':'Off on this device'}</Text></View><Ionicons name={enabled?'notifications':'notifications-off-outline'} size={26} color={enabled?'#3BA986':'#A99FC0'}/></TouchableOpacity>
  <Text style={s.name}>Reminder time</Text><View style={s.grid}>{TIMES.map(t=><TouchableOpacity key={t.hour} disabled={busy} onPress={()=>void apply(enabled,t.hour)} style={[s.chip,{backgroundColor:hour===t.hour?'#7139E9':'#F1EBFD'}]}><Text style={{color:hour===t.hour?'#fff':'#5D4199',fontWeight:'800'}}>{t.name}</Text></TouchableOpacity>)}</View>
  <Text style={s.foot}>{enabled?'A reminder is scheduled every day at '+TIMES.find(x=>x.hour===hour)?.name+'.':'Enable reminders to schedule daily check-ins.'} Times follow your phone's local time.</Text>
