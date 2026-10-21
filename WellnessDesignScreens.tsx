@@ -181,7 +181,7 @@ export function WellnessHealth({companion,accent,onPermissions,onChat}:{companio
  <PageHero title="Health signals" highlight="from your day." detail="Understand your activity, recovery and body signals through real readings." companion={companion} accent={accent}/>
  <HealthDataPanel/>
  <RecoveryInsights companion={companion} onChat={onChat}/>
- <TouchableOpacity onPress={onPermissions} style={[s.white,{backgroundColor:'#F1EAFE'}]}><Text style={s.cardTitle}>Privacy & health permissions  →</Text><Text style={s.body}>Choose what Apple Health shares with Superdots. No measurements are requested until you tap Connect.</Text></TouchableOpacity>
+ <TouchableOpacity onPress={onPermissions} style={[s.white,{backgroundColor:'#F1EAFE'}]}><Text style={s.cardTitle}>Privacy & health permissions  →</Text><Text style={s.body}>Choose what Apple Health shares with MoodPals. No measurements are requested until you tap Connect.</Text></TouchableOpacity>
  </View>;
 }
 export function WellnessSettingsIntro({companion,accent}:{companion:string;accent:string}){
