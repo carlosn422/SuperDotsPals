@@ -165,7 +165,7 @@ export function WellnessTrends({companion,accent,period,onPeriod,mood}:{companio
   return {label:period==='Week'?['S','M','T','W','T','F','S'][d.getDay()]:period==='Day'?'Today':String(d.getDate()),count:bucket.length};
  });
  const maxCount=Math.max(1,...groups.map(g=>g.count));
- return <View style={s.page}><BrandHead companion={companion}/><PageHero title="Your stress," highlight="visualized." detail="Hourly, daily, monthly and yearly trends from your own readings." companion={companion} accent={accent}/>
+ return <View style={s.page}><PageHero title="Your stress," highlight="visualized." detail="Hourly, daily, monthly and yearly trends from your own readings." companion={companion} accent={accent}/>
  <View style={s.segment}>{(['Day','Week','Month','Year'] as const).map(p=><TouchableOpacity key={p} onPress={()=>onPeriod(p)} style={[s.seg,period===p&&{backgroundColor:accent}]}><Text style={{color:period===p?'#fff':MUTED,fontWeight:'800',fontSize:12}}>{p}</Text></TouchableOpacity>)}</View>
  <StressTrendCard period={period as any}/>
 <SectionHeading title="Mood trend"/><View style={s.white}><Text style={s.cardTitle}>How you've been feeling</Text>
@@ -177,7 +177,7 @@ export function WellnessTrends({companion,accent,period,onPeriod,mood}:{companio
  <View style={[s.white,{backgroundColor:'#FFF8E9'}]}><Text style={s.celebrateTitle}>💡 Your wellness insights</Text><Text style={s.body}>These are your recorded check-ins. Any connection between sleep, activity and mood needs real synchronized data before conclusions can be drawn.</Text></View></View>;
 }
 export function WellnessHealth({companion,accent,onPermissions,onChat}:{companion:string;accent:string;onPermissions:()=>void;onChat:()=>void}){
- return <View style={s.page}><BrandHead companion={companion}/>
+ return <View style={s.page}>
  <PageHero title="Health signals" highlight="from your day." detail="Understand your activity, recovery and body signals through real readings." companion={companion} accent={accent}/>
  <HealthDataPanel/>
  <RecoveryInsights companion={companion} onChat={onChat}/>
@@ -185,7 +185,7 @@ export function WellnessHealth({companion,accent,onPermissions,onChat}:{companio
  </View>;
 }
 export function WellnessSettingsIntro({companion,accent}:{companion:string;accent:string}){
- return <View style={s.page}><BrandHead companion={companion}/><View style={[s.hero,{backgroundColor:APP_THEME.mint,minHeight:145}]}><View style={{flex:1,gap:8}}><Text style={s.heroTitle}>Your wellness,{'\n'}<Text style={{color:accent}}>your way.</Text></Text><Text style={s.heroText}>Your companion reflects how you feel. App colors remain calm and consistent.</Text></View></View></View>;
+ return <View style={s.page}><View style={[s.hero,{backgroundColor:APP_THEME.mint,minHeight:145}]}><View style={{flex:1,gap:8}}><Text style={s.heroTitle}>Your wellness,{'\n'}<Text style={{color:accent}}>your way.</Text></Text><Text style={s.heroText}>Your companion reflects how you feel. App colors remain calm and consistent.</Text></View></View></View>;
 }
 const s=StyleSheet.create({
  page:{gap:14,paddingBottom:12},brand:{flexDirection:'row',alignItems:'center',gap:7,marginBottom:4},brandWord:{fontSize:25,fontWeight:'900',color:INK},
