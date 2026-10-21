@@ -2,6 +2,7 @@ import React from 'react';
 import {View,Text,TouchableOpacity,StyleSheet} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import SuperdotMascot from './SuperdotMascot';
+import {Image as RNImage} from 'react-native';
 import {APP_THEME} from './MoodMascot';
 import {supabase} from './supabase';
 import HealthDataPanel,{HealthMiniStats,useSavedHealth} from './HealthDataPanel';
@@ -22,16 +23,16 @@ export function PageHero({title,highlight,detail,companion,accent,onPress,button
     <Text style={s.heroTitle}>{title}{'\n'}<Text style={{color:accent}}>{highlight}</Text></Text>
     <Text style={s.heroText}>{detail}</Text>
    </View>
-   <View style={{width:138,alignItems:'center',justifyContent:'center',gap:3}}>
-    <SuperdotMascot id={companion} color={accent} size={128}/>
-    <Text style={{fontSize:14,fontWeight:'900',color:accent}}>{valid?`HRV · ${Math.round(hrv.value)} ms`:'HRV · — ms'}</Text>
+   <View style={{width:118,alignItems:'center',justifyContent:'center',gap:3,backgroundColor:'rgba(255,255,255,0.7)',borderRadius:22,paddingVertical:14,paddingHorizontal:8}}>
+    <Text style={{fontSize:12,fontWeight:'800',color:MUTED}}>HRV</Text>
+    <Text style={{fontSize:30,fontWeight:'900',color:accent}}>{valid?Math.round(hrv.value):'—'}<Text style={{fontSize:13,fontWeight:'800'}}> ms</Text></Text>
     <Text style={{fontSize:9,color:MUTED,textAlign:'center'}}>{updated?`Last read ${updated}`:loading?'Loading Apple Health…':'No synced HRV reading'}</Text>
    </View>
   </View>
   {button?<TouchableOpacity accessibilityRole="button" onPress={onPress} style={[s.heroButton,{backgroundColor:accent}]}><Text style={{fontWeight:'900',fontSize:17,color:'#fff'}}>{button}  →</Text></TouchableOpacity>:null}
  </View>;
 }
-export function BrandHead({companion}:{companion:string}){return <View style={s.brand}><SuperdotMascot id={companion} color={P} size={41}/><Text style={s.brandWord}>Mood<Text style={{color:'#19AAA4'}}>Pals</Text></Text><View style={{flex:1}}/><SuperdotMascot id={companion} color={P} size={37}/></View>}
+export function BrandHead(_:{companion:string}){return <View style={s.brand}><RNImage source={require('./assets/branding/moodpals-logo.png')} accessibilityRole="image" accessibilityLabel="MoodPals" style={{height:32,width:32*607/97}} resizeMode="contain"/></View>}
 export function SectionHeading({title,detail}:{title:string;detail?:string}){return <View style={s.heading}><Text style={s.headingText}>{title}</Text>{detail?<Text style={s.headingDetail}>{detail}</Text>:null}</View>}
 export function PastelCard({title,detail,emoji,tint,onPress}:{title:string;detail:string;emoji:string;tint:string;onPress?:()=>void}){return <TouchableOpacity disabled={!onPress} onPress={onPress} style={[s.action,{backgroundColor:tint}]}><Text style={s.actionEmoji}>{emoji}</Text><View style={{flex:1,gap:5}}><Text style={s.actionTitle}>{title}</Text><Text style={s.actionText}>{detail}</Text></View><Ionicons name="chevron-forward" color={P} size={16}/></TouchableOpacity>}
 export function StatCard({title,value,detail,icon,tint,onPress}:{title:string;value:string;detail:string;icon:any;tint:string;onPress?:()=>void}){return <TouchableOpacity disabled={!onPress} onPress={onPress} style={s.stat}><View style={[s.statIcon,{backgroundColor:tint}]}><Ionicons name={icon} size={20} color={P}/></View><Text style={s.statTitle}>{title}</Text><Text style={s.statValue}>{value}</Text><Text style={s.statDetail}>{detail}</Text></TouchableOpacity>}
@@ -115,7 +116,6 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpi
  return <View style={[s.page,{gap:15}]}>
   <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
    <View><Text style={{fontSize:29,fontWeight:'900',color:INK}}>Actions</Text><Text style={{color:MUTED,fontSize:12,marginTop:2}}>Actions to relieve stress and build healthy habits</Text></View>
-   <SuperdotMascot id={companion} size={53}/>
   </View>
   <View style={{flexDirection:'row',gap:5}}>{dates.map((d,i)=><TouchableOpacity key={i} onPress={()=>setDay(i-6)} style={{flex:1,alignItems:'center',paddingVertical:11,borderRadius:17,backgroundColor:day===i-6?APP_THEME.primarySoft:'#FFFFFF',gap:4,borderWidth:day===i-6?1.5:1,borderColor:day===i-6?accent:'#ECEAF2'}}>
     <Text style={{fontSize:10,fontWeight:'700',color:MUTED}}>{['Su','Mo','Tu','We','Th','Fr','Sa'][d.getDay()]}</Text><Text style={{fontWeight:'900',fontSize:15,color:day===i-6?accent:INK}}>{d.getDate()}</Text>
@@ -185,7 +185,7 @@ export function WellnessHealth({companion,accent,onPermissions,onChat}:{companio
  </View>;
 }
 export function WellnessSettingsIntro({companion,accent}:{companion:string;accent:string}){
- return <View style={s.page}><BrandHead companion={companion}/><View style={[s.hero,{backgroundColor:APP_THEME.mint,minHeight:145}]}><View style={{flex:1,gap:8}}><Text style={s.heroTitle}>Your wellness,\n<Text style={{color:accent}}>your way.</Text></Text><Text style={s.heroText}>Your companion reflects how you feel. App colors remain calm and consistent.</Text></View><SuperdotMascot id={companion} size={105}/></View></View>;
+ return <View style={s.page}><BrandHead companion={companion}/><View style={[s.hero,{backgroundColor:APP_THEME.mint,minHeight:145}]}><View style={{flex:1,gap:8}}><Text style={s.heroTitle}>Your wellness,{'\n'}<Text style={{color:accent}}>your way.</Text></Text><Text style={s.heroText}>Your companion reflects how you feel. App colors remain calm and consistent.</Text></View></View></View>;
 }
 const s=StyleSheet.create({
  page:{gap:14,paddingBottom:12},brand:{flexDirection:'row',alignItems:'center',gap:7,marginBottom:4},brandWord:{fontSize:25,fontWeight:'900',color:INK},
