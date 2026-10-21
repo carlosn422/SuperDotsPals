@@ -42,7 +42,9 @@ if(!mascot.includes("import {MASCOT_PREVIEW_FRAMES} from './MascotPreviewAssets'
 }
 mascot=mascot.replace("animate=true,playDurationMs,startDelayMs=0}", "animate=true,preview=false,playDurationMs,startDelayMs=0}");
 mascot=mascot.replace("animate?:boolean;playDurationMs?:number", "animate?:boolean;preview?:boolean;playDurationMs?:number");
-if(!mascot.includes("const frames=preview?MASCOT_PREVIEW_FRAMES[key]:MASCOT_FRAMES[key];")){\n mascot=mascot.replace(" const key=frameKey(id);", " const key=frameKey(id);\n const frames=preview?MASCOT_PREVIEW_FRAMES[key]:MASCOT_FRAMES[key];");\n}
+if(!mascot.includes("const frames=preview?MASCOT_PREVIEW_FRAMES[key]:MASCOT_FRAMES[key];")){
+ mascot=mascot.replace(" const key=frameKey(id);", " const key=frameKey(id);\n const frames=preview?MASCOT_PREVIEW_FRAMES[key]:MASCOT_FRAMES[key];");
+}
 mascot=mascot.replace("source={MASCOT_FRAMES[key][0]}", "source={frames[0]}");
 mascot=mascot.replace("frames={MASCOT_FRAMES[key]}", "frames={frames}");
 fs.writeFileSync(mascotFile,mascot);
