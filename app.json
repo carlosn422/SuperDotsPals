@@ -59,7 +59,8 @@
         }
       ],
       "@bacons/apple-targets",
-      "./scripts/with-health-privacy.cjs"
+      "./scripts/with-health-privacy.cjs",
+      "expo-sharing"
     ],
     "extra": {
       "eas": {
