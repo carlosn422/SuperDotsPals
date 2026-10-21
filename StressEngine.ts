@@ -96,3 +96,13 @@ export function sleepQuality(minutes:number,awakeMinutes=0):SleepQuality{
 }
 export function noiseLabel(db:number){return db<70?'Normal':db<80?'Loud':'High'}
 export function formatMinutes(total:number){const h=Math.floor(total/60),m=Math.round(total%60);return {h,m}}
+
+// Energy (0-100): how charged you are today, from last night's sleep, today's stress and activity load.
+export function energyScore({sleepMinutes,stress,activeKcal}:{sleepMinutes:number|null;stress:number|null;activeKcal:number|null}){
+ if(sleepMinutes===null&&stress===null)return null;
+ const sleepPart=sleepMinutes===null?0.6:Math.min(1,sleepMinutes/480);
+ const calmPart=stress===null?0.6:1-stress/100;
+ const drain=activeKcal===null?0:Math.min(0.25,activeKcal/2400);
+ return Math.round(Math.max(0,Math.min(100,100*(0.55*sleepPart+0.45*calmPart-drain))));
+}
+export function energyLabel(score:number){return score>=75?'Charged':score>=50?'Steady':score>=30?'Low':'Drained'}

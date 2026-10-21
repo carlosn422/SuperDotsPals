@@ -7,7 +7,7 @@ import {supabase} from './supabase';
 import HealthDataPanel,{HealthMiniStats,useSavedHealth} from './HealthDataPanel';
 import RecoveryInsights from './RecoveryInsights';
 import HealthTrendOverview from './HealthTrendOverview';
-import {StressHero,HrvTrendCard,HeartRateCard,HealthActionsGrid,StressTrendCard} from './StressDashboard';
+import {StressHero,EnergyCard,HrvTrendCard,HeartRateCard,HealthActionsGrid,StressTrendCard} from './StressDashboard';
 
 const P=APP_THEME.primary,INK=APP_THEME.ink,MUTED=APP_THEME.muted;
 type Props={companion:string;accent:string;onPress?:()=>void};
@@ -69,6 +69,7 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
  );
  return <View style={[s.page,{gap:17}]}>
   <StressHero mood={companion} onCheckin={onCheckin}/>
+  <EnergyCard/>
   <HrvTrendCard/>
   <HeartRateCard/>
   <View style={{gap:10}}>

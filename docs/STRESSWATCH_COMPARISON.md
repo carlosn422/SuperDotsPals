@@ -10,6 +10,8 @@ Benchmark: [StressWatch: AI Stress Monitor](https://apps.apple.com/us/app/stress
 | Heart rate | Daily HR chart | Resting HR only | **Heart Rate** card: hourly averages from HealthKit, avg + resting |
 | Actions | Sleep (duration / quality / avg HR + ring), Fitness (Move / Exercise / Stand rings), Daylight, Mindfulness, Steps, Noise | Water, caffeine, journal, chat; sleep/steps only on Health tab | **Body & recovery** grid with all six tiles from Apple Health; Mindfulness opens the breathing studio |
 | HealthKit | HRV, HR, RHR, sleep stages, activity, daylight, mindful, noise | HRV, RHR, steps, sleep total | + hourly heart rate, sleep stages + sleep HR, activity summaries, time in daylight (iOS 17+), mindful sessions, environmental noise |
+| Sleep detail | Dark sleep screen with stages | Sleep total only | **Sleep detail** sheet (tap Sleep): stages breakdown, sleep HR, 7-night chart |
+| Energy | Body battery | None | **Energy card**: 0–100 from sleep, stress score and active calories |
 | Trends | Hourly / daily / monthly / yearly stress | Mood check-in counts + health medians | **Stress Trend** card per period with level colours and time-in-level distribution |
 | Alerts | Stress notifications | Daily reminder only | Opt-in **stress alerts** (threshold 60/75/85, 3 h cooldown); tapping one opens a breathing break |
 | Mood / water / caffeine | Yes | Yes | Unchanged |
@@ -20,5 +22,5 @@ Benchmark: [StressWatch: AI Stress Monitor](https://apps.apple.com/us/app/stress
 ## Still missing compared with StressWatch
 - Background HealthKit delivery (scores and alerts update when the app syncs, not while it's closed).
 - Watch-face complications/widgets with the live stress level.
-- Body battery / energy score, bio age, and the sleep-stage detail screen.
+- Bio age.
 - Subscription paywall (intentionally out of scope).
