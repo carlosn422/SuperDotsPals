@@ -38,6 +38,7 @@ struct AnimatedMoodMascot: View {
     }
 
     var body: some View {
+        // The frame sequence is local; network synchronization must not gate rendering.
         TimelineView(.animation(minimumInterval: 1.0 / framesPerSecond,
                                 paused: !isActive || reduceMotion)) { context in
             let index = reduceMotion ? 0 :
@@ -54,7 +55,10 @@ struct AnimatedMoodMascot: View {
                 } else {
                     // Assets were not bundled. Show a stable placeholder, not
                     // a rapidly alternating placeholder/mascot.
-                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                    Image(systemName: "face.smiling.fill")
+                        .resizable().scaledToFit()
+                        .foregroundStyle(.purple.opacity(0.7))
+                        .padding(15)
                 }
             }
             .frame(width: size, height: size)
@@ -66,6 +70,11 @@ struct AnimatedMoodMascot: View {
         .onAppear {
             lastEmotion = emotion
             lastImage = frame(0)
+            if lastImage == nil {
+                NSLog("[WatchMascot] Missing bundled asset: %@_frame_000", emotion)
+            } else {
+                NSLog("[WatchMascot] Local frames available for %@", emotion)
+            }
         }
         .accessibilityLabel("\(mood) MoodPal")
     }

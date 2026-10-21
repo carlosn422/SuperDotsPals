@@ -4,7 +4,6 @@ module.exports = {
   displayName: 'Superdots',
   bundleIdentifier: '.watchkitapp',
   deploymentTarget: '10.0',
-  frameworks: ['SwiftUI', 'Security', 'WidgetKit'],
-  icon: '../../assets/icon.png',
+  frameworks: ['SwiftUI', 'Security'],
   infoPlist: { CFBundleIconName: 'AppIcon' },
 };

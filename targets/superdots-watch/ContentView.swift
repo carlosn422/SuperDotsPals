@@ -1,104 +1,147 @@
 import SwiftUI
+import WatchKit
 
 struct ContentView: View {
- @EnvironmentObject var store: WatchStore
- @StateObject private var sync = WatchThemeSync()
- @Environment(\.scenePhase) private var scenePhase
- @State private var contentBottom: CGFloat = .greatestFiniteMagnitude
- private let purple = Color(red:0.47,green:0.38,blue:0.91)
- private let mascotSize: CGFloat = 105 // Joyful is the canonical mascot display size.
+    @EnvironmentObject private var store: WatchStore
+    @StateObject private var sync = WatchThemeSync()
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var choosingMood = false
+    @State private var moodPage = 0
 
- var body: some View {
-  NavigationStack {
-   GeometryReader { viewport in
-    ScrollView {
-     VStack(spacing:14) {
-     if !sync.connected {
-      ProgressView().frame(width:mascotSize,height:mascotSize)
-      wellnessTrack(score:nil)
-      NavigationLink {WatchSyncView(sync:sync)} label: {
-       Label("Connect Account",systemImage:"link").frame(maxWidth:.infinity)
-      }.buttonStyle(.borderedProminent).tint(purple)
-     } else {
-      if sync.moodLoaded {
-       AnimatedMoodMascot(mood:store.wellnessMood,size:mascotSize,isActive:scenePhase == .active)
-      } else {
-       ProgressView().frame(width:mascotSize,height:mascotSize)
-      }
-      VStack(spacing:2) {
-       if let hrv=store.latestHRV, hrv.isFinite, hrv >= 0 {
-        Text("HRV · \\(Int(hrv.rounded())) ms")
-         .font(.headline).foregroundStyle(purple)
-        if let measuredAt=store.hrvHistory.max(by: { $0.date < $1.date })?.date {
-         Text("Last read \\(measuredAt, format:.dateTime.month(.abbreviated).day().hour().minute())")
-          .font(.system(size:9)).foregroundStyle(.secondary)
+    private let moods = ["Joyful", "Calm", "Sad", "Angry", "Anxious", "Tired"]
+    private let purple = Color(red: 0.47, green: 0.38, blue: 0.91)
+
+    private func selectMood(_ mood: String) {
+        choosingMood = false
+        store.currentMood = mood
+        WKInterfaceDevice.current().play(.click)
+        Task {
+            do { try await sync.submitMood(mood, store: store) }
+            catch { sync.message = "Mood could not sync. Please retry." }
         }
-       }
-      }
-      if let score=store.strainScore {
-       Text(store.strainLabel).font(.caption).foregroundStyle(.secondary)
-       wellnessTrack(score:score)
-      } else {
-       wellnessTrack(score:nil)
-      }
-      Text("How are you feeling today?")
-       .font(.headline).multilineTextAlignment(.center)
-       .padding(.top,18)
-      NavigationLink {WatchCheckIn(sync:sync)} label: {
-       Label("Check In",systemImage:"heart.text.square.fill").frame(maxWidth:.infinity)
-      }.buttonStyle(.borderedProminent).tint(purple)
-      NavigationLink {WatchFavorites(sync:sync)} label: {Label("Favorite verses",systemImage:"book.closed.fill")}
-      NavigationLink {WatchHealth()} label: {Label("Health snapshot",systemImage:"heart.fill")}
-      NavigationLink {WatchJournal(sync:sync)} label: {Label("Quick journal",systemImage:"square.and.pencil")}
-      NavigationLink {WatchMoodInsights(sync:sync)} label: {Label("Mood insights",systemImage:"chart.line.uptrend.xyaxis")}
-      NavigationLink {WatchSyncView(sync:sync)} label: {
-       Label("Account & sync",systemImage:"person.crop.circle")
-      }
-      Color.clear.frame(height:1)
-       .background(GeometryReader { marker in
-        Color.clear.preference(key:WatchContentBottomKey.self,
-         value:marker.frame(in:.named("wellnessScroll")).maxY)
-       })
-     }
-     }.padding(.horizontal,4)
     }
-    .coordinateSpace(name:"wellnessScroll")
-    .onPreferenceChange(WatchContentBottomKey.self) { contentBottom = $0 }
-    .overlay(alignment:.bottom) {
-     if sync.connected && contentBottom.isFinite && contentBottom > viewport.size.height + 5 {
-      Image(systemName:"chevron.down")
-       .font(.system(size:12,weight:.bold))
-       .foregroundStyle(.white.opacity(0.85))
-       .frame(maxWidth:.infinity)
-       .frame(height:16)
-       .offset(y:0)
-       .allowsHitTesting(false)
-       .accessibilityLabel("Scroll down for more options")
-     }
-    }
-   }
-   .navigationBarTitleDisplayMode(.inline)
-  }
-  .task {await sync.refresh(store:store)}
-  .onChange(of:scenePhase) {_,phase in
-   if phase == .active {Task {await sync.refresh(store:store)}}
-  }
- }
- private func wellnessTrack(score:Double?) -> some View {
-  GeometryReader { geometry in
-   ZStack(alignment:.leading) {
-    LinearGradient(colors:[.green,.cyan,.purple,.orange,.pink],startPoint:.leading,endPoint:.trailing)
-     .frame(height:9).clipShape(Capsule())
-    if let score {
-     Circle().fill(.white).frame(width:14,height:14)
-      .offset(x:max(0,(geometry.size.width-14)*min(100,max(0,score))/100))
-    }
-   }
-  }.frame(height:16).padding(.bottom,16).offset(y:-9).accessibilityLabel(score == nil ? "Wellness meter awaiting data" : "Estimated wellness meter")
- }
-}
 
-private struct WatchContentBottomKey: PreferenceKey {
- static var defaultValue: CGFloat = .greatestFiniteMagnitude
- static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+    var body: some View {
+        Group {
+            if !sync.connected || sync.needsReconnect || sync.pairingActive {
+                WatchSyncView(sync: sync)
+            } else if !sync.moodLoaded {
+                VStack(spacing: 10) {
+                    if sync.syncWarning == nil {
+                        ProgressView().tint(purple)
+                        Text("Loading your mood…")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Image(systemName: "wifi.exclamationmark")
+                            .foregroundStyle(.secondary)
+                        Text("Could not load your mood")
+                            .font(.caption2)
+                            .multilineTextAlignment(.center)
+                        Button("Try again") {
+                            Task { await sync.refresh(store: store) }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(purple)
+                        .disabled(sync.busy)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                VStack(spacing: 3) {
+                    if choosingMood {
+                        Text("How do you feel?").font(.system(size: 12, weight: .semibold)).lineLimit(1)
+                        Spacer(minLength: 0)
+                        ZStack {
+                            Button {
+                                selectMood(moods[moodPage])
+                            } label: {
+                                AnimatedMoodMascot(mood: moods[moodPage], size: 100, isActive: false)
+                                    .frame(width: 112, height: 112)
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.plain)
+                            .id(moodPage)
+                            .accessibilityLabel("Select \(moods[moodPage])")
+                            HStack {
+                                if moodPage > 0 {
+                                    Button {
+                                        withAnimation(.easeInOut(duration: 0.15)) { moodPage -= 1 }
+                                    } label: {
+                                        Image(systemName: "chevron.left").font(.system(size: 14, weight: .bold))
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Previous mood")
+                                }
+                                Spacer()
+                                if moodPage < moods.count - 1 {
+                                    Button {
+                                        withAnimation(.easeInOut(duration: 0.15)) { moodPage += 1 }
+                                    } label: {
+                                        Image(systemName: "chevron.right").font(.system(size: 14, weight: .bold))
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Next mood")
+                                }
+                            }
+                            .padding(.horizontal, 2)
+                        }
+                        .frame(height: 112)
+                        .contentShape(Rectangle())
+                        .highPriorityGesture(
+                            DragGesture(minimumDistance: 15, coordinateSpace: .local)
+                                .onEnded { value in
+                                    if abs(value.translation.width) > abs(value.translation.height) && value.translation.width < -30 && moodPage < moods.count - 1 {
+                                        withAnimation(.easeInOut(duration: 0.15)) { moodPage += 1 }
+                                    } else if abs(value.translation.width) > abs(value.translation.height) && value.translation.width > 30 && moodPage > 0 {
+                                        withAnimation(.easeInOut(duration: 0.15)) { moodPage -= 1 }
+                                    }
+                                }
+                        )
+                        Text(moods[moodPage])
+                            .font(.system(size: 12, weight: .semibold))
+                            .lineLimit(1)
+                            .frame(height: 17)
+                        Spacer(minLength: 0)
+                        Button("Back") { choosingMood = false }
+                            .font(.system(size: 12, weight: .semibold))
+                            .buttonStyle(.plain)
+                            .frame(height: 22)
+                    } else {
+                        Spacer(minLength: 0)
+                        Button {
+                            moodPage = max(0, moods.firstIndex(of: store.currentMood) ?? 0)
+                            withAnimation(.none) { choosingMood = true }
+                        } label: {
+                            AnimatedMoodMascot(mood: store.currentMood, size: 125, isActive: scenePhase == .active)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Current mood \(store.currentMood). Tap to change.")
+                        Text(store.currentMood).font(.headline)
+                        Text("Tap to change mood").font(.caption2).foregroundStyle(.secondary)
+                        Spacer(minLength: 0)
+                    }
+                }
+                .padding(.horizontal, 5)
+            }
+        }
+        .tint(purple)
+        .task(id: sync.connected) {
+            guard sync.connected else { return }
+            // The root view stays alive after QR pairing completes.
+            // Keep the latest iPhone check-in in sync while the watch is open.
+            await sync.refresh(store: store)
+            while !Task.isCancelled && sync.connected {
+                do { try await Task.sleep(for: .seconds(30)) }
+                catch { break }
+                if scenePhase == .active { await sync.refresh(store: store) }
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active && sync.connected && !sync.pairingActive {
+                Task { await sync.refresh(store: store) }
+            }
+        }
+    }
 }
