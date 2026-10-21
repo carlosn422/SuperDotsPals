@@ -14,6 +14,7 @@ import {WellnessToday,WellnessActions,WellnessTrends,WellnessHealth,WellnessSett
 import {WatchThemesCard,SettingsItem} from './SettingsComponents';
 import {APP_THEME} from './MoodMascot';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import {Image as RNImage} from 'react-native';
 import * as Notifications from 'expo-notifications';
 import Svg, { Circle, Line, Path, Rect, Defs, LinearGradient, Stop, Polygon } from 'react-native-svg';
 
@@ -118,7 +119,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  }
 
  return <View style={[s.safe,{paddingTop:Platform.OS==='ios'?insets.top:StatusBar.currentHeight || 0}]}><StatusBar barStyle="dark-content" backgroundColor={C.bg}/>
-  <View style={s.top}><View style={s.brand}><View style={[s.logo,{backgroundColor:colors.accent}]}><Text style={s.logoText}>✦</Text></View><Text style={s.brandText}>Mood<Text style={{color:'#17AFA8'}}>Pals</Text></Text></View><TouchableOpacity accessibilityLabel="Open profile" onPress={()=>go('Settings')} style={s.avatar}><Text style={{fontSize:18}}>☺</Text></TouchableOpacity></View>
+  <View style={s.top}><View style={s.brand}><RNImage source={require('./assets/branding/moodpals-logo.png')} accessibilityRole="image" accessibilityLabel="MoodPals" style={{height:32,width:32*607/97}} resizeMode="contain"/></View></View>
   <ScrollView ref={pager} horizontal pagingEnabled bounces={false} showsHorizontalScrollIndicator={false} scrollEventThrottle={16} onMomentumScrollEnd={onPageSettled} directionalLockEnabled style={{flex:1}} keyboardShouldPersistTaps="handled">
   <View key="Today" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><WellnessToday companion={mood} accent={colors.accent} water={water} caffeine={coffee} mood={mood} onCheckin={()=>{go('Actions');openAction('checkin')}} onChat={()=>{go('Actions');openAction('chat')}} onActions={()=>{go('Actions');setActionView(null);setActionDetail('water')}} onCaffeine={()=>{go('Actions');setActionView(null);setActionDetail('caffeine')}} onJournal={()=>{go('Actions');openAction('history')}} onAddWater={()=>void quickAddHabit('water')} onAddCaffeine={()=>void quickAddHabit('caffeine')} addingWater={quickAdding.water} addingCaffeine={quickAdding.caffeine}/></ScrollView></View>
   <View key="Actions" style={{width:pageWidth,flex:1}}><ScrollView ref={actionScroll} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">

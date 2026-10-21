@@ -85,3 +85,11 @@ form.addEventListener('submit', async e => {
   } finally { button.disabled = false; button.textContent = 'Get early access'; }
 });
 document.getElementById('yr').textContent = new Date().getFullYear();
+
+// "Join early access" buttons: scroll to the very top so the whole signup form is visible, then focus the email field.
+document.querySelectorAll('[data-join]').forEach(link => link.addEventListener('click', e => {
+  e.preventDefault();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  history.replaceState(null, '', '#top');
+  setTimeout(() => form.querySelector('input[name=email]').focus({ preventScroll: true }), 600);
+}));
