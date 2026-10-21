@@ -17,6 +17,7 @@ Deno.serve(async req=>{
   const payload=await req.json();
   const message=typeof payload.message==="string"?payload.message.trim():"";
   const cid=typeof payload.conversationId==="string"?payload.conversationId:null;
+  const today=typeof payload.clientContext==="string"?payload.clientContext.slice(0,800):"";
   if(!message||message.length>3000)return new Response(JSON.stringify({error:"Message must contain 1–3000 characters"}),{status:400,headers});
   const serviceKey=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if(!serviceKey)return new Response(JSON.stringify({error:"Assistant configuration unavailable."}),{status:503,headers});
@@ -38,11 +39,11 @@ Deno.serve(async req=>{
    db.from("wellness_journal").select("mood,intensity,energy_level,stress_factors,body,occurred_at").eq("user_id",user.id).order("occurred_at",{ascending:false}).limit(12),
    db.from("mood_entries").select("mood,recorded_at").eq("user_id",user.id).order("recorded_at",{ascending:false}).limit(10),
    db.from("wellness_activities").select("activity_type,duration_minutes,occurred_at").eq("user_id",user.id).order("occurred_at",{ascending:false}).limit(15),
-   db.from("wellness_readings").select("metric,value,recorded_at,source").eq("user_id",user.id).neq("source","demo").order("recorded_at",{ascending:false}).limit(20),
+   db.from("wellness_readings").select("metric,value,recorded_at,source").eq("user_id",user.id).neq("source","demo").in("metric",["stress_score","hrv","resting_heart_rate","sleep_minutes","steps","exercise_minutes","mindfulness_minutes"]).order("recorded_at",{ascending:false}).limit(40),
    db.from("habit_entries").select("habit,amount,unit,recorded_at").eq("user_id",user.id).order("recorded_at",{ascending:false}).limit(25),
    conversationId?db.from("wellness_messages").select("role,content").eq("conversation_id",conversationId).eq("user_id",user.id).order("created_at",{ascending:false}).limit(12):Promise.resolve({data:[]})
   ]);
-  const context=JSON.stringify({journal:journal.data||[],moods:moods.data||[],activities:activities.data||[],readings:readings.data||[],habits:habits.data||[]}).slice(0,13000);
+  const context=JSON.stringify({today,journal:journal.data||[],moods:moods.data||[],activities:activities.data||[],readings:readings.data||[],habits:habits.data||[]}).slice(0,13000);
   const turns=(prior.data||[]).reverse().map((m:{role:string;content:string})=>({role:m.role==="assistant"?"model":"user",parts:[{text:String(m.content).slice(0,3000)}]}));
   const model=Deno.env.get("GEMINI_MODEL")||"gemini-3.8-flash";
   const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),25000);
