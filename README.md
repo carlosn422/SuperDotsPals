@@ -1,6 +1,6 @@
-# SuperDotsPals — iOS Stress & Recovery Demo
+# Superdots Pals — iOS-first Wellness Demo
 
-An original React Native / Expo iOS-first wellbeing demo inspired by the general information architecture of HRV-based stress monitoring apps. All health metrics are sample data; no HealthKit connection or medical interpretation is implemented.
+A playful, original React Native Expo stress and recovery demo inspired by wellness dashboards. Visual styling takes cues from the supplied Superdots brand direction: vivid grape-purple, soft lilac, rounded cards, and a friendly two-eyed alien companion with antennae. This new illustrated mascot is **not** a reproduction of the existing one-eyed Superdots logo artwork.
 
 ## Run
 
@@ -9,15 +9,12 @@ npm install
 npx expo start --ios
 ```
 
-Requires macOS with Xcode Simulator for `--ios`; alternatively open the project in Expo Go using `npx expo start`.
+## Included
 
-## Features
+- Today with tappable companion and fictional HRV and stress readings
+- Trends with day/week/month/year charts and sample insights
+- Sleep stages, workouts, steps, daylight, mood, water and caffeine trackers
+- One-minute breathing activity and theme selector
+- iOS-first Expo app (no Apple Health/Watch integration yet)
 
-- Daily readiness and HRV dashboard
-- Sample heart-rate and stress trend graphs
-- Daily / weekly trend selector
-- Mood, hydration and caffeine habit logging (session-local)
-- Recovery/breathing timer
-- Sample insights and settings screen
-
-**Demo only:** All health readings are fictional. A future production version should request Apple Health access with explicit consent and use validated health models, privacy controls, and safety guidance.
+**Important:** No real physiological data is used. All health values and recommendations are fictional demonstrations, not medical advice. Habit entries and theme previews are session-local. App has not yet been tested on an iPhone simulator.

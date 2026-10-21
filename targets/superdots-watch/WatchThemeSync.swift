@@ -1,0 +1,327 @@
+import SwiftUI
+import Security
+
+/// Authenticated direct sync for the standalone watchOS prototype.
+/// The publishable key is public; tokens are stored in the user's Keychain.
+@MainActor
+final class WatchThemeSync: ObservableObject {
+    @Published var connected = false
+    @Published var busy = false
+    @Published var moodLoaded = false
+    @Published var message = "Connect your account to sync mood and health readings."
+    private let base = URL(string: "https://hzoauxxpvrgahlavxmvp.supabase.co")!
+    private let publishableKey = "sb_publishable_pPPqosRo1SqwrbW-8MWURA_UxTED6Vs"
+    private var accessToken = ""
+    private var refreshToken = ""
+    private var userId = ""
+
+    init() {
+        accessToken = secret("watch_access") ?? ""
+        refreshToken = secret("watch_refresh") ?? ""
+        userId = secret("watch_user") ?? ""
+        pairingId = secret("watch_pairing_id") ?? ""
+        connected = !refreshToken.isEmpty && !userId.isEmpty
+    }
+
+    func signIn(email: String, password: String, store: WatchStore) async {
+        busy = true
+        defer { busy = false }
+        do {
+            let payload = try JSONSerialization.data(withJSONObject: ["email":email,"password":password])
+            let response = try await request("/auth/v1/token?grant_type=password",method:"POST",body:payload,authenticated:false)
+            try loadSession(response)
+            connected = true
+            message = "Connected to Superdots."
+            await refresh(store:store)
+        } catch { message = "Sign-in failed: \(error.localizedDescription)" }
+    }
+
+    func refresh(store: WatchStore) async {
+        guard connected else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            try await renewIfNeeded()
+            if !pairingId.isEmpty {
+                let body=try JSONSerialization.data(withJSONObject:["action":"status","id":pairingId])
+                let statusData=try await request("/functions/v1/watch-pairing",method:"POST",body:body)
+                let status=try JSONSerialization.jsonObject(with:statusData) as? [String:Any]
+                if status?["active"] as? Bool != true { signOut();message="This watch was disconnected from your iPhone.";return }
+            }
+            let data = try await request("/rest/v1/wellness_journal?select=mood,occurred_at&user_id=eq.\(userId)&mood=not.is.null&order=occurred_at.desc&limit=1",method:"GET")
+            let rows = try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
+            let savedMood = (rows.first?["mood"] as? String) ?? "Calm"
+            store.currentMood = ["disgust","disgusted"].contains(savedMood.lowercased()) ? "Calm" : savedMood
+            moodLoaded = true
+            let healthData = try await request("/rest/v1/wellness_readings?select=metric,value,recorded_at&user_id=eq.\(userId)&source=eq.healthkit&metric=in.(hrv,resting_heart_rate,steps,sleep_minutes)&order=recorded_at.desc&limit=500",method:"GET")
+            let healthRows = try JSONSerialization.jsonObject(with:healthData) as? [[String:Any]] ?? []
+            store.hrvHistory = []
+            store.restingHeartHistory = []
+            store.latestHRV = nil
+            store.latestRestingHeartRate = nil
+            store.latestSteps = nil
+            store.latestSleepMinutes = nil
+            for reading in healthRows {
+                guard let metric = reading["metric"] as? String else { continue }
+                let raw = reading["value"]
+                let number = (raw as? NSNumber)?.doubleValue ?? Double(String(describing: raw ?? ""))
+                guard let number else { continue }
+                if let dateText = reading["recorded_at"] as? String {
+                    let formatter = ISO8601DateFormatter()
+                    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                    let timestamp = formatter.date(from: dateText)
+                        ?? ISO8601DateFormatter().date(from: dateText)
+                    if let date = timestamp {
+                        if metric == "hrv" { store.hrvHistory.append((value:number,date:date)) }
+                        if metric == "resting_heart_rate" { store.restingHeartHistory.append((value:number,date:date)) }
+                    }
+                }
+                if metric == "hrv" && store.latestHRV == nil { store.latestHRV = number }
+                if metric == "resting_heart_rate" && store.latestRestingHeartRate == nil { store.latestRestingHeartRate = number }
+                if metric == "steps" && store.latestSteps == nil { store.latestSteps = number }
+                if metric == "sleep_minutes" && store.latestSleepMinutes == nil { store.latestSleepMinutes = number }
+            }
+            message = "Mood synced: \(store.currentMood)."
+        } catch { message = "Sync failed: \(error.localizedDescription)" }
+    }
+
+    func signOut() {
+        for key in ["watch_access","watch_refresh","watch_user","watch_pairing_id"] { storeSecret(nil,for:key) }
+        accessToken = ""; refreshToken = ""; userId = ""; pairingId = ""; pairingSecret = ""; pairingURL = ""; pairingActive = false; pairingConnecting = false; connected = false; moodLoaded = false
+        message = "Disconnected. Your watch will show local defaults."
+    }
+
+    // All requests use the current watch user's token; Supabase RLS restricts records.
+    func submitMood(_ mood:String, answers:[String:String] = [:], store:WatchStore) async throws {
+        try await renewIfNeeded()
+        let payload = try JSONSerialization.data(withJSONObject:[
+            "user_id":userId, "entry_type":"reflection", "body":"Watch mood check-in",
+            "mood":mood, "reflection_answers":answers, "stress_factors":[]] as [String:Any])
+        _ = try await request("/rest/v1/wellness_journal", method:"POST", body:payload)
+        store.currentMood = mood
+        moodLoaded = true
+    }
+
+    func questions(for mood:String) async throws -> [[String:Any]] {
+        let data = try await spiritualCall(["action":"questions", "mood":mood, "useHistory":false])
+        let obj = try JSONSerialization.jsonObject(with:data) as? [String:Any] ?? [:]
+        return obj["items"] as? [[String:Any]] ?? []
+    }
+
+    func recommend(for mood:String, answers:[String:String]) async throws -> [String:Any] {
+        let data = try await spiritualCall(["action":"recommend", "mood":mood, "answers":answers, "useHistory":false])
+        return try JSONSerialization.jsonObject(with:data) as? [String:Any] ?? [:]
+    }
+
+    func savedVerses() async throws -> [[String:Any]] {
+        try await renewIfNeeded()
+        let path="/rest/v1/scripture_favorites?select=passage_id,scripture_passages(id,reference,verse_text,translation,source_url)&user_id=eq.\(userId)&order=created_at.desc&limit=30"
+        let data=try await request(path, method:"GET")
+        return try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
+    }
+
+    func saveVerse(_ passageId:Int) async throws {
+        try await renewIfNeeded()
+        let payload=try JSONSerialization.data(withJSONObject:["user_id":userId,"passage_id":passageId])
+        _ = try await request("/rest/v1/scripture_favorites?on_conflict=user_id,passage_id",method:"POST",body:payload,extraHeaders:["Prefer":"resolution=merge-duplicates"])
+    }
+
+    func latestVerse() async throws -> [String:Any]? {
+        let saved=try await savedVerses()
+        if let row=saved.first,let p=row["scripture_passages"] as? [String:Any] { return p }
+        return nil
+    }
+
+    func journal(_ note:String) async throws {
+        try await renewIfNeeded()
+        let payload=try JSONSerialization.data(withJSONObject:["user_id":userId,"entry_type":"reflection","body":String(note.prefix(1000))])
+        _ = try await request("/rest/v1/wellness_journal",method:"POST",body:payload)
+    }
+
+    func moodHistory() async throws -> [[String:Any]] {
+        try await renewIfNeeded()
+        let data=try await request("/rest/v1/wellness_journal?select=mood,occurred_at&user_id=eq.\(userId)&mood=not.is.null&order=occurred_at.desc&limit=365",method:"GET")
+        return try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
+    }
+
+    private func spiritualCall(_ object:[String:Any]) async throws -> Data {
+        try await renewIfNeeded()
+        return try await request("/functions/v1/spiritual-reading",method:"POST",body:JSONSerialization.data(withJSONObject:object))
+    }
+
+    @Published var pairingURL = ""
+    @Published var pairingActive = false
+    @Published var pairingConnecting = false
+    private var pairingId = ""
+    private var pairingSecret = ""
+
+    func startPairing() async {
+        busy=true
+        defer {busy=false}
+        do {
+            let body=try JSONSerialization.data(withJSONObject:["action":"start","deviceName":"Apple Watch"])
+            let data=try await request("/functions/v1/watch-pairing",method:"POST",body:body,authenticated:false)
+            guard let obj=try JSONSerialization.jsonObject(with:data) as? [String:Any],
+              let id=obj["id"] as? String,let secret=obj["secret"] as? String else {throw SyncError.badResponse}
+            pairingId=id;pairingSecret=secret
+            pairingURL="superdots://pair?id=\(id)&secret=\(secret)"
+            pairingActive=true
+            message="Scan with Superdots on your iPhone."
+        }catch{message="Pairing failed: \(error.localizedDescription)"}
+    }
+
+    func pollPairing(store:WatchStore) async {
+        guard pairingActive,!pairingId.isEmpty else{return}
+        do {
+            let body=try JSONSerialization.data(withJSONObject:["action":"poll","id":pairingId,"secret":pairingSecret])
+            let data=try await request("/functions/v1/watch-pairing",method:"POST",body:body,authenticated:false)
+            guard let obj=try JSONSerialization.jsonObject(with:data) as? [String:Any] else{return}
+            let status=obj["status"] as? String ?? ""
+            if status=="expired" {pairingActive=false;message="QR expired. Generate a new code.";return}
+            if status=="approved",let hash=obj["tokenHash"] as? String {
+                pairingConnecting=true
+                message="Connecting your watch…"
+                let started=Date()
+                let verify=try JSONSerialization.data(withJSONObject:["token_hash":hash,"type":"magiclink"])
+                let session=try await request("/auth/v1/verify",method:"POST",body:verify,authenticated:false)
+                try loadSession(session)
+                connected=true
+                storeSecret(pairingId,for:"watch_pairing_id")
+                pairingActive=false
+                let completed=try JSONSerialization.data(withJSONObject:["action":"complete","id":pairingId,"secret":pairingSecret])
+                _ = try? await request("/functions/v1/watch-pairing",method:"POST",body:completed)
+                pairingURL="";pairingSecret=""
+                message="Watch connected to your Superdots account."
+                await refresh(store:store)
+                let remaining=3.0-Date().timeIntervalSince(started)
+                if remaining>0 {try? await Task.sleep(for:.seconds(remaining))}
+                pairingConnecting=false
+            }
+        }catch{message="Waiting for connection: \(error.localizedDescription)"}
+    }
+
+    private func renewIfNeeded() async throws {
+        guard !refreshToken.isEmpty else { throw SyncError.notSignedIn }
+        let payload = try JSONSerialization.data(withJSONObject:["refresh_token":refreshToken])
+        let response = try await request("/auth/v1/token?grant_type=refresh_token",method:"POST",body:payload,authenticated:false)
+        try loadSession(response)
+    }
+
+    private func loadSession(_ data: Data) throws {
+        guard let json = try JSONSerialization.jsonObject(with:data) as? [String:Any],
+              let access = json["access_token"] as? String,
+              let refresh = json["refresh_token"] as? String,
+              let user = json["user"] as? [String:Any],
+              let id = user["id"] as? String else { throw SyncError.badResponse }
+        accessToken = access; refreshToken = refresh; userId = id
+        storeSecret(access,for:"watch_access")
+        storeSecret(refresh,for:"watch_refresh")
+        storeSecret(id,for:"watch_user")
+    }
+
+    private func request(_ path: String,method: String,body: Data? = nil,authenticated: Bool = true,extraHeaders:[String:String] = [:]) async throws -> Data {
+        guard let url = URL(string: path,relativeTo:base) else { throw SyncError.badResponse }
+        var req = URLRequest(url:url)
+        req.httpMethod = method
+        req.setValue(publishableKey,forHTTPHeaderField:"apikey")
+        req.setValue("application/json",forHTTPHeaderField:"Content-Type")
+        if authenticated {
+            guard !accessToken.isEmpty else { throw SyncError.notSignedIn }
+            req.setValue("Bearer \(accessToken)",forHTTPHeaderField:"Authorization")
+        }
+        for (name,value) in extraHeaders { req.setValue(value,forHTTPHeaderField:name) }
+        req.httpBody = body
+        let (data,response) = try await URLSession.shared.data(for:req)
+        guard let http = response as? HTTPURLResponse,(200...299).contains(http.statusCode) else {
+            throw SyncError.server((response as? HTTPURLResponse)?.statusCode ?? 0)
+        }
+        return data
+    }
+
+    private func secret(_ key:String) -> String? {
+        let query:[String:Any] = [kSecClass as String:kSecClassGenericPassword,kSecAttrAccount as String:key,kSecReturnData as String:true,kSecMatchLimit as String:kSecMatchLimitOne]
+        var result:CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary,&result) == errSecSuccess,
+              let data = result as? Data else { return nil }
+        return String(data:data,encoding:.utf8)
+    }
+
+    private func storeSecret(_ value:String?,for key:String) {
+        let query:[String:Any] = [kSecClass as String:kSecClassGenericPassword,kSecAttrAccount as String:key]
+        SecItemDelete(query as CFDictionary)
+        if let value,let data=value.data(using:.utf8) {
+            var add=query
+            add[kSecValueData as String]=data
+            add[kSecAttrAccessible as String]=kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            SecItemAdd(add as CFDictionary,nil)
+        }
+    }
+
+    enum SyncError:LocalizedError {
+        case notSignedIn,badResponse,server(Int)
+        var errorDescription:String? {
+            switch self {
+            case .notSignedIn: return "Please sign in on the watch."
+            case .badResponse: return "Unexpected response."
+            case .server(let status): return "Server error \(status)."
+            }
+        }
+    }
+}
+
+struct WatchSyncView: View {
+ @ObservedObject var sync:WatchThemeSync
+ @EnvironmentObject var store:WatchStore
+ @Environment(\.dismiss) private var dismiss
+ private var qrImageURL:URL? {
+  guard let components=URLComponents(string:sync.pairingURL),let query=components.percentEncodedQuery else{return nil}
+  return URL(string:"https://hzoauxxpvrgahlavxmvp.supabase.co/functions/v1/watch-pairing?"+query)
+ }
+ var body:some View {
+  ScrollView {
+   VStack(spacing:12) {
+    if sync.pairingConnecting {
+     ProgressView().controlSize(.large).tint(.purple)
+     Text("Connecting Apple Watch…").font(.headline).multilineTextAlignment(.center)
+    } else if sync.connected {
+     Image(systemName:"checkmark.circle.fill").font(.largeTitle).foregroundStyle(.green)
+     Text("Connected").font(.headline)
+     Text(sync.message).font(.caption2).multilineTextAlignment(.center)
+     Button("Continue") {dismiss()}
+      .buttonStyle(.borderedProminent)
+      .tint(Color(red:0.43,green:0.32,blue:0.85))
+     Button("Sync again") {Task {await sync.refresh(store:store)}}.disabled(sync.busy)
+     Button("Disconnect",role:.destructive){sync.signOut()}
+    } else {
+     Text("Link with iPhone").font(.headline)
+     Text("On your iPhone: Superdots → Settings → Connected Devices → Scan Apple Watch QR code")
+       .font(.caption2).multilineTextAlignment(.center)
+     if let qrImageURL {
+      AsyncImage(url:qrImageURL){phase in
+       switch phase {
+       case .success(let image): image.resizable().interpolation(.none).scaledToFit()
+       case .failure: Image(systemName:"exclamationmark.triangle").foregroundStyle(.orange)
+       default: ProgressView()
+       }
+      }.frame(width:150,height:150).padding(6).background(.white,in:RoundedRectangle(cornerRadius:8))
+     }
+     if !sync.pairingActive {
+      Button("Show linking QR"){Task {await sync.startPairing()}}
+     } else {
+      Text("Code expires in 5 minutes").font(.system(size:10)).foregroundStyle(.secondary)
+      Button("New QR code"){Task {await sync.startPairing()}}
+     }
+     Text(sync.message).font(.caption2).multilineTextAlignment(.center)
+    }
+    if sync.busy {ProgressView()}
+   }
+  }.navigationTitle("Connected devices")
+   .task {
+    if !sync.connected && !sync.pairingActive {await sync.startPairing()}
+    while !Task.isCancelled && !sync.connected && sync.pairingActive {
+     await sync.pollPairing(store:store)
+     try? await Task.sleep(for:.seconds(3))
+    }
+   }
+ }
+}
