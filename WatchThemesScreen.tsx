@@ -76,12 +76,12 @@ function ModularFaceMock({theme}:{theme:WatchTheme}){
    </View>
    <View style={{flexDirection:'row',alignItems:'center',gap:6,backgroundColor:'#151517',borderRadius:12,padding:6}}>
     <SuperdotMascot id="Calm" size={34} preview animate={false}/>
-    <View style={{flex:1,gap:2}}><Text style={{color:theme.color,fontSize:13,fontWeight:'800'}}>Calm</Text><Text style={{color:'#9a9a9f',fontSize:9}}>Stress Great · 28</Text>
+    <View style={{flex:1,gap:2}}><Text style={{color:theme.color,fontSize:13,fontWeight:'800'}}>Calm</Text><Text style={{color:'#9a9a9f',fontSize:9}}>Great · 28</Text>
      <View style={{height:3,borderRadius:2,backgroundColor:'#333'}}><View style={{width:'28%',height:3,borderRadius:2,backgroundColor:theme.color}}/></View></View>
    </View>
    <View style={{flexDirection:'row',justifyContent:'space-between'}}>
     <View style={{width:34,height:34,borderRadius:17,borderWidth:3,borderColor:theme.color,alignItems:'center',justifyContent:'center'}}><Text style={{color:'#fff',fontSize:11,fontWeight:'800'}}>28</Text></View>
-    <View style={{width:34,height:34,borderRadius:17,backgroundColor:'#1C1C1E',alignItems:'center',justifyContent:'center'}}><SuperdotMascot id="Joyful" size={28} preview animate={false}/></View>
+    <View style={{width:34,height:34,borderRadius:17,backgroundColor:'#1C1C1E'}}/>
     <View style={{width:34,height:34,borderRadius:17,backgroundColor:'#1C1C1E'}}/>
    </View>
   </View>
