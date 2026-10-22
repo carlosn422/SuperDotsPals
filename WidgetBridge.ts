@@ -25,3 +25,21 @@ export function publishStressSnapshot(readings:ScoredReading[]){
   ExtensionStorage.reloadWidget();
  }catch(e){console.warn('Widget snapshot skipped',e)}
 }
+
+const MASCOT_ASSET:Record<string,string>={Joyful:'mascot_joy',Calm:'mascot_disgust',Sad:'mascot_sadness',Angry:'mascot_anger',Anxious:'mascot_fear',Tired:'mascot_tired'};
+export type CircleWidgetSignal={name:string;initials:string;color:string;emoji:string;label:string;at:string};
+// Shares the latest Little Signals with the Little Signals widget. The user's own mood is only included when they turn off "Hide my mood on widgets".
+export function publishCircleSnapshot(data:{signals:CircleWidgetSignal[];unseen:number;todayCount:number;friendCount:number;hideMood:boolean;showNames:boolean;mood:string}){
+ if(Platform.OS!=='ios')return;
+ try{
+  const {ExtensionStorage}=require('@bacons/apple-targets');
+  const store=new ExtensionStorage(APP_GROUP);
+  store.set('circleSnapshot',{
+   signals:data.signals.slice(0,3).map(s=>({...s,at:Math.round(new Date(s.at).getTime()/1000)})),
+   unseen:data.unseen,todayCount:data.todayCount,friendCount:data.friendCount,
+   hideMood:data.hideMood,showNames:data.showNames,
+   mood:data.hideMood?'':data.mood,mascot:data.hideMood?'':(MASCOT_ASSET[data.mood]||''),
+  });
+  ExtensionStorage.reloadWidget();
+ }catch(e){console.warn('Circle widget snapshot skipped',e)}
+}

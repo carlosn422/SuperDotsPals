@@ -15,6 +15,7 @@ import {WatchThemesCard,SettingsItem} from './SettingsComponents';
 import {APP_THEME} from './MoodMascot';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Notifications from 'expo-notifications';
+import {Linking} from 'react-native';
 import {CircleProvider} from './CircleStore';
 import CircleNavigator,{CircleRoute} from './MyCircleScreens';
 import {LittleSignalsTodayCard} from './CircleComponents';
@@ -74,6 +75,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   });
   return()=>{active=false;if(channel)void supabase.removeChannel(channel)};
  },[]);
+ useEffect(()=>{const open=(url:string|null)=>{const m=url?.match(/^wellnest:\/\/circle\/?(\w*)/);if(m)setCircleSheet([{name:m[1]==='send'?'send':'today'}])};Linking.getInitialURL().then(open).catch(()=>{});const sub=Linking.addEventListener('url',e=>open(e.url));return()=>sub.remove()},[]);
  useEffect(()=>{const sub=Notifications.addNotificationResponseReceivedListener(r=>{if(r.notification.request.content.data?.action==='breathing'){go('Actions');openAction('breathing')}else if(r.notification.request.content.data?.action==='circle'){const route=r.notification.request.content.data?.route;setCircleSheet([{name:route==='requests'?'requests':route==='friends'?'friends':'today'}])}});return()=>sub.remove()},[pageWidth]);
  const [water,setWater]=useState(0);
  const [coffee,setCoffee]=useState(0);

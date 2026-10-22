@@ -1,6 +1,7 @@
 import React,{useEffect,useMemo,useState} from 'react';
 import {Alert,Share,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import {CIRCLE_MOODS,CircleGroup,CircleMood,LITTLE_SIGNALS,MOOD_REACTIONS,MOOD_TINTS,SignalId,isToday,signalById,timeAgo,timeLeft} from './LittleSignalsData';
 import {CodePreview,friendName,uniqueAudience,useCircle} from './CircleStore';
 import {Avatar,CCard,CHeading,CRow,CT,Chip,EmptyState,MoodPalThumb,MoodTag,OfflineBanner,PrimaryButton,SampleDataNote,SignalBurst,SoftButton,ToggleRow,cs} from './CircleComponents';
@@ -103,6 +104,9 @@ function PrototypeControls({nav}:{nav:Nav}){
 
 function Invite(){
  const {invite,regenerateCode}=useCircle();
+ const [copied,setCopied]=useState(false);
+ useEffect(()=>{if(!copied)return;const t=setTimeout(()=>setCopied(false),2000);return()=>clearTimeout(t)},[copied]);
+ const copy=async()=>{await Clipboard.setStringAsync(invite.code);setCopied(true)};
  const hours=Math.max(0,Math.round((new Date(invite.expiresAt).getTime()-Date.now())/36e5));
  const left=hours>=36?Math.round(hours/24)+' days':hours>=1?hours+(hours===1?' hour':' hours'):'less than an hour';
  if(!invite.code)return <EmptyState mood="Calm" title="Getting your code…" detail="Connect to the internet to create your invite code."/>;
@@ -114,7 +118,7 @@ function Invite(){
    <Text accessibilityLabel={'Invite code '+invite.code.split('').join(' ')} style={{fontSize:34,fontWeight:'900',letterSpacing:3,color:CT.ink}}>{invite.code}</Text>
    <View style={{flexDirection:'row',alignItems:'center',gap:6}}><Ionicons name="time-outline" size={14} color={CT.muted}/><Text style={cs.muted}>Expires in {left} · anyone you share it with can send you a request</Text></View>
   </CCard>
-  <View style={{flexDirection:'row',gap:9}}><View style={{flex:1}}><SoftButton label="Copy Code" icon="copy-outline" onPress={()=>void Share.share({message:invite.code})}/></View><View style={{flex:1}}><PrimaryButton label="Share Invite" icon="share-outline" onPress={share}/></View></View>
+  <View style={{flexDirection:'row',gap:9}}><View style={{flex:1}}><SoftButton label={copied?"Copied":"Copy Code"} icon={copied?"checkmark-circle-outline":"copy-outline"} onPress={()=>void copy()}/></View><View style={{flex:1}}><PrimaryButton label="Share Invite" icon="share-outline" onPress={share}/></View></View>
   <SoftButton label="Regenerate Code" icon="refresh-outline" onPress={()=>Alert.alert('Regenerate code?','Your current code will stop working immediately. Pending requests already sent stay in your Friend Requests.',[{text:'Cancel',style:'cancel'},{text:'Regenerate',style:'destructive',onPress:regenerateCode}])}/>
   <CCard style={{gap:8}}><CHeading title="How it works"/>
    {['Share your code with someone you trust.','They enter it in MoodPals and send you a request.','You approve the request and choose their groups.','Nothing is shared until you decide to share a mood.'].map((t,i)=><View key={i} style={{flexDirection:'row',gap:10,alignItems:'flex-start'}}><View style={{width:22,height:22,borderRadius:11,backgroundColor:CT.primarySoft,alignItems:'center',justifyContent:'center'}}><Text style={{color:CT.primary,fontWeight:'900',fontSize:12}}>{i+1}</Text></View><Text style={{flex:1,color:CT.ink,fontSize:13,lineHeight:19}}>{t}</Text></View>)}
@@ -449,10 +453,10 @@ function NotificationSettings(){
 
 function WidgetPreviews(){
  const store=useCircle();const latest=store.signals[0];const f=latest&&store.friends.find(x=>x.id===latest.friendId);
- const [privateMode,setPrivate]=useState(true);
+ const privateMode=store.widgetHideMood;const setPrivate=store.setWidgetHideMood;
  const recent=store.signals.slice(0,3);
  return <>
-  <Text style={[cs.muted,{marginTop:-6,lineHeight:18}]}>Design previews of the Little Signals widgets. iOS refreshes widgets on its own schedule, so new signals may take a few minutes to appear.</Text>
+  <Text style={[cs.muted,{marginTop:-6,lineHeight:18}]}>Add these from your Home Screen: touch and hold an empty spot, tap +, then search for MoodPals. iOS refreshes widgets on its own schedule, so new signals may take a few minutes to appear.</Text>
   <CHeading title="Small"/>
   <View style={{flexDirection:'row',gap:14,alignSelf:'center'}}>
    <View style={wd.small}>{latest&&f?<><View style={{flexDirection:'row',alignItems:'center',gap:6}}><Avatar initials={f.initials} color={f.color} size={28}/><Text style={{fontWeight:'800',color:CT.ink,fontSize:13}}>{f.name}</Text></View>

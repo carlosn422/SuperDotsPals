@@ -1,10 +1,12 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Alert,AppState,Platform} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {publishCircleSnapshot} from './WidgetBridge';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import {supabase} from './supabase';
 import type {CircleStore,CodePreview,State} from './CircleStore';
-import {CIRCLE_MOODS,CircleGroup,CircleMood,Friend,NotificationPrefs,SignalId} from './LittleSignalsData';
+import {CIRCLE_MOODS,CircleGroup,CircleMood,Friend,NotificationPrefs,SignalId,isToday,signalById} from './LittleSignalsData';
 
 // My Circle backed by Supabase (see supabase/migrations/20261023_my_circle_little_signals.sql).
 const EMPTY_PREFS:NotificationPrefs={invites:true,approvals:true,signals:true,reactions:true,quietHours:true,showNamesInPreview:true,showMoodOnLockScreen:false};
@@ -16,7 +18,8 @@ const isNetworkError=(e:any)=>/network|fetch|timed? ?out|offline/i.test(String(e
 const deviceTimezone=()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'}catch{return 'UTC'}};
 const startOfToday=()=>{const d=new Date();d.setHours(0,0,0,0);return d.toISOString();};
 
-const emptyState=():State=>({friends:[],groups:[],requests:[],myMoods:[],friendMoods:[],signals:[],invite:{code:'',expiresAt:new Date().toISOString()},prefs:{...EMPTY_PREFS},revokedFriendIds:[],blockedNames:[],sentSignals:[],offline:false});
+const emptyState=():State=>({friends:[],groups:[],requests:[],myMoods:[],friendMoods:[],signals:[],invite:{code:'',expiresAt:new Date().toISOString()},prefs:{...EMPTY_PREFS},revokedFriendIds:[],blockedNames:[],sentSignals:[],offline:false,widgetHideMood:true});
+const WIDGET_HIDE_MOOD_KEY='circle.widgetHideMood';
 
 export function useLiveCircleState():CircleStore{
  const [st,setSt]=useState<State>(emptyState);
@@ -76,6 +79,19 @@ export function useLiveCircleState():CircleStore{
    else console.warn('My Circle refresh failed',e);
   }finally{setLoading(false)}
  },[]);
+
+ useEffect(()=>{AsyncStorage.getItem(WIDGET_HIDE_MOOD_KEY).then(v=>{if(v!==null)up(()=>({widgetHideMood:v==='1'}))}).catch(()=>{})},[]);
+
+ useEffect(()=>{
+  if(loading)return;
+  const name=(id:string)=>st.friends.find(f=>f.id===id);
+  const active=st.myMoods.find(m=>m.active);
+  publishCircleSnapshot({
+   signals:st.signals.map(s=>{const f=name(s.friendId);const sig=signalById(s.signal);return {name:f?.name||'A friend',initials:f?.initials||'?',color:f?.color||'#7BC6A4',emoji:sig.emoji,label:sig.label,at:s.at};}),
+   unseen:st.signals.filter(s=>!s.seen).length,todayCount:st.signals.filter(s=>isToday(s.at)).length,friendCount:st.friends.length,
+   hideMood:st.widgetHideMood,showNames:st.prefs.showNamesInPreview,mood:active?.mood||'',
+  });
+ },[loading,st.signals,st.friends,st.myMoods,st.prefs.showNamesInPreview,st.widgetHideMood]);
 
  useEffect(()=>{
   void refresh();
@@ -174,6 +190,7 @@ export function useLiveCircleState():CircleStore{
   markSignalsSeen:()=>{up(s=>({signals:s.signals.map(x=>({...x,seen:true}))}));supabase.rpc('circle_mark_signals_seen').then(()=>{})},
   setPref:(k:keyof NotificationPrefs,v:boolean)=>{up(s=>({prefs:{...s.prefs,[k]:v}}));
    void run('Couldn’t save notification settings',async()=>supabase.from('circle_notification_prefs').upsert({user_id:await userId(),[PREF_COLUMNS[k]]:v,timezone:deviceTimezone()},{onConflict:'user_id'}))},
+  setWidgetHideMood:(v:boolean)=>{up(()=>({widgetHideMood:v}));AsyncStorage.setItem(WIDGET_HIDE_MOOD_KEY,v?'1':'0').catch(()=>{})},
   refresh,
   ensurePush:async()=>{
    try{

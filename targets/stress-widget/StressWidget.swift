@@ -88,7 +88,6 @@ struct StressWidgetView: View {
     }
 }
 
-@main
 struct StressWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "MoodPalsStressWidget", provider: StressProvider()) { entry in
