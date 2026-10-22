@@ -115,7 +115,7 @@ struct MoodStressComplicationView: View {
                 Image(mood.image).resizable().scaledToFit().frame(width: 40, height: 40)
                 VStack(alignment: .leading) {
                     Text(mood.name).font(.headline).foregroundStyle(theme.accent)
-                    Text(s.score == nil ? "Stress –" : "Stress \(s.label) · \(s.score!)").font(.caption2).foregroundStyle(.secondary)
+                    Text(s.score == nil ? "Stress –" : "\(s.label) · \(s.score!)").font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
                     Gauge(value: Double(s.score ?? 0), in: 0...100) { EmptyView() }.gaugeStyle(.accessoryLinear).tint(theme.accent)
                 }
             }
