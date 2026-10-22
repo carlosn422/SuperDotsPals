@@ -5,7 +5,10 @@
   },
   "build": {
     "base": {
-      "node": "24.22.1"
+      "node": "24.22.1",
+      "env": {
+        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_RIoyBZuThKTmAlOwliKofBjscXi"
+      }
     },
     "development": {
       "extends": "base",

@@ -33,3 +33,12 @@ as $$
 $$;
 
 revoke all on function public.has_plus(uuid) from public, anon, authenticated;
+
+-- Server-only configuration (no policies: readable by the service role only).
+create table if not exists public.server_secrets(
+ name text primary key,
+ value text not null,
+ updated_at timestamptz not null default now()
+);
+alter table public.server_secrets enable row level security;
+revoke all on table public.server_secrets from anon, authenticated;

@@ -1,7 +1,8 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 // RevenueCat → Supabase: keeps public.plus_entitlements in sync with the "plus" entitlement.
-// Configure the webhook in RevenueCat with Authorization header = REVENUECAT_WEBHOOK_AUTH.
+// RevenueCat sends a fixed Authorization header. It is checked against the REVENUECAT_WEBHOOK_AUTH
+// function secret, or else against its SHA-256 stored in public.server_secrets.
 const ENTITLEMENT = "plus";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const json = (body: unknown, status = 200) =>
@@ -14,18 +15,28 @@ function safeEqual(a: string, b: string) {
   return diff === 0;
 }
 
+async function sha256(text: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function authorized(db: ReturnType<typeof createClient>, token: string) {
+  const secret = Deno.env.get("REVENUECAT_WEBHOOK_AUTH");
+  if (secret) return safeEqual(token, secret.replace(/^Bearer\s+/i, ""));
+  const { data } = await db.from("server_secrets").select("value").eq("name", "revenuecat_webhook_auth_sha256").maybeSingle();
+  return !!data?.value && safeEqual(await sha256(token), data.value);
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
-  const expected = Deno.env.get("REVENUECAT_WEBHOOK_AUTH") || "";
-  const got = req.headers.get("Authorization") || "";
-  if (!expected || !(safeEqual(got, expected) || safeEqual(got, `Bearer ${expected}`))) return json({ error: "Unauthorized" }, 401);
-
-  const event = (await req.json().catch(() => null))?.event;
-  if (!event?.type) return json({ error: "Missing event" }, 400);
-
   const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+  const got = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+  if (!got || !(await authorized(db, got))) return json({ error: "Unauthorized" }, 401);
+
+  const event = (await req.json().catch(() => null))?.event;
+  if (!event?.type) return json({ error: "Missing event" }, 400);
   const eventAt = event.event_timestamp_ms ? new Date(event.event_timestamp_ms).toISOString() : new Date().toISOString();
 
   if (event.type === "TRANSFER") {
