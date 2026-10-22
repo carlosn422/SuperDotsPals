@@ -65,6 +65,23 @@ struct ComplicationMood {
     }
 }
 
+/// Colour MoodPal on full-colour faces; a template silhouette (face details cut out)
+/// where watchOS tints or desaturates complications, which would otherwise blank the artwork.
+struct MoodPalImage: View {
+    @Environment(\.widgetRenderingMode) private var renderingMode
+    let mood: ComplicationMood
+
+    var body: some View {
+        if renderingMode == .fullColor {
+            Image(mood.image).resizable().scaledToFit()
+        } else if #available(watchOS 11.0, *), renderingMode == .accented {
+            Image(mood.image).resizable().widgetAccentedRenderingMode(.fullColor).scaledToFit()
+        } else {
+            Image(mood.image + "_mask").resizable().renderingMode(.template).scaledToFit().widgetAccentable()
+        }
+    }
+}
+
 struct ComplicationEntry: TimelineEntry { let date: Date; let snapshot: WatchStressSnapshot }
 
 struct ComplicationProvider: TimelineProvider {
@@ -88,12 +105,12 @@ struct MoodComplicationView: View {
         case .accessoryInline:
             Text("Feeling \(mood.name)")
         case .accessoryCorner:
-            Image(mood.image).resizable().scaledToFit().padding(2)
+            MoodPalImage(mood: mood).padding(2)
                 .widgetLabel { Text(mood.name).foregroundStyle(theme.accent) }
         default:
             ZStack {
                 AccessoryWidgetBackground()
-                Image(mood.image).resizable().scaledToFit().padding(4)
+                MoodPalImage(mood: mood).padding(4)
             }
         }
     }
@@ -112,7 +129,7 @@ struct MoodStressComplicationView: View {
             Text(s.score == nil ? "Feeling \(mood.name)" : "\(mood.name) · Stress \(s.label)")
         case .accessoryRectangular:
             HStack(spacing: 6) {
-                Image(mood.image).resizable().scaledToFit().frame(width: 40, height: 40)
+                MoodPalImage(mood: mood).frame(width: 40, height: 40)
                 VStack(alignment: .leading) {
                     Text(mood.name).font(.headline).foregroundStyle(theme.accent)
                     Text(s.score == nil ? "Stress –" : "\(s.label) · \(s.score!)").font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
@@ -122,7 +139,7 @@ struct MoodStressComplicationView: View {
         default:
             ZStack {
                 Gauge(value: Double(s.score ?? 0), in: 0...100) { EmptyView() }.gaugeStyle(.accessoryCircularCapacity).tint(theme.accent)
-                Image(mood.image).resizable().scaledToFit().padding(6)
+                MoodPalImage(mood: mood).padding(6)
             }
         }
     }
