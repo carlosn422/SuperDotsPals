@@ -6,6 +6,7 @@ import SuperdotMascot from './SuperdotMascot';
 import StressDiary from './StressDiary';
 import {ChatAction,ACTION_META,actionsFor,useStressContext,StressContextBar,promptsFor,TypingBubble} from './ChatExtras';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import {usePlus} from './PlusStore';
 
 const feelings=['Good','Calm','Joyful','Angry','Frustrated','Stressed','Anxious','Sad','Tired','Overwhelmed'];
 const activities=['Walking','Workout','Work','Meeting','Rest','Social time','Other'];
@@ -13,6 +14,7 @@ const stressFactors=['Work','Sleep','Relationships','Caffeine','Exercise','Hydra
 type Entry={id:string;body:string;mood:string|null;intensity:number|null;energy_level:string|null;stress_factors:string[];occurred_at:string};
 type Message={id:string;role:'user'|'assistant';content:string;created_at:string};
 export default function WellnessCompanion({companion,color,initialView='checkin',onMoodSaved,onMoodPreview,onCheckinDone,onWizardNavigate,onOpenInsights,onFindVerse,onAction,onShareWithCircle}:{onShareWithCircle?:(mood:string)=>void;onAction?:(a:ChatAction)=>void;companion:string;color:string;initialView?:'checkin'|'chat'|'history';onMoodSaved?:(mood:string)=>void;onMoodPreview?:(mood:string)=>void;onCheckinDone?:()=>void;onWizardNavigate?:()=>void;onOpenInsights?:()=>void;onFindVerse?:(mood:string,answers:Record<string,string>)=>void}){
+ const {isPlus,showPaywall}=usePlus();
  const [mood,setMood]=useState(''),[energy,setEnergy]=useState<'energized'|'tired'|'neutral'>('neutral'),[factors,setFactors]=useState<string[]>([]),[intensity,setIntensity]=useState(5),[note,setNote]=useState(''),[activity,setActivity]=useState('Walking'),[minutes,setMinutes]=useState('20'),[events,setEvents]=useState<Entry[]>([]);
  const [view,setView]=useState<'checkin'|'chat'|'history'>(initialView);
  const [showDetails,setShowDetails]=useState(false),[showActivity,setShowActivity]=useState(false);
@@ -47,13 +49,14 @@ export default function WellnessCompanion({companion,color,initialView='checkin'
  }
  async function send(text?:string){
   const input=(text??chatText).trim();if(!input||busy)return;
+  if(!isPlus){showPaywall('reflections');return;}
   if(input.length>3000){Alert.alert('Message too long','Please shorten your message to 3,000 characters.');return;}
   setBusy(true);setPending(input);setFailed(null);if(text===undefined)setChatText('');
   try {
    const call=supabase.functions.invoke('superdot-chat',{body:{message:input,conversationId,clientContext:ctx.text}});
    const timeout=new Promise<never>((_,reject)=>setTimeout(()=>reject(Error('MoodPal took too long to answer. Check your connection and retry.')),45000));
    const {data,error}=await Promise.race([call,timeout]);
-   if(error){let msg='Could not reach MoodPal. Please try again.';try{const detail=await (error as any).context?.json?.();if(detail?.error)msg=detail.error;}catch{}throw Error(msg);}
+   if(error){let msg='Could not reach MoodPal. Please try again.';try{const detail=await (error as any).context?.json?.();if(detail?.error)msg=detail.error;if(detail?.code==='reflection_limit'&&!detail.plus)showPaywall('reflections');}catch{}throw Error(msg);}
    if(data?.error)throw Error(data.error);
    if(!data?.reply||!data?.conversationId)throw Error('MoodPal did not return a complete response.');
    setConversationId(data.conversationId);

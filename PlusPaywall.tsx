@@ -1,9 +1,10 @@
 import React,{useEffect,useState} from 'react';
-import {Alert,Image,Modal,ScrollView,StyleSheet,Text,TouchableOpacity,View} from 'react-native';
+import {Alert,Image,Linking,Modal,ScrollView,StyleSheet,Text,TouchableOpacity,View} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {APP_THEME as T} from './MoodMascot';
 import {FEATURE_COPY,PLAN_FEATURES,PLUS_MOCKUP,PlusFeature,PlusPlan,usePlus} from './PlusStore';
 
+const TERMS_URL='https://moodpals.com/terms',PRIVACY_URL='https://moodpals.com/privacy';
 const CALM=require('./assets/mascot-animations/disgust/preview400/frame_000.png');
 const BENEFITS:{icon:React.ComponentProps<typeof Ionicons>['name'];text:string}[]=[
  {icon:'stats-chart',text:'Advanced wellness trends and full history'},
@@ -48,7 +49,7 @@ export function PlusPaywallSheet(){
    <TouchableOpacity accessibilityRole="button" disabled={busy||isPlus} onPress={()=>void buy()} style={[s.cta,(busy||isPlus)&&{opacity:0.6}]}><Text style={s.ctaText}>{isPlus?'You have Plus':`Continue · ${prices[plan].price}/${prices[plan].period}`}</Text></TouchableOpacity>
    <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>void onRestore()}><Text style={s.restore}>Restore Purchases</Text></TouchableOpacity>
    <Text style={s.terms}>{TERMS}</Text>
-   <View style={{flexDirection:'row',gap:18}}><Text style={s.link} onPress={()=>Alert.alert('Terms of Use','Link to the MoodPals Terms of Use.')}>Terms of Use</Text><Text style={s.link} onPress={()=>Alert.alert('Privacy Policy','Link to the MoodPals Privacy Policy.')}>Privacy Policy</Text></View>
+   <View style={{flexDirection:'row',gap:18}}><Text style={s.link} onPress={()=>void Linking.openURL(TERMS_URL)}>Terms of Use</Text><Text style={s.link} onPress={()=>void Linking.openURL(PRIVACY_URL)}>Privacy Policy</Text></View>
    {PLUS_MOCKUP?<Text style={s.mock}>Preview: prices are proposed and no purchase is made.</Text>:null}
   </ScrollView>
  </Modal>;

@@ -17,6 +17,18 @@ export function useIsGuest(){
  return guest;
 }
 
+export function confirmDeleteAccount(){
+ Alert.alert('Delete your account?','This permanently deletes your MoodPals account and everything in it: check-ins, diary, saved health readings, conversations and My Circle. This can\'t be undone.\n\nDeleting your account doesn\'t cancel MoodPals Plus. Cancel it in your Apple Account subscriptions.',[
+  {text:'Cancel',style:'cancel'},
+  {text:'Delete account',style:'destructive',onPress:()=>void (async()=>{
+   const {data,error}=await supabase.functions.invoke('delete-account',{body:{confirm:true}});
+   if(error||!data?.deleted){Alert.alert('Couldn’t delete your account','Please try again, or email hello@moodpals.com.');return;}
+   await supabase.auth.signOut({scope:'local'});
+   Alert.alert('Account deleted','Your MoodPals account and its data have been deleted.');
+  })()},
+ ]);
+}
+
 function Back({label,accent,onPress}:{label:string;accent:string;onPress:()=>void}){
  return <TouchableOpacity accessibilityRole="button" style={s.back} onPress={onPress}><Ionicons name="chevron-back" size={18} color={accent}/><Text style={{color:accent,fontWeight:'800'}}>{label}</Text></TouchableOpacity>;
 }

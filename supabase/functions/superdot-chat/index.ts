@@ -2,6 +2,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const headers = {"Content-Type":"application/json","Cache-Control":"no-store"};
+// AI reflections are a MoodPals Plus feature: up to 100 Ask MoodPal replies per calendar month (UTC).
+const PLUS_MONTHLY_REFLECTIONS=100;
 // Prompt is managed in public.ai_assistant_prompts (prompt_key = superdot_chat).
 // Never accept system prompt overrides from the mobile client.
 Deno.serve(async req=>{
@@ -22,6 +24,14 @@ Deno.serve(async req=>{
   const serviceKey=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if(!serviceKey)return new Response(JSON.stringify({error:"Assistant configuration unavailable."}),{status:503,headers});
   const adminDb=createClient(supabaseUrl,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}});
+  const monthStart=new Date();monthStart.setUTCDate(1);monthStart.setUTCHours(0,0,0,0);
+  const [{data:plus,error:plusError},{count:used,error:usedError}]=await Promise.all([
+   adminDb.rpc("has_plus",{uid:user.id}),
+   adminDb.from("wellness_messages").select("id",{head:true,count:"exact"}).eq("user_id",user.id).eq("role","assistant").gte("created_at",monthStart.toISOString())
+  ]);
+  if(plusError||usedError)return new Response(JSON.stringify({error:"Could not check your plan. Please try again."}),{status:503,headers});
+  if(plus!==true)return new Response(JSON.stringify({error:"AI reflections are part of MoodPals Plus.",code:"reflection_limit",plus:false,limit:PLUS_MONTHLY_REFLECTIONS}),{status:402,headers});
+  if(Number(used||0)>=PLUS_MONTHLY_REFLECTIONS)return new Response(JSON.stringify({error:"You've used all 100 AI reflections for this month. They reset on the 1st.",code:"reflection_limit",plus:true,limit:PLUS_MONTHLY_REFLECTIONS}),{status:402,headers});
   const {data:promptRow,error:promptError}=await adminDb.from("ai_assistant_prompts").select("system_prompt").eq("prompt_key","superdot_chat").eq("is_active",true).single();
   if(promptError||!promptRow?.system_prompt){
    console.error("Assistant prompt lookup failed",promptError?.code||"not configured");

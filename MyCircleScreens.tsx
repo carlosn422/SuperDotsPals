@@ -4,6 +4,7 @@ import {Ionicons} from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import {CIRCLE_MOODS,CircleGroup,CircleMood,LITTLE_SIGNALS,MOOD_REACTIONS,MOOD_TINTS,SignalId,isToday,signalById,timeAgo,timeLeft} from './LittleSignalsData';
 import {CodePreview,friendName,uniqueAudience,useCircle} from './CircleStore';
+import {usePlus} from './PlusStore';
 import {Avatar,CCard,CHeading,CRow,CT,Chip,EmptyState,MoodPalThumb,MoodTag,OfflineBanner,PrimaryButton,SampleDataNote,SignalBurst,SoftButton,ToggleRow,cs} from './CircleComponents';
 
 export type CircleRoute=
@@ -230,10 +231,11 @@ function FriendDetail({id,nav}:{id:string;nav:Nav}){
 
 function Groups({nav}:{nav:Nav}){
  const store=useCircle();
+ const {isPlus,showPaywall}=usePlus();
  return <>
   {!store.groups.length?<EmptyState mood="Calm" title="No groups yet" detail="Groups like Close Friends, Family or Support Team let you choose who sees which moods."/>:
   <CCard style={{paddingVertical:4}}>{store.groups.map((g,i)=><CRow key={g.id} last={i===store.groups.length-1} icon={g.icon} tint={g.color+'22'} color={g.color} title={g.name} subtitle={g.memberIds.length+' members · '+(g.moods.length===6?'All moods':g.moods.length+' of 6 moods')} onPress={()=>nav.push({name:'group',id:g.id})}/>)}</CCard>}
-  <PrimaryButton label="Create Group" icon="add" onPress={()=>nav.push({name:'group'})}/>
+  <PrimaryButton label="Create Group" icon="add" onPress={()=>!isPlus&&store.groups.length>=1?showPaywall('circles'):nav.push({name:'group'})}/>
   <Text style={[cs.muted,{textAlign:'center'}]}>A friend can be in more than one group. Group names and members are only visible to you.</Text>
  </>;
 }

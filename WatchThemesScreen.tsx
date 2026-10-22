@@ -3,6 +3,7 @@ import {ActivityIndicator,Alert,Text,TouchableOpacity,View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
 import SuperdotMascot from './SuperdotMascot';
 import {supabase} from './supabase';
+import {usePlus} from './PlusStore';
 
 // Watch themes are colours. Keep in sync with WatchTheme.swift and StressComplication.swift.
 export const WATCH_LEVELS=[
@@ -22,6 +23,7 @@ export const WATCH_THEMES=[
  {id:'red',label:'Red',color:'#E04F5F',tint:'#FFE3E6'},
 ] as const;
 type WatchTheme=typeof WATCH_THEMES[number];
+const FREE_WATCH_THEMES:string[]=['purple','pink','blue','gold'];
 const ink='#1D2B33',muted='#6E7D86';
 const card={backgroundColor:'#fff',borderRadius:22,padding:16,shadowColor:'#1D2B33',shadowOpacity:.06,shadowRadius:12,shadowOffset:{width:0,height:4}} as const;
 
@@ -109,6 +111,8 @@ export default function WatchThemesScreen({onBack}:{onBack:()=>void}){
  const [selected,setSelected]=useState<WatchTheme|null>(null);
  const [saving,setSaving]=useState(false);
  const [guide,setGuide]=useState(false);
+ const {isPlus,showPaywall}=usePlus();
+ const locked=(t:WatchTheme)=>!isPlus&&!FREE_WATCH_THEMES.includes(t.id);
  useEffect(()=>{(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;
   const {data}=await supabase.from('user_settings').select('watch_theme').eq('user_id',user.id).maybeSingle();setCurrent((data as any)?.watch_theme||'purple');})()},[]);
  const active=WATCH_THEMES.find(t=>t.id===current)||WATCH_THEMES[0];
@@ -145,7 +149,7 @@ export default function WatchThemesScreen({onBack}:{onBack:()=>void}){
    <View style={{flex:1}}><Text style={{fontWeight:'900',color:ink,fontSize:16}}>Add to Watch Face</Text><Text style={{color:muted,fontSize:12}}>See your mood next to the time</Text></View>
    <Ionicons name="chevron-forward" size={18} color={muted}/></TouchableOpacity>
   <View style={[card,{gap:14}]}><Text style={{fontWeight:'900',color:ink,fontSize:16}}>Colours</Text>
-   <View style={{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',rowGap:14}}>{WATCH_THEMES.map(t=><TouchableOpacity key={t.id} onPress={()=>setSelected(t)} accessibilityRole="button" accessibilityLabel={t.label+(t.id===current?', in use':'')} style={{width:'24%',alignItems:'center'}}><Swatch theme={t} on={t.id===current}/></TouchableOpacity>)}</View>
+   <View style={{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',rowGap:14}}>{WATCH_THEMES.map(t=><TouchableOpacity key={t.id} onPress={()=>locked(t)?showPaywall('customization'):setSelected(t)} accessibilityRole="button" accessibilityLabel={t.label+(t.id===current?', in use':locked(t)?', MoodPals Plus':'')} style={{width:'24%',alignItems:'center'}}><Swatch theme={t} on={t.id===current}/>{locked(t)?<View style={{position:'absolute',top:0,right:4,backgroundColor:'#fff',borderRadius:11,padding:4}}><Ionicons name="lock-closed" size={12} color={muted}/></View>:null}</TouchableOpacity>)}</View>
   </View>
  </View>;
 }

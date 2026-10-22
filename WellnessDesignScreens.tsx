@@ -5,6 +5,7 @@ import SuperdotMascot from './SuperdotMascot';
 import {Image as RNImage} from 'react-native';
 import {APP_THEME} from './MoodMascot';
 import {supabase} from './supabase';
+import {usePlus} from './PlusStore';
 import HealthDataPanel,{HealthMiniStats,useSavedHealth} from './HealthDataPanel';
 import RecoveryInsights from './RecoveryInsights';
 import HealthTrendOverview from './HealthTrendOverview';
@@ -153,6 +154,8 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpi
 }
 export function WellnessTrends({companion,accent,period,onPeriod,mood}:{companion:string;accent:string;period:string;onPeriod:(p:'Day'|'Week'|'Month'|'Year')=>void;mood:string}){
  const [entries,setEntries]=React.useState<{mood:string;occurred_at:string}[]>([]);
+ const {isPlus,showPaywall}=usePlus();
+ const locked=(p:string)=>!isPlus&&(p==='Month'||p==='Year');
  const [loading,setLoading]=React.useState(true);
  React.useEffect(()=>{let active=true;(async()=>{try{const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data,error}=await supabase.from('wellness_journal').select('mood,occurred_at').eq('user_id',user.id).not('mood','is',null).order('occurred_at',{ascending:false}).limit(365);if(error)throw error;if(active)setEntries(data||[])}catch(error){console.warn('Mood trends unavailable',error)}finally{if(active)setLoading(false)}})();return()=>{active=false}},[mood]);
  const days=period==='Day'?1:period==='Week'?7:period==='Month'?30:365;
@@ -167,7 +170,7 @@ export function WellnessTrends({companion,accent,period,onPeriod,mood}:{companio
  });
  const maxCount=Math.max(1,...groups.map(g=>g.count));
  return <View style={s.page}><PageHero title="Your stress," highlight="visualized." detail="Hourly, daily, monthly and yearly trends from your own readings." companion={companion} accent={accent}/>
- <View style={s.segment}>{(['Day','Week','Month','Year'] as const).map(p=><TouchableOpacity key={p} onPress={()=>onPeriod(p)} style={[s.seg,period===p&&{backgroundColor:accent}]}><Text style={{color:period===p?'#fff':MUTED,fontWeight:'800',fontSize:12}}>{p}</Text></TouchableOpacity>)}</View>
+ <View style={s.segment}>{(['Day','Week','Month','Year'] as const).map(p=><TouchableOpacity key={p} onPress={()=>locked(p)?showPaywall('trends'):onPeriod(p)} accessibilityLabel={p+(locked(p)?', MoodPals Plus':'')} style={[s.seg,period===p&&{backgroundColor:accent},{flexDirection:'row',justifyContent:'center',gap:4}]}>{locked(p)?<Ionicons name="lock-closed" size={10} color={MUTED}/>:null}<Text style={{color:period===p?'#fff':MUTED,fontWeight:'800',fontSize:12}}>{p}</Text></TouchableOpacity>)}</View>
  <StressTrendCard period={period as any}/>
 <SectionHeading title="Mood trend"/><View style={s.white}><Text style={s.cardTitle}>How you've been feeling</Text>
  <Text style={s.big}>{loading?'Loading…':filtered.length?filtered.length+' check-ins':'No check-ins yet'}</Text>

@@ -36,6 +36,8 @@ Deno.serve(async(req:Request)=>{
   const models=[...new Set([Deno.env.get("SPIRITUAL_GEMINI_MODEL"),"gemini-2.5-flash","gemini-2.5-flash-lite"].filter(Boolean))] as string[];
   let aiResult:any=null,usedAI=false;
   let aiAllowed=Boolean(key);
+  // AI-written questions and reflections are a Plus feature; Free users get the built-in questions and catalog picks.
+  if(aiAllowed){const service=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");const {data:plus}=service?await createClient(url,service,{auth:{persistSession:false,autoRefreshToken:false}}).rpc("has_plus",{uid:user.id}):{data:false};aiAllowed=plus===true;}
   if(aiAllowed){const since=new Date(Date.now()-24*60*60*1000).toISOString();const {count,error:usageError}=await db.from("spiritual_ai_usage").select("id",{head:true,count:"exact"}).eq("user_id",user.id).gte("created_at",since);if(usageError||Number(count||0)>=10)aiAllowed=false;}
   if(aiAllowed){
    const instruction=action==="questions"?
