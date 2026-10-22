@@ -34,6 +34,14 @@ const SCREENS = {
     <div class="verse"><q>In nothing be anxious, but in everything, by prayer and petition with thanksgiving, let your requests be made known to God. And the peace of God, which surpasses all understanding, will guard your hearts and your thoughts in Christ Jesus.</q><div class="ref">Philippians 4:6-7 · WEB</div></div>
     <div class="card"><h5>A reflection for today</h5><div class="muted">Name one worry from today and hand it over in a short prayer, then take three slow breaths with your pal.</div></div>
     <div><span class="chip">Save to favorites</span><span class="chip">Read from source</span></div>${tabbar('Actions')}</div>`,
+  circle: () => `<div class="ui"><div class="top"><span>My Circle</span><span class="muted">3 friends</span></div>
+    <div class="card" style="display:flex;gap:8px;align-items:center"><img src="/img/mascots/disgust.webp" alt="" style="width:42px;height:42px"><div><b>You shared Calm</b><div class="muted">with Close Friends · disappears in 21h</div></div></div>
+    <div class="card"><h5>Little Signals for you</h5>
+      <div class="entry" style="border:0;margin:0;padding:0"><span class="av" style="background:#7BC6A4">J</span><div><b>Jamie</b> is here for you 🫶<div class="muted">2h ago</div></div></div>
+      <div class="entry"><span class="av" style="background:#F2A65A">T</span><div><b>Taylor</b> sent you a hug 🤗<div class="muted">1h ago</div></div></div>
+      <div class="entry"><span class="av" style="background:#B79CEB">M</span><div><b>Mom</b> sent you some sunshine ☀️<div class="muted">40m ago</div></div></div></div>
+    <div class="card"><h5>Send a Little Signal</h5><div class="emojis"><span>❤️</span><span>🤗</span><span>🫶</span><span>☀️</span><span>💪</span><span>🎉</span></div></div>
+    <div class="card muted">Only moods you choose to share. Never your health data.</div>${tabbar('Settings')}</div>`,
   ask: () => `<div class="ui"><div class="top"><span>Ask MoodPal</span></div>
     <div><span class="chip">Elevated · 68</span><span class="chip">HRV 38 ms</span><span class="chip">Slept 5h 40m</span></div>
     <div class="bubble me">Why is my stress high today?</div>
