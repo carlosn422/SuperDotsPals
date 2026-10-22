@@ -52,7 +52,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  const openAction=(view:'checkin'|'chat'|'history'|'spiritual'|'breathing')=>{if(view==='spiritual')setSpiritualCheckin(undefined);setActionDetail(null);setActionView(view);setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});};
  const [settingsPage,setSettingsPage]=useState<'main'|'watch'|'devices'|'health'|'notifications'|'privacy'|'help'|'circle'|'watchThemes'|'plus'|'account'>('main');
  const isGuest=useIsGuest();
- useWatchAutoLink(isGuest);
+ useWatchAutoLink(isGuest,()=>{go('Settings');setSettingsPage('account')});
  const [circleSheet,setCircleSheet]=useState<CircleRoute[]|null>(null);
  const [period,setPeriod]=useState<Period>('Day');
  const [mood,setMood]=useState<string>('');

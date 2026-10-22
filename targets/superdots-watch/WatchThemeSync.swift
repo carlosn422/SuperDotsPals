@@ -425,7 +425,7 @@ struct WatchSyncView: View {
      Button("Disconnect",role:.destructive){sync.signOut()}
     } else {
      Text("Link with iPhone").font(.headline)
-     Text("Open MoodPals on your iPhone and this watch links automatically.")
+     Text("Open MoodPals on your iPhone and this watch links automatically. Using it as a guest? Create a free account there first.")
        .font(.system(size:11)).multilineTextAlignment(.center)
      Text("Or scan: MoodPals → Settings → Connected Devices")
        .font(.system(size:10)).foregroundStyle(.secondary).multilineTextAlignment(.center)
