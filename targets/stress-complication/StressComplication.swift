@@ -47,6 +47,24 @@ struct ComplicationTheme {
     }
 }
 
+/// Latest mood check-in written by the watch app (WatchMoodStore).
+struct ComplicationMood {
+    var name: String
+    var image: String
+    static func load() -> ComplicationMood {
+        let mood = UserDefaults(suiteName: "group.com.superdotspals.wellnest.watch")?.string(forKey: "currentMood") ?? "Calm"
+        let v = mood.lowercased()
+        let key: String
+        if ["happy","good","great","joy","excited","proud"].contains(where: v.contains) { key = "joy" }
+        else if ["anger","angry","frustrated","mad","irritated"].contains(where: v.contains) { key = "anger" }
+        else if ["fear","anxious","stress","worried","nervous","overwhelmed"].contains(where: v.contains) { key = "fear" }
+        else if ["tired","sleepy","exhausted","fatigued"].contains(where: v.contains) { key = "tired" }
+        else if ["sad","down","depressed","lonely"].contains(where: v.contains) { key = "sadness" }
+        else { key = "disgust" }
+        return ComplicationMood(name: ["disgust","disgusted"].contains(v) ? "Calm" : mood.capitalized, image: "mood_\(key)")
+    }
+}
+
 struct ComplicationEntry: TimelineEntry { let date: Date; let snapshot: WatchStressSnapshot }
 
 struct ComplicationProvider: TimelineProvider {
@@ -65,25 +83,26 @@ struct ComplicationView: View {
     var body: some View {
         let s = entry.snapshot
         let theme = ComplicationTheme.load()
+        let mood = ComplicationMood.load()
         switch family {
         case .accessoryInline:
-            Text(s.score == nil ? "Stress –" : "Stress \(s.label) \(s.score!)").foregroundStyle(theme.accent)
+            Text(s.score == nil ? "Feeling \(mood.name)" : "\(mood.name) · Stress \(s.label)")
         case .accessoryRectangular:
             HStack(spacing: 6) {
-                Image(theme.face(s.score)).resizable().scaledToFit().frame(width: 38, height: 38)
+                Image(mood.image).resizable().scaledToFit().frame(width: 40, height: 40)
                 VStack(alignment: .leading) {
-                    Text("MoodPals").font(.caption2).foregroundStyle(.secondary)
-                    Text(s.score == nil ? "Open to sync" : "\(s.label) · \(s.score!)").font(.headline).foregroundStyle(theme.accent)
+                    Text(mood.name).font(.headline).foregroundStyle(theme.accent)
+                    Text(s.score == nil ? "Stress –" : "Stress \(s.label) · \(s.score!)").font(.caption2).foregroundStyle(.secondary)
                     Gauge(value: Double(s.score ?? 0), in: 0...100) { EmptyView() }.gaugeStyle(.accessoryLinear).tint(theme.accent)
                 }
             }
         case .accessoryCorner:
-            Text(s.score.map(String.init) ?? "–").font(.title3.bold()).foregroundStyle(theme.accent)
-                .widgetLabel { Text(s.score == nil ? "Stress" : s.label).foregroundStyle(theme.accent) }
+            Image(mood.image).resizable().scaledToFit().padding(2)
+                .widgetLabel { Text(mood.name).foregroundStyle(theme.accent) }
         default:
             ZStack {
                 Gauge(value: Double(s.score ?? 0), in: 0...100) { EmptyView() }.gaugeStyle(.accessoryCircularCapacity).tint(theme.accent)
-                Image(theme.face(s.score)).resizable().scaledToFit().padding(7)
+                Image(mood.image).resizable().scaledToFit().padding(6)
             }
         }
     }
@@ -95,8 +114,8 @@ struct StressComplication: Widget {
         StaticConfiguration(kind: "MoodPalsStressComplication", provider: ComplicationProvider()) { entry in
             ComplicationView(entry: entry).containerBackground(.clear, for: .widget)
         }
-        .configurationDisplayName("Stress level")
-        .description("Your latest MoodPals stress level.")
+        .configurationDisplayName("Mood & stress")
+        .description("Your current MoodPal and stress level.")
         .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryInline, .accessoryCorner])
     }
 }

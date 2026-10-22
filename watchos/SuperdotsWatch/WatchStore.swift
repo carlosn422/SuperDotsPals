@@ -26,7 +26,9 @@ struct SampleReading: Identifiable {
 final class WatchStore: ObservableObject {
     // Brand colors are consistent; the mood controls the animated mascot, not the theme.
     @Published var companion: Dot = .bloop
-    @Published var currentMood: String = "Calm"
+    @Published var currentMood: String = "Calm" {
+        didSet { if currentMood != oldValue { WatchMoodStore.save(currentMood) } }
+    }
     @Published var latestHRV: Double? = nil
     @Published var latestRestingHeartRate: Double? = nil
     @Published var latestSteps: Double? = nil

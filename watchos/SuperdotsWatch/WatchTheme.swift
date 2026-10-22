@@ -83,3 +83,13 @@ struct ThemeApplyingView: View {
         .transition(.opacity)
     }
 }
+
+/// Latest mood check-in, shared with the watch-face complication through the App Group.
+enum WatchMoodStore {
+    static func save(_ mood: String) {
+        let d = UserDefaults(suiteName: WatchStressStore.appGroup)
+        d?.set(mood, forKey: "currentMood")
+        d?.set(Date().timeIntervalSince1970, forKey: "currentMoodUpdated")
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+}
