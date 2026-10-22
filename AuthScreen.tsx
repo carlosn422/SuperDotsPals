@@ -28,6 +28,13 @@ export default function AuthScreen(){
   });
   return()=>listener.remove();
  },[]);
+ async function startAsGuest(){
+  setMessage('');setLoading(true);
+  try{
+   const {error}=await supabase.auth.signInAnonymously();
+   if(error){setMode('signup');setMessage('Guest mode isn’t available right now. Create an account to continue.');}
+  }finally{setLoading(false);}
+ }
  async function submit(){
   setMessage('');setLoading(true);
   try {
@@ -57,7 +64,7 @@ export default function AuthScreen(){
     accessibilityLabel="Purple and mint MoodPals smiling together"/>
   </View>
   <View style={s.welcomeActions}>
-   <TouchableOpacity accessibilityRole="button" onPress={()=>setMode('signup')} style={s.welcomePrimary}><Text style={s.welcomePrimaryText}>Get Started</Text></TouchableOpacity>
+   <TouchableOpacity accessibilityRole="button" onPress={()=>void startAsGuest()} disabled={loading} style={[s.welcomePrimary,loading&&{opacity:.7}]}>{loading?<ActivityIndicator color="white"/>:<Text style={s.welcomePrimaryText}>Get Started</Text>}</TouchableOpacity>
    <TouchableOpacity accessibilityRole="button" onPress={()=>setMode('signin')} style={s.welcomeSecondary}><Text style={s.welcomeSecondaryText}>Already have an account?</Text></TouchableOpacity>
   </View>
  </View>;
