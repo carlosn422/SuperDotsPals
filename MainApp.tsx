@@ -20,6 +20,7 @@ import {CircleProvider} from './CircleStore';
 import CircleNavigator,{CircleRoute} from './MyCircleScreens';
 import {LittleSignalsTodayCard} from './CircleComponents';
 import WatchThemesScreen from './WatchThemesScreen';
+import {PlusSettingsScreen} from './PlusPaywall';
 import {CIRCLE_MOODS} from './LittleSignalsData';
 import Svg, { Circle, Line, Path, Rect, Defs, LinearGradient, Stop, Polygon } from 'react-native-svg';
 
@@ -47,7 +48,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  const [actionVersion,setActionVersion]=useState(0);
  const [spiritualCheckin,setSpiritualCheckin]=useState<{mood:string;answers:Record<string,string>}|undefined>(undefined);
  const openAction=(view:'checkin'|'chat'|'history'|'spiritual'|'breathing')=>{if(view==='spiritual')setSpiritualCheckin(undefined);setActionDetail(null);setActionView(view);setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});};
- const [settingsPage,setSettingsPage]=useState<'main'|'watch'|'devices'|'health'|'notifications'|'privacy'|'help'|'circle'|'watchThemes'>('main');
+ const [settingsPage,setSettingsPage]=useState<'main'|'watch'|'devices'|'health'|'notifications'|'privacy'|'help'|'circle'|'watchThemes'|'plus'>('main');
  const [circleSheet,setCircleSheet]=useState<CircleRoute[]|null>(null);
  const [period,setPeriod]=useState<Period>('Day');
  const [mood,setMood]=useState<string>('');
@@ -144,6 +145,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
    {settingsPage==='main'?<>
     <WellnessSettingsIntro companion={mood} accent={colors.accent}/>
     <Text style={s.mainTitle}>Settings</Text>
+    <SettingsItem title="MoodPals Plus" subtitle="Free and Plus plans" status="Advanced trends, circles and reflections" icon="sparkles-outline" accent={colors.accent} onPress={()=>setSettingsPage('plus')}/>
 
     <SettingsItem title="Connected Devices" subtitle="Link and manage Apple Watches" status="Scan watch QR code" icon="git-network-outline" accent={colors.accent} onPress={()=>setSettingsPage('devices')}/>
     <SettingsItem title="Health Data" subtitle="Permissions and wearable readings" status="Open Health to connect or sync" icon="heart-outline" accent={colors.accent} onPress={()=>setSettingsPage('health')}/>
@@ -154,7 +156,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
     <SettingsItem title="Privacy & Data" subtitle="Account storage and security" icon="shield-checkmark-outline" accent={colors.accent} onPress={()=>setSettingsPage('privacy')}/>
     <SettingsItem title="Help & Support" subtitle="FAQs and troubleshooting" icon="help-circle-outline" accent={colors.accent} onPress={()=>setSettingsPage('help')}/>
     <TouchableOpacity style={s.settingsRow} onPress={()=>void supabase.auth.signOut()}><Ionicons name="log-out-outline" size={22} color="#D65B79"/><Text style={[s.settingsTitle,{color:'#D65B79'}]}>Sign out</Text></TouchableOpacity>
-   </>:settingsPage==='watchThemes'?<WatchThemesScreen onBack={()=>setSettingsPage('main')}/>:settingsPage==='circle'?<CircleNavigator onExit={()=>setSettingsPage('main')} mood={mood} onRouteChange={()=>settingsScroll.current?.scrollTo({y:0,animated:false})}/>:<>
+   </>:settingsPage==='plus'?<PlusSettingsScreen accent={colors.accent} onBack={()=>setSettingsPage('main')}/>:settingsPage==='watchThemes'?<WatchThemesScreen onBack={()=>setSettingsPage('main')}/>:settingsPage==='circle'?<CircleNavigator onExit={()=>setSettingsPage('main')} mood={mood} onRouteChange={()=>settingsScroll.current?.scrollTo({y:0,animated:false})}/>:<>
     <TouchableOpacity style={s.settingsBack} onPress={()=>setSettingsPage('main')}><Ionicons name="chevron-back" size={18} color={colors.accent}/><Text style={{color:colors.accent,fontWeight:'800'}}>Settings</Text></TouchableOpacity>
     <Text style={s.mainTitle}>{({watch:'Apple Watch & Widgets',devices:'Connected Devices',health:'Apple Health',notifications:'Notifications',privacy:'Privacy & Data',help:'Help & Support'} as const)[settingsPage]}</Text>
     {settingsPage==='devices'?<ConnectedDevices/>:null}

@@ -7,6 +7,8 @@ import './HealthBackground';
 import AuthScreen from './AuthScreen';
 import MainApp from './MainApp';
 import Onboarding,{DOTS} from './Onboarding';
+import {PlusProvider} from './PlusStore';
+import {PlusPaywallSheet} from './PlusPaywall';
 export default function App(){
  const [editingProfile,setEditingProfile]=useState(false);
  const [session,setSession]=useState<Session|null>(null),[ready,setReady]=useState(false),[onboarded,setOnboarded]=useState<boolean|null>(null),[theme,setTheme]=useState('grape'),[selectedCompanion,setSelectedCompanion]=useState('bloop');
@@ -26,5 +28,5 @@ export default function App(){
   return()=>listener.remove();
  },[session?.user.id]);
  async function complete(){const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data}=await supabase.from('user_settings').select('theme,companion').eq('user_id',user.id).maybeSingle();setTheme(data?.theme||'grape');setSelectedCompanion(data?.companion||'bloop');setOnboarded(true);setEditingProfile(false)}
- return <SafeAreaProvider>{!ready?<View style={{flex:1,justifyContent:'center',backgroundColor:'#F8F6FF'}}><ActivityIndicator color="#6536D9"/></View>:session?(onboarded===null?<View style={{flex:1,justifyContent:'center',backgroundColor:'#F8F6FF'}}><ActivityIndicator color="#6536D9"/></View>:(editingProfile||!onboarded)?<Onboarding editing={editingProfile} onCancel={()=>setEditingProfile(false)} done={()=>void complete()}/>:<MainApp selectedTheme={theme} selectedCompanion={selectedCompanion} onEditProfile={()=>setEditingProfile(true)} onThemeChanged={(nextTheme,nextCompanion)=>{setTheme(nextTheme);setSelectedCompanion(nextCompanion)}}/>):<AuthScreen/>}</SafeAreaProvider>;
+ return <SafeAreaProvider>{!ready?<View style={{flex:1,justifyContent:'center',backgroundColor:'#F8F6FF'}}><ActivityIndicator color="#6536D9"/></View>:session?(onboarded===null?<View style={{flex:1,justifyContent:'center',backgroundColor:'#F8F6FF'}}><ActivityIndicator color="#6536D9"/></View>:(editingProfile||!onboarded)?<Onboarding editing={editingProfile} onCancel={()=>setEditingProfile(false)} done={()=>void complete()}/>:<PlusProvider><MainApp selectedTheme={theme} selectedCompanion={selectedCompanion} onEditProfile={()=>setEditingProfile(true)} onThemeChanged={(nextTheme,nextCompanion)=>{setTheme(nextTheme);setSelectedCompanion(nextCompanion)}}/><PlusPaywallSheet/></PlusProvider>):<AuthScreen/>}</SafeAreaProvider>;
 }
