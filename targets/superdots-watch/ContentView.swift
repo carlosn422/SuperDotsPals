@@ -131,21 +131,24 @@ struct ContentView: View {
                         Text(store.currentMood).font(.headline)
                         Text("Tap to change mood").font(.caption2).foregroundStyle(.secondary)
                         StressSummary(reading: store.stress, calibrating: store.stressCalibrating, theme: store.theme)
-                        Button {
-                            measuring = true
-                        } label: {
-                            Label("Measure now", systemImage: "heart.circle")
-                                .font(.system(size: 13, weight: .semibold))
-                                .frame(maxWidth: .infinity)
+                        HStack(spacing: 6) {
+                            Button {
+                                measuring = true
+                            } label: {
+                                Label("Measure now", systemImage: "heart.circle.fill")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .padding(.horizontal, 10)
+                                    .frame(height: 26)
+                                    .background(Capsule().fill(purple))
+                            }
+                            .buttonStyle(.plain)
+                            Button { choosingTheme = true } label: {
+                                Circle().fill(purple).frame(width: 20, height: 20)
+                                    .overlay(Circle().stroke(.white, lineWidth: 1.5))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Theme colour \(store.theme.label). Tap to change.")
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(purple)
-                        .controlSize(.small)
-                        Button { choosingTheme = true } label: {
-                            Label("Theme · \(store.theme.name)", systemImage: "paintpalette").font(.system(size: 10, weight: .semibold))
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(purple)
                         Spacer(minLength: 0)
                     }
                 }
@@ -153,6 +156,13 @@ struct ContentView: View {
             }
         }
         .tint(purple)
+        .background(alignment: .top) {
+            RadialGradient(colors: [purple.opacity(0.35), .clear], center: .top, startRadius: 4, endRadius: 150)
+                .ignoresSafeArea()
+        }
+        .overlay {
+            if let next = store.applyingTheme { ThemeApplyingView(theme: next) }
+        }
         .sheet(isPresented: $measuring) {
             NavigationStack { MeasureNowView() }
         }

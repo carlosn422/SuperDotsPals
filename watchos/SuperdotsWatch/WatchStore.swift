@@ -40,9 +40,21 @@ final class WatchStore: ObservableObject {
     @Published var stressCalibrating = WatchStressStore.calibrating
     @Published var theme: WatchTheme = WatchTheme.loadSaved()
 
+    /// Theme being applied; ContentView shows a loading screen until it takes effect.
+    @Published var applyingTheme: WatchTheme? = nil
+
     func applyTheme(_ id: String) {
-        theme = WatchTheme.named(id)
-        WatchTheme.save(theme.id)
+        let next = WatchTheme.named(id)
+        guard next.id != theme.id, applyingTheme?.id != next.id else { return }
+        applyingTheme = next
+        WatchTheme.save(next.id)
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.6))
+            withAnimation(.easeInOut(duration: 0.3)) {
+                self.theme = next
+                self.applyingTheme = nil
+            }
+        }
     }
 
     func reloadStress() {

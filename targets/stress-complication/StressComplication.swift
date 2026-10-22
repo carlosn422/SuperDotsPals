@@ -30,11 +30,14 @@ struct ComplicationTheme {
     var id: String
     var accent: Color
     static func load() -> ComplicationTheme {
-        let id = UserDefaults(suiteName: "group.com.superdotspals.wellnest.watch")?.string(forKey: "watchTheme") ?? "bloop"
-        let accents: [String: Color] = ["bloop": Color(red: 0.44, green: 0.22, blue: 0.91), "poppy": Color(red: 0.91, green: 0.42, blue: 0.54),
-                                        "mochi": Color(red: 0.28, green: 0.55, blue: 0.85), "zuzu": Color(red: 0.89, green: 0.64, blue: 0.15),
-                                        "nori": Color(red: 0.23, green: 0.66, blue: 0.52)]
-        return ComplicationTheme(id: id, accent: accents[id] ?? accents["bloop"]!)
+        let id = UserDefaults(suiteName: "group.com.superdotspals.wellnest.watch")?.string(forKey: "watchTheme") ?? "purple"
+        let legacy = ["bloop": "purple", "poppy": "pink", "mochi": "blue", "zuzu": "gold", "nori": "green"]
+        let key = legacy[id] ?? id
+        let accents: [String: Color] = ["purple": Color(red: 0.44, green: 0.22, blue: 0.91), "pink": Color(red: 0.91, green: 0.42, blue: 0.54),
+                                        "blue": Color(red: 0.28, green: 0.55, blue: 0.85), "gold": Color(red: 0.89, green: 0.64, blue: 0.15),
+                                        "green": Color(red: 0.23, green: 0.66, blue: 0.52), "teal": Color(red: 0.17, green: 0.70, blue: 0.69),
+                                        "orange": Color(red: 0.94, green: 0.48, blue: 0.25), "red": Color(red: 0.88, green: 0.31, blue: 0.37)]
+        return ComplicationTheme(id: key, accent: accents[key] ?? accents["purple"]!)
     }
     /// A theme's own face image ("<theme>_face_<level>") if bundled, otherwise the shared MoodPal face for that level.
     func face(_ score: Int?) -> String {
@@ -64,19 +67,19 @@ struct ComplicationView: View {
         let theme = ComplicationTheme.load()
         switch family {
         case .accessoryInline:
-            Text(s.score == nil ? "Stress –" : "Stress \(s.label)")
+            Text(s.score == nil ? "Stress –" : "Stress \(s.label) \(s.score!)").foregroundStyle(theme.accent)
         case .accessoryRectangular:
             HStack(spacing: 6) {
                 Image(theme.face(s.score)).resizable().scaledToFit().frame(width: 38, height: 38)
                 VStack(alignment: .leading) {
                     Text("MoodPals").font(.caption2).foregroundStyle(.secondary)
-                    Text(s.score == nil ? "Open to sync" : "\(s.label) · \(s.score!)").font(.headline).foregroundStyle(color(s.score))
+                    Text(s.score == nil ? "Open to sync" : "\(s.label) · \(s.score!)").font(.headline).foregroundStyle(theme.accent)
                     Gauge(value: Double(s.score ?? 0), in: 0...100) { EmptyView() }.gaugeStyle(.accessoryLinear).tint(theme.accent)
                 }
             }
         case .accessoryCorner:
-            Text(s.score.map(String.init) ?? "–").font(.title3.bold()).foregroundStyle(color(s.score))
-                .widgetLabel { Text(s.score == nil ? "Stress" : s.label).foregroundStyle(color(s.score)) }
+            Text(s.score.map(String.init) ?? "–").font(.title3.bold()).foregroundStyle(theme.accent)
+                .widgetLabel { Text(s.score == nil ? "Stress" : s.label).foregroundStyle(theme.accent) }
         default:
             ZStack {
                 Gauge(value: Double(s.score ?? 0), in: 0...100) { EmptyView() }.gaugeStyle(.accessoryCircularCapacity).tint(theme.accent)
