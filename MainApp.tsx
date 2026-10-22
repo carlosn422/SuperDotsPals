@@ -149,7 +149,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
     <SettingsItem title="Health Data" subtitle="Permissions and wearable readings" status="Open Health to connect or sync" icon="heart-outline" accent={colors.accent} onPress={()=>setSettingsPage('health')}/>
     <SettingsItem title="Notifications" subtitle="Reminders and preferences" status="Daily reminders and stress alerts" icon="notifications-outline" accent={colors.accent} onPress={()=>setSettingsPage('notifications')}/>
     <SettingsItem title="My Circle" subtitle="Friends, groups and Little Signals" status="Invite friends with your code" icon="people-outline" accent={colors.accent} onPress={()=>setSettingsPage('circle')}/>
-    <SettingsItem title="Watch Themes" subtitle="Choose your Apple Watch character and colours" status="Syncs to your watch automatically" icon="watch-outline" accent={colors.accent} onPress={()=>setSettingsPage('watchThemes')}/>
+    <SettingsItem title="Watch Themes" subtitle="Choose your Apple Watch colour" status="Syncs to your watch automatically" icon="watch-outline" accent={colors.accent} onPress={()=>setSettingsPage('watchThemes')}/>
     <SettingsItem title="Wellness Profile" subtitle="Goals and onboarding answers" icon="person-circle-outline" accent={colors.accent} onPress={onEditProfile}/>
     <SettingsItem title="Privacy & Data" subtitle="Account storage and security" icon="shield-checkmark-outline" accent={colors.accent} onPress={()=>setSettingsPage('privacy')}/>
     <SettingsItem title="Help & Support" subtitle="FAQs and troubleshooting" icon="help-circle-outline" accent={colors.accent} onPress={()=>setSettingsPage('help')}/>
