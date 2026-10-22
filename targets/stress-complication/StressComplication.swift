@@ -77,7 +77,30 @@ struct ComplicationProvider: TimelineProvider {
     }
 }
 
-struct ComplicationView: View {
+/// "Mood": your current MoodPal.
+struct MoodComplicationView: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: ComplicationEntry
+    var body: some View {
+        let theme = ComplicationTheme.load()
+        let mood = ComplicationMood.load()
+        switch family {
+        case .accessoryInline:
+            Text("Feeling \(mood.name)")
+        case .accessoryCorner:
+            Image(mood.image).resizable().scaledToFit().padding(2)
+                .widgetLabel { Text(mood.name).foregroundStyle(theme.accent) }
+        default:
+            ZStack {
+                AccessoryWidgetBackground()
+                Image(mood.image).resizable().scaledToFit().padding(4)
+            }
+        }
+    }
+}
+
+/// "Mood & Stress": MoodPal, mood name and stress bar.
+struct MoodStressComplicationView: View {
     @Environment(\.widgetFamily) private var family
     let entry: ComplicationEntry
     var body: some View {
@@ -96,9 +119,6 @@ struct ComplicationView: View {
                     Gauge(value: Double(s.score ?? 0), in: 0...100) { EmptyView() }.gaugeStyle(.accessoryLinear).tint(theme.accent)
                 }
             }
-        case .accessoryCorner:
-            Image(mood.image).resizable().scaledToFit().padding(2)
-                .widgetLabel { Text(mood.name).foregroundStyle(theme.accent) }
         default:
             ZStack {
                 Gauge(value: Double(s.score ?? 0), in: 0...100) { EmptyView() }.gaugeStyle(.accessoryCircularCapacity).tint(theme.accent)
@@ -108,14 +128,64 @@ struct ComplicationView: View {
     }
 }
 
-@main
+/// "Stress score": the number with a ring.
+struct StressScoreComplicationView: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: ComplicationEntry
+    var body: some View {
+        let s = entry.snapshot
+        let theme = ComplicationTheme.load()
+        switch family {
+        case .accessoryInline:
+            Text(s.score == nil ? "Stress –" : "Stress \(s.score!) \(s.label)")
+        case .accessoryCorner:
+            Text(s.score.map(String.init) ?? "–").font(.title3.bold()).foregroundStyle(theme.accent)
+                .widgetLabel { Text(s.score == nil ? "Stress" : s.label).foregroundStyle(theme.accent) }
+        default:
+            Gauge(value: Double(s.score ?? 0), in: 0...100) { Text("Stress") } currentValueLabel: { Text(s.score.map(String.init) ?? "–") }
+                .gaugeStyle(.accessoryCircular).tint(theme.accent)
+        }
+    }
+}
+
+struct MoodComplication: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "MoodPalsMoodComplication", provider: ComplicationProvider()) { entry in
+            MoodComplicationView(entry: entry).containerBackground(.clear, for: .widget)
+        }
+        .configurationDisplayName("Mood")
+        .description("Your current MoodPal.")
+        .supportedFamilies([.accessoryCircular, .accessoryCorner, .accessoryInline])
+    }
+}
+
 struct StressComplication: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "MoodPalsStressComplication", provider: ComplicationProvider()) { entry in
-            ComplicationView(entry: entry).containerBackground(.clear, for: .widget)
+            MoodStressComplicationView(entry: entry).containerBackground(.clear, for: .widget)
         }
-        .configurationDisplayName("Mood & stress")
-        .description("Your current MoodPal and stress level.")
-        .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryInline, .accessoryCorner])
+        .configurationDisplayName("Mood & Stress")
+        .description("Your MoodPal, mood and stress level.")
+        .supportedFamilies([.accessoryRectangular, .accessoryCircular, .accessoryInline])
+    }
+}
+
+struct StressScoreComplication: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "MoodPalsStressScore", provider: ComplicationProvider()) { entry in
+            StressScoreComplicationView(entry: entry).containerBackground(.clear, for: .widget)
+        }
+        .configurationDisplayName("Stress score")
+        .description("Your latest stress score.")
+        .supportedFamilies([.accessoryCircular, .accessoryCorner, .accessoryInline])
+    }
+}
+
+@main
+struct MoodPalsComplications: WidgetBundle {
+    var body: some Widget {
+        MoodComplication()
+        StressComplication()
+        StressScoreComplication()
     }
 }
