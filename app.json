@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "MoodPals",
+    "icon": "./assets/branding/app-icon.png",
     "slug": "superdotspals",
     "scheme": "wellnest",
     "version": "1.0.0",
