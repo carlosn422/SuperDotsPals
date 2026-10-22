@@ -2,6 +2,7 @@ import React,{useEffect,useState} from 'react';
 import {View,Text,TextInput,TouchableOpacity,ActivityIndicator,Alert,Switch} from 'react-native';
 import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
+import {ShareWithCircleCard} from './CircleComponents';
 
 const moods=['Joyful','Calm','Sad','Angry','Anxious','Tired'] as const;
 const fallback:Record<string,string[]>={
@@ -14,7 +15,7 @@ const fallback:Record<string,string[]>={
 };
 type MoodQuestion={question:string;choices:string[]};
 const defaultChoices=['Something specific happened','An ongoing situation','My energy or rest','I am not sure yet'];
-export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJournal,onInsights,onFindVerse,onNavigate}:{color:string;onSaved:(mood:string)=>void;onExploreAI:(mood:string)=>void;onDone:()=>void;onJournal:()=>void;onInsights:()=>void;onFindVerse:(mood:string,answers:Record<string,string>)=>void;onNavigate?:()=>void}){
+export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJournal,onInsights,onFindVerse,onNavigate,onShareWithCircle}:{onShareWithCircle?:(mood:string)=>void;color:string;onSaved:(mood:string)=>void;onExploreAI:(mood:string)=>void;onDone:()=>void;onJournal:()=>void;onInsights:()=>void;onFindVerse:(mood:string,answers:Record<string,string>)=>void;onNavigate?:()=>void}){
  const [useHistory,setUseHistory]=useState(false);
  const [loadingQuestions,setLoadingQuestions]=useState(false);
  const [savedAnswers,setSavedAnswers]=useState<Record<string,string>>({});
@@ -100,6 +101,7 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJo
   {step===3?<View style={{gap:13,alignItems:'stretch',paddingTop:11}}>
    <View style={{alignItems:'center',gap:7}}><Text style={{fontSize:35,color:color}}>✓</Text><SuperdotMascot id={mood} size={107}/><Text style={{fontSize:22,fontWeight:'900',color:'#251C45'}}>Check-in complete!</Text><Text style={{color:'#827892',textAlign:'center',fontSize:12,lineHeight:18}}>Your mood has been saved privately.</Text></View>
    <View style={{backgroundColor:'#F2EFFB',borderRadius:13,padding:12,flexDirection:'row',alignItems:'center',gap:9}}><SuperdotMascot id={mood} size={54}/><View style={{flex:1}}><Text style={{fontSize:11,color:'#817892'}}>Your mood today</Text><Text style={{fontSize:15,fontWeight:'900',color:'#30264D'}}>{mood}</Text><Text style={{fontSize:11,color:'#817892'}}>{new Date().toLocaleString()}</Text></View></View>
+   {onShareWithCircle?<ShareWithCircleCard mood={mood} onShare={()=>onShareWithCircle(mood)} onKeepPrivate={()=>{}}/>:null}
    <Text style={{fontSize:15,fontWeight:'900',color:'#30264D'}}>What's next?</Text>
    {[
     {icon:'📜',title:'Find a Bible verse for me',sub:'Find encouragement matched to your check-in',go:()=>onFindVerse(mood,savedAnswers)},
