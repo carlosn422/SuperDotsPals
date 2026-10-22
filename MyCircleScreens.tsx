@@ -16,8 +16,9 @@ const TITLES:Record<CircleRoute['name'],string>={home:'My Circle',invite:'Invite
 const GROUP_ICONS=['heart','home','leaf','star','people','sunny','musical-notes','paw'] as const;
 const GROUP_COLORS=['#E76B8A','#488CD9','#3BA986','#E3A426','#7139E9','#D9704B'];
 
-export default function CircleNavigator({initial=[{name:'home'}],exitLabel='Settings',onExit,mood}:{initial?:CircleRoute[];exitLabel?:string;onExit:()=>void;mood?:string}){
+export default function CircleNavigator({initial=[{name:'home'}],exitLabel='Settings',onExit,mood,onRouteChange}:{initial?:CircleRoute[];exitLabel?:string;onExit:()=>void;mood?:string;onRouteChange?:()=>void}){
  const [stack,setStack]=useState<CircleRoute[]>(initial);
+ useEffect(()=>{onRouteChange?.()},[stack.length,stack[stack.length-1]?.name]);
  useEffect(()=>{setStack(initial)},[JSON.stringify(initial)]);
  const route=stack[stack.length-1];
  const push=(r:CircleRoute)=>setStack(s=>[...s,r]);
