@@ -38,7 +38,7 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJo
    const completedAnswers=withDetails?{...answers}:{};
    setSavedAnswers(completedAnswers);
    onSaved(mood);
-   onFindVerse(mood,completedAnswers);
+   changeStep(3);
   }catch(e:any){Alert.alert('Could not save your mood',e.message||'Please try again.')}finally{setBusy(false)}
  }
  const shownQuestions=questions.length?questions:(fallback[mood]||[]).map(question=>({question,choices:defaultChoices}));

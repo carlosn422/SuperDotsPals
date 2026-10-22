@@ -17,7 +17,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Notifications from 'expo-notifications';
 import {CircleProvider} from './CircleStore';
 import CircleNavigator,{CircleRoute} from './MyCircleScreens';
-import {LittleSignalsTodayCard,ShareWithCircleCard} from './CircleComponents';
+import {LittleSignalsTodayCard} from './CircleComponents';
 import {CIRCLE_MOODS} from './LittleSignalsData';
 import Svg, { Circle, Line, Path, Rect, Defs, LinearGradient, Stop, Polygon } from 'react-native-svg';
 
@@ -130,7 +130,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   <View key="Actions" style={{width:pageWidth,flex:1}}><ScrollView ref={actionScroll} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
   {actionDetail||actionView?<TouchableOpacity onPress={()=>{setActionView(null);setActionDetail(null);actionScroll.current?.scrollTo({y:0,animated:true});}} style={{flexDirection:'row',alignItems:'center',gap:8,paddingVertical:9}}><Ionicons name="arrow-back" size={20} color={colors.accent}/><Text style={{color:colors.accent,fontWeight:'800'}}>All actions</Text></TouchableOpacity>:null}
   {actionDetail?<HabitDetails habit={actionDetail} onBack={()=>{setActionDetail(null);actionScroll.current?.scrollTo({y:0,animated:true})}} onSaved={(habit,n)=>{if(habit==='water')setWater(n);else setCoffee(n)}}/>:
-  actionView==='spiritual'?<View key={actionVersion} style={{gap:14}}>{spiritualCheckin?<View style={{backgroundColor:'#fff',borderRadius:18}}><ShareWithCircleCard mood={spiritualCheckin.mood} onShare={()=>{const cm=CIRCLE_MOODS.find(x=>x.toLowerCase()===spiritualCheckin.mood.toLowerCase());if(cm)setCircleSheet([{name:'share',mood:cm}]);}} onKeepPrivate={()=>{}}/></View>:null}<SpiritualReading initialCheckin={spiritualCheckin}/></View>:
+  actionView==='spiritual'?<SpiritualReading key={actionVersion} initialCheckin={spiritualCheckin}/>:
   actionView==='breathing'?<BreathingStudio key={actionVersion} accent={colors.accent} tint={colors.pale}/>:
   actionView?<WellnessCompanion key={actionVersion} onShareWithCircle={m=>{const cm=CIRCLE_MOODS.find(x=>x.toLowerCase()===m.toLowerCase());if(cm)setCircleSheet([{name:'share',mood:cm}]);}} initialView={actionView as 'checkin'|'chat'|'history'} companion={mood} onMoodSaved={setMood} onWizardNavigate={()=>actionScroll.current?.scrollTo({y:0,animated:false})} onCheckinDone={()=>{setActionView(null);go('Today');}} onOpenInsights={()=>{setActionView(null);go('Trends');}} onFindVerse={(selectedMood,answers)=>{setSpiritualCheckin({mood:selectedMood,answers});setActionView('spiritual');setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});}} onAction={a=>{if(a==='breathing')openAction('breathing');else if(a==='water')void quickAddHabit('water');else if(a==='trends'){setActionView(null);go('Trends')}else{setActionView(null);go('Settings');setSettingsPage('notifications')}}} color={colors.accent}/>:
   <WellnessActions companion={mood} accent={colors.accent} water={water} caffeine={coffee} onCaffeine={()=>{setActionView(null);setActionDetail('caffeine');actionScroll.current?.scrollTo({y:0,animated:true})}} onWater={()=>{setActionView(null);setActionDetail('water');actionScroll.current?.scrollTo({y:0,animated:true})}} onSpiritual={()=>openAction('spiritual')} onChat={()=>openAction('chat')} onMood={()=>openAction('checkin')} onJournal={()=>openAction('history')} onBreathing={()=>openAction('breathing')}/>}
