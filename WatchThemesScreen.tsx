@@ -28,7 +28,7 @@ function WatchMock({theme,small}:{theme:WatchTheme;small?:boolean}){
   <View style={{flex:1,borderRadius:w*0.23,backgroundColor:'#000',alignItems:'center',justifyContent:'center',gap:3}}>
    <Text style={{position:'absolute',top:8,right:12,color:'#fff',fontSize:10,fontWeight:'700'}}>10:09</Text>
    <SuperdotMascot id="Joyful" size={w*0.45} preview animate={false}/>
-   <Text style={{color:'#fff',fontSize:11,fontWeight:'800'}}>Stress Normal · 42</Text>
+   <Text numberOfLines={1} adjustsFontSizeToFit style={{color:'#fff',fontSize:small?9:11,fontWeight:'800',paddingHorizontal:6}}>Stress Normal · 42</Text>
    <View style={{backgroundColor:theme.color,borderRadius:12,paddingHorizontal:12,paddingVertical:4}}><Text style={{color:'#fff',fontSize:9,fontWeight:'800'}}>Measure now</Text></View>
   </View>
  </View>;
@@ -86,7 +86,7 @@ export default function WatchThemesScreen({onBack}:{onBack:()=>void}){
    <View style={{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',rowGap:16}}>{WATCH_THEMES.map(t=>{const on=t.id===current;return <TouchableOpacity key={t.id} onPress={()=>setSelected(t)} accessibilityRole="button" accessibilityLabel={t.name+(on?', in use':'')} style={{width:'31%',alignItems:'center',gap:6}}>
     <View style={{borderWidth:3,borderColor:on?t.color:'transparent',borderRadius:46,padding:2}}><Face theme={t} mood="Calm" size={78}/></View>
     {on?<View style={{position:'absolute',top:62,right:12,backgroundColor:t.color,borderRadius:10,width:20,height:20,alignItems:'center',justifyContent:'center'}}><Ionicons name="checkmark" size={14} color="#fff"/></View>:null}
-    <Text style={{fontWeight:'800',color:ink,fontSize:13}}>{t.name}</Text></TouchableOpacity>})}</View>
+    <Text style={{fontWeight:'800',color:ink,fontSize:13}}>{t.name}</Text></TouchableOpacity>})}{Array.from({length:(3-WATCH_THEMES.length%3)%3}).map((_,i)=><View key={'pad'+i} style={{width:'31%'}}/>)}</View>
    <Text style={{color:muted,fontSize:12}}>More characters are coming soon.</Text>
   </View>
  </View>;
