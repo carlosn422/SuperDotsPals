@@ -282,7 +282,8 @@ final class WatchThemeSync: ObservableObject {
             pairingConnecting=false
             pairingURL="superdots://pair?id=\(id)&secret=\(secret)"
             pairingActive=true
-            message="Scan with MoodPals on your iPhone."
+            WatchPhoneLink.shared.offer(id:id,secret:secret)
+            message="Open MoodPals on your iPhone to link automatically."
         }catch{message="Pairing failed: \(error.localizedDescription)"}
     }
 
@@ -293,7 +294,7 @@ final class WatchThemeSync: ObservableObject {
             let data=try await request("/functions/v1/watch-pairing",method:"POST",body:body,authenticated:false)
             guard let obj=try JSONSerialization.jsonObject(with:data) as? [String:Any] else{return}
             let status=obj["status"] as? String ?? ""
-            if status=="expired" {pairingActive=false;message="QR expired. Generate a new code.";return}
+            if status=="expired" {pairingActive=false;await startPairing();return}
             if status=="approved",let hash=obj["tokenHash"] as? String {
                 pairingConnecting=true
                 message="Connecting your watch…"
@@ -306,6 +307,7 @@ final class WatchThemeSync: ObservableObject {
                 needsReconnect=false
                 storeSecret(pairingId,for:"watch_pairing_id")
                 pairingActive=false
+                WatchPhoneLink.shared.linked()
                 let completed=try JSONSerialization.data(withJSONObject:["action":"complete","id":pairingId,"secret":pairingSecret])
                 _ = try? await request("/functions/v1/watch-pairing",method:"POST",body:completed)
                 pairingURL="";pairingSecret=""
@@ -422,8 +424,10 @@ struct WatchSyncView: View {
      }
      Button("Disconnect",role:.destructive){sync.signOut()}
     } else {
-     Text("Pair with iPhone").font(.headline)
-     Text("MoodPals → Devices → Scan")
+     Text("Link with iPhone").font(.headline)
+     Text("Open MoodPals on your iPhone and this watch links automatically.")
+       .font(.system(size:11)).multilineTextAlignment(.center)
+     Text("Or scan: MoodPals → Settings → Connected Devices")
        .font(.system(size:10)).foregroundStyle(.secondary).multilineTextAlignment(.center)
      if let qrImageURL {
       AsyncImage(url:qrImageURL){phase in

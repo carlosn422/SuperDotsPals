@@ -2,6 +2,7 @@ import React,{useEffect,useState} from 'react';
 import {View,Text,TouchableOpacity,ActivityIndicator,Alert,StyleSheet} from 'react-native';
 import {CameraView,useCameraPermissions} from 'expo-camera';
 import {supabase} from './supabase';
+import {useIsGuest} from './Account';
 
 type Device={id:string;name:string;platform:string;linked_at:string;last_seen_at:string|null;revoked_at:string|null};
 const purple='#6953CA';
@@ -15,6 +16,7 @@ const parse=(raw:string)=>{
 export default function ConnectedDevices(){
  const [devices,setDevices]=useState<Device[]>([]),[scan,setScan]=useState(false),[connecting,setConnecting]=useState(false),[loading,setLoading]=useState(false),[message,setMessage]=useState('');
  const [permission,requestPermission]=useCameraPermissions();
+ const isGuest=useIsGuest();
  async function call(action:string,extra:Record<string,unknown>={}){
   const {data,error}=await supabase.functions.invoke('watch-pairing',{body:{action,...extra}});
   if(error||data?.error)throw Error(data?.error||error?.message||'Connection failed');
@@ -40,7 +42,8 @@ export default function ConnectedDevices(){
  async function remove(device:Device){Alert.alert('Remove device?',device.name+' will be permanently removed from your connected devices. It will need a new QR code to link again. Existing access tokens may remain valid until they expire.',[{text:'Cancel',style:'cancel'},{text:'Remove Device',style:'destructive',onPress:()=>{void (async()=>{setLoading(true);try{await call('remove',{deviceId:device.id});setDevices(current=>current.filter(d=>d.id!==device.id));await load()}catch(e:any){Alert.alert('Removal failed',e.message)}finally{setLoading(false)}})()}}])}
  return <View style={{gap:13}}>
   <Text style={styles.title}>Connected devices</Text>
-  <Text style={styles.sub}>Link your Apple Watch by scanning its one-time QR code. Pairing expires after 5 minutes.</Text>
+  <Text style={styles.sub}>Open MoodPals on your Apple Watch while MoodPals is open on this iPhone and the watch links automatically. If it doesn't, scan the QR code on the watch.</Text>
+  {isGuest?<Text style={[styles.sub,{color:'#D65B79'}]}>Create an account in Settings to link your Apple Watch.</Text>:null}
   {!scan&&!connecting?<TouchableOpacity style={styles.button} onPress={async()=>{if(!permission?.granted){const p=await requestPermission();if(!p.granted)return}setScan(true)}}><Text style={styles.buttonText}>Scan Apple Watch QR code</Text></TouchableOpacity>:null}
   {scan?<View style={{gap:10}}><View style={{height:270,borderRadius:18,overflow:'hidden'}}><CameraView style={{flex:1}} facing="back" barcodeScannerSettings={{barcodeTypes:['qr']}} onBarcodeScanned={e=>void scanned(e.data)}/></View><TouchableOpacity onPress={()=>setScan(false)}><Text style={{color:purple,textAlign:'center'}}>Cancel scanning</Text></TouchableOpacity></View>:null}
   {connecting?<View style={[styles.card,{alignItems:'center',paddingVertical:35,gap:14}]}><ActivityIndicator color={purple} size="large"/><Text style={styles.title}>Connecting Apple Watch…</Text><Text style={styles.sub}>Securely linking your device</Text></View>:null}

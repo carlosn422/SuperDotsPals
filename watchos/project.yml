@@ -12,6 +12,7 @@ targets:
     dependencies:
       - sdk: HealthKit.framework
       - sdk: WidgetKit.framework
+      - sdk: WatchConnectivity.framework
     entitlements:
       path: SuperdotsWatch.entitlements
     settings:

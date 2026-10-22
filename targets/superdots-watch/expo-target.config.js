@@ -5,7 +5,7 @@ module.exports = {
   displayName: 'MoodPals',
   bundleIdentifier: '.watchkitapp',
   deploymentTarget: '10.0',
-  frameworks: ['SwiftUI', 'Security', 'HealthKit', 'WidgetKit'],
+  frameworks: ['SwiftUI', 'Security', 'HealthKit', 'WidgetKit', 'WatchConnectivity'],
   entitlements: {
     'com.apple.developer.healthkit': true,
     'com.apple.developer.healthkit.access': [],
