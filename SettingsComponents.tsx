@@ -37,7 +37,7 @@ export function WatchThemesCard({onOpen}:{onOpen:()=>void}){
   <Text style={s.subtitle}>Choose a MoodPal theme in Settings, then sync it from the watch app. Custom face creation and redemption are not available yet.</Text>
  </View>;
 }
-type SettingIcon='heart-outline'|'notifications-outline'|'shield-checkmark-outline'|'help-circle-outline'|'git-network-outline'|'person-circle-outline'|'people-outline';
+type SettingIcon='heart-outline'|'notifications-outline'|'shield-checkmark-outline'|'help-circle-outline'|'git-network-outline'|'person-circle-outline'|'people-outline'|'watch-outline';
 export function SettingsItem({title,subtitle,status,icon,onPress,accent='#7139E9'}:{title:string;subtitle:string;status?:string;icon:SettingIcon;onPress:()=>void;accent?:string}){
  return <TouchableOpacity onPress={onPress} accessibilityRole="button" style={s.settingRow}><View style={[s.iconBadge,{backgroundColor:'#F1EFF5'}]}><Ionicons name={icon} size={23} color={accent}/></View><View style={{flex:1,gap:3}}><Text style={s.title}>{title}</Text><Text style={s.subtitle}>{subtitle}</Text>{status?<Text style={s.micro}>{status}</Text>:null}</View><Ionicons name="chevron-forward" size={17} color="#AAA4AF"/></TouchableOpacity>;
 }

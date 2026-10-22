@@ -19,6 +19,7 @@ import {Linking} from 'react-native';
 import {CircleProvider} from './CircleStore';
 import CircleNavigator,{CircleRoute} from './MyCircleScreens';
 import {LittleSignalsTodayCard} from './CircleComponents';
+import WatchThemesScreen from './WatchThemesScreen';
 import {CIRCLE_MOODS} from './LittleSignalsData';
 import Svg, { Circle, Line, Path, Rect, Defs, LinearGradient, Stop, Polygon } from 'react-native-svg';
 
@@ -46,7 +47,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  const [actionVersion,setActionVersion]=useState(0);
  const [spiritualCheckin,setSpiritualCheckin]=useState<{mood:string;answers:Record<string,string>}|undefined>(undefined);
  const openAction=(view:'checkin'|'chat'|'history'|'spiritual'|'breathing')=>{if(view==='spiritual')setSpiritualCheckin(undefined);setActionDetail(null);setActionView(view);setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});};
- const [settingsPage,setSettingsPage]=useState<'main'|'watch'|'devices'|'health'|'notifications'|'privacy'|'help'|'circle'>('main');
+ const [settingsPage,setSettingsPage]=useState<'main'|'watch'|'devices'|'health'|'notifications'|'privacy'|'help'|'circle'|'watchThemes'>('main');
  const [circleSheet,setCircleSheet]=useState<CircleRoute[]|null>(null);
  const [period,setPeriod]=useState<Period>('Day');
  const [mood,setMood]=useState<string>('');
@@ -148,11 +149,12 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
     <SettingsItem title="Health Data" subtitle="Permissions and wearable readings" status="Open Health to connect or sync" icon="heart-outline" accent={colors.accent} onPress={()=>setSettingsPage('health')}/>
     <SettingsItem title="Notifications" subtitle="Reminders and preferences" status="Daily reminders and stress alerts" icon="notifications-outline" accent={colors.accent} onPress={()=>setSettingsPage('notifications')}/>
     <SettingsItem title="My Circle" subtitle="Friends, groups and Little Signals" status="Invite friends with your code" icon="people-outline" accent={colors.accent} onPress={()=>setSettingsPage('circle')}/>
+    <SettingsItem title="Watch Themes" subtitle="Choose your Apple Watch character and colours" status="Syncs to your watch automatically" icon="watch-outline" accent={colors.accent} onPress={()=>setSettingsPage('watchThemes')}/>
     <SettingsItem title="Wellness Profile" subtitle="Goals and onboarding answers" icon="person-circle-outline" accent={colors.accent} onPress={onEditProfile}/>
     <SettingsItem title="Privacy & Data" subtitle="Account storage and security" icon="shield-checkmark-outline" accent={colors.accent} onPress={()=>setSettingsPage('privacy')}/>
     <SettingsItem title="Help & Support" subtitle="FAQs and troubleshooting" icon="help-circle-outline" accent={colors.accent} onPress={()=>setSettingsPage('help')}/>
     <TouchableOpacity style={s.settingsRow} onPress={()=>void supabase.auth.signOut()}><Ionicons name="log-out-outline" size={22} color="#D65B79"/><Text style={[s.settingsTitle,{color:'#D65B79'}]}>Sign out</Text></TouchableOpacity>
-   </>:settingsPage==='circle'?<CircleNavigator onExit={()=>setSettingsPage('main')} mood={mood} onRouteChange={()=>settingsScroll.current?.scrollTo({y:0,animated:false})}/>:<>
+   </>:settingsPage==='watchThemes'?<WatchThemesScreen onBack={()=>setSettingsPage('main')}/>:settingsPage==='circle'?<CircleNavigator onExit={()=>setSettingsPage('main')} mood={mood} onRouteChange={()=>settingsScroll.current?.scrollTo({y:0,animated:false})}/>:<>
     <TouchableOpacity style={s.settingsBack} onPress={()=>setSettingsPage('main')}><Ionicons name="chevron-back" size={18} color={colors.accent}/><Text style={{color:colors.accent,fontWeight:'800'}}>Settings</Text></TouchableOpacity>
     <Text style={s.mainTitle}>{({watch:'Apple Watch & Widgets',devices:'Connected Devices',health:'Apple Health',notifications:'Notifications',privacy:'Privacy & Data',help:'Help & Support'} as const)[settingsPage]}</Text>
     {settingsPage==='devices'?<ConnectedDevices/>:null}

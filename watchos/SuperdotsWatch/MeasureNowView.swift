@@ -120,7 +120,7 @@ final class StressMeasurement: NSObject, ObservableObject, HKWorkoutSessionDeleg
 struct MeasureNowView: View {
     @StateObject private var measurement = StressMeasurement()
     @Environment(\.dismiss) private var dismiss
-    private let purple = Color(red: 0.47, green: 0.38, blue: 0.91)
+    private let purple = WatchTheme.loadSaved().accent
 
     var body: some View {
         ScrollView {
@@ -184,7 +184,7 @@ private struct ResultCard: View {
     let result: StressMeasurement.Result
     var body: some View {
         VStack(spacing: 4) {
-            AnimatedMoodMascot(mood: result.level.mascotMood, size: 78)
+            AnimatedMoodMascot(mood: WatchTheme.loadSaved().face(result.level), size: 78)
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(result.level.label).font(.headline).foregroundStyle(stressTint(result.score))
                 Text("\(result.score)").font(.title3.weight(.bold)).monospacedDigit()

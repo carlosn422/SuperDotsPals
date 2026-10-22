@@ -101,6 +101,13 @@ final class WatchThemeSync: ObservableObject {
             syncWarning = [syncWarning, "Mood: \(error.localizedDescription)"].compactMap{$0}.joined(separator:"; ")
         }
         do {
+            let data = try await request("/rest/v1/user_settings?select=watch_theme&user_id=eq.\(userId)&limit=1",method:"GET")
+            let rows = try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
+            if let id = rows.first?["watch_theme"] as? String, id != store.theme.id { store.applyTheme(id) }
+        } catch {
+            NSLog("[WatchSync] Theme sync failed: %@", error.localizedDescription)
+        }
+        do {
                 let healthData = try await request("/rest/v1/wellness_readings?select=metric,value,recorded_at&user_id=eq.\(userId)&source=eq.healthkit&metric=in.(hrv,resting_heart_rate,steps,sleep_minutes)&order=recorded_at.desc&limit=500",method:"GET")
                 let healthRows = try JSONSerialization.jsonObject(with:healthData) as? [[String:Any]] ?? []
                 store.hrvHistory = []
@@ -171,6 +178,14 @@ final class WatchThemeSync: ObservableObject {
         _ = try await request("/rest/v1/wellness_journal", method:"POST", body:payload)
         store.currentMood = mood
         moodLoaded = true
+    }
+
+    /// Saves a theme picked on the watch so the iPhone shows the same choice.
+    func saveTheme(_ id: String) async throws {
+        guard connected, !userId.isEmpty else { return }
+        try await renewIfNeeded()
+        let payload = try JSONSerialization.data(withJSONObject: ["watch_theme": id])
+        _ = try await request("/rest/v1/user_settings?user_id=eq.\(userId)", method: "PATCH", body: payload)
     }
 
     /// Uploads a watch-computed score as a `computed` stress_score row. Idempotent via source_record_key.

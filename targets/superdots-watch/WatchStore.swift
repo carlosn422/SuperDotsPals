@@ -38,6 +38,12 @@ final class WatchStore: ObservableObject {
     /// Newest stress reading from the watch, a Measure now session, or the iPhone (App Group, newest wins).
     @Published var stress: StressReading? = WatchStressStore.load()
     @Published var stressCalibrating = WatchStressStore.calibrating
+    @Published var theme: WatchTheme = WatchTheme.loadSaved()
+
+    func applyTheme(_ id: String) {
+        theme = WatchTheme.named(id)
+        WatchTheme.save(theme.id)
+    }
 
     func reloadStress() {
         stress = WatchStressStore.load()

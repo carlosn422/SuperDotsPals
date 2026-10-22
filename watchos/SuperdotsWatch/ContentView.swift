@@ -8,9 +8,10 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var choosingMood = false
     @State private var moodPage = 0
+    @State private var choosingTheme = false
 
     private let moods = ["Joyful", "Calm", "Sad", "Angry", "Anxious", "Tired"]
-    private let purple = Color(red: 0.47, green: 0.38, blue: 0.91)
+    private var purple: Color { store.theme.accent }
 
     private var simulatorDemo: Bool {
         #if DEBUG && targetEnvironment(simulator)
@@ -129,7 +130,7 @@ struct ContentView: View {
                         .accessibilityLabel("Current mood \(store.currentMood). Tap to change.")
                         Text(store.currentMood).font(.headline)
                         Text("Tap to change mood").font(.caption2).foregroundStyle(.secondary)
-                        StressSummary(reading: store.stress, calibrating: store.stressCalibrating)
+                        StressSummary(reading: store.stress, calibrating: store.stressCalibrating, theme: store.theme)
                         Button {
                             measuring = true
                         } label: {
@@ -140,6 +141,11 @@ struct ContentView: View {
                         .buttonStyle(.borderedProminent)
                         .tint(purple)
                         .controlSize(.small)
+                        Button { choosingTheme = true } label: {
+                            Label("Theme · \(store.theme.name)", systemImage: "paintpalette").font(.system(size: 10, weight: .semibold))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(purple)
                         Spacer(minLength: 0)
                     }
                 }
@@ -149,6 +155,9 @@ struct ContentView: View {
         .tint(purple)
         .sheet(isPresented: $measuring) {
             NavigationStack { MeasureNowView() }
+        }
+        .sheet(isPresented: $choosingTheme) {
+            NavigationStack { WatchThemePicker() }.environmentObject(store)
         }
         .task {
             #if DEBUG && targetEnvironment(simulator)
@@ -182,12 +191,13 @@ struct ContentView: View {
 private struct StressSummary: View {
     let reading: StressReading?
     let calibrating: Bool
+    let theme: WatchTheme
 
     var body: some View {
         Group {
             if let reading, reading.isFresh {
                 HStack(spacing: 4) {
-                    Circle().fill(stressTint(reading.score)).frame(width: 6, height: 6)
+                    AnimatedMoodMascot(mood: theme.face(reading.level), size: 16, isActive: false).frame(width: 16, height: 16)
                     Text("Stress \(reading.level.label) · \(reading.score)")
                     Text(reading.at, style: .relative).foregroundStyle(.secondary)
                 }
