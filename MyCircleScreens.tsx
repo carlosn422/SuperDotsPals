@@ -1,8 +1,8 @@
 import React,{useEffect,useMemo,useState} from 'react';
 import {Alert,Share,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
-import {CIRCLE_MOODS,CircleGroup,CircleMood,LITTLE_SIGNALS,MOCK_CODE_LOOKUP,MOOD_REACTIONS,MOOD_TINTS,SignalId,isToday,signalById,timeAgo,timeLeft} from './LittleSignalsData';
-import {friendName,uniqueAudience,useCircle} from './CircleStore';
+import {CIRCLE_MOODS,CircleGroup,CircleMood,LITTLE_SIGNALS,MOOD_REACTIONS,MOOD_TINTS,SignalId,isToday,signalById,timeAgo,timeLeft} from './LittleSignalsData';
+import {CodePreview,friendName,uniqueAudience,useCircle} from './CircleStore';
 import {Avatar,CCard,CHeading,CRow,CT,Chip,EmptyState,MoodPalThumb,MoodTag,OfflineBanner,PrimaryButton,SampleDataNote,SignalBurst,SoftButton,ToggleRow,cs} from './CircleComponents';
 
 export type CircleRoute=
@@ -18,7 +18,8 @@ const GROUP_COLORS=['#E76B8A','#488CD9','#3BA986','#E3A426','#7139E9','#D9704B']
 
 export default function CircleNavigator({initial=[{name:'home'}],exitLabel='Settings',onExit,mood,onRouteChange}:{initial?:CircleRoute[];exitLabel?:string;onExit:()=>void;mood?:string;onRouteChange?:()=>void}){
  const [stack,setStack]=useState<CircleRoute[]>(initial);
- useEffect(()=>{onRouteChange?.()},[stack.length,stack[stack.length-1]?.name]);
+ const {refresh}=useCircle();
+ useEffect(()=>{onRouteChange?.();void refresh()},[stack.length,stack[stack.length-1]?.name]);
  useEffect(()=>{setStack(initial)},[JSON.stringify(initial)]);
  const route=stack[stack.length-1];
  const push=(r:CircleRoute)=>setStack(s=>[...s,r]);
@@ -64,6 +65,7 @@ function Stat({value,label}:{value:number;label:string}){return <View style={{fl
 
 function Home({nav}:{nav:Nav}){
  const store=useCircle();
+ useEffect(()=>{void store.ensurePush()},[]);
  const pending=store.requests.filter(r=>r.status==='pending'&&r.direction==='incoming').length;
  const todayCount=store.signals.filter(s=>isToday(s.at)).length+store.myMoods.filter(m=>m.active).reduce((n,m)=>n+m.reactions.length,0);
  return <>
@@ -82,7 +84,7 @@ function Home({nav}:{nav:Nav}){
    <CRow icon="notifications-outline" title="Notification Settings" subtitle="Signals, reactions and lock-screen privacy" onPress={()=>nav.push({name:'notifications'})}/>
    <CRow icon="apps-outline" title="Home Screen Widgets" subtitle="Little Signals small and medium widgets" onPress={()=>nav.push({name:'widgets'})} last/>
   </CCard>
-  <PrototypeControls nav={nav}/>
+  {store.live?null:<PrototypeControls nav={nav}/>}
  </>;
 }
 
@@ -101,14 +103,16 @@ function PrototypeControls({nav}:{nav:Nav}){
 
 function Invite(){
  const {invite,regenerateCode}=useCircle();
- const days=Math.max(0,Math.round((new Date(invite.expiresAt).getTime()-Date.now())/864e5));
+ const hours=Math.max(0,Math.round((new Date(invite.expiresAt).getTime()-Date.now())/36e5));
+ const left=hours>=36?Math.round(hours/24)+' days':hours>=1?hours+(hours===1?' hour':' hours'):'less than an hour';
+ if(!invite.code)return <EmptyState mood="Calm" title="Getting your code…" detail="Connect to the internet to create your invite code."/>;
  const share=()=>void Share.share({message:'Join my circle on MoodPals 💚 Open the app and enter my invite code: '+invite.code});
  return <>
   <CCard style={{alignItems:'center',gap:10,paddingVertical:24}}>
    <MoodPalThumb mood="Joyful" size={84}/>
    <Text style={[cs.muted,{fontSize:13}]}>Your personal invite code</Text>
    <Text accessibilityLabel={'Invite code '+invite.code.split('').join(' ')} style={{fontSize:34,fontWeight:'900',letterSpacing:3,color:CT.ink}}>{invite.code}</Text>
-   <View style={{flexDirection:'row',alignItems:'center',gap:6}}><Ionicons name="time-outline" size={14} color={CT.muted}/><Text style={cs.muted}>Expires in {days} days · works for one approved request at a time</Text></View>
+   <View style={{flexDirection:'row',alignItems:'center',gap:6}}><Ionicons name="time-outline" size={14} color={CT.muted}/><Text style={cs.muted}>Expires in {left} · anyone you share it with can send you a request</Text></View>
   </CCard>
   <View style={{flexDirection:'row',gap:9}}><View style={{flex:1}}><SoftButton label="Copy Code" icon="copy-outline" onPress={()=>void Share.share({message:invite.code})}/></View><View style={{flex:1}}><PrimaryButton label="Share Invite" icon="share-outline" onPress={share}/></View></View>
   <SoftButton label="Regenerate Code" icon="refresh-outline" onPress={()=>Alert.alert('Regenerate code?','Your current code will stop working immediately. Pending requests already sent stay in your Friend Requests.',[{text:'Cancel',style:'cancel'},{text:'Regenerate',style:'destructive',onPress:regenerateCode}])}/>
@@ -120,30 +124,35 @@ function Invite(){
 
 function EnterCode({nav}:{nav:Nav}){
  const store=useCircle();
- const [code,setCode]=useState('');const [result,setResult]=useState<null|'invalid'|'expired'|'revoked'|'valid'|'sent'|'self'>(null);
- const found=MOCK_CODE_LOOKUP[code];
- const check=()=>{if(code===store.invite.code){setResult('self');return;}setResult(found?found.state:'invalid')};
+ const [code,setCode]=useState('');const [busy,setBusy]=useState(false);
+ const [result,setResult]=useState<null|CodePreview['state']|'sent'>(null);const [found,setFound]=useState<CodePreview|null>(null);
+ const check=async()=>{setBusy(true);try{const r=await store.previewCode(code,store.invite.code);setFound(r);setResult(r.state);}catch(e:any){Alert.alert('Couldn’t check that code',e?.message||'Please try again.')}finally{setBusy(false)}};
+ const send=async()=>{setBusy(true);try{const r=await store.redeemCode(code);setResult(r==='sent'?'sent':r==='pending'?'pending':r==='already_friends'?'already_friends':'invalid');}catch(e:any){Alert.alert('Couldn’t send your request',e?.message||'Please try again.')}finally{setBusy(false)}};
  const format=(t:string)=>{const raw=t.toUpperCase().replace(/[^A-Z0-9]/g,'').replace(/^MP/,'').slice(0,5);return raw?'MP-'+raw:''};
+ const name=found?.name||'your friend';
  return <>
   <CCard style={{gap:12}}>
    <Text style={cs.muted}>Enter the code a friend shared with you.</Text>
-   <TextInput value={code} onChangeText={t=>{setCode(format(t));setResult(null)}} placeholder="MP-XXXXX" autoCapitalize="characters" autoCorrect={false} accessibilityLabel="Invite code"
+   <TextInput value={code} onChangeText={t=>{setCode(format(t));setResult(null);setFound(null)}} placeholder="MP-XXXXX" autoCapitalize="characters" autoCorrect={false} accessibilityLabel="Invite code"
     style={{borderWidth:1.5,borderColor:CT.border,borderRadius:16,paddingHorizontal:16,paddingVertical:14,fontSize:24,fontWeight:'900',letterSpacing:3,color:CT.ink,textAlign:'center'}}/>
-   <PrimaryButton label="Continue" onPress={check} disabled={code.length<8||store.offline}/>
+   <PrimaryButton label={busy?'Checking…':'Continue'} onPress={()=>void check()} disabled={code.length<8||store.offline||busy}/>
    {store.offline?<Text style={[cs.muted,{textAlign:'center'}]}>Connect to the internet to check a code.</Text>:null}
-   <Text style={[cs.muted,{textAlign:'center'}]}>Try MP-4QW8N (valid), MP-2EXP1 (expired) or MP-9RVK0 (revoked).</Text>
+   {store.live?null:<Text style={[cs.muted,{textAlign:'center'}]}>Try MP-4QW8N (valid), MP-2EXP1 (expired) or MP-9RVK0 (revoked).</Text>}
   </CCard>
   {result==='invalid'?<StateCard icon="alert-circle-outline" color="#D9704B" title="We couldn’t find that code" detail="Check the letters and try again. After several attempts you’ll need to wait a few minutes."/>:null}
-  {result==='self'?<StateCard icon="person-outline" color={CT.muted} title="That’s your own code" detail="Share it with a friend so they can send you a request."/>:null}
-  {result==='expired'?<StateCard icon="time-outline" color="#C99A12" title="This invite has expired" detail="Invite codes expire after 7 days. Ask your friend to share a new code."/>:null}
+  {result==='rate_limited'?<StateCard icon="hourglass-outline" color="#C99A12" title="Too many attempts" detail="For everyone’s privacy, please wait about 10 minutes before trying another code."/>:null}
+  {result==='own'?<StateCard icon="person-outline" color={CT.muted} title="That’s your own code" detail="Share it with a friend so they can send you a request."/>:null}
+  {result==='expired'?<StateCard icon="time-outline" color="#C99A12" title="This invite has expired" detail="Invite codes expire after 2 days. Ask your friend to share a new code."/>:null}
   {result==='revoked'?<StateCard icon="close-circle-outline" color={CT.danger} title="This invite is no longer active" detail="Your friend regenerated their code. Ask them for the new one."/>:null}
+  {result==='already_friends'?<StateCard icon="people-outline" color={CT.primary} title={'You’re already friends with '+name} detail="Find them in Friends."/>:null}
+  {result==='pending'?<StateCard icon="hourglass-outline" color={CT.primary} title="Request already sent" detail={'Waiting for '+name+' to approve it.'}/>:null}
   {(result==='valid'||result==='sent')&&found?<CCard style={{alignItems:'center',gap:8,paddingVertical:20}}>
-   <Avatar initials={found.initials} color={found.color} size={64}/>
-   <Text style={{fontSize:20,fontWeight:'900',color:CT.ink}}>{found.name}</Text>
-   <Text style={cs.muted}>invited you to their circle{found.mutual?' · you both know '+found.mutual:''}</Text>
-   <Text style={[cs.muted,{textAlign:'center',lineHeight:18}]}>You’ll be connected only after {found.name} approves your request. Nothing is shared automatically.</Text>
+   <Avatar initials={found.initials||'?'} color={found.color||'#7BC6A4'} size={64}/>
+   <Text style={{fontSize:20,fontWeight:'900',color:CT.ink}}>{name}</Text>
+   <Text style={cs.muted}>invited you to their circle</Text>
+   <Text style={[cs.muted,{textAlign:'center',lineHeight:18}]}>You’ll be connected only after {name} approves your request. Nothing is shared automatically.</Text>
    <View style={{alignSelf:'stretch',marginTop:6}}>{result==='sent'?<SoftButton label="Request sent · waiting for approval" icon="checkmark-circle-outline" onPress={()=>nav.push({name:'requests'})}/>:
-    <PrimaryButton label="Send Friend Request" icon="paper-plane-outline" onPress={()=>{store.sendRequest(found.name,found.initials,found.color);setResult('sent')}}/>}</View>
+    <PrimaryButton label={busy?'Sending…':'Send Friend Request'} icon="paper-plane-outline" disabled={busy} onPress={()=>void send()}/>}</View>
   </CCard>:null}
  </>;
 }
@@ -157,7 +166,7 @@ function Requests({nav}:{nav:Nav}){
   {!list.length?<EmptyState mood="Calm" title={tab==='incoming'?'No requests right now':'No sent requests'} detail={tab==='incoming'?'When someone enters your invite code, their request appears here for your approval.':'Requests you send with a friend’s code show here until they respond.'}/>:
   <CCard style={{paddingVertical:4}}>{list.map((r,i)=><View key={r.id} style={[cs.row,i===list.length-1&&{borderBottomWidth:0},{flexWrap:'wrap'}]}>
    <Avatar initials={r.initials} color={r.color}/>
-   <View style={{flex:1,gap:2}}><Text style={cs.rowTitle}>{r.name}</Text><Text style={cs.rowSub}>{r.status==='declined'?'Not accepted · you can’t resend for 30 days':(tab==='incoming'?'Wants to join your circle · ':'Sent ')+timeAgo(r.sentAt)}</Text></View>
+   <View style={{flex:1,gap:2}}><Text style={cs.rowTitle}>{r.name}</Text><Text style={cs.rowSub}>{r.status==='declined'?'Not accepted':(tab==='incoming'?'Wants to join your circle · ':'Sent ')+timeAgo(r.sentAt)}</Text></View>
    {tab==='incoming'?<View style={{flexDirection:'row',gap:7}}>
     <TouchableOpacity accessibilityRole="button" onPress={()=>Alert.alert('Decline '+r.name+'?','They won’t be told you declined. Their request just disappears.',[{text:'Cancel',style:'cancel'},{text:'Decline',style:'destructive',onPress:()=>store.declineRequest(r.id)}])} style={[cs.soft,{backgroundColor:'#F3F5F4',paddingVertical:9}]}><Text style={{fontWeight:'800',color:CT.muted,fontSize:13}}>Decline</Text></TouchableOpacity>
     <TouchableOpacity accessibilityRole="button" onPress={()=>nav.push({name:'assignGroups',requestId:r.id})} style={[cs.soft,{backgroundColor:CT.primary,paddingVertical:9}]}><Text style={{fontWeight:'800',color:'#fff',fontSize:13}}>Accept</Text></TouchableOpacity>
@@ -421,8 +430,7 @@ function NotificationSettings(){
    <ToggleRow title="Request approved" subtitle="When a friend accepts your request" value={p.approvals} onChange={v=>store.setPref('approvals',v)}/>
    <ToggleRow title="Little Signals" value={p.signals} onChange={v=>store.setPref('signals',v)}/>
    <ToggleRow title="Reactions to my moods" value={p.reactions} onChange={v=>store.setPref('reactions',v)}/>
-   <ToggleRow title="Bundle into a daily summary" subtitle="After 3 signals in a day, we group them instead of sending each one" value={p.dailySummary} onChange={v=>store.setPref('dailySummary',v)}/>
-   <ToggleRow title="Quiet hours" subtitle="Hold circle notifications 10 PM – 7 AM" value={p.quietHours} onChange={v=>store.setPref('quietHours',v)} last/>
+   <ToggleRow title="Quiet hours" subtitle="No circle notifications 10 PM – 7 AM. Everything still shows in Today’s Signals." value={p.quietHours} onChange={v=>store.setPref('quietHours',v)} last/>
   </CCard>
   <CHeading title="Lock screen privacy"/>
   <CCard style={{paddingVertical:4}}>
@@ -432,7 +440,6 @@ function NotificationSettings(){
   <CHeading title="Preview" detail="How notifications will look with these settings"/>
   <View style={{gap:8,backgroundColor:'#2B3A4A',borderRadius:22,padding:12}}>
    {p.signals?preview('MoodPals',p.showNamesInPreview?'Jamie sent you a hug 🤗':'You received a Little Signal 💚'):null}
-   {p.dailySummary?preview('MoodPals','Three friends sent you a little support today.'):null}
    {p.reactions?preview('MoodPals',who+' reacted to your mood'+(p.showMoodOnLockScreen?' (Anxious) 🫶':'')):null}
    {preview('MoodPals',(p.showNamesInPreview?'Taylor':'A friend')+' shared '+(p.showMoodOnLockScreen?'that they’re feeling sad 💙':'how they’re feeling'))}
   </View>

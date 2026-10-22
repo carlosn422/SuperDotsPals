@@ -1,6 +1,7 @@
-// My Circle & Little Signals — prototype sample data.
-// Everything in this file is fictional and stays on the device; nothing here is read from or written to Supabase.
-export const CIRCLE_PROTOTYPE=true;
+// My Circle & Little Signals — shared constants plus the sample data used in prototype mode.
+// The MOCK_* data is fictional and never read from or written to Supabase.
+// Set to true to review the screens with local sample data instead of the live backend.
+export const CIRCLE_PROTOTYPE=false;
 
 export const CIRCLE_MOODS=['Joyful','Calm','Sad','Angry','Anxious','Tired'] as const;
 export type CircleMood=typeof CIRCLE_MOODS[number];
@@ -41,7 +42,7 @@ export type Reaction={friendId:string;emoji:string;at:string};
 export type MySharedMood={id:string;mood:CircleMood;sharedAt:string;expiresAt:string;groupIds:string[];reactions:Reaction[];active:boolean};
 export type FriendSharedMood={id:string;friendId:string;mood:CircleMood;sharedAt:string;expiresAt:string;myReaction?:string};
 export type ReceivedSignal={id:string;friendId:string;signal:SignalId;at:string;seen:boolean};
-export type NotificationPrefs={invites:boolean;approvals:boolean;signals:boolean;reactions:boolean;dailySummary:boolean;showMoodOnLockScreen:boolean;showNamesInPreview:boolean;quietHours:boolean};
+export type NotificationPrefs={invites:boolean;approvals:boolean;signals:boolean;reactions:boolean;showMoodOnLockScreen:boolean;showNamesInPreview:boolean;quietHours:boolean};
 
 const minutesAgo=(m:number)=>new Date(Date.now()-m*60000).toISOString();
 const hoursFromNow=(h:number)=>new Date(Date.now()+h*3600000).toISOString();
@@ -92,7 +93,7 @@ export const MOCK_CODE_LOOKUP:Record<string,{state:'valid'|'expired'|'revoked';n
  'MP-2EXP1':{state:'expired',name:'Chris',initials:'C',color:'#9DB4C9'},
  'MP-9RVK0':{state:'revoked',name:'Lee',initials:'L',color:'#C3A6E0'},
 };
-export const DEFAULT_PREFS:NotificationPrefs={invites:true,approvals:true,signals:true,reactions:true,dailySummary:true,showMoodOnLockScreen:false,showNamesInPreview:true,quietHours:true};
+export const DEFAULT_PREFS:NotificationPrefs={invites:true,approvals:true,signals:true,reactions:true,showMoodOnLockScreen:false,showNamesInPreview:true,quietHours:true};
 
 export function timeAgo(iso:string){
  const m=Math.max(0,Math.round((Date.now()-new Date(iso).getTime())/60000));

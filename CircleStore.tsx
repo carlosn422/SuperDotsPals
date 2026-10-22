@@ -1,12 +1,15 @@
 import React,{createContext,useContext,useMemo,useState} from 'react';
-import {CIRCLE_MOODS,CircleGroup,CircleMood,DEFAULT_PREFS,Friend,FriendRequest,FriendSharedMood,MOCK_FRIENDS,MOCK_FRIEND_MOODS,MOCK_GROUPS,MOCK_INVITE,MOCK_MY_MOODS,MOCK_REQUESTS,MOCK_SIGNALS,MySharedMood,NotificationPrefs,ReceivedSignal,SignalId} from './LittleSignalsData';
+import {useLiveCircleState} from './CircleLiveStore';
+import {CIRCLE_PROTOTYPE,MOCK_CODE_LOOKUP,CIRCLE_MOODS,CircleGroup,CircleMood,DEFAULT_PREFS,Friend,FriendRequest,FriendSharedMood,MOCK_FRIENDS,MOCK_FRIEND_MOODS,MOCK_GROUPS,MOCK_INVITE,MOCK_MY_MOODS,MOCK_REQUESTS,MOCK_SIGNALS,MySharedMood,NotificationPrefs,ReceivedSignal,SignalId} from './LittleSignalsData';
 
-// Local, in-memory state for the My Circle prototype. Replaced by Supabase-backed data after the prototype review.
-type State={friends:Friend[];groups:CircleGroup[];requests:FriendRequest[];myMoods:MySharedMood[];friendMoods:FriendSharedMood[];signals:ReceivedSignal[];invite:{code:string;expiresAt:string};prefs:NotificationPrefs;revokedFriendIds:string[];blockedNames:string[];sentSignals:{friendIds:string[];signal:SignalId;at:string}[];offline:boolean};
+// Local, in-memory sample data for reviewing My Circle without a backend (CIRCLE_PROTOTYPE=true).
+// The real feature uses useLiveCircleState (Supabase).
+export type State={friends:Friend[];groups:CircleGroup[];requests:FriendRequest[];myMoods:MySharedMood[];friendMoods:FriendSharedMood[];signals:ReceivedSignal[];invite:{code:string;expiresAt:string};prefs:NotificationPrefs;revokedFriendIds:string[];blockedNames:string[];sentSignals:{friendIds:string[];signal:SignalId;at:string}[];offline:boolean};
 const initial=():State=>({friends:MOCK_FRIENDS.map(f=>({...f})),groups:MOCK_GROUPS.map(g=>({...g,memberIds:[...g.memberIds],moods:[...g.moods]})),requests:MOCK_REQUESTS.map(r=>({...r})),myMoods:MOCK_MY_MOODS.map(m=>({...m,reactions:[...m.reactions]})),friendMoods:MOCK_FRIEND_MOODS.map(m=>({...m})),signals:MOCK_SIGNALS.map(s=>({...s})),invite:{...MOCK_INVITE},prefs:{...DEFAULT_PREFS},revokedFriendIds:[],blockedNames:[],sentSignals:[],offline:false});
 const empty=():State=>({...initial(),friends:[],groups:[],requests:[],myMoods:[],friendMoods:[],signals:[]});
 
-function useCircleState(){
+export type CodePreview={state:'valid'|'invalid'|'expired'|'revoked'|'own'|'already_friends'|'pending'|'rate_limited';name?:string;initials?:string;color?:string};
+function useMockCircleState(){
  const [st,setSt]=useState<State>(initial);
  const up=(fn:(s:State)=>Partial<State>)=>setSt(s=>({...s,...fn(s)}));
  const actions=useMemo(()=>({
@@ -33,10 +36,15 @@ function useCircleState(){
   markSignalsSeen:()=>up(s=>({signals:s.signals.map(x=>({...x,seen:true}))})),
   simulateIncomingSignal:(friendId:string,signal:SignalId)=>up(s=>({signals:[{id:'s'+Date.now(),friendId,signal,at:new Date().toISOString(),seen:false},...s.signals]})),
   setPref:(k:keyof NotificationPrefs,v:boolean)=>up(s=>({prefs:{...s.prefs,[k]:v}})),
+  previewCode:async(code:string,own:string):Promise<CodePreview>=>{if(code===own)return {state:'own'};const f=MOCK_CODE_LOOKUP[code];return f?{state:f.state,name:f.name,initials:f.initials,color:f.color}:{state:'invalid'};},
+  redeemCode:async(code:string):Promise<string>=>{const f=MOCK_CODE_LOOKUP[code];if(!f||f.state!=='valid')return 'invalid';up(s=>({requests:[{id:'rq'+Date.now(),direction:'outgoing',name:f.name,initials:f.initials,color:f.color,sentAt:new Date().toISOString(),status:'pending'},...s.requests]}));return 'sent';},
+  refresh:async()=>{},
+  ensurePush:async()=>{},
  }),[]);
- return {...st,...actions};
+ return {...st,...actions,live:false,loading:false};
 }
-export type CircleStore=ReturnType<typeof useCircleState>;
+export type CircleStore=ReturnType<typeof useMockCircleState>;
+const useCircleState:()=>CircleStore=CIRCLE_PROTOTYPE?useMockCircleState:useLiveCircleState;
 const Ctx=createContext<CircleStore|null>(null);
 export function CircleProvider({children}:{children:React.ReactNode}){const store=useCircleState();return <Ctx.Provider value={store}>{children}</Ctx.Provider>;}
 export function useCircle(){const c=useContext(Ctx);if(!c)throw Error('useCircle must be used inside CircleProvider');return c;}
