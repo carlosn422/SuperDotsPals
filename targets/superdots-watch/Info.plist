@@ -8,6 +8,8 @@
 	</array>
 	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
+	<key>WKRunsIndependentlyOfCompanionApp</key>
+	<true/>
 	<key>NSHealthShareUsageDescription</key>
 	<string>MoodPals reads heart rate, heart rate variability and resting heart rate on your watch to estimate your stress level compared with your own baseline.</string>
 	<key>NSHealthUpdateUsageDescription</key>
