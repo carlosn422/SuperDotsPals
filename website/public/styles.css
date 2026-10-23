@@ -201,5 +201,16 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 @keyframes duoIn{to{opacity:1;transform:none}}
 @keyframes duoFly{0%{left:100%;opacity:0;transform:scale(.6)}15%{opacity:1}70%{opacity:1;transform:scale(1.15)}85%,100%{left:-6%;opacity:0;transform:scale(.8)}}
 @keyframes duoPop{0%,72%,100%{transform:none}80%{transform:scale(1.04)}}
+/* Avery's lock screen */
+.lock{height:100%;background:linear-gradient(180deg,#7FE3D3 0%,#B9A6F5 100%);color:#fff;padding:58px 12px 18px;display:flex;flex-direction:column;align-items:stretch;gap:8px;text-align:center}
+.lock-date{font:700 13px Nunito,sans-serif;opacity:.95}
+.lock-time{font:700 64px/1 Fredoka,sans-serif;margin-bottom:22px;text-shadow:0 2px 10px rgba(43,30,69,.15)}
+.lock-n{display:flex;gap:9px;align-items:center;text-align:left;background:rgba(255,255,255,.88);color:var(--ink);border-radius:18px;padding:9px 11px;box-shadow:0 6px 16px rgba(43,30,69,.12)}
+.lock-n img{width:30px;height:30px;border-radius:8px;background:#E4F6EA;object-fit:contain;flex:none}
+.lock-n>div{flex:1;min-width:0}
+.lock-h{display:flex;justify-content:space-between;font-size:10px;color:var(--muted)}.lock-h b{color:var(--ink);font-size:11px}
+.lock-n p{margin:1px 0 0;font:700 12px Nunito,sans-serif}
+.lock-n.new{box-shadow:0 0 0 2px #FFC04A,0 6px 16px rgba(43,30,69,.12);animation:duoPop 4s ease-in-out 1.6s infinite}
+.lock-foot{margin-top:auto;font:700 11px Nunito,sans-serif;opacity:.85}
 @media(max-width:980px){.duo-row{grid-template-columns:1fr;gap:26px}.duo-flow{max-width:420px;margin:0 auto}.duo-flow .arrow{transform:rotate(90deg)}.duo-flow .fly{display:none}.duo-note{margin-top:30px}}
-@media(prefers-reduced-motion:reduce){.duo-flow li:not(.fly){animation:none;opacity:1;transform:none}.duo-flow .fly,.ui .signal-in{animation:none}.duo-flow .fly{display:none}}
+@media(prefers-reduced-motion:reduce){.duo-flow li:not(.fly){animation:none;opacity:1;transform:none}.duo-flow .fly,.ui .signal-in,.lock-n.new{animation:none}.duo-flow .fly{display:none}}

@@ -42,11 +42,10 @@ const SCREENS = {
       <div class="entry"><span class="av" style="background:#B79CEB">M</span><div><b>Mom</b> sent you some sunshine ☀️<div class="muted">40m ago</div></div></div></div>
     <div class="card"><h5>Send a Little Signal</h5><div class="emojis"><span>❤️</span><span>🤗</span><span>🫶</span><span>☀️</span><span>💪</span><span>🎉</span></div></div>
     <div class="card muted">Only moods you choose to share. Never your health data.</div>${tabbar('Settings')}</div>`,
-  duoAvery: () => `<div class="ui"><div class="top"><span>My Circle</span><span class="muted">Avery</span></div>
-    <div class="card" style="display:flex;gap:8px;align-items:center"><img src="/img/mascots/disgust.webp" alt="" style="width:42px;height:42px"><div><b>You shared Calm</b><div class="muted">with Close Friends · just now</div></div></div>
-    <div class="card"><h5>Reactions</h5><div class="entry" style="border:0;margin:0;padding:0"><span class="av" style="background:#F2A65A">J</span><div><b>Jordan</b> reacted 🌿<div class="muted">1m ago</div></div></div></div>
-    <div class="card signal-in"><h5>Little Signals for you</h5><div class="entry" style="border:0;margin:0;padding:0"><span class="av" style="background:#F2A65A">J</span><div><b>Jordan</b> sent you some sunshine ☀️<div class="muted">just now</div></div></div></div>
-    <div class="card muted">Only moods you choose to share. Never your health data.</div>${tabbar('Settings')}</div>`,
+  duoAvery: () => `<div class="lock"><div class="lock-date">Thursday, October 23</div><div class="lock-time">9:41</div>
+    <div class="lock-n new"><img src="/img/mascots/disgust.png" alt=""><div><div class="lock-h"><b>MoodPals</b><span>now</span></div><p>Jordan sent you some sunshine ☀️</p></div></div>
+    <div class="lock-n"><img src="/img/mascots/disgust.png" alt=""><div><div class="lock-h"><b>MoodPals</b><span>1m ago</span></div><p>Jordan reacted 🌿</p></div></div>
+    <div class="lock-foot">MoodPals is closed</div></div>`,
   duoJordan: () => `<div class="ui"><div class="top"><span>My Circle</span><span class="muted">Jordan</span></div>
     <div class="card"><h5>Friends' moods</h5><div style="display:flex;gap:8px;align-items:center"><img src="/img/mascots/disgust.webp" alt="" style="width:42px;height:42px"><div><b>Avery feels Calm</b><div class="muted">Close Friends · 2m ago</div></div></div>
       <div class="emojis react"><span class="picked">🌿</span><span>💚</span><span>☀️</span><span>🧘</span><span>✨</span></div></div>
