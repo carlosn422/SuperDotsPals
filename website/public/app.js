@@ -14,6 +14,9 @@ const hrvDots = () => {
   return `<svg class="chart" viewBox="0 0 236 58" width="100%"><polyline fill="none" stroke="#C9D2D6" stroke-width="1.5" points="${pts.map(p=>p.join(',')).join(' ')}"/>${pts.map((p,i)=>`<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="#fff" stroke="${col[i]}" stroke-width="2.5"/>`).join('')}</svg>`;
 };
 const ring = (pct, color, size = 44, label = '') => `<svg width="${size}" height="${size}" viewBox="0 0 44 44"><circle cx="22" cy="22" r="18" fill="none" stroke="${color}" stroke-opacity=".18" stroke-width="6"/><circle cx="22" cy="22" r="18" fill="none" stroke="${color}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${113*pct} 113" transform="rotate(-90 22 22)"/>${label?`<text x="22" y="26" text-anchor="middle" font-size="11" font-weight="800" fill="#1D2B33">${label}</text>`:''}</svg>`;
+const duoFrames = frames => frames.map(([file, t, alt, tap]) =>
+  (tap ? `<i class="tap" style="--t:${t - 0.5}s;left:${tap[0]}%;top:${tap[1]}%"></i>` : '') +
+  `<img class="frame" src="/img/duo/${file}.webp?v=1" alt="${alt}" decoding="async" style="--t:${t}s">`).join('');
 const SCREENS = {
   today: () => `<div class="ui"><div class="top"><span>Today</span><span class="muted">Tue, Oct 21</span></div>
     <div class="hero"><img src="/img/mascots/disgust.webp" alt=""><div class="muted">Hi Carlos, here's your daily score</div><div class="lvl">Great</div><div class="scale">${scale}<b></b></div><div class="muted">Your body signals look relaxed compared with your usual.</div></div>
@@ -42,20 +45,25 @@ const SCREENS = {
       <div class="entry"><span class="av" style="background:#B79CEB">M</span><div><b>Mom</b> sent you some sunshine ☀️<div class="muted">40m ago</div></div></div></div>
     <div class="card"><h5>Send a Little Signal</h5><div class="emojis"><span>❤️</span><span>🤗</span><span>🫶</span><span>☀️</span><span>💪</span><span>🎉</span></div></div>
     <div class="card muted">Only moods you choose to share. Never your health data.</div>${tabbar('Settings')}</div>`,
-  duoAvery: () => `<div class="a-wrap"><div class="ui a-app"><div class="top"><span>Check in</span><span class="muted">Avery</span></div>
-    <div class="card"><h5>How do you feel?</h5><div class="moodpick"><span><img src="/img/mascots/joy.webp" alt="">Joyful</span><span class="calm"><img src="/img/mascots/disgust.webp" alt="">Calm</span><span><img src="/img/mascots/tired.webp" alt="">Tired</span><span><img src="/img/mascots/fear.webp" alt="">Anxious</span></div></div>
-    <div class="card"><h5>Share with</h5><div class="grp">👯 Close Friends <b>✓</b></div><div class="muted" style="margin-top:6px">Only your mood. Never your health data.</div></div>
-    <div class="share-btn">Share Calm</div>
-    <div class="toast">✓ Shared with Close Friends</div>${tabbar('Today')}</div>
-    <div class="lock"><div class="lock-date">Thursday, October 23</div><div class="lock-time">9:41</div>
-    <div class="lock-n new"><img src="/img/mascots/disgust.png" alt=""><div><div class="lock-h"><b>MoodPals</b><span>now</span></div><p>Jordan sent you some sunshine ☀️</p></div></div>
-    <div class="lock-n react"><img src="/img/mascots/disgust.png" alt=""><div><div class="lock-h"><b>MoodPals</b><span>now</span></div><p>Jordan reacted 🌿</p></div></div>
-    <div class="lock-foot">MoodPals is closed</div></div></div>`,
-  duoJordan: () => `<div class="ui"><div class="top"><span>My Circle</span><span class="muted">Jordan</span></div>
-    <div class="card"><h5>Friends' moods</h5><div class="j-empty muted">No new moods yet</div><div class="j-mood"><div style="display:flex;gap:8px;align-items:center"><img src="/img/mascots/disgust.webp" alt="" style="width:42px;height:42px"><div><b>Avery feels Calm</b><div class="muted">Close Friends · just now</div></div></div>
-      <div class="emojis react"><span class="picked j-leaf">🌿</span><span>💚</span><span>☀️</span><span>🧘</span><span>✨</span></div></div></div>
-    <div class="card"><h5>Send Avery a Little Signal</h5><div class="emojis"><span>❤️</span><span>🤗</span><span>🫶</span><span class="picked j-sun">☀️</span><span>💪</span><span>🎉</span></div></div>
-    <div class="card sent">☀️ Sunshine sent to Avery</div>${tabbar('Settings')}</div>`,
+  // How it works: real MoodPals screens captured on the two review accounts. [file, seconds into the sequence, alt, tap point (% of screen) that leads to it]
+  duoAvery: () => duoFrames([
+    ['a1-checkin', 0, 'Avery\'s check-in: How are you feeling today?'],
+    ['a2-calm', 1.2, 'Avery picks Calm', [70, 38]],
+    ['a3-complete', 2.2, 'Check-in complete. Share this mood?'],
+    ['a4-audience', 3.4, 'Choose Audience: Close friends, Jordan will see it', [69, 67]],
+    ['a5-shared', 4.6, 'Shared with Close friends', [50, 65]],
+    ['a6-lock-react', 6.8, 'Avery\'s lock screen: Jordan reacted 🌿'],
+    ['a7-lock-sun', 10.6, 'Avery\'s lock screen: Jordan sent you some sunshine ☀️']
+  ]),
+  duoJordan: () => duoFrames([
+    ['j0-circle', 0, 'Jordan\'s My Circle'],
+    ['j1-signals', 5.2, 'Today\'s Signals: Avery shared Calm with you', [50, 80]],
+    ['j2-mood', 6, 'Avery is feeling calm', [30, 69]],
+    ['j3-react', 6.6, 'Jordan reacts with 🌿', [15.5, 62.6]],
+    ['j4-send', 8, 'Send a Little Signal to Avery', [50, 75]],
+    ['j5-sunshine', 8.8, 'Jordan picks Sending sunshine', [73, 57.7]],
+    ['j6-sent', 9.6, 'Signal Sent: Sending sunshine to Avery', [50, 72.7]]
+  ]),
   ask: () => `<div class="ui"><div class="top"><span>Ask MoodPal</span></div>
     <div><span class="chip">Elevated · 68</span><span class="chip">HRV 38 ms</span><span class="chip">Slept 5h 40m</span></div>
     <div class="bubble me">Why is my stress high today?</div>
