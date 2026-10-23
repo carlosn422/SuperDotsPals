@@ -85,11 +85,24 @@ struct ThemeApplyingView: View {
 }
 
 /// Latest mood check-in, shared with the watch-face complication through the App Group.
+/// A picked mood holds for an hour (same rule as StressEngine.ts and StressComplication.swift);
+/// after that the MoodPal follows the latest stress reading.
 enum WatchMoodStore {
-    static func save(_ mood: String) {
-        let d = UserDefaults(suiteName: WatchStressStore.appGroup)
-        d?.set(mood, forKey: "currentMood")
-        d?.set(Date().timeIntervalSince1970, forKey: "currentMoodUpdated")
+    static let manualHold: TimeInterval = 3600
+    private static var defaults: UserDefaults? { UserDefaults(suiteName: WatchStressStore.appGroup) }
+
+    static func save(_ mood: String, at date: Date) {
+        defaults?.set(mood, forKey: "currentMood")
+        defaults?.set(date.timeIntervalSince1970, forKey: "currentMoodUpdated")
         WidgetCenter.shared.reloadAllTimelines()
+    }
+    static func loadMood() -> String { defaults?.string(forKey: "currentMood") ?? "Calm" }
+    static func loadDate() -> Date { Date(timeIntervalSince1970: defaults?.double(forKey: "currentMoodUpdated") ?? 0) }
+
+    static func isManual(_ setAt: Date, now: Date = Date()) -> Bool { now.timeIntervalSince(setAt) < manualHold }
+    static func display(manual: String, setAt: Date, stress: StressReading?, now: Date = Date()) -> String {
+        if isManual(setAt, now: now) { return manual }
+        guard let stress, now.timeIntervalSince(stress.at) < 24 * 3600 else { return manual }
+        return stress.level.mascotMood
     }
 }

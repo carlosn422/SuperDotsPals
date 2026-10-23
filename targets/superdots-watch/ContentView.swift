@@ -23,7 +23,7 @@ struct ContentView: View {
 
     private func selectMood(_ mood: String) {
         choosingMood = false
-        store.currentMood = mood
+        store.setMood(mood, at: Date())
         WKInterfaceDevice.current().play(.click)
         Task {
             do { try await sync.submitMood(mood, store: store) }
@@ -119,17 +119,21 @@ struct ContentView: View {
                             .frame(height: 22)
                     } else {
                         Spacer(minLength: 0)
+                        // Re-evaluated every minute so the MoodPal switches back to heart data when the hour is up.
+                        TimelineView(.everyMinute) { context in
+                        let shownMood = store.displayMood(at: context.date)
                         Button {
-                            moodPage = max(0, moods.firstIndex(of: store.currentMood) ?? 0)
+                            moodPage = max(0, moods.firstIndex(of: store.displayMood()) ?? 0)
                             withAnimation(.none) { choosingMood = true }
                         } label: {
-                            AnimatedMoodMascot(mood: store.currentMood, size: 96, isActive: scenePhase == .active)
+                            AnimatedMoodMascot(mood: shownMood, size: 96, isActive: scenePhase == .active)
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Current mood \(store.currentMood). Tap to change.")
-                        Text(store.currentMood).font(.headline)
-                        Text("Tap to change mood").font(.caption2).foregroundStyle(.secondary)
+                        .accessibilityLabel("Current mood \(shownMood). Tap to change.")
+                        Text(shownMood).font(.headline)
+                        Text(store.moodFromHealth(at: context.date) ? "From your heart data" : "Tap to change mood").font(.caption2).foregroundStyle(.secondary)
+                        }
                         StressSummary(reading: store.stress, calibrating: store.stressCalibrating, theme: store.theme)
                         HStack(spacing: 6) {
                             Button {

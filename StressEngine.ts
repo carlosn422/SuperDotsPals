@@ -20,6 +20,19 @@ export function levelFor(score:number):StressLevel{
  if(score<80)return 'elevated';
  return 'overload';
 }
+// A mood the user picks stays for an hour; after that the MoodPal follows their latest stress reading.
+export const MANUAL_MOOD_HOLD_MS=60*60*1000;
+const STRESS_MOOD:Record<StressLevel,string>={great:'Calm',normal:'Joyful',elevated:'Anxious',overload:'Angry'};
+export function manualMoodActive(moodAt:string|null|undefined,now=Date.now()){
+ return !!moodAt&&now-new Date(moodAt).getTime()<MANUAL_MOOD_HOLD_MS;
+}
+export function displayMood(mood:string,moodAt:string|null|undefined,points:StressPoint[],now=Date.now()){
+ if(mood&&manualMoodActive(moodAt,now))return mood;
+ const last=points[points.length-1];
+ if(last&&now-new Date(last.at).getTime()<24*3600000)return STRESS_MOOD[last.level];
+ return mood;
+}
+
 export function median(values:number[]){
  const x=values.filter(Number.isFinite).sort((a,b)=>a-b);
  if(!x.length)return null;

@@ -94,7 +94,10 @@ final class WatchThemeSync: ObservableObject {
             let rows = try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
             let savedMood = (rows.first?["mood"] as? String) ?? store.currentMood
             NSLog("[WatchSync] Latest mood from account: %@", savedMood)
-            store.currentMood = ["disgust","disgusted"].contains(savedMood.lowercased()) ? "Calm" : savedMood
+            let mood = ["disgust","disgusted"].contains(savedMood.lowercased()) ? "Calm" : savedMood
+            let savedAt = Self.parseTimestamp(rows.first?["occurred_at"] as? String)
+                ?? (mood == store.currentMood ? store.currentMoodAt : Date())
+            store.setMood(mood, at: savedAt)
             moodLoaded = true
         } catch {
             NSLog("[WatchSync] Mood sync failed: %@", error.localizedDescription)
@@ -169,6 +172,13 @@ final class WatchThemeSync: ObservableObject {
         message = "Disconnected. Your watch will show local defaults."
     }
 
+    /// Postgres timestamps can carry microseconds, which ISO8601DateFormatter rejects.
+    static func parseTimestamp(_ text: String?) -> Date? {
+        guard let text else { return nil }
+        let trimmed = text.replacingOccurrences(of: #"\.\d+"#, with: "", options: .regularExpression)
+        return ISO8601DateFormatter().date(from: trimmed)
+    }
+
     // All requests use the current watch user's token; Supabase RLS restricts records.
     func submitMood(_ mood:String, answers:[String:String] = [:], store:WatchStore) async throws {
         try await renewIfNeeded()
@@ -176,7 +186,7 @@ final class WatchThemeSync: ObservableObject {
             "user_id":userId, "entry_type":"reflection", "body":"Watch mood check-in",
             "mood":mood, "reflection_answers":answers, "stress_factors":[]] as [String:Any])
         _ = try await request("/rest/v1/wellness_journal", method:"POST", body:payload)
-        store.currentMood = mood
+        store.setMood(mood, at: Date())
         moodLoaded = true
     }
 

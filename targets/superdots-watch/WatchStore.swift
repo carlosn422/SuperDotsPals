@@ -26,8 +26,18 @@ struct SampleReading: Identifiable {
 final class WatchStore: ObservableObject {
     // Brand colors are consistent; the mood controls the animated mascot, not the theme.
     @Published var companion: Dot = .bloop
-    @Published var currentMood: String = "Calm" {
-        didSet { if currentMood != oldValue { WatchMoodStore.save(currentMood) } }
+    @Published private(set) var currentMood: String = WatchMoodStore.loadMood()
+    @Published private(set) var currentMoodAt: Date = WatchMoodStore.loadDate()
+
+    /// What the MoodPal shows: the picked mood for an hour, then the latest stress reading.
+    func displayMood(at now: Date = Date()) -> String { WatchMoodStore.display(manual: currentMood, setAt: currentMoodAt, stress: stress, now: now) }
+    func moodFromHealth(at now: Date = Date()) -> Bool { !WatchMoodStore.isManual(currentMoodAt, now: now) && stress?.isFresh == true }
+
+    func setMood(_ mood: String, at date: Date) {
+        guard mood != currentMood || date != currentMoodAt else { return }
+        currentMood = mood
+        currentMoodAt = date
+        WatchMoodStore.save(mood, at: date)
     }
     @Published var latestHRV: Double? = nil
     @Published var latestRestingHeartRate: Double? = nil
@@ -66,7 +76,7 @@ final class WatchStore: ObservableObject {
 
     // Use existing animated mascot frames. This describes physiological signals,
     // not an inferred emotional mood or a medical diagnosis.
-    var wellnessMood: String { currentMood }
+    var wellnessMood: String { displayMood() }
 
     private var stressObserver: NSObjectProtocol?
 

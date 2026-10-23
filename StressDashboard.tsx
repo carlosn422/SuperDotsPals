@@ -41,7 +41,7 @@ export function StressHero({name,mood,onCheckin}:{name?:string;mood:string;onChe
  const detail=level?level.summary:!readings.length?'Connect Apple Health so your MoodPal can read HRV and heart rate from your iPhone and Apple Watch.':!baseline.ready?`Building your personal baseline: ${baseline.samples}/${MIN_BASELINE_SAMPLES} HRV readings across ${baseline.days}/${MIN_BASELINE_DAYS} days.`:'No HRV reading in the last 24 hours. Wear your Apple Watch to get a fresh score.';
  const position=today?100-today.score:50;
  return <View style={[st.hero,{backgroundColor:tint}]}>
-  <View style={{alignItems:'center'}}><SuperdotMascot id={level?.mascot||mood||'calm'} size={168}/></View>
+  <View style={{alignItems:'center'}}><SuperdotMascot id={mood||level?.mascot||'calm'} size={168}/></View>
   <Text style={st.heroGreeting}>{name?`Hi ${name}, here's your daily score`:"Here's your daily stress score"}</Text>
   <Text style={[st.heroLevel,{color:level?.color||SW.ink}]} accessibilityLabel={today?`Stress ${title}, score ${today.score} of 100`:title}>{title}</Text>
   <View style={st.scale} accessible accessibilityLabel="Stress scale from overload to great">

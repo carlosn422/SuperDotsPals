@@ -5,10 +5,10 @@ import WidgetKit
 struct WatchStressSnapshot {
     var score: Int?
     var label: String
-    static func load() -> WatchStressSnapshot {
+    static func load(at date: Date = .now) -> WatchStressSnapshot {
         let d = UserDefaults(suiteName: "group.com.superdotspals.wellnest.watch")
         let updated = d?.double(forKey: "stressUpdated") ?? 0
-        let fresh = updated > 0 && Date().timeIntervalSince1970 - updated < 24 * 3600
+        let fresh = updated > 0 && date.timeIntervalSince1970 - updated < 24 * 3600
         let score = d?.object(forKey: "stressScore") as? Int
         guard fresh, let score else { return WatchStressSnapshot(score: nil, label: "") }
         return WatchStressSnapshot(score: score, label: stressLabel(score))
@@ -47,12 +47,20 @@ struct ComplicationTheme {
     }
 }
 
-/// Latest mood check-in written by the watch app (WatchMoodStore).
+/// Latest mood check-in written by the watch app (WatchMoodStore). A picked mood holds for an hour;
+/// after that the MoodPal follows the latest stress score (same rule as the watch and iPhone apps).
 struct ComplicationMood {
+    static let manualHold: TimeInterval = 3600
     var name: String
     var image: String
-    static func load() -> ComplicationMood {
-        let mood = UserDefaults(suiteName: "group.com.superdotspals.wellnest.watch")?.string(forKey: "currentMood") ?? "Calm"
+    static var manualSetAt: Date {
+        Date(timeIntervalSince1970: UserDefaults(suiteName: "group.com.superdotspals.wellnest.watch")?.double(forKey: "currentMoodUpdated") ?? 0)
+    }
+    static func load(at date: Date = .now) -> ComplicationMood {
+        var mood = UserDefaults(suiteName: "group.com.superdotspals.wellnest.watch")?.string(forKey: "currentMood") ?? "Calm"
+        if date.timeIntervalSince(manualSetAt) >= manualHold, let score = WatchStressSnapshot.load(at: date).score {
+            mood = score < 35 ? "Calm" : score < 60 ? "Joyful" : score < 80 ? "Anxious" : "Angry"
+        }
         let v = mood.lowercased()
         let key: String
         if ["happy","good","great","joy","excited","proud"].contains(where: v.contains) { key = "joy" }
@@ -82,15 +90,28 @@ struct MoodPalImage: View {
     }
 }
 
-struct ComplicationEntry: TimelineEntry { let date: Date; let snapshot: WatchStressSnapshot }
+struct ComplicationEntry: TimelineEntry {
+    let date: Date
+    let snapshot: WatchStressSnapshot
+    let mood: ComplicationMood
+    static func at(_ date: Date) -> ComplicationEntry {
+        ComplicationEntry(date: date, snapshot: .load(at: date), mood: .load(at: date))
+    }
+}
 
 struct ComplicationProvider: TimelineProvider {
-    func placeholder(in context: Context) -> ComplicationEntry { ComplicationEntry(date: .now, snapshot: WatchStressSnapshot(score: 28, label: "Great")) }
+    func placeholder(in context: Context) -> ComplicationEntry {
+        ComplicationEntry(date: .now, snapshot: WatchStressSnapshot(score: 28, label: "Great"), mood: ComplicationMood(name: "Calm", image: "mood_disgust"))
+    }
     func getSnapshot(in context: Context, completion: @escaping (ComplicationEntry) -> Void) {
-        completion(context.isPreview ? placeholder(in: context) : ComplicationEntry(date: .now, snapshot: .load()))
+        completion(context.isPreview ? placeholder(in: context) : .at(.now))
     }
     func getTimeline(in context: Context, completion: @escaping (Timeline<ComplicationEntry>) -> Void) {
-        completion(Timeline(entries: [ComplicationEntry(date: .now, snapshot: .load())], policy: .after(.now.addingTimeInterval(1800))))
+        var entries = [ComplicationEntry.at(.now)]
+        // Switch from the picked mood to the stress-based mood when the one-hour hold ends.
+        let holdEnds = ComplicationMood.manualSetAt.addingTimeInterval(ComplicationMood.manualHold)
+        if holdEnds > .now { entries.append(.at(holdEnds.addingTimeInterval(1))) }
+        completion(Timeline(entries: entries, policy: .after(.now.addingTimeInterval(1800))))
     }
 }
 
@@ -100,7 +121,7 @@ struct MoodComplicationView: View {
     let entry: ComplicationEntry
     var body: some View {
         let theme = ComplicationTheme.load()
-        let mood = ComplicationMood.load()
+        let mood = entry.mood
         switch family {
         case .accessoryInline:
             Text("Feeling \(mood.name)")
@@ -123,7 +144,7 @@ struct MoodStressComplicationView: View {
     var body: some View {
         let s = entry.snapshot
         let theme = ComplicationTheme.load()
-        let mood = ComplicationMood.load()
+        let mood = entry.mood
         switch family {
         case .accessoryInline:
             Text(s.score == nil ? "Feeling \(mood.name)" : "\(mood.name) · Stress \(s.label)")
