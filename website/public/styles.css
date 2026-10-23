@@ -185,23 +185,21 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 .duo-phone figcaption small{font:600 13px Nunito,sans-serif;color:var(--muted)}
 .duo-phone .acct{width:30px;height:30px;border-radius:50%;color:#fff;display:grid;place-items:center;font-size:15px;margin-bottom:4px}
 .duo-flow{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:16px;position:relative;text-align:left}
-.duo-flow li:not(.fly){background:#fff;border-radius:22px;padding:16px 16px 16px 14px;box-shadow:0 10px 26px rgba(43,30,69,.07);display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;opacity:0;transform:translateY(12px);animation:duoIn .6s ease forwards}
-.duo-flow li:nth-child(2){animation-delay:.5s}.duo-flow li:nth-child(3){animation-delay:1s}
+.duo-flow li:not(.fly){background:#fff;border-radius:22px;padding:16px 16px 16px 14px;box-shadow:0 10px 26px rgba(43,30,69,.07);display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}
 .duo-flow b{font-family:Fredoka,sans-serif;font-size:17px}.duo-flow p{margin:2px 0 0;color:var(--muted);font-size:14px}
 .duo-flow .num{display:grid;place-items:center;width:34px;height:34px;border-radius:12px;background:linear-gradient(180deg,var(--teal2),var(--teal));color:#fff;font:700 17px Fredoka,sans-serif}
 .duo-flow .to-left .num{background:linear-gradient(180deg,var(--orange2),var(--orange))}
 .duo-flow .arrow{font:700 22px Fredoka,sans-serif;color:var(--teal)}.duo-flow .to-left .arrow{color:var(--orange)}
 .duo-flow .fly{position:absolute;left:0;right:0;bottom:-46px;height:36px;pointer-events:none}
-.duo-flow .fly span{position:absolute;font-size:28px;animation:duoFly 4s ease-in-out 1.6s infinite;opacity:0}
+.duo-flow .fly span{position:absolute;font-size:28px;opacity:0}
 .duo-note{color:var(--muted);max-width:620px;margin:56px auto 0;font-size:15px}
 .ui .emojis .picked{background:#FFEBD9;border-radius:10px;box-shadow:0 0 0 2px #FFC04A}
 .ui .emojis.react{margin-top:8px;font-size:16px}
-.ui .signal-in{box-shadow:0 0 0 2px #FFC04A,0 3px 10px rgba(45,74,62,.07);animation:duoPop 4s ease-in-out 1.6s infinite}
 .ui .sent{background:#FFF3CC;color:#8A6200;font-weight:800;text-align:center}
-@keyframes duoIn{to{opacity:1;transform:none}}
 @keyframes duoFly{0%{left:100%;opacity:0;transform:scale(.6)}15%{opacity:1}70%{opacity:1;transform:scale(1.15)}85%,100%{left:-6%;opacity:0;transform:scale(.8)}}
 @keyframes duoPop{0%,72%,100%{transform:none}80%{transform:scale(1.04)}}
 /* Avery's lock screen */
+.a-wrap{position:relative;height:100%}.a-wrap>*{position:absolute;inset:0}.a-app{opacity:0}
 .lock{height:100%;background:linear-gradient(180deg,#7FE3D3 0%,#B9A6F5 100%);color:#fff;padding:58px 12px 18px;display:flex;flex-direction:column;align-items:stretch;gap:8px;text-align:center}
 .lock-date{font:700 13px Nunito,sans-serif;opacity:.95}
 .lock-time{font:700 64px/1 Fredoka,sans-serif;margin-bottom:22px;text-shadow:0 2px 10px rgba(43,30,69,.15)}
@@ -210,7 +208,52 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 .lock-n>div{flex:1;min-width:0}
 .lock-h{display:flex;justify-content:space-between;font-size:10px;color:var(--muted)}.lock-h b{color:var(--ink);font-size:11px}
 .lock-n p{margin:1px 0 0;font:700 12px Nunito,sans-serif}
-.lock-n.new{box-shadow:0 0 0 2px #FFC04A,0 6px 16px rgba(43,30,69,.12);animation:duoPop 4s ease-in-out 1.6s infinite}
+.lock-n.new{box-shadow:0 0 0 2px #FFC04A,0 6px 16px rgba(43,30,69,.12)}
 .lock-foot{margin-top:auto;font:700 11px Nunito,sans-serif;opacity:.85}
 @media(max-width:980px){.duo-row{grid-template-columns:1fr;gap:26px}.duo-flow{max-width:420px;margin:0 auto}.duo-flow .arrow{transform:rotate(90deg)}.duo-flow .fly{display:none}.duo-note{margin-top:30px}}
-@media(prefers-reduced-motion:reduce){.duo-flow li:not(.fly){animation:none;opacity:1;transform:none}.duo-flow .fly,.ui .signal-in,.lock-n.new{animation:none}.duo-flow .fly{display:none}}
+/* Avery's check-in screen */
+.ui .moodpick{display:flex;justify-content:space-between;text-align:center;font-weight:700;font-size:9px}
+.ui .moodpick span{display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 4px;border-radius:12px}
+.ui .moodpick img{width:34px;height:34px}
+.ui .moodpick .calm{background:#E4F6EA;box-shadow:0 0 0 2px #3CC9B8}
+.ui .grp{display:flex;justify-content:space-between;background:#F4FAF6;border-radius:10px;padding:7px 9px;font-weight:800}.ui .grp b{color:#2E8F64}
+.ui .share-btn{background:linear-gradient(180deg,#FFC04A,#FF9A2E);color:#fff;text-align:center;font:700 13px Fredoka,sans-serif;border-radius:14px;padding:9px}
+.ui .toast{background:#E4F6EA;color:#2E8F64;text-align:center;font-weight:800;border-radius:12px;padding:8px}
+.j-empty{max-height:0;opacity:0;overflow:hidden}
+/* Live sequence (JS adds .anim; .live while the section is on screen) */
+.duo.anim .a-app{opacity:1}.duo.anim .lock{opacity:0}
+.duo.anim .moodpick .calm{background:none;box-shadow:none}
+.duo.anim .ui .toast,.duo.anim .ui .sent,.duo.anim .lock-n.react{opacity:0}
+.duo.anim .j-empty{max-height:20px;opacity:1}
+.duo.anim .j-mood{max-height:0;opacity:0;overflow:hidden}
+.duo.anim .ui .emojis .picked{background:none;box-shadow:none}
+.duo.anim .lock-n.new{max-height:0;opacity:0;padding-top:0;padding-bottom:0;margin-bottom:-8px;overflow:hidden}
+.duo.anim .duo-flow li:not(.fly){opacity:.45}
+.duo.anim.live .duo-flow li:nth-child(1){animation:duoStep 2.8s ease .3s both}
+.duo.anim.live .duo-flow li:nth-child(2){animation:duoStep 2s ease 3.2s both}
+.duo.anim.live .duo-flow li:nth-child(3){animation:duoStep 2.6s ease 5.2s both}
+.duo.anim.live .moodpick .calm{animation:duoSel .3s ease .8s both}
+.duo.anim.live .ui .share-btn{animation:duoPress .35s ease 1.6s both}
+.duo.anim.live .ui .toast{animation:duoPopIn .4s ease 2s both}
+.duo.anim.live .a-app{animation:duoOut .5s ease 3s both}
+.duo.anim.live .lock{animation:duoFade .5s ease 3s both}
+.duo.anim.live .j-empty{animation:duoCollapse .3s ease 2.4s both}
+.duo.anim.live .j-mood{animation:duoExpand .5s ease 2.4s both}
+.duo.anim.live .ui .emojis .j-leaf{animation:duoPick .4s ease 3.8s both}
+.duo.anim.live .lock-n.react{animation:duoDrop .5s ease 4.3s both}
+.duo.anim.live .ui .emojis .j-sun{animation:duoPick .4s ease 5.8s both}
+.duo.anim.live .ui .sent{animation:duoPopIn .4s ease 6.4s both}
+.duo.anim.live .duo-flow .fly span{animation:duoFly 1.2s ease-in-out 6.4s both}
+.duo.anim.live .lock-n.new{animation:duoNotif .5s ease 7.4s both,duoPop 4s ease-in-out 8s infinite}
+@keyframes duoStep{0%{opacity:.45}15%,75%{opacity:1;transform:scale(1.03);box-shadow:0 0 0 3px #FFC04A,0 14px 30px rgba(43,30,69,.12)}100%{opacity:1;transform:none}}
+@keyframes duoSel{0%{transform:scale(.9)}60%{transform:scale(1.08)}100%{transform:none;background:#E4F6EA;box-shadow:0 0 0 2px #3CC9B8}}
+@keyframes duoPress{50%{transform:scale(.94);filter:brightness(.92)}}
+@keyframes duoPopIn{from{opacity:0;transform:translateY(8px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes duoOut{to{opacity:0}}
+@keyframes duoFade{from{opacity:0}to{opacity:1}}
+@keyframes duoCollapse{to{max-height:0;opacity:0}}
+@keyframes duoExpand{from{max-height:0;opacity:0}to{max-height:120px;opacity:1}}
+@keyframes duoPick{0%{transform:scale(1)}50%{transform:scale(1.35)}100%{transform:none;background:#FFEBD9;box-shadow:0 0 0 2px #FFC04A}}
+@keyframes duoDrop{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:none}}
+@keyframes duoNotif{from{max-height:0;opacity:0;padding-top:0;padding-bottom:0;margin-bottom:-8px;transform:translateY(-14px)}to{max-height:80px;opacity:1;padding-top:9px;padding-bottom:9px;margin-bottom:0;transform:none}}
+@media(prefers-reduced-motion:reduce){.duo-flow .fly{display:none}}

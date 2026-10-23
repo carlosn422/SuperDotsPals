@@ -42,14 +42,19 @@ const SCREENS = {
       <div class="entry"><span class="av" style="background:#B79CEB">M</span><div><b>Mom</b> sent you some sunshine ☀️<div class="muted">40m ago</div></div></div></div>
     <div class="card"><h5>Send a Little Signal</h5><div class="emojis"><span>❤️</span><span>🤗</span><span>🫶</span><span>☀️</span><span>💪</span><span>🎉</span></div></div>
     <div class="card muted">Only moods you choose to share. Never your health data.</div>${tabbar('Settings')}</div>`,
-  duoAvery: () => `<div class="lock"><div class="lock-date">Thursday, October 23</div><div class="lock-time">9:41</div>
+  duoAvery: () => `<div class="a-wrap"><div class="ui a-app"><div class="top"><span>Check in</span><span class="muted">Avery</span></div>
+    <div class="card"><h5>How do you feel?</h5><div class="moodpick"><span><img src="/img/mascots/joy.webp" alt="">Joyful</span><span class="calm"><img src="/img/mascots/disgust.webp" alt="">Calm</span><span><img src="/img/mascots/tired.webp" alt="">Tired</span><span><img src="/img/mascots/fear.webp" alt="">Anxious</span></div></div>
+    <div class="card"><h5>Share with</h5><div class="grp">👯 Close Friends <b>✓</b></div><div class="muted" style="margin-top:6px">Only your mood. Never your health data.</div></div>
+    <div class="share-btn">Share Calm</div>
+    <div class="toast">✓ Shared with Close Friends</div>${tabbar('Today')}</div>
+    <div class="lock"><div class="lock-date">Thursday, October 23</div><div class="lock-time">9:41</div>
     <div class="lock-n new"><img src="/img/mascots/disgust.png" alt=""><div><div class="lock-h"><b>MoodPals</b><span>now</span></div><p>Jordan sent you some sunshine ☀️</p></div></div>
-    <div class="lock-n"><img src="/img/mascots/disgust.png" alt=""><div><div class="lock-h"><b>MoodPals</b><span>1m ago</span></div><p>Jordan reacted 🌿</p></div></div>
-    <div class="lock-foot">MoodPals is closed</div></div>`,
+    <div class="lock-n react"><img src="/img/mascots/disgust.png" alt=""><div><div class="lock-h"><b>MoodPals</b><span>now</span></div><p>Jordan reacted 🌿</p></div></div>
+    <div class="lock-foot">MoodPals is closed</div></div></div>`,
   duoJordan: () => `<div class="ui"><div class="top"><span>My Circle</span><span class="muted">Jordan</span></div>
-    <div class="card"><h5>Friends' moods</h5><div style="display:flex;gap:8px;align-items:center"><img src="/img/mascots/disgust.webp" alt="" style="width:42px;height:42px"><div><b>Avery feels Calm</b><div class="muted">Close Friends · 2m ago</div></div></div>
-      <div class="emojis react"><span class="picked">🌿</span><span>💚</span><span>☀️</span><span>🧘</span><span>✨</span></div></div>
-    <div class="card"><h5>Send Avery a Little Signal</h5><div class="emojis"><span>❤️</span><span>🤗</span><span>🫶</span><span class="picked">☀️</span><span>💪</span><span>🎉</span></div></div>
+    <div class="card"><h5>Friends' moods</h5><div class="j-empty muted">No new moods yet</div><div class="j-mood"><div style="display:flex;gap:8px;align-items:center"><img src="/img/mascots/disgust.webp" alt="" style="width:42px;height:42px"><div><b>Avery feels Calm</b><div class="muted">Close Friends · just now</div></div></div>
+      <div class="emojis react"><span class="picked j-leaf">🌿</span><span>💚</span><span>☀️</span><span>🧘</span><span>✨</span></div></div></div>
+    <div class="card"><h5>Send Avery a Little Signal</h5><div class="emojis"><span>❤️</span><span>🤗</span><span>🫶</span><span class="picked j-sun">☀️</span><span>💪</span><span>🎉</span></div></div>
     <div class="card sent">☀️ Sunshine sent to Avery</div>${tabbar('Settings')}</div>`,
   ask: () => `<div class="ui"><div class="top"><span>Ask MoodPal</span></div>
     <div><span class="chip">Elevated · 68</span><span class="chip">HRV 38 ms</span><span class="chip">Slept 5h 40m</span></div>
@@ -117,3 +122,13 @@ document.querySelectorAll('[data-watch]').forEach(watch => {
   const t = () => { const d = new Date(); watch.querySelector('.time').textContent = `${d.getHours() % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}`; };
   t(); setInterval(t, 30000);
 });
+
+// How it works: play the two-account story live while it is on screen, reset when it leaves
+const duo = document.querySelector('.duo');
+if (duo && 'IntersectionObserver' in window && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  duo.classList.add('anim');
+  new IntersectionObserver(([e]) => {
+    if (!e.isIntersecting) duo.classList.remove('live');
+    else if (e.intersectionRatio >= 0.5 || e.intersectionRect.height >= innerHeight * 0.5) duo.classList.add('live');
+  }, { threshold: [0, 0.25, 0.5, 0.75] }).observe(duo.querySelector('.duo-row'));
+}
