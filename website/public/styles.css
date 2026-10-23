@@ -174,3 +174,32 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 .contact-card h2{margin:0 0 4px;font-size:22px}.contact-card p{margin:0}
 @media(max-width:640px){.legal table,.legal tbody,.legal tr,.legal td{display:block;width:100%}.legal tr:first-child{display:none}.legal tr{border-bottom:1px solid #EEE6F7;padding:8px 0}.legal td{border:0;padding:4px 0}.legal td:first-child{font:600 16px Fredoka,sans-serif;color:var(--ink)}.contact-card{flex-direction:column;text-align:center}}
 [id]{scroll-margin-top:84px}
+
+/* How it works: two accounts */
+.duo{margin-top:64px;text-align:center}
+.duo h3{font-size:clamp(24px,3vw,34px)}
+.duo-row{display:grid;grid-template-columns:auto minmax(220px,320px) auto;gap:34px;justify-content:center;align-items:center;margin-top:10px}
+.duo .ui{text-align:left}
+.duo-phone{margin:0}.duo-phone .phone{width:260px;margin:0 auto}
+.duo-phone figcaption{margin-top:16px;font:700 17px Fredoka,sans-serif;display:flex;flex-direction:column;align-items:center;gap:2px}
+.duo-phone figcaption small{font:600 13px Nunito,sans-serif;color:var(--muted)}
+.duo-phone .acct{width:30px;height:30px;border-radius:50%;color:#fff;display:grid;place-items:center;font-size:15px;margin-bottom:4px}
+.duo-flow{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:16px;position:relative;text-align:left}
+.duo-flow li:not(.fly){background:#fff;border-radius:22px;padding:16px 16px 16px 14px;box-shadow:0 10px 26px rgba(43,30,69,.07);display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;opacity:0;transform:translateY(12px);animation:duoIn .6s ease forwards}
+.duo-flow li:nth-child(2){animation-delay:.5s}.duo-flow li:nth-child(3){animation-delay:1s}
+.duo-flow b{font-family:Fredoka,sans-serif;font-size:17px}.duo-flow p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.duo-flow .num{display:grid;place-items:center;width:34px;height:34px;border-radius:12px;background:linear-gradient(180deg,var(--teal2),var(--teal));color:#fff;font:700 17px Fredoka,sans-serif}
+.duo-flow .to-left .num{background:linear-gradient(180deg,var(--orange2),var(--orange))}
+.duo-flow .arrow{font:700 22px Fredoka,sans-serif;color:var(--teal)}.duo-flow .to-left .arrow{color:var(--orange)}
+.duo-flow .fly{position:absolute;left:0;right:0;bottom:-46px;height:36px;pointer-events:none}
+.duo-flow .fly span{position:absolute;font-size:28px;animation:duoFly 4s ease-in-out 1.6s infinite;opacity:0}
+.duo-note{color:var(--muted);max-width:620px;margin:56px auto 0;font-size:15px}
+.ui .emojis .picked{background:#FFEBD9;border-radius:10px;box-shadow:0 0 0 2px #FFC04A}
+.ui .emojis.react{margin-top:8px;font-size:16px}
+.ui .signal-in{box-shadow:0 0 0 2px #FFC04A,0 3px 10px rgba(45,74,62,.07);animation:duoPop 4s ease-in-out 1.6s infinite}
+.ui .sent{background:#FFF3CC;color:#8A6200;font-weight:800;text-align:center}
+@keyframes duoIn{to{opacity:1;transform:none}}
+@keyframes duoFly{0%{left:100%;opacity:0;transform:scale(.6)}15%{opacity:1}70%{opacity:1;transform:scale(1.15)}85%,100%{left:-6%;opacity:0;transform:scale(.8)}}
+@keyframes duoPop{0%,72%,100%{transform:none}80%{transform:scale(1.04)}}
+@media(max-width:980px){.duo-row{grid-template-columns:1fr;gap:26px}.duo-flow{max-width:420px;margin:0 auto}.duo-flow .arrow{transform:rotate(90deg)}.duo-flow .fly{display:none}.duo-note{margin-top:30px}}
+@media(prefers-reduced-motion:reduce){.duo-flow li:not(.fly){animation:none;opacity:1;transform:none}.duo-flow .fly,.ui .signal-in{animation:none}.duo-flow .fly{display:none}}

@@ -42,6 +42,16 @@ const SCREENS = {
       <div class="entry"><span class="av" style="background:#B79CEB">M</span><div><b>Mom</b> sent you some sunshine ☀️<div class="muted">40m ago</div></div></div></div>
     <div class="card"><h5>Send a Little Signal</h5><div class="emojis"><span>❤️</span><span>🤗</span><span>🫶</span><span>☀️</span><span>💪</span><span>🎉</span></div></div>
     <div class="card muted">Only moods you choose to share. Never your health data.</div>${tabbar('Settings')}</div>`,
+  duoAvery: () => `<div class="ui"><div class="top"><span>My Circle</span><span class="muted">Avery</span></div>
+    <div class="card" style="display:flex;gap:8px;align-items:center"><img src="/img/mascots/disgust.webp" alt="" style="width:42px;height:42px"><div><b>You shared Calm</b><div class="muted">with Close Friends · just now</div></div></div>
+    <div class="card"><h5>Reactions</h5><div class="entry" style="border:0;margin:0;padding:0"><span class="av" style="background:#F2A65A">J</span><div><b>Jordan</b> reacted 🌿<div class="muted">1m ago</div></div></div></div>
+    <div class="card signal-in"><h5>Little Signals for you</h5><div class="entry" style="border:0;margin:0;padding:0"><span class="av" style="background:#F2A65A">J</span><div><b>Jordan</b> sent you some sunshine ☀️<div class="muted">just now</div></div></div></div>
+    <div class="card muted">Only moods you choose to share. Never your health data.</div>${tabbar('Settings')}</div>`,
+  duoJordan: () => `<div class="ui"><div class="top"><span>My Circle</span><span class="muted">Jordan</span></div>
+    <div class="card"><h5>Friends' moods</h5><div style="display:flex;gap:8px;align-items:center"><img src="/img/mascots/disgust.webp" alt="" style="width:42px;height:42px"><div><b>Avery feels Calm</b><div class="muted">Close Friends · 2m ago</div></div></div>
+      <div class="emojis react"><span class="picked">🌿</span><span>💚</span><span>☀️</span><span>🧘</span><span>✨</span></div></div>
+    <div class="card"><h5>Send Avery a Little Signal</h5><div class="emojis"><span>❤️</span><span>🤗</span><span>🫶</span><span class="picked">☀️</span><span>💪</span><span>🎉</span></div></div>
+    <div class="card sent">☀️ Sunshine sent to Avery</div>${tabbar('Settings')}</div>`,
   ask: () => `<div class="ui"><div class="top"><span>Ask MoodPal</span></div>
     <div><span class="chip">Elevated · 68</span><span class="chip">HRV 38 ms</span><span class="chip">Slept 5h 40m</span></div>
     <div class="bubble me">Why is my stress high today?</div>
