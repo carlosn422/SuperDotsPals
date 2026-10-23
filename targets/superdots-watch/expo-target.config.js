@@ -3,6 +3,7 @@ module.exports = {
   type: 'watch',
   name: 'SuperdotsWatch',
   displayName: 'MoodPals',
+  // Keep the watch app embedded in the existing MoodPals iOS bundle.
   bundleIdentifier: '.watchkitapp',
   deploymentTarget: '10.0',
   frameworks: ['SwiftUI', 'Security', 'HealthKit', 'WidgetKit', 'WatchConnectivity'],
@@ -13,6 +14,10 @@ module.exports = {
     // Shared with the MoodPalsStressComplication watch-face widget.
     'com.apple.security.application-groups': ['group.com.superdotspals.wellnest.watch'],
   },
-  // Health usage strings and WKBackgroundModes live in Info.plist (apple-targets keeps an existing Info.plist as-is).
-  infoPlist: { CFBundleIconName: 'AppIcon' },
+  // Keep Info.plist in sync: apple-targets preserves the existing file as-is.
+  // Independent install does not remove the iPhone companion relationship.
+  infoPlist: {
+    CFBundleIconName: 'AppIcon',
+    WKRunsIndependentlyOfCompanionApp: true,
+  },
 };
