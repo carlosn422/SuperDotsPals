@@ -76,6 +76,7 @@ function Home({nav}:{nav:Nav}){
    <View style={{flexDirection:'row',gap:9}}><Stat value={store.friends.length} label="Friends"/><Stat value={store.groups.length} label="Groups"/><Stat value={pending} label="Pending"/></View>
    <View style={{flexDirection:'row',gap:9}}><View style={{flex:1}}><PrimaryButton label="Invite Friends" icon="person-add-outline" onPress={()=>nav.push({name:'invite'})}/></View><View style={{flex:1}}><SoftButton label="Enter Code" icon="keypad-outline" onPress={()=>nav.push({name:'enterCode'})}/></View></View>
   </CCard>
+  <ReactionNotices nav={nav}/>
   {!store.friends.length?<EmptyState mood="Joyful" title="Your circle is empty" detail="Invite close friends or family with your personal code. Nobody can find you by searching — only people you share your code with." action="Invite Friends" onAction={()=>nav.push({name:'invite'})}/>:null}
   <CCard style={{paddingVertical:4}}>
    <CRow icon="mail-unread-outline" title="Friend Requests" subtitle={pending?pending+' waiting for your approval':'No new requests'} onPress={()=>nav.push({name:'requests'})} right={pending?<View style={cs.badge}><Text style={{color:'#fff',fontWeight:'900',fontSize:11}}>{pending}</Text></View>:undefined}/>
@@ -402,6 +403,25 @@ function ReactionRoom({id,nav}:{id:string;nav:Nav}){
     <Text style={{fontSize:12,fontWeight:'800',color:CT.muted}}>{f?.name||'Former friend'}</Text><Text style={{fontSize:30}}>{r.emoji}</Text></View>
    <Text style={[cs.rowSub,{marginBottom:4}]}>{timeAgo(r.at)}</Text></View>})}</View>}
   {m.active?<SoftButton danger label="Stop Sharing" icon="eye-off-outline" onPress={()=>Alert.alert('Stop sharing?','Friends will no longer see this mood or be able to react.',[{text:'Cancel',style:'cancel'},{text:'Stop sharing',style:'destructive',onPress:()=>store.stopSharing(m.id)}])}/>:null}
+ </>;
+}
+
+// Reactions to my shared moods: name, emoji and the original mood only. Unread ones are marked one at a time when opened.
+function ReactionNotices({nav}:{nav:Nav}){
+ const store=useCircle();const [all,setAll]=useState(false);
+ const unread=store.inbox.filter(n=>!n.read).length;
+ if(!store.inbox.length)return null;
+ const shown=all?store.inbox:store.inbox.slice(0,6);
+ return <>
+  <CHeading title={unread?'Notifications · '+unread+' unread':'Notifications'} action={store.inbox.length>6?(all?'Show less':'Show all'):undefined} onAction={()=>setAll(v=>!v)}/>
+  <CCard style={{paddingVertical:4}}>{shown.map((n,i)=><TouchableOpacity key={n.id} accessibilityRole="button" accessibilityLabel={n.name+' '+n.emoji+', '+n.mood+(n.read?'':', unread')}
+   onPress={()=>{store.markReactionRead(n.id);if(store.myMoods.some(m=>m.id===n.moodId))nav.push({name:'room',id:n.moodId});}}
+   style={{flexDirection:'row',alignItems:'center',gap:10,paddingVertical:10,borderBottomWidth:i===shown.length-1?0:1,borderBottomColor:'#EEF2F0'}}>
+   <View style={{width:8,height:8,borderRadius:4,backgroundColor:n.read?'transparent':'#3B82F6'}}/>
+   <View style={{flex:1}}><Text style={cs.rowTitle}>{n.name}</Text><Text style={cs.rowSub}>{timeAgo(n.at)}</Text></View>
+   <Text style={{fontSize:26}}>{n.emoji}</Text>
+   <MoodPalThumb mood={n.mood} size={40}/>
+  </TouchableOpacity>)}</CCard>
  </>;
 }
 

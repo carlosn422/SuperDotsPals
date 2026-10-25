@@ -39,6 +39,8 @@ export type Friend={id:string;name:string;initials:string;color:string;since:str
 export type CircleGroup={id:string;name:string;icon:string;color:string;memberIds:string[];moods:CircleMood[]};
 export type FriendRequest={id:string;direction:'incoming'|'outgoing';name:string;initials:string;color:string;sentAt:string;status:'pending'|'declined'};
 export type Reaction={friendId:string;emoji:string;at:string};
+// One reaction to one of my shared moods; read state is stored on the server (circle_reactions.read_at).
+export type ReactionNotice={id:string;moodId:string;mood:CircleMood;friendId:string;name:string;emoji:string;at:string;read:boolean};
 export type MySharedMood={id:string;mood:CircleMood;sharedAt:string;expiresAt:string;groupIds:string[];reactions:Reaction[];active:boolean};
 export type FriendSharedMood={id:string;friendId:string;mood:CircleMood;sharedAt:string;expiresAt:string;myReaction?:string};
 export type ReceivedSignal={id:string;friendId:string;signal:SignalId;at:string;seen:boolean};
