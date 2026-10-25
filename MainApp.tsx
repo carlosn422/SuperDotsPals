@@ -87,14 +87,27 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
     .order('occurred_at',{ascending:false}).limit(1).maybeSingle();
    if(active&&!error){setMood(data?.mood||'');setMoodAt(data?.occurred_at||null);setMoodClock(Date.now())}
   };
+  let userId:string|null=null;
+  const subscribe=async(id:string)=>{
+   if(channel){const old=channel;channel=null;await supabase.removeChannel(old)}
+   if(!active)return;
+   channel=supabase.channel('mood-sync:'+id)
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'wellness_journal',filter:'user_id=eq.'+id},()=>{void syncLatest(id)})
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'wellness_journal',filter:'user_id=eq.'+id},()=>{void syncLatest(id)})
+    .subscribe();
+  };
   void supabase.auth.getUser().then(({data:{user}})=>{
    if(!active||!user)return;
-   channel=supabase.channel('mood-sync:'+user.id)
-    .on('postgres_changes',{event:'INSERT',schema:'public',table:'wellness_journal',filter:'user_id=eq.'+user.id},()=>{void syncLatest(user.id)})
-    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'wellness_journal',filter:'user_id=eq.'+user.id},()=>{void syncLatest(user.id)})
-    .subscribe();
+   userId=user.id;
+   void subscribe(user.id);
   });
-  return()=>{active=false;if(channel)void supabase.removeChannel(channel)};
+  // iOS drops the realtime socket while the app is suspended, so catch up and reconnect on return.
+  const appState=AppState.addEventListener('change',st=>{
+   if(st!=='active'||!userId)return;
+   void syncLatest(userId);
+   void subscribe(userId);
+  });
+  return()=>{active=false;appState.remove();if(channel)void supabase.removeChannel(channel)};
  },[]);
  useEffect(()=>{const open=(url:string|null)=>{const m=url?.match(/^wellnest:\/\/circle\/?(\w*)/);if(m)setCircleSheet([{name:m[1]==='send'?'send':'today'}])};Linking.getInitialURL().then(open).catch(()=>{});const sub=Linking.addEventListener('url',e=>open(e.url));return()=>sub.remove()},[]);
  useEffect(()=>{const sub=Notifications.addNotificationResponseReceivedListener(r=>{if(r.notification.request.content.data?.action==='breathing'){go('Actions');openAction('breathing')}else if(r.notification.request.content.data?.action==='circle'){const route=r.notification.request.content.data?.route;setCircleSheet([{name:route==='requests'?'requests':route==='friends'?'friends':'today'}])}});return()=>sub.remove()},[pageWidth]);
