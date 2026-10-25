@@ -41,8 +41,11 @@ async function approveRow(user:{id:string;email?:string},row:{id:string;device_n
  const token=link?.properties?.hashed_token;
  if(linkError||!token){await admin.from("watch_pairing_requests").update({status:"pending",owner_id:null}).eq("id",row.id).eq("status","approved");return json({error:"Unable to create watch session"},500)}
  await admin.from("watch_pairing_requests").update({login_token_hash:token}).eq("id",row.id).eq("status","approved");
+ // A re-link of the same watch (e.g. after the session was signed out) keeps its earlier illustration color.
+ const {data:prior}=color?{data:null}:await admin.from("connected_devices").select("watch_color").eq("user_id",user.id).eq("name",row.device_name).not("watch_color","is",null).order("linked_at",{ascending:false}).limit(1).maybeSingle();
+ const keep=color??prior?.watch_color??null;
  await admin.from("connected_devices").upsert({user_id:user.id,pairing_id:row.id,name:row.device_name,platform:"watchos",
-   ...(color?{watch_color:color}:{})},{onConflict:"pairing_id"});
+   ...(keep?{watch_color:keep}:{})},{onConflict:"pairing_id"});
  return json({status:"approved",deviceName:row.device_name});
 }
 Deno.serve(async req=>{
