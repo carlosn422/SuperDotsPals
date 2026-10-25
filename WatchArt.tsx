@@ -12,8 +12,9 @@ const IMAGES:Record<WatchColor,number>={
  mint:require('./assets/watches/watch_mint.png'),
  lavender:require('./assets/watches/watch_lavender.png'),
 };
-// The PNGs share one 320×490 canvas; the blank badge circle sits at the same spot in each.
-const ASPECT=320/490,BADGE={x:.79,y:.713,d:.254};
+// The PNGs share one 320×490 canvas; BADGE is the centre of each image's blank circle as a fraction of it.
+const ASPECT=320/490,BADGE_D=.26;
+const BADGE:Record<WatchColor,{x:number;y:number}>={charcoal:{x:.787,y:.742},ivory:{x:.79,y:.718},navy:{x:.794,y:.744},rose:{x:.787,y:.724},mint:{x:.78,y:.73},lavender:{x:.787,y:.736}};
 const ink='#251C45',muted='#807694',purple='#6953CA';
 
 export const isWatchColor=(c:unknown):c is WatchColor=>WATCH_COLORS.includes(c as WatchColor);
@@ -29,10 +30,10 @@ export function watchInitials(name:string){
 }
 
 export function WatchImage({color,name,width=96}:{color:WatchColor|null;name:string;width?:number}){
- const height=width/ASPECT,d=width*BADGE.d;
+ const height=width/ASPECT,d=width*BADGE_D,b=BADGE[color||'charcoal'];
  return <View style={{width,height}} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
   <Image source={IMAGES[color||'charcoal']} style={{width,height}} resizeMode="contain"/>
-  <View style={{position:'absolute',left:width*BADGE.x-d/2,top:height*BADGE.y-d/2,width:d,height:d,alignItems:'center',justifyContent:'center'}}>
+  <View style={{position:'absolute',left:width*b.x-d/2,top:height*b.y-d/2,width:d,height:d,alignItems:'center',justifyContent:'center'}}>
    <Text allowFontScaling={false} numberOfLines={1} adjustsFontSizeToFit style={{width:d*.72,textAlign:'center',fontSize:d*.4,fontWeight:'900',color:'#3B2F63'}}>{watchInitials(name)}</Text>
   </View>
  </View>;
