@@ -1,10 +1,13 @@
 import React,{useCallback,useEffect,useState} from 'react';
-import {View,Text,TouchableOpacity,TextInput,ActivityIndicator,Modal,StyleSheet,ScrollView} from 'react-native';
+import {AppState,View,Text,TouchableOpacity,TextInput,ActivityIndicator,Modal,StyleSheet,ScrollView} from 'react-native';
 import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
 
 export type FamilyProfile={id:string;name:string;createdAt:string;lastSeenAt:string|null;connected:boolean;mood:string|null;moodAt:string|null};
 const purple='#6953CA',red='#C64F67';
+// Every mounted Family Watches list reloads when any screen adds or removes a profile.
+const listeners=new Set<()=>void>();
+export function familyProfilesChanged(){listeners.forEach(l=>l())}
 const DELETED_ITEMS=['Linked profile information','Mood history and mood events','Emoji reactions from this profile','Profile-specific notifications','Assigned Circle recipients','Watch pairing and sign-in credentials','Other data owned by this profile'];
 
 export async function familyCall(action:string,extra:Record<string,unknown>={}){
@@ -25,7 +28,14 @@ export function useFamilyProfiles(enabled=true){
   catch(e:any){setError(e.message)}
   finally{setLoading(false)}
  },[]);
- useEffect(()=>{if(enabled)void load()},[load,enabled]);
+ useEffect(()=>{
+  if(!enabled)return;
+  void load();
+  const reload=()=>{void load()};
+  listeners.add(reload);
+  const appState=AppState.addEventListener('change',st=>{if(st==='active')reload()});
+  return()=>{listeners.delete(reload);appState.remove()};
+ },[load,enabled]);
  return {profiles,slots,loading,error,load};
 }
 
@@ -46,7 +56,7 @@ export default function FamilyWatches({reloadKey}:{reloadKey:number}){
    <Text style={styles.sub}>Mood-only · {p.mood?p.mood+' · ':''}{p.lastSeenAt?'Last seen '+new Date(p.lastSeenAt).toLocaleString():'Added '+new Date(p.createdAt).toLocaleDateString()}</Text>
    <Text style={{color:purple,fontWeight:'800'}}>Manage ›</Text>
   </TouchableOpacity>)}
-  {managing?<ManageFamilyProfile profile={managing} onClose={()=>setManaging(null)} onDeleted={async()=>{setManaging(null);await load();setNotice(managing.name+' was permanently removed.')}}/>:null}
+  {managing?<ManageFamilyProfile profile={managing} onClose={()=>setManaging(null)} onDeleted={async()=>{setManaging(null);await load();familyProfilesChanged();setNotice(managing.name+' was permanently removed.')}}/>:null}
  </View>;
 }
 

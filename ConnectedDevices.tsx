@@ -3,7 +3,7 @@ import {View,Text,TouchableOpacity,ActivityIndicator,Alert,StyleSheet} from 'rea
 import {CameraView,useCameraPermissions} from 'expo-camera';
 import {supabase} from './supabase';
 import {useIsGuest} from './Account';
-import FamilyWatches from './FamilyWatches';
+import FamilyWatches,{familyProfilesChanged} from './FamilyWatches';
 
 type Device={id:string;name:string;platform:string;linked_at:string;last_seen_at:string|null;revoked_at:string|null};
 const purple='#6953CA';
@@ -37,7 +37,7 @@ export default function ConnectedDevices(){
    const approved=await call('approve',details);
    await new Promise(resolve=>setTimeout(resolve,Math.max(0,3000-(Date.now()-began))));
    await load();
-   if(approved?.family){setFamilyReload(n=>n+1);setMessage('Family watch added as a mood-only profile.')}
+   if(approved?.family){setFamilyReload(n=>n+1);familyProfilesChanged();setMessage('Family watch added as a mood-only profile.')}
    else setMessage('Apple Watch linked successfully.');
   }catch(e:any){Alert.alert('Unable to link watch',e.message)}
   finally{setConnecting(false)}
