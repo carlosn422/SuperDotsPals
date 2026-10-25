@@ -268,21 +268,21 @@ struct FloatingReactionView: View {
     var body: some View {
         VStack(spacing: 1) {
             Text(reaction.name)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .font(.system(size: 16, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
                 .frame(maxWidth: GlassBubble.size - 22)
             Text(reaction.emoji)
-                .font(.system(size: 38))
+                .font(.system(size: 54))
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
         }
         .frame(width: GlassBubble.size, height: GlassBubble.size)
         .background(GlassBubble())
         .modifier(FloatIn(duration: WatchCircleStore.floatDuration + WatchCircleStore.fadeDuration))
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .padding(.top, 14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .offset(y: -16)
         .allowsHitTesting(false)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(reaction.name) reacted \(reaction.emoji)")
@@ -317,8 +317,8 @@ struct FloatingSummaryView: View {
         }
         .buttonStyle(.plain)
         .modifier(FloatIn(duration: WatchCircleStore.fadeInDuration + WatchCircleStore.summaryVisibleDuration + WatchCircleStore.fadeDuration))
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .padding(.top, 14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .offset(y: -16)
         .accessibilityLabel("\(summary.count) more reactions. Open Circle.")
     }
 }
@@ -345,7 +345,7 @@ private struct FloatIn: ViewModifier {
 
 private struct GlassBubble: View {
     static let tint = Color(red: 0.56, green: 0.40, blue: 1.0)
-    static let size: CGFloat = 88
+    static let size: CGFloat = 120
 
     var body: some View {
         ZStack {
