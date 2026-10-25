@@ -41,6 +41,8 @@ export default function ConnectedDevices(){
    else setMessage((approved?.deviceName||'Apple Watch')+' linked.');
    await load();
   }catch(e:any){
+   // Auto-link and Link can send the same watch request; the second approve loses after the first already linked it.
+   if(action==='approve'&&/already used/.test(e.message||'')){await load();return}
    setMessage(e.message||'Connection failed');
    if(!isPlus&&/Family watch limit/.test(e.message||'')){setMessage("MoodPals Free includes 1 family watch. Upgrade to Plus for up to 4, then enter the watch's code again.");showPaywall('family')}
   }finally{setConnecting(false)}
