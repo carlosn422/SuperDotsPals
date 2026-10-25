@@ -32,6 +32,12 @@ final class WatchThemeSync: ObservableObject {
         userId = secret("watch_user") ?? ""
         pairingId = secret("watch_pairing_id") ?? ""
         connected = !refreshToken.isEmpty && !userId.isEmpty
+        WatchPhoneLink.shared.onPairingRequested = { [weak self] in
+            Task { @MainActor in
+                guard let self, !self.connected || self.needsReconnect, !self.pairingActive, !self.busy else { return }
+                await self.startPairing()
+            }
+        }
     }
 
     func signIn(email: String, password: String, store: WatchStore) async {
@@ -78,7 +84,7 @@ final class WatchThemeSync: ObservableObject {
                (detail.contains("refresh_token_not_found") || detail.contains("invalid_grant") || detail.contains("Invalid Refresh Token")) {
                 needsReconnect = true
                 connected = false
-                message = "Session expired. Reconnect using a new QR code."
+                message = "Session expired. Reconnect with a new code."
                 NSLog("[WatchSync] Stored refresh token expired; new pairing required")
                 return
             }
@@ -183,7 +189,7 @@ final class WatchThemeSync: ObservableObject {
 
     func signOut() {
         for key in ["watch_access","watch_refresh","watch_user","watch_pairing_id"] { storeSecret(nil,for:key) }
-        accessToken = ""; refreshToken = ""; userId = ""; pairingId = ""; pairingSecret = ""; pairingURL = ""; pairingActive = false; pairingConnecting = false; connected = false; moodLoaded = false; sessionVerified = false; needsReconnect = false; syncWarning = nil
+        accessToken = ""; refreshToken = ""; userId = ""; pairingId = ""; pairingSecret = ""; pairingCode = ""; pairingActive = false; pairingConnecting = false; connected = false; moodLoaded = false; sessionVerified = false; needsReconnect = false; syncWarning = nil
         WatchCircleStore.shared.reset()
         setMoodOnly(false)
         message = "Disconnected. Your watch will show local defaults."
@@ -290,7 +296,7 @@ final class WatchThemeSync: ObservableObject {
         return try await request("/functions/v1/spiritual-reading",method:"POST",body:JSONSerialization.data(withJSONObject:object))
     }
 
-    @Published var pairingURL = ""
+    @Published var pairingCode = ""
     @Published var pairingActive = false
     @Published var pairingConnecting = false
     private var pairingId = ""
@@ -309,11 +315,11 @@ final class WatchThemeSync: ObservableObject {
             let body=try JSONSerialization.data(withJSONObject:["action":"start","family":family,"deviceName":WKInterfaceDevice.current().name.isEmpty ? "Apple Watch" : WKInterfaceDevice.current().name])
             let data=try await request("/functions/v1/watch-pairing",method:"POST",body:body,authenticated:false)
             guard let obj=try JSONSerialization.jsonObject(with:data) as? [String:Any],
-              let id=obj["id"] as? String,let secret=obj["secret"] as? String else {throw SyncError.badResponse}
+              let id=obj["id"] as? String,let secret=obj["secret"] as? String,let code=obj["code"] as? String else {throw SyncError.badResponse}
             pairingId=id;pairingSecret=secret
             needsReconnect=false
             pairingConnecting=false
-            pairingURL="superdots://pair?id=\(id)&secret=\(secret)"
+            pairingCode=code
             pairingActive=true
             WatchPhoneLink.shared.offer(id:id,secret:secret)
             message="Open MoodPals on your iPhone to link automatically."
@@ -344,10 +350,10 @@ final class WatchThemeSync: ObservableObject {
                 WatchPhoneLink.shared.linked()
                 let completed=try JSONSerialization.data(withJSONObject:["action":"complete","id":pairingId,"secret":pairingSecret])
                 _ = try? await request("/functions/v1/watch-pairing",method:"POST",body:completed)
-                pairingURL="";pairingSecret=""
+                pairingCode="";pairingSecret=""
                 message="Watch connected to your MoodPals account."
                 // The root view owns refreshing after the pairing screen disappears.
-                // Refreshing here inherits cancellation from the QR polling task.
+                // Refreshing here inherits cancellation from the pairing polling task.
                 let remaining=3.0-Date().timeIntervalSince(started)
                 if remaining>0 {try? await Task.sleep(for:.seconds(remaining))}
                 pairingConnecting=false
@@ -459,9 +465,9 @@ struct WatchSyncView: View {
  @ObservedObject var sync:WatchThemeSync
  @EnvironmentObject var store:WatchStore
  @Environment(\.dismiss) private var dismiss
- private var qrImageURL:URL? {
-  guard let components=URLComponents(string:sync.pairingURL),let query=components.percentEncodedQuery else{return nil}
-  return URL(string:"https://hzoauxxpvrgahlavxmvp.supabase.co/functions/v1/watch-pairing?"+query)
+ private var spacedCode:String {
+  let c=sync.pairingCode
+  return c.count==6 ? String(c.prefix(3))+" "+String(c.suffix(3)) : c
  }
  var body:some View {
   ScrollView {
@@ -486,22 +492,16 @@ struct WatchSyncView: View {
      Text("Link with iPhone").font(.headline)
      Text("Open MoodPals on your iPhone and this watch links automatically. Using it as a guest? Create a free account there first.")
        .font(.system(size:11)).multilineTextAlignment(.center)
-     Text("Or scan: MoodPals → Settings → Connected Devices")
-       .font(.system(size:10)).foregroundStyle(.secondary).multilineTextAlignment(.center)
-     if let qrImageURL {
-      AsyncImage(url:qrImageURL){phase in
-       switch phase {
-       case .success(let image): image.resizable().interpolation(.none).scaledToFit()
-       case .failure: Image(systemName:"exclamationmark.triangle").foregroundStyle(.orange)
-       default: ProgressView()
-       }
-      }.frame(width:118,height:118).padding(4).background(.white,in:RoundedRectangle(cornerRadius:8))
-     }
-     if !sync.pairingActive {
-      Button("Show linking QR"){Task {await sync.startPairing()}}
-     } else {
+     if sync.pairingActive && !sync.pairingCode.isEmpty {
+      Text(spacedCode)
+        .font(.system(size:30,weight:.bold,design:.rounded)).monospacedDigit()
+        .accessibilityLabel("Link code "+sync.pairingCode.map(String.init).joined(separator:" "))
+      Text("Or on your iPhone: MoodPals → Settings → Connected Devices → enter this code")
+        .font(.system(size:10)).foregroundStyle(.secondary).multilineTextAlignment(.center)
       Text("Code expires in 5 minutes").font(.system(size:10)).foregroundStyle(.secondary)
-      Button("New QR code"){Task {await sync.startPairing()}}
+      Button("New code"){Task {await sync.startPairing()}}
+     } else if !sync.pairingActive {
+      Button("Show link code"){Task {await sync.startPairing()}}
      }
      if !sync.pairingActive { Text(sync.message).font(.caption2).multilineTextAlignment(.center) }
     }

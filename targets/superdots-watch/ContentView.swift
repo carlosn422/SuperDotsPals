@@ -221,7 +221,7 @@ struct ContentView: View {
         }
         .task(id: sync.connected) {
             guard sync.connected else { return }
-            // The root view stays alive after QR pairing completes.
+            // The root view stays alive after pairing completes.
             // Keep the latest iPhone check-in in sync while the watch is open.
             await sync.refresh(store: store)
             while !Task.isCancelled && sync.connected {

@@ -69,7 +69,7 @@ export default function FamilyTab({onAdd}:{onAdd:()=>void}){
   {loading&&profiles.length===0?<ActivityIndicator color={purple}/>:null}
   {!loading&&profiles.length===0&&!error?<View style={[styles.card,{alignItems:'center'}]}>
    <Text style={styles.heading}>No family watches yet</Text>
-   <Text style={[styles.sub,{textAlign:'center'}]}>Open MoodPals on a watch set up with Family Setup, then scan its QR code.</Text>
+   <Text style={[styles.sub,{textAlign:'center'}]}>Open MoodPals on a watch set up with Family Setup, then enter the code it shows in Settings → Connected Devices.</Text>
    <TouchableOpacity style={styles.button} onPress={onAdd} accessibilityRole="button"><Text style={{color:'white',fontWeight:'800'}}>Add a family watch</Text></TouchableOpacity>
   </View>:null}
   {profiles.map(p=><FamilyCard key={p.id} profile={p} groups={groups} onManage={()=>{setNotice('');setManaging(p)}}/>)}

@@ -190,7 +190,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
     {isGuest?<SettingsItem title="Create your account" subtitle="Save your MoodPals and use My Circle" status="You're using MoodPals as a guest" icon="person-circle-outline" accent={colors.accent} onPress={()=>setSettingsPage('account')}/>:null}
     <SettingsItem title="MoodPals Plus" subtitle="Free and Plus plans" status="Advanced trends, circles and reflections" icon="sparkles-outline" accent={colors.accent} onPress={()=>setSettingsPage('plus')}/>
 
-    <SettingsItem title="Connected Devices" subtitle="Link and manage Apple Watches" status="Scan watch QR code" icon="git-network-outline" accent={colors.accent} onPress={()=>setSettingsPage('devices')}/>
+    <SettingsItem title="Connected Devices" subtitle="Link and manage Apple Watches" status="Link or enter watch code" icon="git-network-outline" accent={colors.accent} onPress={()=>setSettingsPage('devices')}/>
     <SettingsItem title="Health Data" subtitle="Permissions and wearable readings" status="Open Health to connect or sync" icon="heart-outline" accent={colors.accent} onPress={()=>setSettingsPage('health')}/>
     <SettingsItem title="Notifications" subtitle="Reminders and preferences" status="Daily reminders and stress alerts" icon="notifications-outline" accent={colors.accent} onPress={()=>setSettingsPage('notifications')}/>
     <SettingsItem title="My Circle" subtitle="Friends, groups and Little Signals" status="Invite friends with your code" icon="people-outline" accent={colors.accent} onPress={()=>setSettingsPage('circle')}/>

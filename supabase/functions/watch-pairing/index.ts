@@ -22,9 +22,23 @@ async function approveFamily(ownerId:string,row:{id:string;device_name:string}){
  const token=link?.properties?.hashed_token;
  if(tokenError||!token){await discard();return json({error:"Unable to create watch session"},500)}
  const {data:approved,error}=await admin.from("watch_pairing_requests").update({status:"approved",owner_id:profile.id,login_token_hash:token}).eq("id",row.id).eq("status","pending").select("id");
- if(error||!approved?.length){await discard();return json({error:"This QR code has expired or was already used"},400)}
+ if(error||!approved?.length){await discard();return json({error:"This code has expired or was already used"},400)}
  await admin.from("connected_devices").upsert({user_id:profile.id,pairing_id:row.id,name:row.device_name,platform:"watchos"},{onConflict:"pairing_id"});
  return json({status:"approved",deviceName:row.device_name,family:true,profileId:profile.id});
+}
+const CODE_WINDOW_MS=15*60*1000,CODE_MAX_FAILURES=10;
+function sixDigits(){const a=crypto.getRandomValues(new Uint32Array(1));return String(a[0]%1000000).padStart(6,"0")}
+async function approveRow(user:{id:string;email?:string},row:{id:string;device_name:string;kind:string}){
+ if(row.kind==="family")return await approveFamily(user.id,row);
+ if(!user.email)return json({error:"Email-based Supabase login is required for pairing"},400);
+ const {data:link,error:linkError}=await admin.auth.admin.generateLink({type:"magiclink",email:user.email});
+ const token=link?.properties?.hashed_token;
+ if(linkError||!token)return json({error:"Unable to create watch session"},500);
+ const {data:approved,error}=await admin.from("watch_pairing_requests").update({status:"approved",owner_id:user.id,login_token_hash:token}).eq("id",row.id).eq("status","pending").select("id");
+ if(error)return json({error:"Unable to approve"},500);
+ if(!approved?.length)return json({error:"This code has expired or was already used"},400);
+ await admin.from("connected_devices").upsert({user_id:user.id,pairing_id:row.id,name:row.device_name,platform:"watchos"},{onConflict:"pairing_id"});
+ return json({status:"approved",deviceName:row.device_name});
 }
 Deno.serve(async req=>{
  if(req.method==="GET"){
@@ -43,9 +57,16 @@ Deno.serve(async req=>{
   const p=await req.json();const action=String(p.action||"");
   if(action==="start"){
    const secret=random();
-   const {data,error}=await admin.from("watch_pairing_requests").insert({secret_hash:await hash(secret),device_name:String(p.deviceName||"Apple Watch").slice(0,80),kind:p.family===true?"family":"self"}).select("id,expires_at").single();
-   if(error||!data)return json({error:"Could not create link"},500);
-   return json({id:data.id,secret,expiresAt:data.expires_at});
+   // Expired requests release their codes so the pending-code unique index only covers live codes.
+   await admin.from("watch_pairing_requests").update({status:"expired",login_token_hash:null}).eq("status","pending").lt("expires_at",new Date().toISOString());
+   for(let attempt=0;attempt<8;attempt++){
+    const code=sixDigits();
+    const {data,error}=await admin.from("watch_pairing_requests").insert({secret_hash:await hash(secret),pair_code:code,device_name:String(p.deviceName||"Apple Watch").slice(0,80),kind:p.family===true?"family":"self"}).select("id,expires_at").single();
+    if(error?.code==="23505")continue;
+    if(error||!data)return json({error:"Could not create link"},500);
+    return json({id:data.id,secret,code,expiresAt:data.expires_at});
+   }
+   return json({error:"Could not create link"},500);
   }
   if(action==="poll"||action==="complete"){
    const id=String(p.id||""),secret=String(p.secret||"");
@@ -67,16 +88,20 @@ Deno.serve(async req=>{
   if(action==="approve"){
    const id=String(p.id||""),secret=String(p.secret||"");
    const {data:row}=await admin.from("watch_pairing_requests").select("*").eq("id",id).maybeSingle();
-   if(!row||row.secret_hash!==await hash(secret)||row.status!=="pending"||Date.parse(row.expires_at)<Date.now())return json({error:"This QR code has expired or was already used"},400);
-   if(row.kind==="family")return await approveFamily(user.id,row);
-   if(!user.email)return json({error:"Email-based Supabase login is required for pairing"},400);
-   const {data:link,error:linkError}=await admin.auth.admin.generateLink({type:"magiclink",email:user.email});
-   const token=link?.properties?.hashed_token;
-   if(linkError||!token)return json({error:"Unable to create watch session"},500);
-   const {error}=await admin.from("watch_pairing_requests").update({status:"approved",owner_id:user.id,login_token_hash:token}).eq("id",id).eq("status","pending");
-   if(error)return json({error:"Unable to approve"},500);
-   await admin.from("connected_devices").upsert({user_id:user.id,pairing_id:id,name:row.device_name,platform:"watchos"},{onConflict:"pairing_id"});
-   return json({status:"approved",deviceName:row.device_name});
+   if(!row||row.secret_hash!==await hash(secret)||row.status!=="pending"||Date.parse(row.expires_at)<Date.now())return json({error:"This code has expired or was already used"},400);
+   return await approveRow(user,row);
+  }
+  if(action==="approve_code"){
+   const code=String(p.code||"").replace(/\D/g,"");
+   const since=new Date(Date.now()-CODE_WINDOW_MS).toISOString();
+   const {count}=await admin.from("watch_pairing_code_attempts").select("id",{count:"exact",head:true}).eq("user_id",user.id).gte("created_at",since);
+   if((count||0)>=CODE_MAX_FAILURES)return json({error:"Too many wrong codes. Wait 15 minutes and try again."},429);
+   const {data:row}=code.length===6?await admin.from("watch_pairing_requests").select("*").eq("pair_code",code).eq("status","pending").gt("expires_at",new Date().toISOString()).maybeSingle():{data:null};
+   if(!row){
+    await admin.from("watch_pairing_code_attempts").insert({user_id:user.id});
+    return json({error:"That code didn't match a watch. Check the 6 digits on the watch, or show a new code."},400);
+   }
+   return await approveRow(user,row);
   }
   if(action==="list"){
    const {data,error}=await admin.from("connected_devices").select("id,name,platform,linked_at,last_seen_at,revoked_at").eq("user_id",user.id).is("revoked_at",null).order("linked_at",{ascending:false}).limit(50);

@@ -49,7 +49,7 @@ export default function FamilyWatches({reloadKey}:{reloadKey:number}){
  useEffect(()=>{if(reloadKey)void load()},[reloadKey,load]);
  return <View style={{gap:10}}>
   <Text style={styles.title}>Family Watches</Text>
-  <Text style={styles.sub}>Apple Watches set up with Family Setup link as their own mood-only profile under your account. Open MoodPals on the family watch and scan its QR code above. {profiles.length}/{slots} used.</Text>
+  <Text style={styles.sub}>Apple Watches set up with Family Setup link as their own mood-only profile under your account. Open MoodPals on the family watch and enter the code it shows above. {profiles.length}/{slots} used.</Text>
   {notice?<Text style={[styles.sub,{color:'#2E8B57',fontWeight:'700'}]}>{notice}</Text>:null}
   {error?<Text style={[styles.sub,{color:red}]}>{error}</Text>:null}
   {loading&&profiles.length===0?<ActivityIndicator color={purple}/>:null}
