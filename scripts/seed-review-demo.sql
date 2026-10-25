@@ -12,8 +12,9 @@ begin
  select profile_user_id into mia from public.family_profiles where owner_id=a order by created_at limit 1;
  if mia is null then
   mia:=gen_random_uuid();
-  insert into auth.users(id,instance_id,aud,role,email,email_confirmed_at,raw_user_meta_data,raw_app_meta_data,created_at,updated_at)
-   values(mia,'00000000-0000-0000-0000-000000000000','authenticated','authenticated','family-'||mia||'@family.moodpals.invalid',now(),
+  -- GoTrue can't read NULL token columns, so set them to ''.
+  insert into auth.users(id,instance_id,aud,role,email,email_confirmed_at,confirmation_token,recovery_token,email_change_token_new,email_change,email_change_token_current,phone_change,phone_change_token,reauthentication_token,raw_user_meta_data,raw_app_meta_data,created_at,updated_at)
+   values(mia,'00000000-0000-0000-0000-000000000000','authenticated','authenticated','family-'||mia||'@family.moodpals.invalid',now(),'','','','','','','','',
     jsonb_build_object('family_profile',true,'owner_id',a),'{"provider":"email","providers":["email"]}',now(),now());
   insert into public.family_profiles(profile_user_id,owner_id,device_name) values(mia,a,'Mia''s Apple Watch');
  end if;
