@@ -79,7 +79,7 @@ export default function AuthScreen(){
  return <KeyboardAvoidingView style={s.page} behavior={Platform.OS==='ios'?'padding':undefined}>
   <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
    <View style={s.brand}>
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back to welcome" onPress={()=>{setMode('welcome');setMessage('')}} style={s.authBack}><Text style={s.authBackText}>‹  Back</Text></TouchableOpacity>
+    {mode!=='signin'?<TouchableOpacity accessibilityRole="button" accessibilityLabel="Back to sign in" onPress={()=>{setMode('signin');setMessage('')}} style={s.authBack}><Text style={s.authBackText}>‹  Back</Text></TouchableOpacity>:null}
     <Text style={s.logo}>Mood<Text style={s.logoMint}>Pals</Text></Text>
     <Text style={s.tagline}>A little check-in. A brighter day.</Text>
    </View>
