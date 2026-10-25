@@ -5,8 +5,11 @@ import {Image} from 'react-native';
 import SuperdotMascot from './SuperdotMascot';
 import MoodPalsWelcomeArt from './MoodPalsWelcomeArt';
 import Svg,{Path} from 'react-native-svg';
+// Set before signing a guest out from onboarding so the auth screen opens on Sign in instead of Welcome.
+let nextMode:'welcome'|'signin'='welcome';
+export function openSignInNext(){nextMode='signin'}
 export default function AuthScreen(){
- const [mode,setMode]=useState<'welcome'|'signin'|'signup'|'reset'>('welcome'),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[name,setName]=useState(''),[loading,setLoading]=useState(false),[message,setMessage]=useState('');
+ const [mode,setMode]=useState<'welcome'|'signin'|'signup'|'reset'>(()=>{const m=nextMode;nextMode='welcome';return m}),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[name,setName]=useState(''),[loading,setLoading]=useState(false),[message,setMessage]=useState('');
  const [waitingForConfirmation,setWaitingForConfirmation]=useState(false);
  const currentCredentials=useRef<{email:string;password:string}|null>(null);
  const checking=useRef(false);
