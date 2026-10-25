@@ -8,13 +8,14 @@ import {usePlus} from './PlusStore';
 import {Avatar,CCard,CHeading,CRow,CT,Chip,EmptyState,MoodPalThumb,MoodTag,OfflineBanner,PrimaryButton,SampleDataNote,SignalBurst,SoftButton,ToggleRow,cs} from './CircleComponents';
 
 export type CircleRoute=
- |{name:'home'}|{name:'invite'}|{name:'enterCode'}|{name:'requests'}|{name:'assignGroups';requestId:string}
- |{name:'friends'}|{name:'friend';id:string}|{name:'groups'}|{name:'group';id?:string}|{name:'permissions'}
+ |{name:'home'}|{name:'invite'}|{name:'enterCode'}|{name:'requests';groupId?:string;groupName?:string}|{name:'assignGroups';requestId:string;groupId?:string;groupName?:string}
+ |{name:'friends'}|{name:'friend';id:string}|{name:'groups'}|{name:'group';id?:string;draft?:GroupDraft}|{name:'permissions'}
  |{name:'share';mood:CircleMood}|{name:'send';friendId?:string}|{name:'signalSent';signal:SignalId;friendIds:string[]}
  |{name:'signalReceived';signalId:string}|{name:'friendMood';id:string}|{name:'room';id:string}|{name:'today'}
  |{name:'notifications'}|{name:'widgets'}|{name:'revoked'};
 
 const TITLES:Record<CircleRoute['name'],string>={home:'My Circle',invite:'Invite Friends',enterCode:'Enter Invite Code',requests:'Friend Requests',assignGroups:'Add to Groups',friends:'Friends',friend:'Friend',groups:'Manage Groups',group:'Group',permissions:'Mood Sharing',share:'Choose Audience',send:'Send a Little Signal',signalSent:'Signal Sent',signalReceived:'Little Signal',friendMood:'Shared Mood',room:'Reactions',today:"Today's Signals",notifications:'Circle Notifications',widgets:'Widgets',revoked:'Not Available'};
+type GroupDraft={group:CircleGroup;knownFriendIds:string[]};
 const GROUP_ICONS=['heart','home','leaf','star','people','sunny','musical-notes','paw'] as const;
 const GROUP_COLORS=['#E76B8A','#488CD9','#3BA986','#E3A426','#7139E9','#D9704B'];
 
@@ -43,12 +44,12 @@ function Screen({route,nav,mood}:{route:CircleRoute;nav:Nav;mood?:string}){
   case 'home':return <Home nav={nav}/>;
   case 'invite':return <Invite/>;
   case 'enterCode':return <EnterCode nav={nav}/>;
-  case 'requests':return <Requests nav={nav}/>;
-  case 'assignGroups':return <AssignGroups id={route.requestId} nav={nav}/>;
+  case 'requests':return <Requests groupId={route.groupId} groupName={route.groupName} nav={nav}/>;
+  case 'assignGroups':return <AssignGroups id={route.requestId} groupId={route.groupId} groupName={route.groupName} nav={nav}/>;
   case 'friends':return <Friends nav={nav}/>;
   case 'friend':return <FriendDetail id={route.id} nav={nav}/>;
   case 'groups':return <Groups nav={nav}/>;
-  case 'group':return <GroupEdit id={route.id} nav={nav}/>;
+  case 'group':return <GroupEdit id={route.id} draft={route.draft} nav={nav}/>;
   case 'permissions':return <Permissions/>;
   case 'share':return <ChooseAudience mood={route.mood} nav={nav}/>;
   case 'send':return <SendSignal friendId={route.friendId} nav={nav}/>;
@@ -164,7 +165,7 @@ function EnterCode({nav}:{nav:Nav}){
 }
 function StateCard({icon,color,title,detail}:{icon:any;color:string;title:string;detail:string}){return <CCard style={{flexDirection:'row',gap:12,alignItems:'flex-start'}}><Ionicons name={icon} size={24} color={color}/><View style={{flex:1,gap:3}}><Text style={cs.rowTitle}>{title}</Text><Text style={cs.rowSub}>{detail}</Text></View></CCard>;}
 
-function Requests({nav}:{nav:Nav}){
+function Requests({groupId,groupName,nav}:{groupId?:string;groupName?:string;nav:Nav}){
  const store=useCircle();const [tab,setTab]=useState<'incoming'|'outgoing'>('incoming');
  const list=store.requests.filter(r=>r.direction===tab);
  return <>
@@ -175,7 +176,7 @@ function Requests({nav}:{nav:Nav}){
    <View style={{flex:1,gap:2}}><Text style={cs.rowTitle}>{r.name}</Text><Text style={cs.rowSub}>{r.status==='declined'?'Not accepted':(tab==='incoming'?'Wants to join your circle · ':'Sent ')+timeAgo(r.sentAt)}</Text></View>
    {tab==='incoming'?<View style={{flexDirection:'row',gap:7}}>
     <TouchableOpacity accessibilityRole="button" onPress={()=>Alert.alert('Decline '+r.name+'?','They won’t be told you declined. Their request just disappears.',[{text:'Cancel',style:'cancel'},{text:'Decline',style:'destructive',onPress:()=>store.declineRequest(r.id)}])} style={[cs.soft,{backgroundColor:'#F3F5F4',paddingVertical:9}]}><Text style={{fontWeight:'800',color:CT.muted,fontSize:13}}>Decline</Text></TouchableOpacity>
-    <TouchableOpacity accessibilityRole="button" onPress={()=>nav.push({name:'assignGroups',requestId:r.id})} style={[cs.soft,{backgroundColor:CT.primary,paddingVertical:9}]}><Text style={{fontWeight:'800',color:'#fff',fontSize:13}}>Accept</Text></TouchableOpacity>
+    <TouchableOpacity accessibilityRole="button" onPress={()=>nav.push({name:'assignGroups',requestId:r.id,groupId,groupName})} style={[cs.soft,{backgroundColor:CT.primary,paddingVertical:9}]}><Text style={{fontWeight:'800',color:'#fff',fontSize:13}}>Accept</Text></TouchableOpacity>
    </View>:r.status==='declined'?<Ionicons name="close-circle" size={22} color="#C9D2CE"/>:<TouchableOpacity onPress={()=>store.cancelRequest(r.id)}><Text style={{color:CT.danger,fontWeight:'800',fontSize:12}}>Cancel</Text></TouchableOpacity>}
   </View>)}</CCard>}
  </>;
@@ -194,14 +195,15 @@ function GroupPicker({selected,onToggle}:{selected:string[];onToggle:(id:string)
 }
 const toggle=(arr:string[],id:string)=>arr.includes(id)?arr.filter(x=>x!==id):[...arr,id];
 
-function AssignGroups({id,nav}:{id:string;nav:Nav}){
- const store=useCircle();const r=store.requests.find(x=>x.id===id);const [sel,setSel]=useState<string[]>([]);
+function AssignGroups({id,groupId,groupName,nav}:{id:string;groupId?:string;groupName?:string;nav:Nav}){
+ const store=useCircle();const r=store.requests.find(x=>x.id===id);const [sel,setSel]=useState<string[]>(()=>groupId&&store.groups.some(g=>g.id===groupId)?[groupId]:[]);
+ const draftOnly=!!groupId&&!store.groups.some(g=>g.id===groupId);
  if(!r)return <EmptyState title="Request handled" detail="This request is no longer pending."/>;
  return <>
   <CCard style={{flexDirection:'row',alignItems:'center',gap:12}}><Avatar initials={r.initials} color={r.color} size={52}/><View style={{flex:1}}><Text style={{fontSize:18,fontWeight:'900',color:CT.ink}}>{r.name}</Text><Text style={cs.muted}>Choose which groups {r.name} belongs to. Only you can see your groups.</Text></View></CCard>
-  <GroupPicker selected={sel} onToggle={g=>setSel(s=>toggle(s,g))}/>
-  <Text style={[cs.muted,{textAlign:'center'}]}>{sel.length?'':'No group selected — '+r.name+' can send you signals but won’t see your moods.'}</Text>
-  <PrimaryButton label={'Accept '+r.name} icon="checkmark" onPress={()=>{store.acceptRequest(id,sel);nav.replace({name:'friends'})}}/>
+  {draftOnly&&!store.groups.length?null:<GroupPicker selected={sel} onToggle={g=>setSel(s=>toggle(s,g))}/>}
+  <Text style={[cs.muted,{textAlign:'center'}]}>{draftOnly?r.name+' will be added to '+(groupName?'“'+groupName+'”':'your new group')+' when you create it.':sel.length?'':'No group selected — '+r.name+' can send you signals but won’t see your moods.'}</Text>
+  <PrimaryButton label={'Accept '+r.name} icon="checkmark" onPress={()=>{store.acceptRequest(id,sel);if(groupId)nav.popTo('group');else nav.replace({name:'friends'})}}/>
  </>;
 }
 
@@ -241,10 +243,23 @@ function Groups({nav}:{nav:Nav}){
  </>;
 }
 
-function GroupEdit({id,nav}:{id?:string;nav:Nav}){
+function GroupEdit({id,draft,nav}:{id?:string;draft?:GroupDraft;nav:Nav}){
  const store=useCircle();const existing=store.groups.find(g=>g.id===id);
- const [g,setG]=useState<CircleGroup>(existing||{id:'g'+Date.now(),name:'',icon:'star',color:GROUP_COLORS[4],memberIds:[],moods:['Joyful','Calm']});
+ const [g,setG]=useState<CircleGroup>(draft?.group||existing||{id:'g'+Date.now(),name:'',icon:'star',color:GROUP_COLORS[4],memberIds:[],moods:['Joyful','Calm']});
+ const [known,setKnown]=useState<string[]>(draft?.knownFriendIds||[]);
  const set=(p:Partial<CircleGroup>)=>setG(x=>({...x,...p}));
+ const pending=store.requests.filter(r=>r.status==='pending'&&r.direction==='incoming').length;
+ // Friends approved while inviting from this screen join the draft; for a saved group only if they were added to it when approved.
+ useEffect(()=>{
+  if(!draft)return;
+  const fresh=store.friends.map(f=>f.id).filter(f=>!known.includes(f));
+  if(!fresh.length)return;
+  setKnown(k=>[...k,...fresh]);
+  const saved=store.groups.find(x=>x.id===g.id);
+  const add=saved?fresh.filter(f=>saved.memberIds.includes(f)):fresh;
+  if(add.length)setG(x=>({...x,memberIds:[...x.memberIds,...add.filter(f=>!x.memberIds.includes(f))]}));
+ },[store.friends,store.groups]);
+ const leave=(r:CircleRoute)=>{nav.replace({name:'group',id,draft:{group:g,knownFriendIds:store.friends.map(f=>f.id)}});nav.push(r)};
  return <>
   <CCard style={{gap:12}}>
    <Text style={cs.rowTitle}>Name</Text>
@@ -257,7 +272,11 @@ function GroupEdit({id,nav}:{id?:string;nav:Nav}){
   <CHeading title="Moods this group can see"/>
   <MoodPermissionRow moods={g.moods} onToggle={m=>set({moods:g.moods.includes(m)?g.moods.filter(x=>x!==m):CIRCLE_MOODS.filter(x=>x===m||g.moods.includes(x))})}/>
   <CHeading title={'Members ('+g.memberIds.length+')'}/>
-  <CCard style={{paddingVertical:4}}>{store.friends.length?store.friends.map((f,i)=>{const on=g.memberIds.includes(f.id);return <CRow key={f.id} last={i===store.friends.length-1} leading={<Avatar initials={f.initials} color={f.color} size={34}/>} title={f.name} onPress={()=>set({memberIds:toggle(g.memberIds,f.id)})} right={<Ionicons name={on?'checkmark-circle':'ellipse-outline'} size={24} color={on?g.color:'#C9D2CE'}/>}/>}):<Text style={[cs.muted,{padding:12}]}>Approve a friend request to add members.</Text>}</CCard>
+  <CCard style={{paddingVertical:4}}>
+   {store.friends.length?store.friends.map(f=>{const on=g.memberIds.includes(f.id);return <CRow key={f.id} leading={<Avatar initials={f.initials} color={f.color} size={34}/>} title={f.name} onPress={()=>set({memberIds:toggle(g.memberIds,f.id)})} right={<Ionicons name={on?'checkmark-circle':'ellipse-outline'} size={24} color={on?g.color:'#C9D2CE'}/>}/>}):<Text style={[cs.muted,{paddingHorizontal:12,paddingTop:12,paddingBottom:4}]}>{pending?'Approve a friend request to add them to this group.':'No friends in your circle yet. Invite someone you trust, then add them here.'}</Text>}
+   {pending?<CRow icon="mail-unread-outline" title={'Review '+pending+(pending===1?' friend request':' friend requests')} subtitle="Approve and add them to this group" onPress={()=>leave({name:'requests',groupId:g.id,groupName:g.name.trim()})} right={<View style={cs.badge}><Text style={{color:'#fff',fontWeight:'900',fontSize:11}}>{pending}</Text></View>}/>:null}
+   <CRow icon="person-add-outline" title={store.friends.length?'Invite more friends':'Invite Friends'} subtitle="Share your personal invite code" onPress={()=>leave({name:'invite'})} last/>
+  </CCard>
   <PrimaryButton label={existing?'Save Group':'Create Group'} disabled={!g.name.trim()} onPress={()=>{store.saveGroup({...g,name:g.name.trim()});nav.back()}}/>
   {existing?<SoftButton danger label="Delete Group" icon="trash-outline" onPress={()=>Alert.alert('Delete '+g.name+'?','Members stay your friends. They’ll stop seeing moods shared only with this group.',[{text:'Cancel',style:'cancel'},{text:'Delete',style:'destructive',onPress:()=>{store.deleteGroup(g.id);nav.back()}}])}/>:null}
  </>;
