@@ -2,7 +2,7 @@ import React,{useState,useEffect,useRef} from 'react';
 import {View,Text,TextInput,TouchableOpacity,StyleSheet,KeyboardAvoidingView,ScrollView,Platform,ActivityIndicator,AppState} from 'react-native';
 import {supabase} from './supabase';
 import {Image} from 'react-native';
-import MoodPalMascot from './MoodPalMascot';
+import SuperdotMascot from './SuperdotMascot';
 import MoodPalsWelcomeArt from './MoodPalsWelcomeArt';
 import Svg,{Path} from 'react-native-svg';
 export default function AuthScreen(){
@@ -77,7 +77,7 @@ export default function AuthScreen(){
    </View>
    <View style={s.hero}>
     <View style={s.heroGlow}/>
-    <View style={s.mascot}><MoodPalMascot id="joyful" size={154}/></View>
+    <View style={s.mascot}><SuperdotMascot id="joyful" size={154}/></View>
     <Text style={s.heroCaption}>Your friendly companion, every day.</Text>
    </View>
    <View style={s.panel}>
