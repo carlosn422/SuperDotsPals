@@ -65,6 +65,7 @@ final class WatchCircleStore: ObservableObject {
     /// drops the queue and abandons any floating reaction without marking it read.
     func setActive(_ value: Bool) {
         guard value != active else { return }
+        NSLog("[WatchCircle] active=%d", value ? 1 : 0)
         active = value
         pollTask?.cancel()
         pollTask = nil
@@ -109,6 +110,9 @@ final class WatchCircleStore: ObservableObject {
             queue += new.sorted { $0.at < $1.at }
         }
         if !new.isEmpty { seen += new.map(\.id); known = seen }
+        if !baselined || !new.isEmpty {
+            NSLog("[WatchCircle] Inbox: %ld unread, %ld new%@", fresh.count, new.count, baselined ? "" : " (baseline)")
+        }
         baselined = true
         playNext()
     }

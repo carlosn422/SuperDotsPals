@@ -370,16 +370,18 @@ final class WatchThemeSync: ObservableObject {
         guard connected, !refreshToken.isEmpty else { throw SyncError.notSignedIn }
         let body = try JSONSerialization.data(withJSONObject: params)
         let path = "/rest/v1/rpc/\(name)"
-        do { return try await request(path, method: "POST", body: body) }
+        // Short timeout so a stalled request can't hold up the 10 s Circle poll.
+        do { return try await request(path, method: "POST", body: body, timeout: 15) }
         catch SyncError.server(401, _, _) {
             try await renewIfNeeded()
-            return try await request(path, method: "POST", body: body)
+            return try await request(path, method: "POST", body: body, timeout: 15)
         }
     }
 
-    private func request(_ path: String,method: String,body: Data? = nil,authenticated: Bool = true,extraHeaders:[String:String] = [:]) async throws -> Data {
+    private func request(_ path: String,method: String,body: Data? = nil,authenticated: Bool = true,extraHeaders:[String:String] = [:],timeout: TimeInterval? = nil) async throws -> Data {
         guard let url = URL(string: path,relativeTo:base) else { throw SyncError.badResponse }
         var req = URLRequest(url:url)
+        if let timeout { req.timeoutInterval = timeout }
         req.httpMethod = method
         req.setValue(publishableKey,forHTTPHeaderField:"apikey")
         req.setValue("application/json",forHTTPHeaderField:"Content-Type")
