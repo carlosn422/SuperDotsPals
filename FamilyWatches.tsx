@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import {usePlus} from './PlusStore';
 import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
+import FamilyTimeline from './FamilyTimeline';
 
 export type FamilyProfile={id:string;name:string;createdAt:string;lastSeenAt:string|null;connected:boolean;mood:string|null;moodAt:string|null};
 const purple='#6953CA',red='#C64F67';
@@ -210,7 +211,7 @@ export const MASCOT_ID:Record<string,string>={joyful:'joy',calm:'disgust',disgus
 type MoodRow={mood:string;occurred_at:string};
 
 // Today switcher: "Me" shows the normal Today screen; a family watch shows its moods read-only.
-type ReactionRow={id:string;mood:string;reactor_name:string;emoji:string;reacted_at:string};
+type ReactionRow={id:string;mood:string;shared_at:string;reactor_name:string;emoji:string;reacted_at:string};
 const SELECTED_KEY='moodpals.familySelectedProfile';
 export function shortProfileName(name:string){return name.replace(/[’']s\s+Apple\s+Watch$/i,'').replace(/\s*Apple\s+Watch$/i,'').trim()||name}
 
@@ -228,8 +229,8 @@ export function FamilySwitcher({children,disabled=false,onAdd,focused=true}:{chi
   if(!selected)return;
   let live=true;setLoading(true);setError('');
   void Promise.all([
-   supabase.rpc('family_profile_moods',{p_profile:selected,p_limit:20}),
-   supabase.rpc('family_profile_reactions',{p_profile:selected,p_limit:20})]).then(([m,r])=>{
+   supabase.rpc('family_profile_moods',{p_profile:selected,p_limit:200}),
+   supabase.rpc('family_profile_reactions',{p_profile:selected,p_limit:100})]).then(([m,r])=>{
    if(!live)return;
    if(m.error||r.error)setError('Unable to load moods and reactions.');
    else{setMoods((m.data as MoodRow[])||[]);setReactions((r.data as ReactionRow[])||[])}
@@ -254,15 +255,7 @@ export function FamilySwitcher({children,disabled=false,onAdd,focused=true}:{chi
    </View>
    {loading?<ActivityIndicator color={purple}/>:null}
    {error?<Text style={[styles.sub,{color:red}]}>{error}</Text>:null}
-   {moods.length>1?<View style={styles.card}>
-    <Text style={{fontWeight:'800',color:'#271C49'}}>Recent moods</Text>
-    {moods.slice(1).map(m=><Text key={m.occurred_at} style={styles.sub}>{m.mood} · {new Date(m.occurred_at).toLocaleString()}</Text>)}
-   </View>:null}
-   {!loading||reactions.length?<View style={styles.card}>
-    <Text style={{fontWeight:'800',color:'#271C49'}}>Reactions</Text>
-    {reactions.length?reactions.map(r=><Text key={r.id} style={styles.sub}>{r.emoji} {r.reactor_name} · to {r.mood.toLowerCase()} · {new Date(r.reacted_at).toLocaleString()}</Text>)
-     :<Text style={styles.sub}>No reactions yet.</Text>}
-   </View>:null}
+   {!loading||moods.length?<FamilyTimeline key={profile.id} name={shortProfileName(profile.name)} moods={moods} reactions={reactions}/>:null}
   </View>}
  </View>;
 }
