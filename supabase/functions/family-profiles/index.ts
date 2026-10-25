@@ -20,15 +20,24 @@ Deno.serve(async req=>{
    if(error)return json({error:"Unable to load family watches"},500);
    const ids=(rows||[]).map(r=>r.profile_user_id);
    const [{data:devices},{data:moods},{data:plus}]=await Promise.all([
-    ids.length?admin.from("connected_devices").select("user_id,last_seen_at").in("user_id",ids).is("revoked_at",null):Promise.resolve({data:[]}),
+    ids.length?admin.from("connected_devices").select("user_id,last_seen_at,watch_color").in("user_id",ids).is("revoked_at",null):Promise.resolve({data:[]}),
     ids.length?admin.from("wellness_journal").select("user_id,mood,occurred_at").in("user_id",ids).not("mood","is",null).order("occurred_at",{ascending:false}).limit(200):Promise.resolve({data:[]}),
     admin.rpc("has_plus",{uid:user.id}),
    ]);
    const profiles=(rows||[]).map(r=>{
     const device=(devices||[]).find(d=>d.user_id===r.profile_user_id),mood=(moods||[]).find(m=>m.user_id===r.profile_user_id);
-    return {id:r.profile_user_id,name:r.device_name,createdAt:r.created_at,lastSeenAt:device?.last_seen_at??null,connected:!!device,mood:mood?.mood??null,moodAt:mood?.occurred_at??null};
+    return {id:r.profile_user_id,name:r.device_name,createdAt:r.created_at,lastSeenAt:device?.last_seen_at??null,connected:!!device,watchColor:device?.watch_color??null,mood:mood?.mood??null,moodAt:mood?.occurred_at??null};
    });
    return json({profiles,slots:plus===true?4:1});
+  }
+  if(action==="set_color"){
+   const id=String(p.profileId||""),color=String(p.color||"");
+   if(!["charcoal","ivory","navy","rose","mint","lavender"].includes(color))return json({error:"Choose one of the 6 watch colors"},400);
+   const {data:row}=uuid.test(id)?await admin.from("family_profiles").select("owner_id").eq("profile_user_id",id).maybeSingle():{data:null};
+   if(!row||row.owner_id!==user.id)return json({error:"Profile not found"},404);
+   const {data,error}=await admin.from("connected_devices").update({watch_color:color}).eq("user_id",id).is("revoked_at",null).select("id");
+   if(error)return json({error:"Unable to save color"},500);
+   return data?.length?json({watchColor:color}):json({error:"This family watch isn't linked right now"},404);
   }
   if(action==="remove"){
    const id=String(p.profileId||"");

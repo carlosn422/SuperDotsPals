@@ -9,7 +9,9 @@ function random(){const a=crypto.getRandomValues(new Uint8Array(32));return Arra
 async function authed(req:Request){const bearer=req.headers.get("Authorization")||"";if(!bearer.startsWith("Bearer "))return null;const client=createClient(url,anon,{global:{headers:{Authorization:bearer}},auth:{persistSession:false,autoRefreshToken:false}});const {data:{user}}=await client.auth.getUser(bearer.slice(7));return user||null}
 // A Family Setup watch becomes its own mood-only sub-profile under the approving account.
 // The profile has no real email; an internal address exists only so the watch can get a session.
-async function approveFamily(ownerId:string,row:{id:string;device_name:string}){
+const WATCH_COLORS=["charcoal","ivory","navy","rose","mint","lavender"];
+const watchColor=(c:unknown)=>WATCH_COLORS.includes(String(c))?String(c):null;
+async function approveFamily(ownerId:string,row:{id:string;device_name:string},color:string|null=null){
  const {data:isFamily}=await admin.rpc("is_family_profile",{uid:ownerId});
  if(isFamily)return json({error:"A family watch can't add other watches"},403);
  const {data:created,error:createError}=await admin.auth.admin.createUser({email:"family-"+crypto.randomUUID()+"@family.moodpals.invalid",email_confirm:true,user_metadata:{family_profile:true,owner_id:ownerId}});
@@ -23,13 +25,13 @@ async function approveFamily(ownerId:string,row:{id:string;device_name:string}){
  if(tokenError||!token){await discard();return json({error:"Unable to create watch session"},500)}
  const {data:approved,error}=await admin.from("watch_pairing_requests").update({status:"approved",owner_id:profile.id,login_token_hash:token}).eq("id",row.id).eq("status","pending").select("id");
  if(error||!approved?.length){await discard();return json({error:"This code has expired or was already used"},400)}
- await admin.from("connected_devices").upsert({user_id:profile.id,pairing_id:row.id,name:row.device_name,platform:"watchos"},{onConflict:"pairing_id"});
+ await admin.from("connected_devices").upsert({user_id:profile.id,pairing_id:row.id,name:row.device_name,platform:"watchos",...(color?{watch_color:color}:{})},{onConflict:"pairing_id"});
  return json({status:"approved",deviceName:row.device_name,family:true,profileId:profile.id});
 }
 const CODE_WINDOW_MS=15*60*1000,CODE_MAX_FAILURES=10;
 function sixDigits(){const a=crypto.getRandomValues(new Uint32Array(1));return String(a[0]%1000000).padStart(6,"0")}
-async function approveRow(user:{id:string;email?:string},row:{id:string;device_name:string;kind:string}){
- if(row.kind==="family")return await approveFamily(user.id,row);
+async function approveRow(user:{id:string;email?:string},row:{id:string;device_name:string;kind:string},color:string|null=null){
+ if(row.kind==="family")return await approveFamily(user.id,row,color);
  if(!user.email)return json({error:"Email-based Supabase login is required for pairing"},400);
  // Claim the request before minting a login token: a new magic link invalidates the previous one, so a losing duplicate approve must not mint.
  const {data:claimed,error}=await admin.from("watch_pairing_requests").update({status:"approved",owner_id:user.id,login_token_hash:null}).eq("id",row.id).eq("status","pending").select("id");
@@ -39,7 +41,8 @@ async function approveRow(user:{id:string;email?:string},row:{id:string;device_n
  const token=link?.properties?.hashed_token;
  if(linkError||!token){await admin.from("watch_pairing_requests").update({status:"pending",owner_id:null}).eq("id",row.id).eq("status","approved");return json({error:"Unable to create watch session"},500)}
  await admin.from("watch_pairing_requests").update({login_token_hash:token}).eq("id",row.id).eq("status","approved");
- await admin.from("connected_devices").upsert({user_id:user.id,pairing_id:row.id,name:row.device_name,platform:"watchos"},{onConflict:"pairing_id"});
+ await admin.from("connected_devices").upsert({user_id:user.id,pairing_id:row.id,name:row.device_name,platform:"watchos",
+   ...(color?{watch_color:color}:{})},{onConflict:"pairing_id"});
  return json({status:"approved",deviceName:row.device_name});
 }
 Deno.serve(async req=>{
@@ -91,7 +94,7 @@ Deno.serve(async req=>{
    const id=String(p.id||""),secret=String(p.secret||"");
    const {data:row}=await admin.from("watch_pairing_requests").select("*").eq("id",id).maybeSingle();
    if(!row||row.secret_hash!==await hash(secret)||row.status!=="pending"||Date.parse(row.expires_at)<Date.now())return json({error:"This code has expired or was already used"},400);
-   return await approveRow(user,row);
+   return await approveRow(user,row,watchColor(p.color));
   }
   if(action==="approve_code"){
    const code=String(p.code||"").replace(/\D/g,"");
@@ -103,11 +106,17 @@ Deno.serve(async req=>{
     await admin.from("watch_pairing_code_attempts").insert({user_id:user.id});
     return json({error:"That code didn't match a watch. Check the 6 digits on the watch, or show a new code."},400);
    }
-   return await approveRow(user,row);
+   return await approveRow(user,row,watchColor(p.color));
   }
   if(action==="list"){
-   const {data,error}=await admin.from("connected_devices").select("id,name,platform,linked_at,last_seen_at,revoked_at").eq("user_id",user.id).is("revoked_at",null).order("linked_at",{ascending:false}).limit(50);
+   const {data,error}=await admin.from("connected_devices").select("id,name,platform,linked_at,last_seen_at,revoked_at,watch_color").eq("user_id",user.id).is("revoked_at",null).order("linked_at",{ascending:false}).limit(50);
    return error?json({error:"Unable to list"},500):json({devices:data||[]});
+  }
+  if(action==="set_color"){
+   const color=watchColor(p.color);if(!color)return json({error:"Choose one of the 6 watch colors"},400);
+   const {data,error}=await admin.from("connected_devices").update({watch_color:color}).eq("id",String(p.deviceId||"")).eq("user_id",user.id).is("revoked_at",null).select("id");
+   if(error)return json({error:"Unable to save color"},500);
+   return data?.length?json({watchColor:color}):json({error:"Device not found"},404);
   }
   if(action==="remove"){
    const deviceId=String(p.deviceId||"");

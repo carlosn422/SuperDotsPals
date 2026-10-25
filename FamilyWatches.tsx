@@ -6,8 +6,9 @@ import {usePlus} from './PlusStore';
 import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
 import FamilyTimeline,{RETENTION_DAYS} from './FamilyTimeline';
+import {SectionHeader,WatchColorSheet,WatchImage,WatchRow,colorName,isWatchColor} from './WatchArt';
 
-export type FamilyProfile={id:string;name:string;createdAt:string;lastSeenAt:string|null;connected:boolean;mood:string|null;moodAt:string|null};
+export type FamilyProfile={id:string;name:string;createdAt:string;lastSeenAt:string|null;connected:boolean;mood:string|null;moodAt:string|null;watchColor?:string|null};
 const purple='#6953CA',red='#C64F67';
 // Every mounted Family Watches list reloads when any screen adds or removes a profile.
 const listeners=new Set<()=>void>();
@@ -44,28 +45,31 @@ export function useFamilyProfiles(enabled=true){
 }
 
 // Family Watches section shown under Connected devices.
-export default function FamilyWatches({reloadKey}:{reloadKey:number}){
+export default function FamilyWatches({reloadKey,onAdd}:{reloadKey:number;onAdd?:()=>void}){
  const {profiles,slots,loading,error,load}=useFamilyProfiles();
+ const {isPlus,showPaywall}=usePlus();
  const [managing,setManaging]=useState<FamilyProfile|null>(null),[notice,setNotice]=useState('');
  useEffect(()=>{if(reloadKey)void load()},[reloadKey,load]);
+ const full=profiles.length>=slots;
  return <View style={{gap:10}}>
-  <Text style={styles.title}>Family Watches</Text>
-  <Text style={styles.sub}>Apple Watches set up with Family Setup link as their own mood-only profile under your account. Open MoodPals on the family watch and enter the code it shows above. {profiles.length}/{slots} used.</Text>
+  <SectionHeader title="Family Watches" action="Add Family Watch" disabled={full&&(isPlus||slots>1)} onAction={()=>full?showPaywall('family'):onAdd?.()}/>
+  <Text style={styles.sub}>Family Setup watches link as their own mood-only profile under your account. {profiles.length}/{slots} used.</Text>
   {notice?<Text style={[styles.sub,{color:'#2E8B57',fontWeight:'700'}]}>{notice}</Text>:null}
   {error?<Text style={[styles.sub,{color:red}]}>{error}</Text>:null}
-  {loading&&profiles.length===0?<ActivityIndicator color={purple}/>:null}
-  {!loading&&profiles.length===0&&!error?<Text style={styles.sub}>No family watches yet.</Text>:null}
-  {profiles.map(p=><TouchableOpacity key={p.id} style={styles.card} onPress={()=>{setNotice('');setManaging(p)}} accessibilityLabel={'Manage '+p.name}>
-   <Text style={{fontWeight:'800',color:'#271C49'}}>{p.name}</Text>
-   <Text style={styles.sub}>Mood-only · {p.mood?p.mood+' · ':''}{p.lastSeenAt?'Last seen '+new Date(p.lastSeenAt).toLocaleString():'Added '+new Date(p.createdAt).toLocaleDateString()}</Text>
-   <Text style={{color:purple,fontWeight:'800'}}>Manage ›</Text>
-  </TouchableOpacity>)}
+  <View style={[styles.card,{paddingVertical:6}]}>
+   {loading&&profiles.length===0?<ActivityIndicator color={purple}/>:null}
+   {!loading&&profiles.length===0&&!error?<Text style={[styles.sub,{paddingVertical:8}]}>No family watches linked yet</Text>:null}
+   {profiles.map((p,i)=><WatchRow key={p.id} last={i===profiles.length-1} color={isWatchColor(p.watchColor)?p.watchColor:null} name={shortProfileName(p.name)} title={p.name} label={'Manage '+p.name}
+    lines={['Linked to '+shortProfileName(p.name),'Mood-only family watch',p.connected?'':'Watch not linked',isWatchColor(p.watchColor)?'':'Choose Watch Color in Manage']} onPress={()=>{setNotice('');setManaging(p)}}/>)}
+  </View>
   {managing?<ManageFamilyProfile profile={managing} onClose={()=>setManaging(null)} onDeleted={async()=>{setManaging(null);await load();familyProfilesChanged();setNotice(managing.name+' was permanently removed.')}}/>:null}
  </View>;
 }
 
 export function ManageFamilyProfile({profile,onClose,onDeleted}:{profile:FamilyProfile;onClose:()=>void;onDeleted:()=>void|Promise<void>}){
  const [confirming,setConfirming]=useState(false),[typed,setTyped]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const [color,setColor]=useState(isWatchColor(profile.watchColor)?profile.watchColor:null),[recoloring,setRecoloring]=useState(false);
+ async function saveColor(c:NonNullable<typeof color>){await familyCall('set_color',{profileId:profile.id,color:c});setColor(c);familyProfilesChanged()}
  async function remove(){
   if(typed!=='DELETE'||busy)return;
   setBusy(true);setError('');
@@ -79,12 +83,16 @@ export function ManageFamilyProfile({profile,onClose,onDeleted}:{profile:FamilyP
  return <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={busy?undefined:onClose}>
   <ScrollView contentContainerStyle={{padding:22,gap:14}}>
    <TouchableOpacity disabled={busy} onPress={onClose}><Text style={{color:purple,fontWeight:'800'}}>‹ Back</Text></TouchableOpacity>
-   <Text style={styles.title}>{profile.name}</Text>
+   <View style={{alignItems:'center',gap:6}}><WatchImage color={color} name={shortProfileName(profile.name)} width={130}/><Text style={styles.title}>{profile.name}</Text></View>
    <View style={styles.card}>
+    <Text style={styles.sub}>Profile: {shortProfileName(profile.name)} (mood-only family watch)</Text>
+    <Text style={styles.sub}>Watch color: {color?colorName(color):'not chosen yet'}</Text>
     <Text style={styles.sub}>Mood-only family profile. No heart rate, HRV, sleep, activity or other Health data is collected.</Text>
     <Text style={styles.sub}>Latest mood: {profile.mood?profile.mood+' · '+new Date(profile.moodAt||'').toLocaleString():'none yet'}</Text>
     <Text style={styles.sub}>Watch: {profile.connected?'linked':'not linked'}{profile.lastSeenAt?' · last seen '+new Date(profile.lastSeenAt).toLocaleString():''}</Text>
    </View>
+   {profile.connected?<TouchableOpacity accessibilityRole="button" style={styles.button} onPress={()=>setRecoloring(true)}><Text style={styles.buttonText}>{color?'Change Watch Color':'Choose Watch Color'}</Text></TouchableOpacity>:null}
+   <WatchColorSheet visible={recoloring} name={shortProfileName(profile.name)} initial={color} onSave={saveColor} onClose={()=>setRecoloring(false)}/>
    {!confirming?<TouchableOpacity style={[styles.button,{backgroundColor:red}]} onPress={()=>setConfirming(true)}><Text style={styles.buttonText}>Remove Linked Profile</Text></TouchableOpacity>:
    <View style={[styles.card,{borderColor:'#F1C7D0'}]}>
     <Text style={{fontWeight:'900',color:red}}>Permanently remove {profile.name}?</Text>
