@@ -124,8 +124,16 @@ document.querySelectorAll('[data-join]').forEach(link => link.addEventListener('
   setTimeout(() => form.querySelector('input[name=email]').focus({ preventScroll: true }), 600);
 }));
 
-// Apple Watch mockups: Calm pal, matching the watch app's default screen.
+// Apple Watch mockups: Calm pal, matching the watch app's default screen, or real watch screens when data-watch-slides is set.
 document.querySelectorAll('[data-watch]').forEach(watch => {
+  const slides = (watch.dataset.watchSlides || '').split(',').filter(Boolean);
+  if (slides.length) {
+    watch.innerHTML = `<div class="band top"></div><div class="case"><div class="face">${slides.map((s, i) => `<img class="wslide${i ? '' : ' on'}" src="/img/watch/${s}.webp?v=1" alt="MoodPals Apple Watch ${s} screen">`).join('')}</div></div><div class="band bottom"></div>`;
+    let i = 0;
+    const imgs = watch.querySelectorAll('.wslide');
+    setInterval(() => { imgs[i].classList.remove('on'); i = (i + 1) % imgs.length; imgs[i].classList.add('on'); }, 2800);
+    return;
+  }
   watch.innerHTML = '<div class="band top"></div><div class="case"><div class="face"><span class="time"></span><img src="/img/mascots/disgust.webp" alt="Calm pal on Apple Watch"><div class="mood">Calm</div><div class="hint">Tap to change mood</div></div></div><div class="band bottom"></div>';
   const t = () => { const d = new Date(); watch.querySelector('.time').textContent = `${d.getHours() % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}`; };
   t(); setInterval(t, 30000);
