@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import {usePlus} from './PlusStore';
 import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
-import FamilyTimeline from './FamilyTimeline';
+import FamilyTimeline,{RETENTION_DAYS} from './FamilyTimeline';
 
 export type FamilyProfile={id:string;name:string;createdAt:string;lastSeenAt:string|null;connected:boolean;mood:string|null;moodAt:string|null};
 const purple='#6953CA',red='#C64F67';
@@ -255,7 +255,7 @@ export function FamilySwitcher({children,disabled=false,onAdd,focused=true}:{chi
    </View>
    {loading?<ActivityIndicator color={purple}/>:null}
    {error?<Text style={[styles.sub,{color:red}]}>{error}</Text>:null}
-   {!loading||moods.length?<FamilyTimeline key={profile.id} name={shortProfileName(profile.name)} moods={moods} reactions={reactions}/>:null}
+   {!loading||moods.length?<FamilyTimeline key={profile.id} name={shortProfileName(profile.name)} moods={moods} reactions={reactions} retentionDays={RETENTION_DAYS}/>:null}
   </View>}
  </View>;
 }

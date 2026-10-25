@@ -5,7 +5,7 @@ import {CIRCLE_MOODS,CircleMood,MOOD_TINTS} from './LittleSignalsData';
 import {MoodPalThumb} from './CircleComponents';
 
 export type TimelineMood={mood:string;occurred_at:string};
-export type TimelineReaction={id:string;mood:string;shared_at:string;reactor_name:string;emoji:string;reacted_at:string};
+export type TimelineReaction={share_id?:string;id:string;mood:string;shared_at:string;reactor_name:string;emoji:string;reacted_at:string};
 type Reaction={id:string;name:string;emoji:string;at:string};
 type MoodEvent={key:string;mood:CircleMood;at:string;reactions:Reaction[]};
 type Bubble={emoji:string;count:number;name:string;at:string};
@@ -23,7 +23,7 @@ const time=(iso:string)=>new Date(iso).toLocaleTimeString(undefined,{hour:'numer
 // Each journal mood is one event. Its reactions are those on the share made for that mood, grouped by share, never by emotion alone.
 export function buildMoodEvents(moods:TimelineMood[],reactions:TimelineReaction[]):MoodEvent[]{
  const shares=new Map<string,{mood:string;sharedAt:number;reactions:Reaction[]}>();
- for(const r of reactions){const key=r.mood.toLowerCase()+'|'+r.shared_at;const s=shares.get(key)||{mood:r.mood.toLowerCase(),sharedAt:Date.parse(r.shared_at),reactions:[]};s.reactions.push({id:r.id,name:r.reactor_name,emoji:r.emoji,at:r.reacted_at});shares.set(key,s)}
+ for(const r of reactions){const key=r.share_id||r.mood.toLowerCase()+'|'+r.shared_at;const s=shares.get(key)||{mood:r.mood.toLowerCase(),sharedAt:Date.parse(r.shared_at),reactions:[]};s.reactions.push({id:r.id,name:r.reactor_name,emoji:r.emoji,at:r.reacted_at});shares.set(key,s)}
  const used=new Set<string>();
  return moods.map(m=>{
   const at=Date.parse(m.occurred_at);let best:string|null=null,gap=Infinity;
@@ -74,24 +74,28 @@ function MoodReactionDetails({event,onBack}:{event:MoodEvent;onBack:()=>void}){
  </View>;
 }
 
-export default function FamilyTimeline({name,moods,reactions}:{name:string;moods:TimelineMood[];reactions:TimelineReaction[]}){
+// retentionDays limits how far back the day picker goes; omit it for no limit.
+export default function FamilyTimeline({name,moods,reactions,retentionDays,onDay}:{name:string;moods:TimelineMood[];reactions:TimelineReaction[];retentionDays?:number;onDay?:(start:Date)=>void}){
  const [dayOffset,setDayOffset]=useState(0),[openKey,setOpenKey]=useState<string|null>(null);
  const today=startOfDay(new Date());
- const days=Array.from({length:RETENTION_DAYS},(_,i)=>new Date(today.getTime()-(RETENTION_DAYS-1-i)*DAY_MS));
+ const maxOffset=retentionDays?retentionDays-1:Infinity;
+ const windowEnd=Math.floor(dayOffset/RETENTION_DAYS)*RETENTION_DAYS;
+ const days=Array.from({length:RETENTION_DAYS},(_,i)=>new Date(today.getTime()-(windowEnd+RETENTION_DAYS-1-i)*DAY_MS)).filter((_,i)=>windowEnd+RETENTION_DAYS-1-i<=maxOffset);
+ React.useEffect(()=>{onDay?.(new Date(today.getTime()-dayOffset*DAY_MS))},[dayOffset]);// eslint-disable-line react-hooks/exhaustive-deps
  const events=useMemo(()=>buildMoodEvents(moods,reactions),[moods,reactions]);
  const day=new Date(today.getTime()-dayOffset*DAY_MS),next=day.getTime()+DAY_MS;
  const dayEvents=events.filter(e=>{const t=Date.parse(e.at);return t>=day.getTime()&&t<next});
  const open=events.find(e=>e.key===openKey);
  if(open)return <MoodReactionDetails event={open} onBack={()=>setOpenKey(null)}/>;
- const step=(d:number)=>setDayOffset(o=>Math.min(RETENTION_DAYS-1,Math.max(0,o+d)));
+ const step=(d:number)=>setDayOffset(o=>Math.min(maxOffset,Math.max(0,o+d)));
  return <View style={{gap:12}}>
   <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
-   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Previous day" disabled={dayOffset>=RETENTION_DAYS-1} onPress={()=>step(1)} style={[st.back,dayOffset>=RETENTION_DAYS-1&&{opacity:.35}]}><Ionicons name="chevron-back" size={20} color={ink}/></TouchableOpacity>
-   <View style={{alignItems:'center',flex:1}}><Text numberOfLines={1} style={st.title}>{name}'s Day</Text><Text style={st.sub}>{day.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}</Text></View>
+   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Previous day" disabled={dayOffset>=maxOffset} onPress={()=>step(1)} style={[st.back,dayOffset>=maxOffset&&{opacity:.35}]}><Ionicons name="chevron-back" size={20} color={ink}/></TouchableOpacity>
+   <View style={{alignItems:'center',flex:1}}><Text numberOfLines={1} style={st.title}>{name==='You'?'Your':name+"'s"} Day</Text><Text style={st.sub}>{day.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}</Text></View>
    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next day" disabled={dayOffset===0} onPress={()=>step(-1)} style={[st.back,dayOffset===0&&{opacity:.35}]}><Ionicons name="chevron-forward" size={20} color={ink}/></TouchableOpacity>
   </View>
   <View style={{flexDirection:'row',gap:5}}>
-   {days.map((d,i)=>{const off=RETENTION_DAYS-1-i,sel=off===dayOffset;return <TouchableOpacity key={d.toISOString()} accessibilityRole="button" accessibilityState={{selected:sel}} accessibilityLabel={d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'})} onPress={()=>setDayOffset(off)} style={[st.dayChip,sel&&{backgroundColor:purple,borderColor:purple}]}>
+   {days.map((d,i)=>{const off=windowEnd+RETENTION_DAYS-1-i,sel=off===dayOffset;return <TouchableOpacity key={d.toISOString()} accessibilityRole="button" accessibilityState={{selected:sel}} accessibilityLabel={d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'})} onPress={()=>setDayOffset(off)} style={[st.dayChip,sel&&{backgroundColor:purple,borderColor:purple}]}>
     <Text style={[st.dayMonth,sel&&{color:'white'}]}>{d.toLocaleDateString(undefined,{month:'short'})}</Text>
     <Text style={[st.dayNum,sel&&{color:'white'}]}>{d.getDate()}</Text>
     {off===0?<Text style={[st.dayMonth,{color:sel?'white':purple}]}>Today</Text>:null}
