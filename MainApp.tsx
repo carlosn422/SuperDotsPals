@@ -69,6 +69,8 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  const [spiritualCheckin,setSpiritualCheckin]=useState<{mood:string;answers:Record<string,string>}|undefined>(undefined);
  const openAction=(view:'checkin'|'chat'|'history'|'spiritual'|'breathing')=>{if(view==='spiritual')setSpiritualCheckin(undefined);setActionDetail(null);setActionView(view);setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});};
  const [settingsPage,setSettingsPage]=useState<'main'|'watch'|'devices'|'health'|'notifications'|'privacy'|'help'|'circle'|'watchThemes'|'plus'|'account'|'delete'>('main');
+ // Each Settings sub-page opens at its top, not at the list's scroll position.
+ useEffect(()=>{settingsScroll.current?.scrollTo({y:0,animated:false})},[settingsPage]);
  const isGuest=useIsGuest();
  const circleUnread=useCircle().inbox.filter(n=>!n.read).length;
  const appleLink=useAppleLink();
