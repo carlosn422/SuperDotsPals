@@ -27,19 +27,24 @@ export default function MoreSheet({visible,items,onClose,onSelect}:{visible:bool
    Animated.timing(fade,{toValue:0,duration:DURATION,useNativeDriver:true})]).start(()=>{setMounted(false);onClose();after?.()});
  };
  const dismissRef=useRef(dismiss);dismissRef.current=dismiss;
- const pan=useRef(PanResponder.create({
-  onMoveShouldSetPanResponder:(_e,g)=>g.dy>6&&Math.abs(g.dy)>Math.abs(g.dx),
-  onPanResponderMove:(_e,g)=>{if(g.dy>0&&!closing.current)y.setValue(g.dy)},
-  onPanResponderRelease:(_e,g)=>{if(g.dy>90||g.vy>0.8)dismissRef.current();else Animated.spring(y,{toValue:0,bounciness:0,useNativeDriver:true}).start()},
- })).current;
+ const drag={
+  onMoveShouldSetPanResponder:(_e:unknown,g:{dx:number;dy:number})=>g.dy>6&&Math.abs(g.dy)>Math.abs(g.dx),
+  onMoveShouldSetPanResponderCapture:(_e:unknown,g:{dx:number;dy:number})=>g.dy>6&&Math.abs(g.dy)>Math.abs(g.dx),
+  onPanResponderTerminationRequest:()=>false,
+  onPanResponderMove:(_e:unknown,g:{dy:number})=>{if(g.dy>0&&!closing.current)y.setValue(g.dy)},
+  onPanResponderRelease:(_e:unknown,g:{dy:number;vy:number})=>{if(g.dy>90||g.vy>0.8)dismissRef.current();else Animated.spring(y,{toValue:0,bounciness:0,useNativeDriver:true}).start()},
+  onPanResponderTerminate:()=>{if(!closing.current)Animated.spring(y,{toValue:0,bounciness:0,useNativeDriver:true}).start()},
+ };
+ const pan=useRef(PanResponder.create(drag)).current;
+ const grab=useRef(PanResponder.create({...drag,onStartShouldSetPanResponder:()=>true})).current;
  return <Modal visible={mounted} transparent animationType="none" statusBarTranslucent onRequestClose={()=>dismiss()}>
   <View style={{flex:1,justifyContent:'flex-end'}}>
    <Animated.View style={[StyleSheet.absoluteFill,{backgroundColor:'rgba(22,16,44,0.38)',opacity:fade}]}>
     <Pressable style={{flex:1}} accessibilityRole="button" accessibilityLabel="Close More Menu" onPress={()=>dismiss()}/>
    </Animated.View>
    <Animated.View {...pan.panHandlers} accessibilityViewIsModal style={[st.sheet,{paddingBottom:Math.max(insets.bottom,16),transform:[{translateY:y}]}]}>
-    <View style={st.handle}/>
-    <View style={st.header}>
+    <View {...grab.panHandlers} style={st.dragZone}><View style={st.handle}/></View>
+    <View {...grab.panHandlers} style={st.header}>
      <Text style={st.title} accessibilityRole="header">More</Text>
      <TouchableOpacity style={st.closeTarget} onPress={()=>dismiss()} accessibilityRole="button" accessibilityLabel="Close More Menu">
       <View style={st.closeCircle}><Ionicons name="close" size={20} color={ink}/></View>
@@ -57,7 +62,8 @@ export default function MoreSheet({visible,items,onClose,onSelect}:{visible:bool
 
 const st=StyleSheet.create({
  sheet:{backgroundColor:'white',borderTopLeftRadius:28,borderTopRightRadius:28,paddingHorizontal:18,paddingTop:8,shadowColor:'#1E2A26',shadowOpacity:0.15,shadowRadius:18,shadowOffset:{width:0,height:-4},elevation:12},
- handle:{alignSelf:'center',width:40,height:5,borderRadius:3,backgroundColor:'#E2DDEC',marginBottom:6},
+ dragZone:{alignSelf:'stretch',alignItems:'center',paddingTop:2,paddingBottom:10},
+ handle:{width:40,height:5,borderRadius:3,backgroundColor:'#E2DDEC'},
  header:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:4},
  title:{fontSize:22,fontWeight:'900',color:ink},
  closeTarget:{width:44,height:44,alignItems:'center',justifyContent:'center',marginRight:-6},
