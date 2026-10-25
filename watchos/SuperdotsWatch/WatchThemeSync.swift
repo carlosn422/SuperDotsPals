@@ -341,6 +341,9 @@ final class WatchThemeSync: ObservableObject {
                 let verify=try JSONSerialization.data(withJSONObject:["token_hash":hash,"type":"magiclink"])
                 let session=try await request("/auth/v1/verify",method:"POST",body:verify,authenticated:false)
                 try loadSession(session)
+                // Mark the request claimed before pairingActive=false dismisses the pairing view and cancels this task.
+                let completed=try JSONSerialization.data(withJSONObject:["action":"complete","id":pairingId,"secret":pairingSecret])
+                _ = try? await request("/functions/v1/watch-pairing",method:"POST",body:completed)
                 setMoodOnly(obj["moodOnly"] as? Bool ?? false)
                 connected=true
                 sessionVerified=true
@@ -348,8 +351,6 @@ final class WatchThemeSync: ObservableObject {
                 storeSecret(pairingId,for:"watch_pairing_id")
                 pairingActive=false
                 WatchPhoneLink.shared.linked()
-                let completed=try JSONSerialization.data(withJSONObject:["action":"complete","id":pairingId,"secret":pairingSecret])
-                _ = try? await request("/functions/v1/watch-pairing",method:"POST",body:completed)
                 pairingCode="";pairingSecret=""
                 message="Watch connected to your MoodPals account."
                 // The root view owns refreshing after the pairing screen disappears.
