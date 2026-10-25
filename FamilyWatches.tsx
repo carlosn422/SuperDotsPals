@@ -60,7 +60,7 @@ export default function FamilyWatches({reloadKey}:{reloadKey:number}){
  </View>;
 }
 
-function ManageFamilyProfile({profile,onClose,onDeleted}:{profile:FamilyProfile;onClose:()=>void;onDeleted:()=>void|Promise<void>}){
+export function ManageFamilyProfile({profile,onClose,onDeleted}:{profile:FamilyProfile;onClose:()=>void;onDeleted:()=>void|Promise<void>}){
  const [confirming,setConfirming]=useState(false),[typed,setTyped]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
  async function remove(){
   if(typed!=='DELETE'||busy)return;
@@ -101,7 +101,7 @@ function ManageFamilyProfile({profile,onClose,onDeleted}:{profile:FamilyProfile;
 
 const styles=StyleSheet.create({title:{fontWeight:'900',fontSize:20,color:'#251C45'},sub:{fontSize:12,lineHeight:19,color:'#807694'},button:{backgroundColor:purple,borderRadius:14,padding:14,alignItems:'center'},buttonText:{color:'white',fontWeight:'900'},card:{backgroundColor:'white',borderRadius:16,padding:15,gap:8,borderWidth:1,borderColor:'#EDE9F3'},chip:{borderWidth:1,borderColor:'#E2DCEC',borderRadius:18,paddingHorizontal:14,paddingVertical:8,backgroundColor:'white'},input:{borderWidth:1,borderColor:'#E2DCEC',borderRadius:12,padding:12,fontWeight:'800',letterSpacing:2,color:'#271C49'}});
 
-const MASCOT_ID:Record<string,string>={joyful:'joy',calm:'disgust',disgust:'disgust',sad:'sadness',angry:'anger',anxious:'fear',tired:'tired'};
+export const MASCOT_ID:Record<string,string>={joyful:'joy',calm:'disgust',disgust:'disgust',sad:'sadness',angry:'anger',anxious:'fear',tired:'tired'};
 type MoodRow={mood:string;occurred_at:string};
 
 // Today switcher: "Me" shows the normal Today screen; a family watch shows its moods read-only.

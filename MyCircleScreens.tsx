@@ -3,7 +3,7 @@ import {Alert,Share,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import {CIRCLE_MOODS,CircleGroup,CircleMood,LITTLE_SIGNALS,MOOD_REACTIONS,MOOD_TINTS,SignalId,isToday,signalById,timeAgo,timeLeft} from './LittleSignalsData';
-import {CodePreview,friendName,uniqueAudience,useCircle} from './CircleStore';
+import {CodePreview,familyFriend,friendName,uniqueAudience,useCircle} from './CircleStore';
 import {usePlus} from './PlusStore';
 import {Avatar,CCard,CHeading,CRow,CT,Chip,EmptyState,MoodPalThumb,MoodTag,OfflineBanner,PrimaryButton,SampleDataNote,SignalBurst,SoftButton,ToggleRow,cs} from './CircleComponents';
 
@@ -386,7 +386,7 @@ function ReactionPicker({mood,value,onPick}:{mood:CircleMood;value?:string;onPic
 
 function FriendMood({id,nav}:{id:string;nav:Nav}){
  const store=useCircle();const fm=store.friendMoods.find(m=>m.id===id);
- const f=fm&&store.friends.find(x=>x.id===fm.friendId);
+ const f=fm&&(store.friends.find(x=>x.id===fm.friendId)||familyFriend(store,fm.friendId));
  if(!fm||!f||new Date(fm.expiresAt).getTime()<Date.now())return <Screen route={{name:'revoked'}} nav={nav}/>;
  return <>
   <CCard style={{alignItems:'center',gap:8,paddingVertical:20,backgroundColor:MOOD_TINTS[fm.mood].tint}}>

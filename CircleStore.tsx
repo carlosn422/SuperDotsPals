@@ -4,8 +4,8 @@ import {CIRCLE_PROTOTYPE,MOCK_CODE_LOOKUP,CIRCLE_MOODS,CircleGroup,CircleMood,DE
 
 // Local, in-memory sample data for reviewing My Circle without a backend (CIRCLE_PROTOTYPE=true).
 // The real feature uses useLiveCircleState (Supabase).
-export type State={friends:Friend[];groups:CircleGroup[];requests:FriendRequest[];myMoods:MySharedMood[];friendMoods:FriendSharedMood[];signals:ReceivedSignal[];invite:{code:string;expiresAt:string};prefs:NotificationPrefs;revokedFriendIds:string[];blockedNames:string[];sentSignals:{friendIds:string[];signal:SignalId;at:string}[];offline:boolean;widgetHideMood:boolean;inbox:ReactionNotice[]};
-const initial=():State=>({friends:MOCK_FRIENDS.map(f=>({...f})),groups:MOCK_GROUPS.map(g=>({...g,memberIds:[...g.memberIds],moods:[...g.moods]})),requests:MOCK_REQUESTS.map(r=>({...r})),myMoods:MOCK_MY_MOODS.map(m=>({...m,reactions:[...m.reactions]})),friendMoods:MOCK_FRIEND_MOODS.map(m=>({...m})),signals:MOCK_SIGNALS.map(s=>({...s})),invite:{...MOCK_INVITE},prefs:{...DEFAULT_PREFS},revokedFriendIds:[],blockedNames:[],sentSignals:[],offline:false,widgetHideMood:true,
+export type State={friends:Friend[];groups:CircleGroup[];requests:FriendRequest[];myMoods:MySharedMood[];friendMoods:FriendSharedMood[];signals:ReceivedSignal[];invite:{code:string;expiresAt:string};prefs:NotificationPrefs;revokedFriendIds:string[];blockedNames:string[];sentSignals:{friendIds:string[];signal:SignalId;at:string}[];offline:boolean;widgetHideMood:boolean;inbox:ReactionNotice[];familyNames:Record<string,{name:string;owner:string}>};
+const initial=():State=>({familyNames:{},friends:MOCK_FRIENDS.map(f=>({...f})),groups:MOCK_GROUPS.map(g=>({...g,memberIds:[...g.memberIds],moods:[...g.moods]})),requests:MOCK_REQUESTS.map(r=>({...r})),myMoods:MOCK_MY_MOODS.map(m=>({...m,reactions:[...m.reactions]})),friendMoods:MOCK_FRIEND_MOODS.map(m=>({...m})),signals:MOCK_SIGNALS.map(s=>({...s})),invite:{...MOCK_INVITE},prefs:{...DEFAULT_PREFS},revokedFriendIds:[],blockedNames:[],sentSignals:[],offline:false,widgetHideMood:true,
  inbox:MOCK_MY_MOODS.flatMap(m=>m.reactions.map((r,i)=>({id:m.id+'-'+r.friendId,moodId:m.id,mood:m.mood,friendId:r.friendId,name:MOCK_FRIENDS.find(f=>f.id===r.friendId)?.name||'A friend',emoji:r.emoji,at:r.at,read:i>0}))).sort((a,b)=>b.at.localeCompare(a.at))});
 const empty=():State=>({...initial(),friends:[],groups:[],requests:[],myMoods:[],friendMoods:[],signals:[],inbox:[]});
 
@@ -51,7 +51,8 @@ const useCircleState:()=>CircleStore=CIRCLE_PROTOTYPE?useMockCircleState:useLive
 const Ctx=createContext<CircleStore|null>(null);
 export function CircleProvider({children}:{children:React.ReactNode}){const store=useCircleState();return <Ctx.Provider value={store}>{children}</Ctx.Provider>;}
 export function useCircle(){const c=useContext(Ctx);if(!c)throw Error('useCircle must be used inside CircleProvider');return c;}
-export function friendName(store:CircleStore,id:string){return store.friends.find(f=>f.id===id)?.name||'Former friend';}
+export function familyFriend(store:CircleStore,id:string):Friend|undefined{const n=store.familyNames?.[id];return n?{id,name:n.name+' · '+n.owner+"'s family",initials:(n.name.trim()[0]||'?').toUpperCase(),color:'#B79CEB',since:'',muted:false,hideMyMoods:false}:undefined;}
+export function friendName(store:CircleStore,id:string){return store.friends.find(f=>f.id===id)?.name||familyFriend(store,id)?.name||'Former friend';}
 export function uniqueAudience(store:CircleStore,groupIds:string[],mood?:CircleMood){
  const ids=new Set<string>();
  store.groups.filter(g=>groupIds.includes(g.id)&&(!mood||g.moods.includes(mood))).forEach(g=>g.memberIds.forEach(m=>{const f=store.friends.find(x=>x.id===m);if(f&&!f.hideMyMoods)ids.add(m)}));

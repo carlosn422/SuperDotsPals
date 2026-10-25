@@ -18,7 +18,7 @@ const isNetworkError=(e:any)=>/network|fetch|timed? ?out|offline/i.test(String(e
 const deviceTimezone=()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'}catch{return 'UTC'}};
 const startOfToday=()=>{const d=new Date();d.setHours(0,0,0,0);return d.toISOString();};
 
-const emptyState=():State=>({friends:[],groups:[],requests:[],myMoods:[],friendMoods:[],signals:[],invite:{code:'',expiresAt:new Date().toISOString()},prefs:{...EMPTY_PREFS},revokedFriendIds:[],blockedNames:[],sentSignals:[],offline:false,widgetHideMood:true,inbox:[]});
+const emptyState=():State=>({familyNames:{},friends:[],groups:[],requests:[],myMoods:[],friendMoods:[],signals:[],invite:{code:'',expiresAt:new Date().toISOString()},prefs:{...EMPTY_PREFS},revokedFriendIds:[],blockedNames:[],sentSignals:[],offline:false,widgetHideMood:true,inbox:[]});
 const WIDGET_HIDE_MOOD_KEY='circle.widgetHideMood';
 // Read acknowledgements that couldn't reach the server yet; retried on every refresh.
 const PENDING_READS_KEY='circle.pendingReactionReads';
@@ -45,7 +45,7 @@ export function useLiveCircleState():CircleStore{
    const ensure=await supabase.rpc('circle_ensure_profile');if(ensure.error)throw ensure.error;
    const pendingReads=await loadPendingReads();
    if(pendingReads.length){const r=await supabase.rpc('circle_mark_reactions_read',{p_ids:pendingReads});if(!r.error)await savePendingReads([]);}
-   const [invite,friends,requests,groups,mine,shared,myReactions,signals,sent,prefs,inbox]=await Promise.all([
+   const [invite,friends,requests,groups,mine,shared,myReactions,signals,sent,prefs,inbox,family]=await Promise.all([
     supabase.rpc('circle_my_invite'),
     supabase.rpc('circle_friends'),
     supabase.rpc('circle_requests'),
@@ -57,8 +57,9 @@ export function useLiveCircleState():CircleStore{
     supabase.from('circle_signals').select('recipient_id,signal,sent_at').eq('sender_id',uid).gte('sent_at',startOfToday()),
     supabase.from('circle_notification_prefs').select('*').eq('user_id',uid).maybeSingle(),
     supabase.rpc('circle_reaction_inbox',{p_unread_only:false,p_limit:50}),
+    supabase.rpc('circle_family_names'),
    ]);
-   const failed=[invite,friends,requests,groups,mine,shared,myReactions,signals,sent,prefs,inbox].find(r=>r.error);
+   const failed=[invite,friends,requests,groups,mine,shared,myReactions,signals,sent,prefs,inbox,family].find(r=>r.error);
    if(failed?.error)throw failed.error;
    const now=Date.now();
    const reactionByMood=new Map<string,string>(((myReactions.data||[]) as any[]).map(r=>[r.shared_mood_id,r.emoji]));
@@ -78,6 +79,7 @@ export function useLiveCircleState():CircleStore{
     signals:((signals.data||[]) as any[]).map(x=>({id:x.id,friendId:x.sender_id,signal:x.signal as SignalId,at:x.sent_at,seen:!!x.seen_at})),
     sentSignals:((sent.data||[]) as any[]).map(x=>({friendIds:[x.recipient_id],signal:x.signal as SignalId,at:x.sent_at})),
     inbox:((inbox.data||[]) as any[]).map(n=>({id:n.id,moodId:n.shared_mood_id,mood:asMood(n.mood),friendId:n.reactor_id,name:n.reactor_name,emoji:n.emoji,at:n.reacted_at,read:!!n.read_at||pendingReads.includes(n.id)})),
+    familyNames:Object.fromEntries(((family.data||[]) as any[]).map(n=>[n.profile_id,{name:n.display_name,owner:n.owner_name}])),
     prefs:p?{invites:p.invites,approvals:p.approvals,signals:p.signals,reactions:p.reactions,quietHours:p.quiet_hours,showNamesInPreview:p.show_names_in_preview,showMoodOnLockScreen:p.show_mood_on_lock_screen}:s.prefs,
    }));
    const tz=deviceTimezone();
