@@ -7,6 +7,25 @@ const admin=createClient(url,service,{auth:{persistSession:false,autoRefreshToke
 async function hash(s:string){return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s)))).map(x=>x.toString(16).padStart(2,"0")).join("")}
 function random(){const a=crypto.getRandomValues(new Uint8Array(32));return Array.from(a).map(x=>x.toString(16).padStart(2,"0")).join("")}
 async function authed(req:Request){const bearer=req.headers.get("Authorization")||"";if(!bearer.startsWith("Bearer "))return null;const client=createClient(url,anon,{global:{headers:{Authorization:bearer}},auth:{persistSession:false,autoRefreshToken:false}});const {data:{user}}=await client.auth.getUser(bearer.slice(7));return user||null}
+// A Family Setup watch becomes its own mood-only sub-profile under the approving account.
+// The profile has no real email; an internal address exists only so the watch can get a session.
+async function approveFamily(ownerId:string,row:{id:string;device_name:string}){
+ const {data:isFamily}=await admin.rpc("is_family_profile",{uid:ownerId});
+ if(isFamily)return json({error:"A family watch can't add other watches"},403);
+ const {data:created,error:createError}=await admin.auth.admin.createUser({email:"family-"+crypto.randomUUID()+"@family.moodpals.invalid",email_confirm:true,user_metadata:{family_profile:true,owner_id:ownerId}});
+ const profile=created?.user;
+ if(createError||!profile?.email)return json({error:"Unable to create family profile"},500);
+ const discard=async()=>{await admin.auth.admin.deleteUser(profile.id)};
+ const {error:linkError}=await admin.from("family_profiles").insert({profile_user_id:profile.id,owner_id:ownerId,device_name:row.device_name||"Apple Watch"});
+ if(linkError){await discard();return json({error:linkError.code==="P0001"?linkError.message:"Unable to add family watch"},linkError.code==="P0001"?409:500)}
+ const {data:link,error:tokenError}=await admin.auth.admin.generateLink({type:"magiclink",email:profile.email});
+ const token=link?.properties?.hashed_token;
+ if(tokenError||!token){await discard();return json({error:"Unable to create watch session"},500)}
+ const {data:approved,error}=await admin.from("watch_pairing_requests").update({status:"approved",owner_id:profile.id,login_token_hash:token}).eq("id",row.id).eq("status","pending").select("id");
+ if(error||!approved?.length){await discard();return json({error:"This QR code has expired or was already used"},400)}
+ await admin.from("connected_devices").upsert({user_id:profile.id,pairing_id:row.id,name:row.device_name,platform:"watchos"},{onConflict:"pairing_id"});
+ return json({status:"approved",deviceName:row.device_name,family:true,profileId:profile.id});
+}
 Deno.serve(async req=>{
  if(req.method==="GET"){
   try {
@@ -24,7 +43,7 @@ Deno.serve(async req=>{
   const p=await req.json();const action=String(p.action||"");
   if(action==="start"){
    const secret=random();
-   const {data,error}=await admin.from("watch_pairing_requests").insert({secret_hash:await hash(secret),device_name:String(p.deviceName||"Apple Watch").slice(0,80)}).select("id,expires_at").single();
+   const {data,error}=await admin.from("watch_pairing_requests").insert({secret_hash:await hash(secret),device_name:String(p.deviceName||"Apple Watch").slice(0,80),kind:p.family===true?"family":"self"}).select("id,expires_at").single();
    if(error||!data)return json({error:"Could not create link"},500);
    return json({id:data.id,secret,expiresAt:data.expires_at});
   }
@@ -42,13 +61,14 @@ Deno.serve(async req=>{
     await admin.from("connected_devices").update({last_seen_at:new Date().toISOString()}).eq("pairing_id",id).eq("user_id",user.id);
     return json({status:"claimed"});
    }
-   return json({status:row.status,tokenHash:row.status==="approved"?row.login_token_hash:undefined});
+   return json({status:row.status,tokenHash:row.status==="approved"?row.login_token_hash:undefined,moodOnly:row.kind==="family"});
   }
   const user=await authed(req);if(!user)return json({error:"Sign in required"},401);
   if(action==="approve"){
    const id=String(p.id||""),secret=String(p.secret||"");
    const {data:row}=await admin.from("watch_pairing_requests").select("*").eq("id",id).maybeSingle();
    if(!row||row.secret_hash!==await hash(secret)||row.status!=="pending"||Date.parse(row.expires_at)<Date.now())return json({error:"This QR code has expired or was already used"},400);
+   if(row.kind==="family")return await approveFamily(user.id,row);
    if(!user.email)return json({error:"Email-based Supabase login is required for pairing"},400);
    const {data:link,error:linkError}=await admin.auth.admin.generateLink({type:"magiclink",email:user.email});
    const token=link?.properties?.hashed_token;
@@ -82,7 +102,8 @@ Deno.serve(async req=>{
   if(action==="status"){
    const {data}=await admin.from("connected_devices").select("revoked_at").eq("user_id",user.id).eq("pairing_id",String(p.id||"")).maybeSingle();
    if(data&&!data.revoked_at)await admin.from("connected_devices").update({last_seen_at:new Date().toISOString()}).eq("user_id",user.id).eq("pairing_id",String(p.id||""));
-   return json({active:!!data&&!data.revoked_at});
+   const {data:family}=await admin.from("family_profiles").select("profile_user_id").eq("profile_user_id",user.id).maybeSingle();
+   return json({active:!!data&&!data.revoked_at,moodOnly:!!family});
   }
   return json({error:"Unknown action"},400);
  }catch(e){console.error("Watch pairing error",String(e));return json({error:"Unable to complete pairing"},500)}

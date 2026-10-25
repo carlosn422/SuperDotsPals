@@ -4,6 +4,11 @@ import WatchKit
 
 /// Authenticated direct sync for the standalone watchOS prototype.
 /// The publishable key is public; tokens are stored in the user's Keychain.
+/// Family watch sessions are mood-only: no HealthKit collection or health controls.
+enum WatchProfile {
+    static var moodOnly: Bool { UserDefaults.standard.bool(forKey: "watch_mood_only") }
+}
+
 @MainActor
 final class WatchThemeSync: ObservableObject {
     static let shared = WatchThemeSync()
@@ -13,6 +18,7 @@ final class WatchThemeSync: ObservableObject {
     @Published var sessionVerified = false
     @Published var needsReconnect = false
     @Published var syncWarning: String? = nil
+    @Published private(set) var moodOnly = WatchProfile.moodOnly
     @Published var message = "Connect your account to sync mood and health readings."
     private let base = URL(string: "https://hzoauxxpvrgahlavxmvp.supabase.co")!
     private let publishableKey = "sb_publishable_pPPqosRo1SqwrbW-8MWURA_UxTED6Vs"
@@ -59,6 +65,14 @@ final class WatchThemeSync: ObservableObject {
         } catch {
             sessionVerified = false
             if case SyncError.server(let status, let endpoint, let detail) = error,
+               endpoint.contains("/auth/v1/user"), status == 401 || status == 403 || status == 404,
+               detail.contains("user_not_found") || detail.contains("does not exist") {
+                // The profile was removed on the server; drop credentials and queued events.
+                signOut()
+                message = "This watch's profile was removed."
+                return
+            }
+            if case SyncError.server(let status, let endpoint, let detail) = error,
                endpoint.contains("/auth/v1/token"),
                (status == 400 || status == 401),
                (detail.contains("refresh_token_not_found") || detail.contains("invalid_grant") || detail.contains("Invalid Refresh Token")) {
@@ -78,6 +92,7 @@ final class WatchThemeSync: ObservableObject {
                 let body = try JSONSerialization.data(withJSONObject:["action":"status","id":pairingId])
                 let statusData = try await request("/functions/v1/watch-pairing",method:"POST",body:body)
                 let status = try JSONSerialization.jsonObject(with:statusData) as? [String:Any]
+                if let flag = status?["moodOnly"] as? Bool { setMoodOnly(flag) }
                 if status?["active"] as? Bool == false {
                     // Only an explicit inactive response is a revocation.
                     signOut()
@@ -170,6 +185,7 @@ final class WatchThemeSync: ObservableObject {
         for key in ["watch_access","watch_refresh","watch_user","watch_pairing_id"] { storeSecret(nil,for:key) }
         accessToken = ""; refreshToken = ""; userId = ""; pairingId = ""; pairingSecret = ""; pairingURL = ""; pairingActive = false; pairingConnecting = false; connected = false; moodLoaded = false; sessionVerified = false; needsReconnect = false; syncWarning = nil
         WatchCircleStore.shared.reset()
+        setMoodOnly(false)
         message = "Disconnected. Your watch will show local defaults."
     }
 
@@ -201,7 +217,7 @@ final class WatchThemeSync: ObservableObject {
 
     /// Uploads a watch-computed score as a `computed` stress_score row. Idempotent via source_record_key.
     func uploadStress(score:Int, at:Date, key:String) async {
-        guard connected, !userId.isEmpty, !refreshToken.isEmpty else { return }
+        guard !moodOnly, connected, !userId.isEmpty, !refreshToken.isEmpty else { return }
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let row:[String:Any] = ["user_id":userId,"metric":"stress_score","value":score,"source":"computed",
@@ -280,11 +296,17 @@ final class WatchThemeSync: ObservableObject {
     private var pairingId = ""
     private var pairingSecret = ""
 
+    private func setMoodOnly(_ value: Bool) {
+        UserDefaults.standard.set(value, forKey: "watch_mood_only")
+        moodOnly = value
+    }
+
     func startPairing() async {
         busy=true
         defer {busy=false}
         do {
-            let body=try JSONSerialization.data(withJSONObject:["action":"start","deviceName":WKInterfaceDevice.current().name.isEmpty ? "Apple Watch" : WKInterfaceDevice.current().name])
+            let family=await WatchPhoneLink.shared.isFamilyWatch()
+            let body=try JSONSerialization.data(withJSONObject:["action":"start","family":family,"deviceName":WKInterfaceDevice.current().name.isEmpty ? "Apple Watch" : WKInterfaceDevice.current().name])
             let data=try await request("/functions/v1/watch-pairing",method:"POST",body:body,authenticated:false)
             guard let obj=try JSONSerialization.jsonObject(with:data) as? [String:Any],
               let id=obj["id"] as? String,let secret=obj["secret"] as? String else {throw SyncError.badResponse}
@@ -313,6 +335,7 @@ final class WatchThemeSync: ObservableObject {
                 let verify=try JSONSerialization.data(withJSONObject:["token_hash":hash,"type":"magiclink"])
                 let session=try await request("/auth/v1/verify",method:"POST",body:verify,authenticated:false)
                 try loadSession(session)
+                setMoodOnly(obj["moodOnly"] as? Bool ?? false)
                 connected=true
                 sessionVerified=true
                 needsReconnect=false

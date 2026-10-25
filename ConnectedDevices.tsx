@@ -3,6 +3,7 @@ import {View,Text,TouchableOpacity,ActivityIndicator,Alert,StyleSheet} from 'rea
 import {CameraView,useCameraPermissions} from 'expo-camera';
 import {supabase} from './supabase';
 import {useIsGuest} from './Account';
+import FamilyWatches from './FamilyWatches';
 
 type Device={id:string;name:string;platform:string;linked_at:string;last_seen_at:string|null;revoked_at:string|null};
 const purple='#6953CA';
@@ -16,6 +17,7 @@ const parse=(raw:string)=>{
 export default function ConnectedDevices(){
  const [devices,setDevices]=useState<Device[]>([]),[scan,setScan]=useState(false),[connecting,setConnecting]=useState(false),[loading,setLoading]=useState(false),[message,setMessage]=useState('');
  const [permission,requestPermission]=useCameraPermissions();
+ const [familyReload,setFamilyReload]=useState(0);
  const isGuest=useIsGuest();
  async function call(action:string,extra:Record<string,unknown>={}){
   const {data,error}=await supabase.functions.invoke('watch-pairing',{body:{action,...extra}});
@@ -32,10 +34,11 @@ export default function ConnectedDevices(){
   setConnecting(true);setMessage('');
   const began=Date.now();
   try{
-   await call('approve',details);
+   const approved=await call('approve',details);
    await new Promise(resolve=>setTimeout(resolve,Math.max(0,3000-(Date.now()-began))));
    await load();
-   setMessage('Apple Watch linked successfully.');
+   if(approved?.family){setFamilyReload(n=>n+1);setMessage('Family watch added as a mood-only profile.')}
+   else setMessage('Apple Watch linked successfully.');
   }catch(e:any){Alert.alert('Unable to link watch',e.message)}
   finally{setConnecting(false)}
  }
@@ -51,6 +54,7 @@ export default function ConnectedDevices(){
   {message?<Text style={styles.sub}>{message}</Text>:null}
   <TouchableOpacity onPress={()=>void load()}><Text style={{color:purple,fontWeight:'700'}}>Refresh device list ↻</Text></TouchableOpacity>
   {devices.length===0?<Text style={styles.sub}>No connected watches yet.</Text>:devices.map(d=><View key={d.id} style={styles.card}><Text style={{fontWeight:'800',color:'#271C49'}}>{d.name?.trim()||'Apple Watch'}</Text><Text style={styles.sub}>{d.platform==='watchos'?'Apple Watch · ':''}{d.last_seen_at?'Last seen '+new Date(d.last_seen_at).toLocaleString():'Paired '+new Date(d.linked_at).toLocaleDateString()}</Text><TouchableOpacity onPress={()=>void remove(d)}><Text style={{color:'#C64F67',fontWeight:'800'}}>Remove Device</Text></TouchableOpacity></View>)}
+  {!isGuest?<FamilyWatches reloadKey={familyReload}/>:null}
  </View>;
 }
 const styles=StyleSheet.create({title:{fontWeight:'900',fontSize:20,color:'#251C45'},sub:{fontSize:12,lineHeight:19,color:'#807694'},button:{backgroundColor:purple,borderRadius:14,padding:14,alignItems:'center'},buttonText:{color:'white',fontWeight:'900'},card:{backgroundColor:'white',borderRadius:16,padding:15,gap:10,borderWidth:1,borderColor:'#EDE9F3'}});

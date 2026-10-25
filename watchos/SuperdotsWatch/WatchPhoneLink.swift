@@ -12,6 +12,16 @@ final class WatchPhoneLink: NSObject, WCSessionDelegate {
         WCSession.default.activate()
     }
 
+    /// A Family Setup watch has no paired iPhone of its own, so the MoodPals companion is never installed.
+    func isFamilyWatch() async -> Bool {
+        guard WCSession.isSupported() else { return true }
+        for _ in 0..<20 where WCSession.default.activationState != .activated {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        let session = WCSession.default
+        return session.activationState == .activated && !session.isCompanionAppInstalled
+    }
+
     func offer(id: String, secret: String) {
         pending = ["pairId": id, "pairSecret": secret]
         send()

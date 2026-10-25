@@ -139,18 +139,22 @@ struct ContentView: View {
                         Text(shownMood).font(.headline)
                         Text(store.moodFromHealth(at: context.date) ? "From your heart data" : "Tap to change mood").font(.caption2).foregroundStyle(.secondary)
                         }
-                        StressSummary(reading: store.stress, calibrating: store.stressCalibrating, theme: store.theme)
+                        if !sync.moodOnly {
+                            StressSummary(reading: store.stress, calibrating: store.stressCalibrating, theme: store.theme)
+                        }
                         HStack(spacing: 6) {
-                            Button {
-                                measuring = true
-                            } label: {
-                                Label("Measure now", systemImage: "heart.circle.fill")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .padding(.horizontal, 10)
-                                    .frame(height: 26)
-                                    .background(Capsule().fill(purple))
+                            if !sync.moodOnly {
+                                Button {
+                                    measuring = true
+                                } label: {
+                                    Label("Measure now", systemImage: "heart.circle.fill")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .padding(.horizontal, 10)
+                                        .frame(height: 26)
+                                        .background(Capsule().fill(purple))
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                             Button { choosingTheme = true } label: {
                                 Circle().fill(purple).frame(width: 20, height: 20)
                                     .overlay(Circle().stroke(.white, lineWidth: 1.5))
@@ -209,7 +213,7 @@ struct ContentView: View {
             #if DEBUG && targetEnvironment(simulator)
             await SimulatorDemo.seedHealthIfNeeded()
             #endif
-            if await HealthStressMonitor.shared.requestAuthorization() {
+            if !sync.moodOnly, await HealthStressMonitor.shared.requestAuthorization() {
                 HealthStressMonitor.shared.startObserving()
                 await HealthStressMonitor.shared.recompute(upload: sync.connected)
             }
