@@ -28,7 +28,7 @@ Deno.serve(async req=>{
     const device=(devices||[]).find(d=>d.user_id===r.profile_user_id),mood=(moods||[]).find(m=>m.user_id===r.profile_user_id);
     return {id:r.profile_user_id,name:r.device_name,createdAt:r.created_at,lastSeenAt:device?.last_seen_at??null,connected:!!device,mood:mood?.mood??null,moodAt:mood?.occurred_at??null};
    });
-   return json({profiles,slots:plus===true?5:1});
+   return json({profiles,slots:plus===true?4:1});
   }
   if(action==="remove"){
    const id=String(p.profileId||"");

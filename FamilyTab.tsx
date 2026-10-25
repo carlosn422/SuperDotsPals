@@ -2,6 +2,7 @@ import React,{useCallback,useEffect,useState} from 'react';
 import {View,Text,TouchableOpacity,ActivityIndicator,Switch,StyleSheet} from 'react-native';
 import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
+import {usePlus} from './PlusStore';
 import {useFamilyProfiles,ManageFamilyProfile,familyProfilesChanged,MASCOT_ID,type FamilyProfile} from './FamilyWatches';
 
 type MoodRow={mood:string;occurred_at:string};
@@ -56,6 +57,8 @@ function FamilyCard({profile,groups,onManage}:{profile:FamilyProfile;groups:Grou
 
 export default function FamilyTab({onAdd}:{onAdd:()=>void}){
  const {profiles,slots,loading,error,load}=useFamilyProfiles();
+ const {isPlus,showPaywall}=usePlus();
+ const full=profiles.length>=slots;
  const [groups,setGroups]=useState<Group[]>([]),[managing,setManaging]=useState<FamilyProfile|null>(null),[notice,setNotice]=useState('');
  useEffect(()=>{void supabase.from('circle_groups').select('id,name,allowed_moods').order('created_at').then(({data})=>setGroups((data as Group[])||[]))},[profiles.length]);
  return <View style={{gap:14}}>
@@ -70,6 +73,7 @@ export default function FamilyTab({onAdd}:{onAdd:()=>void}){
    <TouchableOpacity style={styles.button} onPress={onAdd} accessibilityRole="button"><Text style={{color:'white',fontWeight:'800'}}>Add a family watch</Text></TouchableOpacity>
   </View>:null}
   {profiles.map(p=><FamilyCard key={p.id} profile={p} groups={groups} onManage={()=>{setNotice('');setManaging(p)}}/>)}
+  {profiles.length>0?<TouchableOpacity style={[styles.button,{alignSelf:'center'},full&&isPlus&&{opacity:0.5}]} disabled={full&&isPlus} accessibilityRole="button" onPress={()=>full?showPaywall('family'):onAdd()}><Text style={{color:'white',fontWeight:'800'}}>{full&&isPlus?'All '+slots+' family watches used':'Add another family watch'}</Text></TouchableOpacity>:null}
   {managing?<ManageFamilyProfile profile={managing} onClose={()=>setManaging(null)} onDeleted={async()=>{setManaging(null);await load();familyProfilesChanged();setNotice(managing.name+' was permanently removed.')}}/>:null}
  </View>;
 }

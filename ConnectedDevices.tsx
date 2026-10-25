@@ -4,6 +4,7 @@ import {CameraView,useCameraPermissions} from 'expo-camera';
 import {supabase} from './supabase';
 import {useIsGuest} from './Account';
 import FamilyWatches,{familyProfilesChanged} from './FamilyWatches';
+import {usePlus} from './PlusStore';
 
 type Device={id:string;name:string;platform:string;linked_at:string;last_seen_at:string|null;revoked_at:string|null};
 const purple='#6953CA';
@@ -19,6 +20,7 @@ export default function ConnectedDevices(){
  const [permission,requestPermission]=useCameraPermissions();
  const [familyReload,setFamilyReload]=useState(0);
  const isGuest=useIsGuest();
+ const {isPlus,showPaywall}=usePlus();
  async function call(action:string,extra:Record<string,unknown>={}){
   const {data,error}=await supabase.functions.invoke('watch-pairing',{body:{action,...extra}});
   if(error||data?.error)throw Error(data?.error||error?.message||'Connection failed');
@@ -39,7 +41,10 @@ export default function ConnectedDevices(){
    await load();
    if(approved?.family){setFamilyReload(n=>n+1);familyProfilesChanged();setMessage('Family watch added as a mood-only profile.')}
    else setMessage('Apple Watch linked successfully.');
-  }catch(e:any){Alert.alert('Unable to link watch',e.message)}
+  }catch(e:any){
+   if(!isPlus&&/Family watch limit/.test(e.message||'')){setMessage("MoodPals Free includes 1 family watch. Upgrade to Plus for up to 4, then scan the watch's QR code again.");showPaywall('family')}
+   else Alert.alert('Unable to link watch',e.message);
+  }
   finally{setConnecting(false)}
  }
  async function remove(device:Device){Alert.alert('Remove device?',device.name+' will be permanently removed from your connected devices. It will need a new QR code to link again. Existing access tokens may remain valid until they expire.',[{text:'Cancel',style:'cancel'},{text:'Remove Device',style:'destructive',onPress:()=>{void (async()=>{setLoading(true);try{await call('remove',{deviceId:device.id});setDevices(current=>current.filter(d=>d.id!==device.id));await load()}catch(e:any){Alert.alert('Removal failed',e.message)}finally{setLoading(false)}})()}}])}

@@ -10,6 +10,7 @@ const BENEFITS:{icon:React.ComponentProps<typeof Ionicons>['name'];text:string}[
  {icon:'stats-chart',text:'Advanced wellness trends and full history'},
  {icon:'color-palette',text:'Extra customization for app and watch'},
  {icon:'people',text:'Expanded private circles'},
+ {icon:'watch',text:'Up to 4 family watches'},
  {icon:'sparkles',text:'Up to 100 AI reflections each month'},
 ];
 const TERMS='Payment is charged to your Apple Account when you confirm. The subscription renews automatically unless cancelled at least 24 hours before the end of the current period. Manage or cancel any time in your Apple Account settings.';
