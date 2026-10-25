@@ -9,6 +9,8 @@ struct ContentView: View {
     @State private var choosingMood = false
     @State private var moodPage = 0
     @State private var choosingTheme = false
+    @ObservedObject private var circle = WatchCircleStore.shared
+    @State private var showingCircle = false
 
     private let moods = ["Joyful", "Calm", "Sad", "Angry", "Anxious", "Tired"]
     private var purple: Color { store.theme.accent }
@@ -24,10 +26,13 @@ struct ContentView: View {
     private func selectMood(_ mood: String) {
         choosingMood = false
         store.setMood(mood, at: Date())
+        // Only a mood picked here notifies the Circle; sync and restore never do.
+        circle.recordMoodChange(mood)
         WKInterfaceDevice.current().play(.click)
         Task {
             do { try await sync.submitMood(mood, store: store) }
             catch { sync.message = "Mood could not sync. Please retry." }
+            await circle.flushMoodShares()
         }
     }
 
@@ -152,6 +157,9 @@ struct ContentView: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel("Theme colour \(store.theme.label). Tap to change.")
+                            if sync.connected {
+                                CircleButton(unread: circle.unread.count, accent: purple) { showingCircle = true }
+                            }
                         }
                         Spacer(minLength: 0)
                     }
@@ -172,6 +180,26 @@ struct ContentView: View {
         }
         .sheet(isPresented: $choosingTheme) {
             NavigationStack { WatchThemePicker() }.environmentObject(store)
+        }
+        .sheet(isPresented: $showingCircle) {
+            NavigationStack { WatchCircleList() }
+        }
+        .overlay {
+            ZStack {
+                if let reaction = circle.floating {
+                    FloatingReactionView(reaction: reaction, accent: purple)
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeInOut(duration: WatchCircleStore.fadeDuration), value: circle.floating?.id)
+            .allowsHitTesting(false)
+        }
+        // Circle reactions only float while the app is open in the foreground.
+        .onChange(of: scenePhase == .active && sync.connected && !sync.pairingActive, initial: true) { _, isActive in
+            circle.setActive(isActive)
+        }
+        .onChange(of: choosingMood || measuring || choosingTheme || showingCircle || store.applyingTheme != nil, initial: true) { _, covered in
+            circle.hold = covered
         }
         .task {
             #if DEBUG && targetEnvironment(simulator)

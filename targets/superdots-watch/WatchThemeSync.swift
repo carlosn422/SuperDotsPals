@@ -169,6 +169,7 @@ final class WatchThemeSync: ObservableObject {
     func signOut() {
         for key in ["watch_access","watch_refresh","watch_user","watch_pairing_id"] { storeSecret(nil,for:key) }
         accessToken = ""; refreshToken = ""; userId = ""; pairingId = ""; pairingSecret = ""; pairingURL = ""; pairingActive = false; pairingConnecting = false; connected = false; moodLoaded = false; sessionVerified = false; needsReconnect = false; syncWarning = nil
+        WatchCircleStore.shared.reset()
         message = "Disconnected. Your watch will show local defaults."
     }
 
@@ -334,7 +335,18 @@ final class WatchThemeSync: ObservableObject {
         }
     }
 
+    // Concurrent renewals would spend the same rotating refresh token twice.
+    private var renewing: Task<Void, Error>?
+
     private func renewIfNeeded() async throws {
+        if let renewing { return try await renewing.value }
+        let task = Task { try await self.renewSession() }
+        renewing = task
+        defer { renewing = nil }
+        try await task.value
+    }
+
+    private func renewSession() async throws {
         guard !refreshToken.isEmpty else { throw SyncError.notSignedIn }
         let payload = try JSONSerialization.data(withJSONObject:["refresh_token":refreshToken])
         let response = try await request("/auth/v1/token?grant_type=refresh_token",method:"POST",body:payload,authenticated:false)
@@ -351,6 +363,18 @@ final class WatchThemeSync: ObservableObject {
         storeSecret(access,for:"watch_access")
         storeSecret(refresh,for:"watch_refresh")
         storeSecret(id,for:"watch_user")
+    }
+
+    /// Calls a Postgres RPC as the signed-in user, renewing the session once if the access token expired.
+    func rpc(_ name: String, _ params: [String: Any]) async throws -> Data {
+        guard connected, !refreshToken.isEmpty else { throw SyncError.notSignedIn }
+        let body = try JSONSerialization.data(withJSONObject: params)
+        let path = "/rest/v1/rpc/\(name)"
+        do { return try await request(path, method: "POST", body: body) }
+        catch SyncError.server(401, _, _) {
+            try await renewIfNeeded()
+            return try await request(path, method: "POST", body: body)
+        }
     }
 
     private func request(_ path: String,method: String,body: Data? = nil,authenticated: Bool = true,extraHeaders:[String:String] = [:]) async throws -> Data {
