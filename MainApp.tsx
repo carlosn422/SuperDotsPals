@@ -16,6 +16,7 @@ import {WellnessToday,WellnessActions,WellnessTrends,WellnessHealth,WellnessSett
 import {WatchThemesCard,SettingsItem} from './SettingsComponents';
 import {APP_THEME} from './MoodMascot';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import MoreSheet,{type MoreItem} from './MoreSheet';
 import * as Notifications from 'expo-notifications';
 import {Linking} from 'react-native';
 import {CircleProvider,useCircle} from './CircleStore';
@@ -33,7 +34,17 @@ import Svg, { Circle, Line, Path, Rect, Defs, LinearGradient, Stop, Polygon } fr
 type Tab = 'Today' | 'Circle' | 'Family' | 'Actions' | 'Trends' | 'Health' | 'Settings';
 type Period = 'Day' | 'Week' | 'Month' | 'Year';
 const C = { ink:APP_THEME.ink, muted:APP_THEME.muted, green:APP_THEME.primary, deep:APP_THEME.primary, surface:APP_THEME.surface, bg:APP_THEME.background, mint:APP_THEME.primarySoft, peach:'#FFF0DE', orange:'#F4A570', lilac:APP_THEME.primarySoft, purple:APP_THEME.primary, line:APP_THEME.border, red:'#EC7D8C' };
-const tabs: {name:Tab;icon:'home'|'people'|'watch'|'sparkles'|'stats-chart'|'heart'|'settings';outline:'home-outline'|'people-outline'|'watch-outline'|'sparkles-outline'|'stats-chart-outline'|'heart-outline'|'settings-outline'}[] = [{name:'Today',icon:'home',outline:'home-outline'},{name:'Circle',icon:'people',outline:'people-outline'},{name:'Family',icon:'watch',outline:'watch-outline'},{name:'Actions',icon:'sparkles',outline:'sparkles-outline'},{name:'Trends',icon:'stats-chart',outline:'stats-chart-outline'},{name:'Health',icon:'heart',outline:'heart-outline'},{name:'Settings',icon:'settings',outline:'settings-outline'}];
+const tabs: {name:Tab}[] = [{name:'Today'},{name:'Circle'},{name:'Family'},{name:'Settings'}];
+type MorePage='Actions'|'Health'|'Trends';
+const NAV_ITEMS=tabs.length+1;
+const MORE_ITEMS:MoreItem[]=[
+ {key:'Actions',title:'Actions',detail:'Check-ins, breathing, habits and chat',icon:'play'},
+ {key:'Health',title:'Health',detail:'Heart, sleep and activity readings',icon:'heart'},
+ {key:'Trends',title:'Trends',detail:'Mood and stress history',icon:'bar-chart'},
+ {key:'plus',title:'Subscription',detail:'MoodPals Plus and Free plans',icon:'star'},
+ {key:'help',title:'Help & Support',detail:'FAQs and troubleshooting',icon:'help-circle'},
+ {key:'privacy',title:'Privacy',detail:'Privacy & Data',icon:'shield-checkmark'},
+];
 
 function Card({children,style}: {children:React.ReactNode;style?:any}) { return <View style={[s.card,style]}>{children}</View>; }
 function Chip({label,active,onPress}: {label:string;active:boolean;onPress:()=>void}) { return <TouchableOpacity onPress={onPress} style={[s.chip,active&&s.chipActive]}><Text style={[s.chipText,active&&s.chipTextActive]}>{label}</Text></TouchableOpacity>; }
@@ -47,6 +58,8 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  const activePosition=useRef(new Animated.Value(0)).current;
  const [navWidth,setNavWidth]=useState(0);
  const [tab,setTab]=useState<Tab>('Today');
+ const [moreScreen,setMoreScreen]=useState<MorePage|null>(null);
+ const [moreOpen,setMoreOpen]=useState(false);
  const actionScroll=useRef<ScrollView>(null);
  const settingsScroll=useRef<ScrollView>(null);
  const [actionDetail,setActionDetail]=useState<'water'|'caffeine'|null>(null);
@@ -125,7 +138,9 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  const [companion,setCompanion]=useState<'happy'|'sleepy'>('happy');
  const [seconds,setSeconds]=useState(60);
  useEffect(()=>{if(!breathing)return;const id=setInterval(()=>setSeconds(v=>{if(v<=1){setBreathing(false);return 60;}return v-1;}),1000);return()=>clearInterval(id);},[breathing]);
- const go=(t:Tab)=>{const index=tabs.findIndex(item=>item.name===t);if(index<0)return;pager.current?.scrollTo({x:index*pageWidth,animated:true});setTab(t);setPeriod('Day');setSettingsPage('main');Animated.timing(activePosition,{toValue:index,duration:250,useNativeDriver:true}).start();};
+ const go=(t:Tab)=>{setPeriod('Day');setSettingsPage('main');if(t==='Actions'||t==='Health'||t==='Trends'){setMoreScreen(t);Animated.timing(activePosition,{toValue:NAV_ITEMS-1,duration:250,useNativeDriver:true}).start();return;}const index=tabs.findIndex(item=>item.name===t);if(index<0)return;setMoreScreen(null);pager.current?.scrollTo({x:index*pageWidth,animated:true});setTab(t);Animated.timing(activePosition,{toValue:index,duration:250,useNativeDriver:true}).start();};
+ const closeMorePage=()=>{setMoreScreen(null);Animated.timing(activePosition,{toValue:Math.max(0,tabs.findIndex(x=>x.name===tab)),duration:250,useNativeDriver:true}).start();};
+ const pickMore=(key:string)=>{if(key==='plus'||key==='help'||key==='privacy'){go('Settings');setSettingsPage(key);}else go(key as MorePage);};
  const onPageSettled=(event:NativeSyntheticEvent<NativeScrollEvent>)=>{
   const index=Math.max(0,Math.min(tabs.length-1,Math.round(event.nativeEvent.contentOffset.x/pageWidth)));
   setTab(tabs[index].name);
@@ -163,20 +178,11 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
 
  return <View style={[s.safe,{paddingTop:Platform.OS==='ios'?insets.top:StatusBar.currentHeight || 0}]}><StatusBar barStyle="dark-content" backgroundColor={C.bg}/>
   <View style={s.top}></View>
+  <View style={{flex:1}}>
   <ScrollView ref={pager} horizontal pagingEnabled bounces={false} showsHorizontalScrollIndicator={false} scrollEventThrottle={16} onMomentumScrollEnd={onPageSettled} directionalLockEnabled style={{flex:1}} keyboardShouldPersistTaps="handled">
   <View key="Today" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><FamilySwitcher disabled={isGuest}><WellnessToday socialCard={<LittleSignalsTodayCard onOpenSignals={()=>setCircleSheet([{name:'today'}])} onSend={()=>setCircleSheet([{name:'send'}])}/>} companion={shownMood} accent={colors.accent} water={water} caffeine={coffee} mood={mood} onCheckin={()=>{go('Actions');openAction('checkin')}} onChat={()=>{go('Actions');openAction('chat')}} onActions={()=>{go('Actions');setActionView(null);setActionDetail('water')}} onCaffeine={()=>{go('Actions');setActionView(null);setActionDetail('caffeine')}} onJournal={()=>{go('Actions');openAction('history')}} onAddWater={()=>void quickAddHabit('water')} onAddCaffeine={()=>void quickAddHabit('caffeine')} addingWater={quickAdding.water} addingCaffeine={quickAdding.caffeine}/></FamilySwitcher></ScrollView></View>
   <View key="Circle" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">{isGuest?<AccountRequired accent={colors.accent} backLabel="Today" onBack={()=>go('Today')} onCreate={()=>{go('Settings');setSettingsPage('account')}}/>:<CircleNavigator exitLabel="Today" onExit={()=>go('Today')} mood={mood}/>}</ScrollView></View>
   <View key="Family" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>{isGuest?<AccountRequired accent={colors.accent} backLabel="Today" onBack={()=>go('Today')} onCreate={()=>{go('Settings');setSettingsPage('account')}}/>:<FamilyTab onAdd={()=>{go('Settings');setSettingsPage('devices')}}/>}</ScrollView></View>
-  <View key="Actions" style={{width:pageWidth,flex:1}}><ScrollView ref={actionScroll} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-  {actionDetail||actionView?<TouchableOpacity onPress={()=>{setActionView(null);setActionDetail(null);actionScroll.current?.scrollTo({y:0,animated:true});}} style={{flexDirection:'row',alignItems:'center',gap:8,paddingVertical:9}}><Ionicons name="arrow-back" size={20} color={colors.accent}/><Text style={{color:colors.accent,fontWeight:'800'}}>All actions</Text></TouchableOpacity>:null}
-  {actionDetail?<HabitDetails habit={actionDetail} onBack={()=>{setActionDetail(null);actionScroll.current?.scrollTo({y:0,animated:true})}} onSaved={(habit,n)=>{if(habit==='water')setWater(n);else setCoffee(n)}}/>:
-  actionView==='spiritual'?<SpiritualReading key={actionVersion} initialCheckin={spiritualCheckin}/>:
-  actionView==='breathing'?<BreathingStudio key={actionVersion} accent={colors.accent} tint={colors.pale}/>:
-  actionView?<WellnessCompanion key={actionVersion} onShareWithCircle={m=>{const cm=CIRCLE_MOODS.find(x=>x.toLowerCase()===m.toLowerCase());if(cm)setCircleSheet([{name:'share',mood:cm}]);}} initialView={actionView as 'checkin'|'chat'|'history'} companion={shownMood} onMoodSaved={saveMood} onWizardNavigate={()=>actionScroll.current?.scrollTo({y:0,animated:false})} onCheckinDone={()=>{setActionView(null);go('Today');}} onOpenInsights={()=>{setActionView(null);go('Trends');}} onFindVerse={(selectedMood,answers)=>{setSpiritualCheckin({mood:selectedMood,answers});setActionView('spiritual');setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});}} onAction={a=>{if(a==='breathing')openAction('breathing');else if(a==='water')void quickAddHabit('water');else if(a==='trends'){setActionView(null);go('Trends')}else{setActionView(null);go('Settings');setSettingsPage('notifications')}}} color={colors.accent}/>:
-  <WellnessActions companion={shownMood} accent={colors.accent} water={water} caffeine={coffee} onCaffeine={()=>{setActionView(null);setActionDetail('caffeine');actionScroll.current?.scrollTo({y:0,animated:true})}} onWater={()=>{setActionView(null);setActionDetail('water');actionScroll.current?.scrollTo({y:0,animated:true})}} onSpiritual={()=>openAction('spiritual')} onChat={()=>openAction('chat')} onMood={()=>openAction('checkin')} onJournal={()=>openAction('history')} onBreathing={()=>openAction('breathing')}/>}
-</ScrollView></View>
-  <View key="Trends" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><WellnessTrends companion={shownMood} accent={colors.accent} period={period} onPeriod={setPeriod} mood={mood}/><WellnessReportExport/></ScrollView></View>
-  <View key="Health" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><WellnessHealth companion={shownMood} accent={colors.accent} onChat={()=>{go('Actions');openAction('chat')}} onPermissions={()=>{go('Settings');setSettingsPage('health')}}/></ScrollView></View>
   <View key="Settings" style={{width:pageWidth,flex:1}}><ScrollView ref={settingsScroll} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
    {settingsPage==='main'?<>
     <WellnessSettingsIntro companion={shownMood} accent={colors.accent}/>
@@ -206,21 +212,37 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
    </>}
   </ScrollView></View>
   </ScrollView>
+  <View pointerEvents={moreScreen?'auto':'none'} style={[StyleSheet.absoluteFill,{backgroundColor:C.bg,display:moreScreen?'flex':'none'}]}>
+  <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Back to '+tab} onPress={closeMorePage} style={{flexDirection:'row',alignItems:'center',alignSelf:'flex-start',gap:2,paddingHorizontal:14,minHeight:44}}><Ionicons name="chevron-back" size={20} color={C.deep}/><Text style={{color:C.deep,fontWeight:'800',fontSize:14}}>{tab}</Text></TouchableOpacity>
+  <View key="Actions" style={{flex:1,display:moreScreen==='Actions'?'flex':'none'}}><ScrollView ref={actionScroll} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+  {actionDetail||actionView?<TouchableOpacity onPress={()=>{setActionView(null);setActionDetail(null);actionScroll.current?.scrollTo({y:0,animated:true});}} style={{flexDirection:'row',alignItems:'center',gap:8,paddingVertical:9}}><Ionicons name="arrow-back" size={20} color={colors.accent}/><Text style={{color:colors.accent,fontWeight:'800'}}>All actions</Text></TouchableOpacity>:null}
+  {actionDetail?<HabitDetails habit={actionDetail} onBack={()=>{setActionDetail(null);actionScroll.current?.scrollTo({y:0,animated:true})}} onSaved={(habit,n)=>{if(habit==='water')setWater(n);else setCoffee(n)}}/>:
+  actionView==='spiritual'?<SpiritualReading key={actionVersion} initialCheckin={spiritualCheckin}/>:
+  actionView==='breathing'?<BreathingStudio key={actionVersion} accent={colors.accent} tint={colors.pale}/>:
+  actionView?<WellnessCompanion key={actionVersion} onShareWithCircle={m=>{const cm=CIRCLE_MOODS.find(x=>x.toLowerCase()===m.toLowerCase());if(cm)setCircleSheet([{name:'share',mood:cm}]);}} initialView={actionView as 'checkin'|'chat'|'history'} companion={shownMood} onMoodSaved={saveMood} onWizardNavigate={()=>actionScroll.current?.scrollTo({y:0,animated:false})} onCheckinDone={()=>{setActionView(null);go('Today');}} onOpenInsights={()=>{setActionView(null);go('Trends');}} onFindVerse={(selectedMood,answers)=>{setSpiritualCheckin({mood:selectedMood,answers});setActionView('spiritual');setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});}} onAction={a=>{if(a==='breathing')openAction('breathing');else if(a==='water')void quickAddHabit('water');else if(a==='trends'){setActionView(null);go('Trends')}else{setActionView(null);go('Settings');setSettingsPage('notifications')}}} color={colors.accent}/>:
+  <WellnessActions companion={shownMood} accent={colors.accent} water={water} caffeine={coffee} onCaffeine={()=>{setActionView(null);setActionDetail('caffeine');actionScroll.current?.scrollTo({y:0,animated:true})}} onWater={()=>{setActionView(null);setActionDetail('water');actionScroll.current?.scrollTo({y:0,animated:true})}} onSpiritual={()=>openAction('spiritual')} onChat={()=>openAction('chat')} onMood={()=>openAction('checkin')} onJournal={()=>openAction('history')} onBreathing={()=>openAction('breathing')}/>}
+</ScrollView></View>
+  <View key="Trends" style={{flex:1,display:moreScreen==='Trends'?'flex':'none'}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><WellnessTrends companion={shownMood} accent={colors.accent} period={period} onPeriod={setPeriod} mood={mood}/><WellnessReportExport/></ScrollView></View>
+  <View key="Health" style={{flex:1,display:moreScreen==='Health'?'flex':'none'}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><WellnessHealth companion={shownMood} accent={colors.accent} onChat={()=>{go('Actions');openAction('chat')}} onPermissions={()=>{go('Settings');setSettingsPage('health')}}/></ScrollView></View>
+  </View>
+  </View>
 
   <View style={[s.navDock,{paddingBottom:Math.max(insets.bottom,8)}]}>
    <View style={s.tabBar} onLayout={e=>setNavWidth(e.nativeEvent.layout.width)}>
-    {navWidth>0?<Animated.View pointerEvents="none" style={[s.slidingPill,{backgroundColor:NAV_PILL,width:(navWidth-8)/tabs.length,transform:[{translateX:activePosition.interpolate({inputRange:[0,tabs.length-1],outputRange:[0,(tabs.length-1)*(navWidth-8)/tabs.length]})}]}]}/>:null}
-    {tabs.map(t=>{
-    const active=tab===t.name;
-    return <TouchableOpacity key={t.name} accessibilityRole="tab" accessibilityLabel={t.name==='Circle'&&circleUnread>0?`Circle, ${circleUnread} unread`:t.name}
+    {navWidth>0?<Animated.View pointerEvents="none" style={[s.slidingPill,{backgroundColor:NAV_PILL,width:(navWidth-8)/NAV_ITEMS,transform:[{translateX:activePosition.interpolate({inputRange:[0,NAV_ITEMS-1],outputRange:[0,(NAV_ITEMS-1)*(navWidth-8)/NAV_ITEMS]})}]}]}/>:null}
+    {[...tabs.map(t=>t.name as string),'More'].map(name=>{
+    const active=name==='More'?!!moreScreen:!moreScreen&&tab===name;
+    const icon=name==='Circle'?'people':name==='Family'?'watch':name==='Settings'?'settings':name==='More'?'ellipsis-horizontal':'calendar';
+    return <TouchableOpacity key={name} accessibilityRole="tab" accessibilityLabel={name==='Circle'&&circleUnread>0?`Circle, ${circleUnread} unread`:name==='More'?'More: Actions, Health, Trends and more':name}
       accessibilityState={{selected:active}} activeOpacity={0.8}
-      style={s.tab} onPress={()=>go(t.name)}>
-      <View><Ionicons name={t.name==='Circle'?'people':t.name==='Family'?'watch':t.name==='Actions'?'play':t.name==='Trends'?'bar-chart':t.name==='Health'?'heart':t.name==='Settings'?'settings':'today'} size={24} color={active?NAV_GREEN:NAV_INK}/>
-      {t.name==='Circle'&&circleUnread>0?<View style={s.navBadge}><Text style={s.navBadgeText}>{circleUnread>99?'99+':circleUnread}</Text></View>:null}</View>
-      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} style={[s.tabLabel,{color:active?NAV_GREEN:NAV_INK}]}>{t.name}</Text>
+      style={s.tab} onPress={()=>name==='More'?setMoreOpen(true):go(name as Tab)}>
+      <View><Ionicons name={icon} size={24} color={active?NAV_GREEN:NAV_INK}/>
+      {name==='Circle'&&circleUnread>0?<View style={s.navBadge}><Text style={s.navBadgeText}>{circleUnread>99?'99+':circleUnread}</Text></View>:null}</View>
+      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} style={[s.tabLabel,{color:active?NAV_GREEN:NAV_INK}]}>{name}</Text>
     </TouchableOpacity>
    })}</View>
   </View>
+  <MoreSheet visible={moreOpen} items={MORE_ITEMS} onClose={()=>setMoreOpen(false)} onSelect={pickMore}/>
   <Modal visible={!!circleSheet} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setCircleSheet(null)}>
    <View style={{flex:1,backgroundColor:C.bg}}><ScrollView contentContainerStyle={[s.scroll,{paddingTop:18,paddingBottom:48}]} keyboardShouldPersistTaps="handled">
     {circleSheet?(isGuest?<AccountRequired accent={colors.accent} backLabel="Close" onBack={()=>setCircleSheet(null)} onCreate={()=>{setCircleSheet(null);go('Settings');setSettingsPage('account')}}/>:<CircleNavigator initial={circleSheet} exitLabel="Close" onExit={()=>setCircleSheet(null)} mood={mood}/>):null}
