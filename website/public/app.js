@@ -128,7 +128,7 @@ document.querySelectorAll('[data-join]').forEach(link => link.addEventListener('
 document.querySelectorAll('[data-watch]').forEach(watch => {
   const slides = (watch.dataset.watchSlides || '').split(',').filter(Boolean);
   if (slides.length) {
-    watch.innerHTML = `<div class="band top"></div><div class="case"><div class="face">${slides.map((s, i) => `<img class="wslide${i ? '' : ' on'}" src="/img/watch/${s}.webp?v=1" alt="MoodPals Apple Watch ${s} screen">`).join('')}</div></div><div class="band bottom"></div>`;
+    watch.innerHTML = `<div class="band top"></div><div class="case"><div class="face">${slides.map((s, i) => `<img class="wslide${i ? '' : ' on'}" src="/img/watch/${s}.webp?v=2" alt="MoodPals Apple Watch ${s} screen">`).join('')}</div></div><div class="band bottom"></div>`;
     let i = 0;
     const imgs = watch.querySelectorAll('.wslide');
     setInterval(() => { imgs[i].classList.remove('on'); i = (i + 1) % imgs.length; imgs[i].classList.add('on'); }, 2800);
