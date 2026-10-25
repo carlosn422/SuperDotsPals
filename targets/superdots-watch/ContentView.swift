@@ -187,11 +187,11 @@ struct ContentView: View {
         .overlay {
             ZStack {
                 if let reaction = circle.floating {
-                    FloatingReactionView(reaction: reaction, accent: purple)
-                        .transition(.opacity)
+                    FloatingReactionView(reaction: reaction)
+                        .transition(.asymmetric(insertion: .identity, removal: .opacity))
                 }
             }
-            .animation(.easeInOut(duration: WatchCircleStore.fadeDuration), value: circle.floating?.id)
+            .animation(.easeIn(duration: WatchCircleStore.fadeDuration), value: circle.floating?.id)
             .allowsHitTesting(false)
         }
         // Circle reactions only float while the app is open in the foreground.

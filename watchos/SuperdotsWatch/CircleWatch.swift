@@ -26,8 +26,11 @@ final class WatchCircleStore: ObservableObject {
         }
     }
 
-    static let floatDuration: TimeInterval = 2.6
-    static let fadeDuration: TimeInterval = 0.45
+    static let fadeInDuration: TimeInterval = 0.25
+    static let visibleDuration: TimeInterval = 2.0
+    /// Time from appearing until the fade-out starts.
+    static let floatDuration: TimeInterval = fadeInDuration + visibleDuration
+    static let fadeDuration: TimeInterval = 0.35
 
     private struct PendingShare: Codable { let event: String; let mood: String; let at: Date }
 
@@ -211,35 +214,64 @@ final class WatchCircleStore: ObservableObject {
     }
 }
 
-/// Name, emoji and the original mood floating briefly over the home screen. Never takes touches.
+/// Round glass bubble with the sender's name and emoji, floating briefly over the home screen. Never takes touches.
 struct FloatingReactionView: View {
     let reaction: WatchReaction
-    let accent: Color
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var shown = false
     @State private var risen = false
 
+    private static let tint = Color(red: 0.56, green: 0.40, blue: 1.0)
+    private static let size: CGFloat = 88
+
     var body: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 1) {
             Text(reaction.name)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white)
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            Text(reaction.emoji).font(.system(size: 30))
-            AnimatedMoodMascot(mood: reaction.mood, size: 44)
-                .frame(width: 44, height: 44)
+                .minimumScaleFactor(0.6)
+                .frame(maxWidth: Self.size - 22)
+            Text(reaction.emoji)
+                .font(.system(size: 38))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: 18).fill(Color.black.opacity(0.78)))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(accent.opacity(0.6), lineWidth: 1))
-        .offset(y: reduceMotion ? 0 : (risen ? -10 : 12))
+        .frame(width: Self.size, height: Self.size)
+        .background(bubble)
+        .scaleEffect(reduceMotion || shown ? 1 : 0.85)
+        .opacity(shown ? 1 : 0)
+        .offset(y: reduceMotion ? 0 : (risen ? -10 : 0))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.top, 14)
         .onAppear {
+            withAnimation(.easeOut(duration: WatchCircleStore.fadeInDuration)) { shown = true }
             guard !reduceMotion else { return }
             withAnimation(.easeOut(duration: WatchCircleStore.floatDuration + WatchCircleStore.fadeDuration)) { risen = true }
         }
         .allowsHitTesting(false)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(reaction.name) \(reaction.emoji), \(reaction.mood)")
+        .accessibilityLabel("\(reaction.name) reacted \(reaction.emoji)")
+    }
+
+    private var bubble: some View {
+        ZStack {
+            Circle().fill(.ultraThinMaterial)
+            Circle().fill(RadialGradient(colors: [Self.tint.opacity(0.22), Self.tint.opacity(0.5)],
+                                         center: .center, startRadius: 0, endRadius: Self.size / 2))
+            // Soft glass highlight in the upper left.
+            Ellipse()
+                .fill(LinearGradient(colors: [.white.opacity(0.35), .white.opacity(0)], startPoint: .top, endPoint: .bottom))
+                .frame(width: Self.size * 0.42, height: Self.size * 0.24)
+                .rotationEffect(.degrees(-30))
+                .offset(x: -Self.size * 0.18, y: -Self.size * 0.27)
+            Circle().strokeBorder(LinearGradient(colors: [.white.opacity(0.85), Self.tint.opacity(0.9)],
+                                                 startPoint: .topLeading, endPoint: .bottomTrailing),
+                                  lineWidth: 1.5)
+        }
+        .compositingGroup()
+        .shadow(color: Self.tint.opacity(0.75), radius: 9)
+        .shadow(color: Self.tint.opacity(0.35), radius: 18)
     }
 }
 
