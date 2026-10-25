@@ -190,9 +190,13 @@ struct ContentView: View {
                     FloatingReactionView(reaction: reaction)
                         .transition(.asymmetric(insertion: .identity, removal: .opacity))
                 }
+                if let summary = circle.summary {
+                    FloatingSummaryView(summary: summary) { showingCircle = true }
+                        .transition(.asymmetric(insertion: .identity, removal: .opacity))
+                }
             }
             .animation(.easeIn(duration: WatchCircleStore.fadeDuration), value: circle.floating?.id)
-            .allowsHitTesting(false)
+            .animation(.easeIn(duration: WatchCircleStore.fadeDuration), value: circle.summary?.id)
         }
         // Circle reactions only float while the app is open in the foreground.
         .onChange(of: scenePhase == .active && sync.connected && !sync.pairingActive, initial: true) { _, isActive in

@@ -9,6 +9,13 @@ struct WatchReaction: Identifiable, Hashable {
     let at: Date
 }
 
+/// "+N more" bubble shown instead of animating every reaction in a large batch.
+struct WatchReactionSummary: Equatable {
+    let id = UUID()
+    let emojis: [String]
+    let count: Int
+}
+
 /// Unread Circle reactions on the watch. Polls only while the app is active; a reaction is marked read
 /// when its floating animation finishes or when it is opened from the Circle list.
 @MainActor
@@ -17,6 +24,8 @@ final class WatchCircleStore: ObservableObject {
     @Published private(set) var unread: [WatchReaction] = []
     /// Reaction currently floating over the home screen.
     @Published private(set) var floating: WatchReaction?
+    /// Summary for the rest of a batch after `maxIndividualFloats`; those reactions stay unread.
+    @Published private(set) var summary: WatchReactionSummary?
 
     /// True while the mood picker or a sheet covers the home screen; animations wait until it clears.
     var hold = false {
@@ -31,6 +40,8 @@ final class WatchCircleStore: ObservableObject {
     /// Time from appearing until the fade-out starts.
     static let floatDuration: TimeInterval = fadeInDuration + visibleDuration
     static let fadeDuration: TimeInterval = 0.35
+    static let maxIndividualFloats = 3
+    static let summaryVisibleDuration: TimeInterval = 4.0
 
     private struct PendingShare: Codable { let event: String; let mood: String; let at: Date }
 
@@ -43,6 +54,8 @@ final class WatchCircleStore: ObservableObject {
     private var active = false
     private var baselined = false
     private var queue: [WatchReaction] = []
+    /// Individual floats played back to back in the current batch.
+    private var batchPlayed = 0
     private var pollTask: Task<Void, Never>?
     private var floatTask: Task<Void, Never>?
     private var markedRead: Set<String> = []
@@ -84,6 +97,7 @@ final class WatchCircleStore: ObservableObject {
         } else {
             interruptFloating(requeue: false)
             queue.removeAll()
+            batchPlayed = 0
         }
     }
 
@@ -121,8 +135,14 @@ final class WatchCircleStore: ObservableObject {
     }
 
     private func playNext() {
-        guard active, !hold, floating == nil, floatTask == nil, !queue.isEmpty else { return }
+        guard active, !hold, floating == nil, summary == nil, floatTask == nil else { return }
+        guard !queue.isEmpty else { batchPlayed = 0; return }
+        if batchPlayed >= Self.maxIndividualFloats {
+            showSummary()
+            return
+        }
         let next = queue.removeFirst()
+        batchPlayed += 1
         floating = next
         floatTask = Task {
             do {
@@ -139,11 +159,38 @@ final class WatchCircleStore: ObservableObject {
         }
     }
 
+    /// Leaves the rest of the batch unread in Circle (never animated) behind one tappable summary bubble.
+    private func showSummary() {
+        let rest = queue
+        queue.removeAll()
+        var emojis: [String] = []
+        for reaction in rest where emojis.count < 3 && !emojis.contains(reaction.emoji) { emojis.append(reaction.emoji) }
+        summary = WatchReactionSummary(emojis: emojis, count: rest.count)
+        floatTask = Task {
+            do {
+                try await Task.sleep(for: .seconds(Self.fadeInDuration + Self.summaryVisibleDuration))
+                self.summary = nil
+                try await Task.sleep(for: .seconds(Self.fadeDuration + 0.05))
+            } catch { return }
+            self.floatTask = nil
+            self.batchPlayed = 0
+            self.playNext()
+        }
+    }
+
     private func interruptFloating(requeue: Bool) {
         floatTask?.cancel()
         floatTask = nil
-        if let current = floating, requeue { queue.insert(current, at: 0) }
+        if let current = floating, requeue {
+            queue.insert(current, at: 0)
+            batchPlayed = max(0, batchPlayed - 1)
+        }
         floating = nil
+        // A summary is not replayed; its reactions are still unread in Circle.
+        if summary != nil {
+            summary = nil
+            batchPlayed = 0
+        }
     }
 
     /// Marks one reaction read; the server call is retried until it succeeds.
@@ -153,7 +200,7 @@ final class WatchCircleStore: ObservableObject {
         queue.removeAll { $0.id == id }
         unread.removeAll { $0.id == id }
         if !known.contains(id) { known = known + [id] }
-        pendingReads = pendingReads + [id]
+        if !pendingReads.contains(id) { pendingReads = pendingReads + [id] }
         Task { await flushReads() }
     }
 
@@ -217,12 +264,6 @@ final class WatchCircleStore: ObservableObject {
 /// Round glass bubble with the sender's name and emoji, floating briefly over the home screen. Never takes touches.
 struct FloatingReactionView: View {
     let reaction: WatchReaction
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var shown = false
-    @State private var risen = false
-
-    private static let tint = Color(red: 0.56, green: 0.40, blue: 1.0)
-    private static let size: CGFloat = 88
 
     var body: some View {
         VStack(spacing: 1) {
@@ -231,30 +272,82 @@ struct FloatingReactionView: View {
                 .foregroundStyle(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
-                .frame(maxWidth: Self.size - 22)
+                .frame(maxWidth: GlassBubble.size - 22)
             Text(reaction.emoji)
                 .font(.system(size: 38))
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
         }
-        .frame(width: Self.size, height: Self.size)
-        .background(bubble)
-        .scaleEffect(reduceMotion || shown ? 1 : 0.85)
-        .opacity(shown ? 1 : 0)
-        .offset(y: reduceMotion ? 0 : (risen ? -10 : 0))
+        .frame(width: GlassBubble.size, height: GlassBubble.size)
+        .background(GlassBubble())
+        .modifier(FloatIn(duration: WatchCircleStore.floatDuration + WatchCircleStore.fadeDuration))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding(.top, 14)
-        .onAppear {
-            withAnimation(.easeOut(duration: WatchCircleStore.fadeInDuration)) { shown = true }
-            guard !reduceMotion else { return }
-            withAnimation(.easeOut(duration: WatchCircleStore.floatDuration + WatchCircleStore.fadeDuration)) { risen = true }
-        }
         .allowsHitTesting(false)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(reaction.name) reacted \(reaction.emoji)")
     }
+}
 
-    private var bubble: some View {
+/// Same bubble for the rest of a large batch; tapping it opens Circle.
+struct FloatingSummaryView: View {
+    let summary: WatchReactionSummary
+    let open: () -> Void
+
+    var body: some View {
+        Button(action: open) {
+            VStack(spacing: 1) {
+                Text(summary.emojis.joined(separator: " "))
+                    .font(.system(size: 17))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .frame(maxWidth: GlassBubble.size - 18)
+                Text("+\(summary.count) more")
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                Text("Open Circle")
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.75))
+                    .lineLimit(1)
+            }
+            .frame(width: GlassBubble.size, height: GlassBubble.size)
+            .background(GlassBubble())
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .modifier(FloatIn(duration: WatchCircleStore.fadeInDuration + WatchCircleStore.summaryVisibleDuration + WatchCircleStore.fadeDuration))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.top, 14)
+        .accessibilityLabel("\(summary.count) more reactions. Open Circle.")
+    }
+}
+
+/// Fades in while growing from 0.85 and drifts up 10pt; Reduce Motion fades only.
+private struct FloatIn: ViewModifier {
+    let duration: TimeInterval
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var shown = false
+    @State private var risen = false
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(reduceMotion || shown ? 1 : 0.85)
+            .opacity(shown ? 1 : 0)
+            .offset(y: reduceMotion ? 0 : (risen ? -10 : 0))
+            .onAppear {
+                withAnimation(.easeOut(duration: WatchCircleStore.fadeInDuration)) { shown = true }
+                guard !reduceMotion else { return }
+                withAnimation(.easeOut(duration: duration)) { risen = true }
+            }
+    }
+}
+
+private struct GlassBubble: View {
+    static let tint = Color(red: 0.56, green: 0.40, blue: 1.0)
+    static let size: CGFloat = 88
+
+    var body: some View {
         ZStack {
             Circle().fill(.ultraThinMaterial)
             Circle().fill(RadialGradient(colors: [Self.tint.opacity(0.22), Self.tint.opacity(0.5)],
@@ -304,36 +397,50 @@ struct CircleButton: View {
     }
 }
 
-/// Unread reactions only. Read-only: no replies on Apple Watch.
+/// Unread reactions only; opened or floated ones drop out. Read-only: no replies on Apple Watch.
 struct WatchCircleList: View {
     @ObservedObject private var circle = WatchCircleStore.shared
 
     var body: some View {
         Group {
             if circle.unread.isEmpty {
-                Text("No new reactions")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                VStack(spacing: 4) {
+                    Text("All caught up! 💚").font(.headline)
+                    Text("No unread responses.").font(.caption2).foregroundStyle(.secondary)
+                }
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(circle.unread) { reaction in
                     NavigationLink(value: reaction) {
                         HStack(spacing: 6) {
-                            Text(reaction.name)
-                                .font(.system(size: 15, weight: .semibold))
-                                .lineLimit(1)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(reaction.name)
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .lineLimit(1)
+                                Text("\(reaction.mood) · \(Self.ago(reaction.at))")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
                             Spacer(minLength: 2)
                             Text(reaction.emoji).font(.system(size: 22))
-                            AnimatedMoodMascot(mood: reaction.mood, size: 30, isActive: false)
-                                .frame(width: 30, height: 30)
                         }
                     }
-                    .accessibilityLabel("\(reaction.name) \(reaction.emoji), \(reaction.mood)")
+                    .accessibilityLabel("\(reaction.name) \(reaction.emoji), \(reaction.mood), \(Self.ago(reaction.at))")
                 }
             }
         }
         .navigationTitle("Circle")
         .navigationDestination(for: WatchReaction.self) { WatchReactionDetail(reaction: $0) }
+    }
+
+    static func ago(_ date: Date, now: Date = Date()) -> String {
+        let seconds = max(0, Int(now.timeIntervalSince(date)))
+        if seconds < 60 { return "now" }
+        if seconds < 3600 { return "\(seconds / 60)m" }
+        if seconds < 86400 { return "\(seconds / 3600)h" }
+        return "\(seconds / 86400)d"
     }
 }
 
