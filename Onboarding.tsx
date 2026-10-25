@@ -66,7 +66,7 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
  }
  if(fetching)return <View style={[s.root,{justifyContent:'center'}]}><ActivityIndicator color={picked.color}/></View>;
  return <View style={s.root}><ScrollView key={step} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
-  <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={s.brand}>✦ MoodPals</Text>{!editing?<TouchableOpacity accessibilityRole="button" accessibilityLabel="Back to sign in" disabled={loading} hitSlop={10} onPress={()=>{openSignInNext();void supabase.auth.signOut()}}><Text style={s.signIn}>Sign in instead</Text></TouchableOpacity>:null}</View>{editing?<TouchableOpacity onPress={onCancel}><Text style={s.skip}>Cancel editing</Text></TouchableOpacity>:null}
+  <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>{!editing?<TouchableOpacity accessibilityRole="button" accessibilityLabel="Back to sign in" disabled={loading} hitSlop={10} onPress={()=>{openSignInNext();void supabase.auth.signOut()}}><Text style={s.signIn}>‹ Back to login</Text></TouchableOpacity>:null}<Text style={s.brand}>✦ MoodPals</Text></View>{editing?<TouchableOpacity onPress={onCancel}><Text style={s.skip}>Cancel editing</Text></TouchableOpacity>:null}
   <Text style={s.progress}>STEP {step+1} OF {stepTitles.length}</Text>
   <View style={s.track}><View style={[s.fill,{width:`${((step+1)/stepTitles.length*100)}%` as `${number}%`,backgroundColor:picked.color}]}/></View>
   <Text style={s.title}>{stepTitles[step]}</Text>
