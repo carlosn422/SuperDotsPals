@@ -20,7 +20,9 @@ export async function appleCredential():Promise<AppleCredential|null>{
   return {token:c.identityToken,nonce,code:c.authorizationCode,name,email:c.email};
  }catch(e:any){
   if(e?.code==='ERR_REQUEST_CANCELED')return null;
-  throw e;
+  // Closing iOS's "Sign in to your Apple Account" sheet arrives as an unknown-reason failure.
+  if(e?.code==='ERR_REQUEST_UNKNOWN'||e?.code==='ERR_REQUEST_FAILED')throw Error('Sign in with Apple didn’t finish. Make sure you’re signed in to your Apple Account in Settings, then try again.');
+  throw Error('Sign in with Apple isn’t available right now. Please try again.');
  }
 }
 
