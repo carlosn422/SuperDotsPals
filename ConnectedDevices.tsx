@@ -68,8 +68,8 @@ export default function ConnectedDevices(){
   {isGuest?<Text style={[styles.sub,{color:'#D65B79'}]}>Create an account in Settings to link your Apple Watch.</Text>:null}
   {!isGuest&&watch.paired&&watch.installed?<View style={styles.card}>
    <View style={{flexDirection:'row',alignItems:'center',gap:12}}>
-    <View style={{flex:1}}><Text style={{fontWeight:'800',color:'#271C49'}}>This iPhone's Apple Watch</Text><Text style={styles.sub}>{ownWatchLinked?'Linked. Tap Link again to reconnect it.':'MoodPals is installed on it.'}</Text></View>
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Link this iPhone's Apple Watch" disabled={connecting||waiting} onPress={linkThisWatch} style={[styles.small,(connecting||waiting)&&{opacity:.5}]}>{waiting?<ActivityIndicator color="white"/>:<Text style={styles.buttonText}>Link</Text>}</TouchableOpacity>
+    <View style={{flex:1}}><Text style={{fontWeight:'800',color:'#271C49'}}>This iPhone's Apple Watch</Text><Text style={styles.sub}>{ownWatchLinked?'Linked to this account.':'MoodPals is installed on it.'}</Text></View>
+    {ownWatchLinked?<Text style={{fontWeight:'800',color:'#2E9E6A'}}>Linked</Text>:<TouchableOpacity accessibilityRole="button" accessibilityLabel="Link this iPhone's Apple Watch" disabled={connecting||waiting} onPress={linkThisWatch} style={[styles.small,(connecting||waiting)&&{opacity:.5}]}>{waiting?<ActivityIndicator color="white"/>:<Text style={styles.buttonText}>Link</Text>}</TouchableOpacity>}
    </View>
    {waiting?<Text style={styles.sub}>Waiting for your watch… keep MoodPals open on it.</Text>:null}
   </View>:null}

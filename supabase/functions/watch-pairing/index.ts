@@ -31,12 +31,14 @@ function sixDigits(){const a=crypto.getRandomValues(new Uint32Array(1));return S
 async function approveRow(user:{id:string;email?:string},row:{id:string;device_name:string;kind:string}){
  if(row.kind==="family")return await approveFamily(user.id,row);
  if(!user.email)return json({error:"Email-based Supabase login is required for pairing"},400);
+ // Claim the request before minting a login token: a new magic link invalidates the previous one, so a losing duplicate approve must not mint.
+ const {data:claimed,error}=await admin.from("watch_pairing_requests").update({status:"approved",owner_id:user.id,login_token_hash:null}).eq("id",row.id).eq("status","pending").select("id");
+ if(error)return json({error:"Unable to approve"},500);
+ if(!claimed?.length)return json({error:"This code has expired or was already used"},400);
  const {data:link,error:linkError}=await admin.auth.admin.generateLink({type:"magiclink",email:user.email});
  const token=link?.properties?.hashed_token;
- if(linkError||!token)return json({error:"Unable to create watch session"},500);
- const {data:approved,error}=await admin.from("watch_pairing_requests").update({status:"approved",owner_id:user.id,login_token_hash:token}).eq("id",row.id).eq("status","pending").select("id");
- if(error)return json({error:"Unable to approve"},500);
- if(!approved?.length)return json({error:"This code has expired or was already used"},400);
+ if(linkError||!token){await admin.from("watch_pairing_requests").update({status:"pending",owner_id:null}).eq("id",row.id).eq("status","approved");return json({error:"Unable to create watch session"},500)}
+ await admin.from("watch_pairing_requests").update({login_token_hash:token}).eq("id",row.id).eq("status","approved");
  await admin.from("connected_devices").upsert({user_id:user.id,pairing_id:row.id,name:row.device_name,platform:"watchos"},{onConflict:"pairing_id"});
  return json({status:"approved",deviceName:row.device_name});
 }
