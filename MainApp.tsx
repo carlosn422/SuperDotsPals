@@ -25,7 +25,7 @@ import CircleNavigator,{CircleRoute} from './MyCircleScreens';
 import {LittleSignalsTodayCard} from './CircleComponents';
 import WatchThemesScreen from './WatchThemesScreen';
 import {PlusSettingsScreen} from './PlusPaywall';
-import {AccountRequired,CreateAccountScreen,confirmDeleteAccount,useIsGuest} from './Account';
+import {AccountRequired,CreateAccountScreen,DeleteAccountScreen,useAppleLink,useIsGuest} from './Account';
 import {useWatchAutoLink} from './WatchAutoLink';
 import {CIRCLE_MOODS} from './LittleSignalsData';
 import {useStress} from './StressDashboard';
@@ -68,9 +68,10 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  const [actionVersion,setActionVersion]=useState(0);
  const [spiritualCheckin,setSpiritualCheckin]=useState<{mood:string;answers:Record<string,string>}|undefined>(undefined);
  const openAction=(view:'checkin'|'chat'|'history'|'spiritual'|'breathing')=>{if(view==='spiritual')setSpiritualCheckin(undefined);setActionDetail(null);setActionView(view);setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});};
- const [settingsPage,setSettingsPage]=useState<'main'|'watch'|'devices'|'health'|'notifications'|'privacy'|'help'|'circle'|'watchThemes'|'plus'|'account'>('main');
+ const [settingsPage,setSettingsPage]=useState<'main'|'watch'|'devices'|'health'|'notifications'|'privacy'|'help'|'circle'|'watchThemes'|'plus'|'account'|'delete'>('main');
  const isGuest=useIsGuest();
  const circleUnread=useCircle().inbox.filter(n=>!n.read).length;
+ const appleLink=useAppleLink();
  useWatchAutoLink(isGuest,()=>{go('Settings');setSettingsPage('account')});
  const [circleSheet,setCircleSheet]=useState<CircleRoute[]|null>(null);
  const [period,setPeriod]=useState<Period>('Day');
@@ -199,9 +200,10 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
     <SettingsItem title="Wellness Profile" subtitle="Goals and onboarding answers" icon="person-circle-outline" accent={colors.accent} onPress={onEditProfile}/>
     <SettingsItem title="Privacy & Data" subtitle="Account storage and security" icon="shield-checkmark-outline" accent={colors.accent} onPress={()=>setSettingsPage('privacy')}/>
     <SettingsItem title="Help & Support" subtitle="FAQs and troubleshooting" icon="help-circle-outline" accent={colors.accent} onPress={()=>setSettingsPage('help')}/>
+    {!isGuest&&appleLink.available?<SettingsItem title="Sign in with Apple" subtitle={appleLink.linked?'Linked to this account':'Also sign in to this account with Apple'} status={appleLink.linked?'Linked':undefined} icon="logo-apple" accent={colors.accent} onPress={()=>appleLink.linked?Alert.alert('Sign in with Apple','Apple is already linked. You can sign in with Apple or with your email and password.'):void appleLink.link()}/>:null}
     {isGuest?null:<TouchableOpacity style={s.settingsRow} onPress={()=>void supabase.auth.signOut()}><Ionicons name="log-out-outline" size={22} color="#D65B79"/><Text style={[s.settingsTitle,{color:'#D65B79'}]}>Sign out</Text></TouchableOpacity>}
-    <TouchableOpacity accessibilityRole="button" style={s.settingsRow} onPress={confirmDeleteAccount}><Ionicons name="trash-outline" size={22} color="#D65B79"/><Text style={[s.settingsTitle,{color:'#D65B79'}]}>Delete account</Text></TouchableOpacity>
-   </>:settingsPage==='account'?<CreateAccountScreen accent={colors.accent} onBack={()=>setSettingsPage('main')}/>:settingsPage==='plus'?<PlusSettingsScreen accent={colors.accent} onBack={()=>setSettingsPage('main')}/>:settingsPage==='watchThemes'?<WatchThemesScreen onBack={()=>setSettingsPage('main')}/>:settingsPage==='circle'?(isGuest?<AccountRequired accent={colors.accent} backLabel="Settings" onBack={()=>setSettingsPage('main')} onCreate={()=>setSettingsPage('account')}/>:<CircleNavigator onExit={()=>setSettingsPage('main')} mood={mood} onRouteChange={()=>settingsScroll.current?.scrollTo({y:0,animated:false})}/>):<>
+    <TouchableOpacity accessibilityRole="button" style={s.settingsRow} onPress={()=>setSettingsPage('delete')}><Ionicons name="trash-outline" size={22} color="#D65B79"/><Text style={[s.settingsTitle,{color:'#D65B79'}]}>Delete account</Text></TouchableOpacity>
+   </>:settingsPage==='account'?<CreateAccountScreen accent={colors.accent} onBack={()=>setSettingsPage('main')}/>:settingsPage==='delete'?<DeleteAccountScreen accent={colors.accent} onBack={()=>setSettingsPage('main')}/>:settingsPage==='plus'?<PlusSettingsScreen accent={colors.accent} onBack={()=>setSettingsPage('main')}/>:settingsPage==='watchThemes'?<WatchThemesScreen onBack={()=>setSettingsPage('main')}/>:settingsPage==='circle'?(isGuest?<AccountRequired accent={colors.accent} backLabel="Settings" onBack={()=>setSettingsPage('main')} onCreate={()=>setSettingsPage('account')}/>:<CircleNavigator onExit={()=>setSettingsPage('main')} mood={mood} onRouteChange={()=>settingsScroll.current?.scrollTo({y:0,animated:false})}/>):<>
     <TouchableOpacity style={s.settingsBack} onPress={()=>setSettingsPage('main')}><Ionicons name="chevron-back" size={18} color={colors.accent}/><Text style={{color:colors.accent,fontWeight:'800'}}>Settings</Text></TouchableOpacity>
     <Text style={s.mainTitle}>{({watch:'Apple Watch & Widgets',devices:'Connected Devices',health:'Apple Health',notifications:'Notifications',privacy:'Privacy & Data',help:'Help & Support'} as const)[settingsPage]}</Text>
     {settingsPage==='devices'?<ConnectedDevices/>:null}

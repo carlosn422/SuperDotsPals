@@ -5,10 +5,15 @@ import {Image} from 'react-native';
 import SuperdotMascot from './SuperdotMascot';
 import MoodPalsWelcomeArt from './MoodPalsWelcomeArt';
 import Svg,{Path} from 'react-native-svg';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import {appleAvailable,signInWithApple} from './AppleAuth';
 // Set before signing a guest out from onboarding so the auth screen opens on Sign in instead of Welcome.
 let nextMode:'welcome'|'signin'='welcome';
 export function openSignInNext(){nextMode='signin'}
 export default function AuthScreen(){
+ const [appleOk,setAppleOk]=useState(false);
+ useEffect(()=>{void appleAvailable().then(setAppleOk)},[]);
+ async function apple(){setMessage('');setLoading(true);try{await signInWithApple()}catch(e:any){setMessage(e?.message||'Sign in with Apple failed. Please try again.')}finally{setLoading(false)}}
  const [mode,setMode]=useState<'welcome'|'signin'|'signup'|'reset'>(()=>{const m=nextMode;nextMode='welcome';return m}),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[name,setName]=useState(''),[loading,setLoading]=useState(false),[message,setMessage]=useState('');
  const [waitingForConfirmation,setWaitingForConfirmation]=useState(false);
  const currentCredentials=useRef<{email:string;password:string}|null>(null);
@@ -92,6 +97,7 @@ export default function AuthScreen(){
     {message?<Text style={s.message}>{message}</Text>:null}
     <TouchableOpacity accessibilityRole="button" onPress={submit} disabled={loading} style={[s.primary,loading&&{opacity:.65}]}>{loading?<ActivityIndicator color="white"/>:<Text style={s.primaryText}>{mode==='signin'?'Sign in  →':mode==='signup'?'Create account  →':'Send reset email  →'}</Text>}</TouchableOpacity>
     {mode==='signin' && waitingForConfirmation?<TouchableOpacity onPress={()=>void completeConfirmation()} style={s.confirmButton}><Text style={s.confirmText}>I've confirmed my email — continue</Text></TouchableOpacity>:null}
+    {mode!=='reset'&&appleOk?<><View style={s.orRow}><View style={s.orLine}/><Text style={s.orText}>or</Text><View style={s.orLine}/></View><AppleAuthentication.AppleAuthenticationButton buttonType={mode==='signup'?AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP:AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN} buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK} cornerRadius={17} style={{height:54,width:'100%',opacity:loading?.6:1}} onPress={()=>{if(!loading)void apple()}}/></>:null}
     {mode==='signin'?<TouchableOpacity onPress={()=>{setMode('reset');setMessage('')}} style={s.secondaryAction}><Text style={s.link}>Forgot password?</Text></TouchableOpacity>:null}
     <TouchableOpacity onPress={()=>{setMode(mode==='signup'?'signin':'signup');setMessage('')}} style={s.secondaryAction}><Text style={s.link}>{mode==='signup'?'Already have an account? Sign in':mode==='reset'?'Back to sign in':'New here? Create an account'}</Text></TouchableOpacity>
    </View>
@@ -115,6 +121,7 @@ const s=StyleSheet.create({
  welcomePrimaryText:{color:'#FFFFFF',fontSize:17,fontWeight:'800'},
  welcomeSecondary:{backgroundColor:'#FFFFFF',borderColor:'#CFC5EA',borderWidth:1.4,borderRadius:28,paddingVertical:17,alignItems:'center'},
  welcomeSecondaryText:{color:'#55468B',fontSize:15,fontWeight:'700'},
+ orRow:{flexDirection:'row',alignItems:'center',gap:10,marginVertical:2},orLine:{flex:1,height:1,backgroundColor:'#E4DEF2'},orText:{color:'#9690AF',fontWeight:'700',fontSize:12},
  authBack:{alignSelf:'flex-start',paddingVertical:7,paddingHorizontal:4},
  authBackText:{color:'#7861E8',fontWeight:'800',fontSize:13},
  page:{flex:1,backgroundColor:'#FAF8FF'},

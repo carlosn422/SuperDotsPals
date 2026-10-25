@@ -20,7 +20,8 @@
         "com.apple.security.application-groups": [
           "group.com.superdotspals.wellnest"
         ]
-      }
+      },
+      "usesAppleSignIn": true
     },
     "android": {
       "package": "com.superdotspals.wellnest",
@@ -55,7 +56,8 @@
       "@bacons/apple-targets",
       "./scripts/with-watch-widget-embed.cjs",
       "./scripts/with-health-privacy.cjs",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-apple-authentication"
     ],
     "extra": {
       "eas": {
