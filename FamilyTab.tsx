@@ -73,7 +73,7 @@ export default function FamilyTab({onAdd}:{onAdd:()=>void}){
    <TouchableOpacity style={styles.button} onPress={onAdd} accessibilityRole="button"><Text style={{color:'white',fontWeight:'800'}}>Add a family watch</Text></TouchableOpacity>
   </View>:null}
   {profiles.map(p=><FamilyCard key={p.id} profile={p} groups={groups} onManage={()=>{setNotice('');setManaging(p)}}/>)}
-  {profiles.length>0?<TouchableOpacity style={[styles.button,{alignSelf:'center'},full&&isPlus&&{opacity:0.5}]} disabled={full&&isPlus} accessibilityRole="button" onPress={()=>full?showPaywall('family'):onAdd()}><Text style={{color:'white',fontWeight:'800'}}>{full&&isPlus?'All '+slots+' family watches used':'Add another family watch'}</Text></TouchableOpacity>:null}
+  {profiles.length>0?<TouchableOpacity style={[styles.button,{alignSelf:'center'},full&&(isPlus||slots>1)&&{opacity:0.5}]} disabled={full&&(isPlus||slots>1)} accessibilityRole="button" onPress={()=>full?showPaywall('family'):onAdd()}><Text style={{color:'white',fontWeight:'800'}}>{full&&(isPlus||slots>1)?'All '+slots+' family watches used':'Add another family watch'}</Text></TouchableOpacity>:null}
   {managing?<ManageFamilyProfile profile={managing} onClose={()=>setManaging(null)} onDeleted={async()=>{setManaging(null);await load();familyProfilesChanged();setNotice(managing.name+' was permanently removed.')}}/>:null}
  </View>;
 }
