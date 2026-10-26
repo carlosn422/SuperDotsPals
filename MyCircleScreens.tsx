@@ -65,6 +65,8 @@ function Screen({route,nav,mood}:{route:CircleRoute;nav:Nav;mood?:string}){
 
 function Stat({value,label}:{value:number;label:string}){return <View style={{flex:1,alignItems:'center',backgroundColor:CT.background,borderRadius:16,paddingVertical:12}}><Text style={{fontSize:24,fontWeight:'900',color:CT.ink}}>{value}</Text><Text style={{fontSize:11,color:CT.muted,fontWeight:'700'}}>{label}</Text></View>;}
 
+
+
 function Home({nav}:{nav:Nav}){
  const store=useCircle();
  useEffect(()=>{void store.ensurePush()},[]);
@@ -83,7 +85,8 @@ function Home({nav}:{nav:Nav}){
    <CRow icon="people-outline" title="Friends" subtitle={store.friends.length+' approved friends'} onPress={()=>nav.push({name:'friends'})}/>
    <CRow icon="albums-outline" title="Manage Groups" subtitle={store.groups.map(g=>g.name).join(', ')||'Create your first group'} onPress={()=>nav.push({name:'groups'})}/>
    <CRow icon="happy-outline" title="Mood Sharing Settings" subtitle="Choose which moods each group can see" onPress={()=>nav.push({name:'permissions'})}/>
-   <CRow icon="sparkles-outline" title="Today's Signals" subtitle={todayCount?todayCount+' signals and reactions today':'Nothing yet today'} onPress={()=>nav.push({name:'today'})}/>
+      <CRow icon="sparkles-outline" title="Today's Signals" subtitle={todayCount?todayCount+' signals and reactions today':'Nothing yet today'} onPress={()=>nav.push({name:'today'})}/>
+  
    <CRow icon="notifications-outline" title="Notification Settings" subtitle="Signals, reactions and lock-screen privacy" onPress={()=>nav.push({name:'notifications'})}/>
    <CRow icon="apps-outline" title="Home Screen Widgets" subtitle="Little Signals small and medium widgets" onPress={()=>nav.push({name:'widgets'})} last/>
   </CCard>

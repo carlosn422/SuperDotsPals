@@ -74,48 +74,32 @@ function MoodReactionDetails({event,onBack}:{event:MoodEvent;onBack:()=>void}){
 }
 
 // retentionDays limits how far back the day picker goes; omit it for no limit.
-export default function FamilyTimeline({name,moods,reactions,retentionDays,onDay,openKey,onOpenKey}:{name:string;moods:TimelineMood[];reactions:TimelineReaction[];retentionDays?:number;onDay?:(start:Date)=>void,openKey:string|null, onOpenKey:(key:string|null)=>void}){
- const [dayOffset,setDayOffset]=useState(0);
- const today=startOfDay(new Date());
- const maxOffset=retentionDays?retentionDays-1:Infinity;
- const windowEnd=Math.floor(dayOffset/RETENTION_DAYS)*RETENTION_DAYS;
- const days=Array.from({length:RETENTION_DAYS},(_,i)=>new Date(today.getTime()-(windowEnd+RETENTION_DAYS-1-i)*DAY_MS)).filter((_,i)=>windowEnd+RETENTION_DAYS-1-i<=maxOffset);
- React.useEffect(()=>{onDay?.(new Date(today.getTime()-dayOffset*DAY_MS))},[dayOffset]);// eslint-disable-line react-hooks/exhaustive-deps
- const events=useMemo(()=>buildMoodEvents(moods,reactions),[moods,reactions]);
- const day=new Date(today.getTime()-dayOffset*DAY_MS),next=day.getTime()+DAY_MS;
- const dayEvents=events.filter(e=>{const t=Date.parse(e.at);return t>=day.getTime()&&t<next});
- const open=events.find(e=>e.key===openKey);
- if(open)return <MoodReactionDetails event={open} onBack={()=>onOpenKey(null)}/>;
- const step=(d:number)=>setDayOffset(o=>Math.min(maxOffset,Math.max(0,o+d)));
- return <View style={{gap:12}}>
-  <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
-   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Previous day" disabled={dayOffset>=maxOffset} onPress={()=>step(1)} style={[st.back,dayOffset>=maxOffset&&{opacity:.35}]}><Ionicons name="chevron-back" size={20} color={ink}/></TouchableOpacity>
-   <View style={{alignItems:'center',flex:1}}><Text numberOfLines={1} style={st.title}>{name==='You'?'Your':name+"'s"} Day</Text><Text style={st.sub}>{day.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}</Text></View>
-   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Next day" disabled={dayOffset===0} onPress={()=>step(-1)} style={[st.back,dayOffset===0&&{opacity:.35}]}><Ionicons name="chevron-forward" size={20} color={ink}/></TouchableOpacity>
-  </View>
-  <View style={{flexDirection:'row',gap:5}}>
-   {days.map((d,i)=>{const off=windowEnd+RETENTION_DAYS-1-i,sel=off===dayOffset;return <TouchableOpacity key={d.toISOString()} accessibilityRole="button" accessibilityState={{selected:sel}} accessibilityLabel={d.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'})} onPress={()=>setDayOffset(off)} style={[st.dayChip,sel&&{backgroundColor:purple,borderColor:purple}]}>
-    <Text style={[st.dayMonth,sel&&{color:'white'}]}>{d.toLocaleDateString(undefined,{month:'short'})}</Text>
-    <Text style={[st.dayNum,sel&&{color:'white'}]}>{d.getDate()}</Text>
-    {off===0?<Text style={[st.dayMonth,{color:sel?'white':purple}]}>Today</Text>:null}
-   </TouchableOpacity>})}
-  </View>
-  {dayEvents.length?dayEvents.map((e,i)=><View key={e.key} style={{flexDirection:'row',gap:10}}>
-   <View style={{width:62,alignItems:'center'}}>
-    <Text style={[st.sub,{fontSize:11}]}>{time(e.at)}</Text>
-    <View style={[st.dot,{backgroundColor:MOOD_TINTS[e.mood].color}]}/>
-    {i<dayEvents.length-1?<View style={[st.line,{backgroundColor:MOOD_TINTS[e.mood].color}]}/>:null}
-   </View>
-   <TouchableOpacity accessibilityRole="button" accessibilityLabel={e.mood+' at '+time(e.at)+', '+e.reactions.length+' reactions'} onPress={()=>onOpenKey(e.key)} style={[st.card,{flex:1,marginBottom:8}]}>
-    <View style={{flexDirection:'row',alignItems:'center',gap:10}}>
-     <View style={{backgroundColor:MOOD_TINTS[e.mood].tint,borderRadius:30}}><MoodPalThumb mood={e.mood} size={52}/></View>
-     <View style={{flex:1}}><Text style={{fontWeight:'800',fontSize:16,color:ink}}>{e.mood}</Text><Text style={st.sub}>{time(e.at)}</Text></View>
-     <Ionicons name="chevron-forward" size={18} color={muted}/>
-    </View>
-    <ReactionSummary reactions={e.reactions}/>
-   </TouchableOpacity>
-  </View>):<View style={st.card}><Text style={st.sub}>No mood changes on this day.</Text></View>}
- </View>;
+export default function FamilyTimeline({name,moods,reactions,onDay,openKey,onOpenKey,initialDate}:{name:string;moods:TimelineMood[];reactions:TimelineReaction[];retentionDays?:number;onDay?:(start:Date)=>void,openKey:string|null, onOpenKey:(key:string|null)=>void,initialDate?:Date|null}){
+  const today = startOfDay(new Date());
+  const day = initialDate ? startOfDay(initialDate) : today;
+
+  const events=useMemo(()=>buildMoodEvents(moods,reactions),[moods,reactions]);
+  const dayEvents=events.filter(e=>{const t=Date.parse(e.at);return t>=day.getTime()&&t<day.getTime()+DAY_MS});
+  const open=events.find(e=>e.key===openKey);
+  if(open)return <MoodReactionDetails event={open} onBack={()=>onOpenKey(null)}/>;
+
+  return <View style={{gap:12, marginTop: 16}}>
+    {dayEvents.length?dayEvents.map((e,i)=><View key={e.key} style={{flexDirection:'row',gap:10}}>
+     <View style={{width:62,alignItems:'center'}}>
+      <Text style={[st.sub,{fontSize:11}]}>{time(e.at)}</Text>
+      <View style={[st.dot,{backgroundColor:MOOD_TINTS[e.mood].color}]}/>
+      {i<dayEvents.length-1?<View style={[st.line,{backgroundColor:MOOD_TINTS[e.mood].color}]}/>:null}
+     </View>
+     <TouchableOpacity accessibilityRole="button" accessibilityLabel={e.mood+' at '+time(e.at)+', '+e.reactions.length+' reactions'} onPress={()=>onOpenKey(e.key)} style={[st.card,{flex:1,marginBottom:8}]}>
+      <View style={{flexDirection:'row',alignItems:'center',gap:10}}>
+       <View style={{backgroundColor:MOOD_TINTS[e.mood].tint,borderRadius:30}}><MoodPalThumb mood={e.mood} size={52}/></View>
+       <View style={{flex:1}}><Text style={{fontWeight:'800',fontSize:16,color:ink}}>{e.mood}</Text><Text style={st.sub}>{time(e.at)}</Text></View>
+       <Ionicons name="chevron-forward" size={18} color={muted}/>
+      </View>
+      <ReactionSummary reactions={e.reactions}/>
+     </TouchableOpacity>
+    </View>):<View style={st.card}><Text style={st.sub}>No mood changes on this day.</Text></View>}
+   </View>;
 }
 
 const st=StyleSheet.create({
