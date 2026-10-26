@@ -52,7 +52,6 @@ function ReactionSummary({reactions}:{reactions:Reaction[]}){
 function MoodReactionDetails({event,onBack}:{event:MoodEvent;onBack:()=>void}){
  const bubbles=reactionBubbles(event.reactions),t=MOOD_TINTS[event.mood],date=new Date(event.at);
  return <View style={{gap:14}}>
-  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back" onPress={onBack} style={st.back}><Ionicons name="chevron-back" size={22} color={ink}/></TouchableOpacity>
   <View style={{alignItems:'center',gap:4}}>
    <MoodPalThumb mood={event.mood} size={120} animate/>
    <Text style={[st.title,{fontSize:24}]}>{event.mood} Reactions</Text>
@@ -75,8 +74,8 @@ function MoodReactionDetails({event,onBack}:{event:MoodEvent;onBack:()=>void}){
 }
 
 // retentionDays limits how far back the day picker goes; omit it for no limit.
-export default function FamilyTimeline({name,moods,reactions,retentionDays,onDay}:{name:string;moods:TimelineMood[];reactions:TimelineReaction[];retentionDays?:number;onDay?:(start:Date)=>void}){
- const [dayOffset,setDayOffset]=useState(0),[openKey,setOpenKey]=useState<string|null>(null);
+export default function FamilyTimeline({name,moods,reactions,retentionDays,onDay,openKey,onOpenKey}:{name:string;moods:TimelineMood[];reactions:TimelineReaction[];retentionDays?:number;onDay?:(start:Date)=>void,openKey:string|null, onOpenKey:(key:string|null)=>void}){
+ const [dayOffset,setDayOffset]=useState(0);
  const today=startOfDay(new Date());
  const maxOffset=retentionDays?retentionDays-1:Infinity;
  const windowEnd=Math.floor(dayOffset/RETENTION_DAYS)*RETENTION_DAYS;
@@ -86,7 +85,7 @@ export default function FamilyTimeline({name,moods,reactions,retentionDays,onDay
  const day=new Date(today.getTime()-dayOffset*DAY_MS),next=day.getTime()+DAY_MS;
  const dayEvents=events.filter(e=>{const t=Date.parse(e.at);return t>=day.getTime()&&t<next});
  const open=events.find(e=>e.key===openKey);
- if(open)return <MoodReactionDetails event={open} onBack={()=>setOpenKey(null)}/>;
+ if(open)return <MoodReactionDetails event={open} onBack={()=>onOpenKey(null)}/>;
  const step=(d:number)=>setDayOffset(o=>Math.min(maxOffset,Math.max(0,o+d)));
  return <View style={{gap:12}}>
   <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
@@ -107,7 +106,7 @@ export default function FamilyTimeline({name,moods,reactions,retentionDays,onDay
     <View style={[st.dot,{backgroundColor:MOOD_TINTS[e.mood].color}]}/>
     {i<dayEvents.length-1?<View style={[st.line,{backgroundColor:MOOD_TINTS[e.mood].color}]}/>:null}
    </View>
-   <TouchableOpacity accessibilityRole="button" accessibilityLabel={e.mood+' at '+time(e.at)+', '+e.reactions.length+' reactions'} onPress={()=>setOpenKey(e.key)} style={[st.card,{flex:1,marginBottom:8}]}>
+   <TouchableOpacity accessibilityRole="button" accessibilityLabel={e.mood+' at '+time(e.at)+', '+e.reactions.length+' reactions'} onPress={()=>onOpenKey(e.key)} style={[st.card,{flex:1,marginBottom:8}]}>
     <View style={{flexDirection:'row',alignItems:'center',gap:10}}>
      <View style={{backgroundColor:MOOD_TINTS[e.mood].tint,borderRadius:30}}><MoodPalThumb mood={e.mood} size={52}/></View>
      <View style={{flex:1}}><Text style={{fontWeight:'800',fontSize:16,color:ink}}>{e.mood}</Text><Text style={st.sub}>{time(e.at)}</Text></View>

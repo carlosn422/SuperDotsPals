@@ -31,7 +31,6 @@ export default function CircleNavigator({initial=[{name:'home'}],exitLabel='Sett
  const prev=stack.length>1?TITLES[stack[stack.length-2].name]:exitLabel;
  const nav={push,replace,back,popTo:(name:CircleRoute['name'])=>setStack(s=>{const i=s.map(x=>x.name).lastIndexOf(name);return i>=0?s.slice(0,i+1):[{name:'home'}]})};
  return <View style={{gap:14}}>
-  <TouchableOpacity onPress={back} accessibilityRole="button" style={{flexDirection:'row',alignItems:'center',gap:4,paddingVertical:6,alignSelf:'flex-start'}}><Ionicons name="chevron-back" size={18} color={CT.primary}/><Text style={{color:CT.primary,fontWeight:'800'}}>{prev}</Text></TouchableOpacity>
   <Text style={cs.title}>{TITLES[route.name]}</Text>
   <OfflineBanner/>
   <Screen route={route} nav={nav} mood={mood}/>
