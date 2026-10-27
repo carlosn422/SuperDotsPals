@@ -1,4 +1,4 @@
-import React,{useEffect,useMemo,useState} from 'react';
+import React,{createContext,useContext,useEffect,useMemo,useState} from 'react';
 import {View,Text,TouchableOpacity,StyleSheet,ActivityIndicator,Alert,Modal,ScrollView} from 'react-native';
 import Svg,{Circle,Line,Path,Rect} from 'react-native-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -59,32 +59,41 @@ export function StressHero({name,mood,onCheckin}:{name?:string;mood:string;onChe
 
 function Card({children,style}:{children:React.ReactNode;style?:any}){return <View style={[st.card,style]}>{children}</View>}
 
+export const ChartScrubContext=createContext<(active:boolean)=>void>(()=>{});
+
 export function HrvTrendCard(){
+ const setScrubbing=useContext(ChartScrubContext);
+ useEffect(()=>()=>setScrubbing(false),[setScrubbing]);
  const {readings,points}=useStress();
  const {width,onLayout}=useWidth();
  const [range,setRange]=useState<'day'|'week'>('day');
+ const [sel,setSel]=useState<number|null>(null);
  const now=new Date(),start=new Date(now);start.setHours(0,0,0,0);if(range==='week')start.setDate(start.getDate()-6);
  const end=range==='day'?new Date(start.getTime()+86400000):now;
  const hrv=readings.filter(r=>r.metric==='hrv'&&new Date(r.recorded_at)>=start).sort((a,b)=>+new Date(a.recorded_at)-+new Date(b.recorded_at));
  const scoreAt=new Map(points.map(p=>[p.at,p]));
- const latest=hrv[hrv.length-1];
+ const latest=(sel!==null&&hrv[sel])||hrv[hrv.length-1];
  const latestLevel=latest&&scoreAt.get(latest.recorded_at)?.level;
+ const when=(iso:string)=>range==='week'?new Date(iso).toLocaleString(undefined,{weekday:'short',hour:'numeric',minute:'2-digit'}):fmtTime(iso);
  const H=150,pad=10,max=Math.max(40,...hrv.map(r=>r.value))*1.1,min=0;
  const x=(iso:string)=>pad+(width-2*pad)*Math.min(1,Math.max(0,(+new Date(iso)-+start)/(+end-+start)));
  const y=(v:number)=>H-pad-(H-2*pad)*(v-min)/(max-min);
+ const scrub=(lx:number)=>{let best=0;hrv.forEach((r,i)=>{if(Math.abs(x(r.recorded_at)-lx)<Math.abs(x(hrv[best].recorded_at)-lx))best=i});setSel(best)};
  const path=hrv.map((r,i)=>(i?'L':'M')+x(r.recorded_at).toFixed(1)+' '+y(r.value).toFixed(1)).join(' ');
  const labels=range==='day'?['0:00','6:00','12:00','18:00','24:00']:Array.from({length:7},(_,i)=>{const d=new Date(start);d.setDate(d.getDate()+i);return ['S','M','T','W','T','F','S'][d.getDay()]});
  return <Card>
   <View style={st.cardTop}><Text style={st.cardTitle}>HRV Trend</Text>
-   {latest?<View style={st.pill}><View style={[st.dot,{backgroundColor:latestLevel?STRESS_LEVELS[latestLevel].color:SW.muted}]}/><View><Text style={[st.pillTitle,{color:latestLevel?STRESS_LEVELS[latestLevel].color:SW.muted}]}>{latestLevel?STRESS_LEVELS[latestLevel].label:'Calibrating'}</Text><Text style={st.pillSub}>HRV {Math.round(latest.value)}ms · {fmtTime(latest.recorded_at)}</Text></View></View>:null}
+   {latest?<View style={st.pill}><View style={[st.dot,{backgroundColor:latestLevel?STRESS_LEVELS[latestLevel].color:SW.muted}]}/><View><Text style={[st.pillTitle,{color:latestLevel?STRESS_LEVELS[latestLevel].color:SW.muted}]}>{latestLevel?STRESS_LEVELS[latestLevel].label:'Calibrating'}</Text><Text style={st.pillSub}>HRV {Math.round(latest.value)}ms · {when(latest.recorded_at)}</Text></View></View>:null}
   </View>
-  <Segmented value={range} options={[['day','Today'],['week','7 days']]} onChange={v=>setRange(v as any)}/>
+  <Segmented value={range} options={[['day','Today'],['week','7 days']]} onChange={v=>{setSel(null);setRange(v as any)}}/>
   <View onLayout={onLayout} style={{height:H}}>
    {hrv.length?<Svg width={width} height={H}>
     {[0,1,2,3,4].map(i=><Line key={i} x1={pad+(width-2*pad)*i/4} x2={pad+(width-2*pad)*i/4} y1={pad} y2={H-pad} stroke={SW.line} strokeDasharray="3 4"/>)}
     <Path d={path} stroke="#C9D2D6" strokeWidth={2} fill="none"/>
-    {hrv.map(r=>{const p=scoreAt.get(r.recorded_at);return <Circle key={r.recorded_at} cx={x(r.recorded_at)} cy={y(r.value)} r={5.5} fill="#fff" stroke={p?STRESS_LEVELS[p.level].color:'#B7C2C7'} strokeWidth={3}/>})}
+    {sel!==null&&latest?<Line x1={x(latest.recorded_at)} x2={x(latest.recorded_at)} y1={pad} y2={H-pad} stroke={SW.ink} strokeWidth={1.5}/>:null}
+    {hrv.map((r,i)=>{const p=scoreAt.get(r.recorded_at);return <Circle key={r.recorded_at} cx={x(r.recorded_at)} cy={y(r.value)} r={i===sel?7.5:5.5} fill="#fff" stroke={p?STRESS_LEVELS[p.level].color:'#B7C2C7'} strokeWidth={3}/>})}
    </Svg>:<View style={st.empty}><Ionicons name="pulse-outline" size={26} color={SW.muted}/><Text style={st.muted}>No HRV readings {range==='day'?'today':'this week'} yet. Apple Watch records HRV periodically and during Breathe sessions.</Text></View>}
+   {hrv.length?<View style={StyleSheet.absoluteFill} accessibilityHint="Drag across the chart to see each HRV reading" onStartShouldSetResponder={()=>true} onMoveShouldSetResponder={()=>true} onResponderTerminationRequest={()=>false} onResponderGrant={e=>{setScrubbing(true);scrub(e.nativeEvent.locationX)}} onResponderMove={e=>scrub(e.nativeEvent.locationX)} onResponderRelease={()=>{setSel(null);setScrubbing(false)}} onResponderTerminate={()=>{setSel(null);setScrubbing(false)}}/>:null}
   </View>
   <View style={st.axis}>{labels.map((l,i)=><Text key={i} style={st.axisText}>{l}</Text>)}</View>
  </Card>;
