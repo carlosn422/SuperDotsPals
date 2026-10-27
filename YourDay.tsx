@@ -14,7 +14,7 @@ function startOfDay(d: Date) {
   return x;
 }
 
-import MonthlyCalendar from './MonthlyCalendar';
+import MonthlyCalendar, { localDayKey } from './MonthlyCalendar';
 
 // The signed-in user's own day: their journal moods plus reactions on their Circle shares. No retention limit.
 export default function YourDay({onClose,top,bottom,date:initialDate}:{onClose:()=>void;top:number;bottom:number;date?:Date|null}){
@@ -46,7 +46,7 @@ export default function YourDay({onClose,top,bottom,date:initialDate}:{onClose:(
       if (!error && data) {
         const moodsByDay: { [key: string]: string } = {};
         for (const mood of data) {
-          const dayString = mood.occurred_at.split('T')[0];
+          const dayString = localDayKey(new Date(mood.occurred_at));
           if (!moodsByDay[dayString]) {
             moodsByDay[dayString] = mood.mood;
           }

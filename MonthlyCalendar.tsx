@@ -61,7 +61,7 @@ export default function MonthlyCalendar({ date, onDateChange, moods }: { date: D
               if (day.getTime() === 0) {
                 return <View key={j} style={styles.day} />;
               }
-              const dayString = day.toISOString().split('T')[0];
+              const dayString = localDayKey(day);
               const mood = moods[dayString];
               const isSelected = startOfDay(day).getTime() === startOfDay(date).getTime();
 
@@ -141,3 +141,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 });
+
+export function localDayKey(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}

@@ -81,7 +81,7 @@ document.querySelectorAll('.phone').forEach(phone => {
   phone.appendChild(screen);
   const slides = (phone.dataset.slides || '').split(',').filter(Boolean);
   if (slides.length) {
-    screen.innerHTML = slides.map((s, i) => `<img class="slide${i ? '' : ' on'}" src="/img/screens/${s}.webp?v=6" alt="MoodPals ${s.replace('-', ' ')} screen">`).join('');
+    screen.innerHTML = slides.map((s, i) => `<img class="slide${i ? '' : ' on'}" src="/img/screens/${s}.webp?v=7" alt="MoodPals ${s.replace('-', ' ')} screen">`).join('');
     let i = 0;
     const imgs = screen.querySelectorAll('.slide');
     setInterval(() => { imgs[i].classList.remove('on'); i = (i + 1) % imgs.length; imgs[i].classList.add('on'); }, 2800);

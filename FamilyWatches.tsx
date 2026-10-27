@@ -227,7 +227,8 @@ export function FamilySwitcher({children,disabled=false,onAdd,focused=true}:{chi
  const {profiles,slots,load,loaded}=useFamilyProfiles(!disabled);
  const {isPlus,showPaywall}=usePlus();
  const [selected,setSelectedState]=useState<string|null>(null),[moods,setMoods]=useState<MoodRow[]>([]),[reactions,setReactions]=useState<ReactionRow[]>([]),[tick,setTick]=useState(0),[loading,setLoading]=useState(false),[error,setError]=useState('');
- const [saved,setSaved]=useState<string|null|undefined>(undefined),[lastLinked,setLastLinked]=useState<string|null>(null),[listOpen,setListOpen]=useState(false);
+ const [saved,setSaved]=useState<string|null|undefined>(undefined),[lastLinked,setLastLinked]=useState<string|null>(null),[listOpen,setListOpen]=useState(false),[openKey,setOpenKey]=useState<string|null>(null);
+ useEffect(()=>setOpenKey(null),[selected]);
  const profile=profiles.find(p=>p.id===selected)||null;
  const setSelected=(id:string|null)=>{setSelectedState(id);if(id)setLastLinked(id);void (id?AsyncStorage.setItem(SELECTED_KEY,id):AsyncStorage.removeItem(SELECTED_KEY))};
  useEffect(()=>{void AsyncStorage.getItem(SELECTED_KEY).then(v=>setSaved(v))},[]);
@@ -263,7 +264,8 @@ export function FamilySwitcher({children,disabled=false,onAdd,focused=true}:{chi
    </View>
    {loading?<ActivityIndicator color={purple}/>:null}
    {error?<Text style={[styles.sub,{color:red}]}>{error}</Text>:null}
-   {!loading||moods.length?<FamilyTimeline key={profile.id} name={shortProfileName(profile.name)} moods={moods} reactions={reactions} retentionDays={RETENTION_DAYS}/>:null}
+   {openKey?<TouchableOpacity accessibilityRole="button" accessibilityLabel="Back" onPress={()=>setOpenKey(null)} style={{flexDirection:'row',alignItems:'center',gap:3,alignSelf:'flex-start'}}><Ionicons name="chevron-back" size={22} color="#251C45"/><Text style={{fontWeight:'800',color:'#251C45'}}>Back</Text></TouchableOpacity>:null}
+   {!loading||moods.length?<FamilyTimeline key={profile.id} name={shortProfileName(profile.name)} moods={moods} reactions={reactions} retentionDays={RETENTION_DAYS} openKey={openKey} onOpenKey={setOpenKey}/>:null}
   </View>}
  </View>;
 }
