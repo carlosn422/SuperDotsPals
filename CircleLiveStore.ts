@@ -18,8 +18,12 @@ const isNetworkError=(e:any)=>/network|fetch|timed? ?out|offline/i.test(String(e
 const deviceTimezone=()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'}catch{return 'UTC'}};
 const startOfToday=()=>{const d=new Date();d.setHours(0,0,0,0);return d.toISOString();};
 
-const emptyState=():State=>({friends:[],groups:[],requests:[],myMoods:[],friendMoods:[],signals:[],invite:{code:'',expiresAt:new Date().toISOString()},prefs:{...EMPTY_PREFS},revokedFriendIds:[],blockedNames:[],sentSignals:[],offline:false,widgetHideMood:true});
+const emptyState=():State=>({familyNames:{},friends:[],groups:[],requests:[],myMoods:[],friendMoods:[],signals:[],invite:{code:'',expiresAt:new Date().toISOString()},prefs:{...EMPTY_PREFS},revokedFriendIds:[],blockedNames:[],sentSignals:[],offline:false,widgetHideMood:true,inbox:[]});
 const WIDGET_HIDE_MOOD_KEY='circle.widgetHideMood';
+// Read acknowledgements that couldn't reach the server yet; retried on every refresh.
+const PENDING_READS_KEY='circle.pendingReactionReads';
+const loadPendingReads=async():Promise<string[]>=>{try{return JSON.parse((await AsyncStorage.getItem(PENDING_READS_KEY))||'[]')}catch{return []}};
+const savePendingReads=(ids:string[])=>AsyncStorage.setItem(PENDING_READS_KEY,JSON.stringify(Array.from(new Set(ids)).slice(-200))).catch(()=>{});
 
 export function useLiveCircleState():CircleStore{
  const [st,setSt]=useState<State>(emptyState);
@@ -39,7 +43,9 @@ export function useLiveCircleState():CircleStore{
   const uid=await userId();if(!uid){setLoading(false);return;}
   try{
    const ensure=await supabase.rpc('circle_ensure_profile');if(ensure.error)throw ensure.error;
-   const [invite,friends,requests,groups,mine,shared,myReactions,signals,sent,prefs]=await Promise.all([
+   const pendingReads=await loadPendingReads();
+   if(pendingReads.length){const r=await supabase.rpc('circle_mark_reactions_read',{p_ids:pendingReads});if(!r.error)await savePendingReads([]);}
+   const [invite,friends,requests,groups,mine,shared,myReactions,signals,sent,prefs,inbox,family]=await Promise.all([
     supabase.rpc('circle_my_invite'),
     supabase.rpc('circle_friends'),
     supabase.rpc('circle_requests'),
@@ -50,8 +56,10 @@ export function useLiveCircleState():CircleStore{
     supabase.from('circle_signals').select('id,sender_id,signal,sent_at,seen_at').eq('recipient_id',uid).order('sent_at',{ascending:false}).limit(50),
     supabase.from('circle_signals').select('recipient_id,signal,sent_at').eq('sender_id',uid).gte('sent_at',startOfToday()),
     supabase.from('circle_notification_prefs').select('*').eq('user_id',uid).maybeSingle(),
+    supabase.rpc('circle_reaction_inbox',{p_unread_only:false,p_limit:50}),
+    supabase.rpc('circle_family_names'),
    ]);
-   const failed=[invite,friends,requests,groups,mine,shared,myReactions,signals,sent,prefs].find(r=>r.error);
+   const failed=[invite,friends,requests,groups,mine,shared,myReactions,signals,sent,prefs,inbox,family].find(r=>r.error);
    if(failed?.error)throw failed.error;
    const now=Date.now();
    const reactionByMood=new Map<string,string>(((myReactions.data||[]) as any[]).map(r=>[r.shared_mood_id,r.emoji]));
@@ -70,6 +78,8 @@ export function useLiveCircleState():CircleStore{
     friendMoods:((shared.data||[]) as any[]).map(m=>({id:m.id,friendId:m.owner_id,mood:asMood(m.mood),sharedAt:m.shared_at,expiresAt:m.expires_at,myReaction:reactionByMood.get(m.id)})),
     signals:((signals.data||[]) as any[]).map(x=>({id:x.id,friendId:x.sender_id,signal:x.signal as SignalId,at:x.sent_at,seen:!!x.seen_at})),
     sentSignals:((sent.data||[]) as any[]).map(x=>({friendIds:[x.recipient_id],signal:x.signal as SignalId,at:x.sent_at})),
+    inbox:((inbox.data||[]) as any[]).map(n=>({id:n.id,moodId:n.shared_mood_id,mood:asMood(n.mood),friendId:n.reactor_id,name:n.reactor_name,emoji:n.emoji,at:n.reacted_at,read:!!n.read_at||pendingReads.includes(n.id)})),
+    familyNames:Object.fromEntries(((family.data||[]) as any[]).map(n=>[n.profile_id,{name:n.display_name,owner:n.owner_name}])),
     prefs:p?{invites:p.invites,approvals:p.approvals,signals:p.signals,reactions:p.reactions,quietHours:p.quiet_hours,showNamesInPreview:p.show_names_in_preview,showMoodOnLockScreen:p.show_mood_on_lock_screen}:s.prefs,
    }));
    const tz=deviceTimezone();
@@ -186,6 +196,12 @@ export function useLiveCircleState():CircleStore{
    void run('Couldn’t send your signal',async()=>{const r=await supabase.rpc('circle_send_signal',{p_recipients:friendIds,p_signal:signal});
     if(!r.error&&typeof r.data==='number'&&r.data<friendIds.length)Alert.alert('Some signals weren’t sent','You can send up to 3 signals to the same friend per hour and 30 a day.');
     return r;});
+  },
+  // Only the opened notification is marked read; opening the Circle tab never clears the rest.
+  markReactionRead:(id:string)=>{
+   const n=stRef.current.inbox.find(x=>x.id===id);if(!n||n.read)return;
+   up(s=>({inbox:s.inbox.map(x=>x.id===id?{...x,read:true}:x)}));
+   supabase.rpc('circle_mark_reactions_read',{p_ids:[id]}).then(r=>{if(r.error)void loadPendingReads().then(ids=>savePendingReads([...ids,id]))},()=>{void loadPendingReads().then(ids=>savePendingReads([...ids,id]))});
   },
   markSignalsSeen:()=>{up(s=>({signals:s.signals.map(x=>({...x,seen:true}))}));supabase.rpc('circle_mark_signals_seen').then(()=>{})},
   setPref:(k:keyof NotificationPrefs,v:boolean)=>{up(s=>({prefs:{...s.prefs,[k]:v}}));

@@ -4,6 +4,11 @@ import WatchKit
 
 /// Authenticated direct sync for the standalone watchOS prototype.
 /// The publishable key is public; tokens are stored in the user's Keychain.
+/// Family watch sessions are mood-only: no HealthKit collection or health controls.
+enum WatchProfile {
+    static var moodOnly: Bool { UserDefaults.standard.bool(forKey: "watch_mood_only") }
+}
+
 @MainActor
 final class WatchThemeSync: ObservableObject {
     static let shared = WatchThemeSync()
@@ -13,6 +18,7 @@ final class WatchThemeSync: ObservableObject {
     @Published var sessionVerified = false
     @Published var needsReconnect = false
     @Published var syncWarning: String? = nil
+    @Published private(set) var moodOnly = WatchProfile.moodOnly
     @Published var message = "Connect your account to sync mood and health readings."
     private let base = URL(string: "https://hzoauxxpvrgahlavxmvp.supabase.co")!
     private let publishableKey = "sb_publishable_pPPqosRo1SqwrbW-8MWURA_UxTED6Vs"
@@ -26,6 +32,12 @@ final class WatchThemeSync: ObservableObject {
         userId = secret("watch_user") ?? ""
         pairingId = secret("watch_pairing_id") ?? ""
         connected = !refreshToken.isEmpty && !userId.isEmpty
+        WatchPhoneLink.shared.onPairingRequested = { [weak self] in
+            Task { @MainActor in
+                guard let self, !self.connected || self.needsReconnect, !self.pairingActive, !self.busy else { return }
+                await self.startPairing()
+            }
+        }
     }
 
     func signIn(email: String, password: String, store: WatchStore) async {
@@ -59,12 +71,20 @@ final class WatchThemeSync: ObservableObject {
         } catch {
             sessionVerified = false
             if case SyncError.server(let status, let endpoint, let detail) = error,
+               endpoint.contains("/auth/v1/user"), status == 401 || status == 403 || status == 404,
+               detail.contains("user_not_found") || detail.contains("does not exist") {
+                // The profile was removed on the server; drop credentials and queued events.
+                signOut()
+                message = "This watch's profile was removed."
+                return
+            }
+            if case SyncError.server(let status, let endpoint, let detail) = error,
                endpoint.contains("/auth/v1/token"),
                (status == 400 || status == 401),
                (detail.contains("refresh_token_not_found") || detail.contains("invalid_grant") || detail.contains("Invalid Refresh Token")) {
                 needsReconnect = true
                 connected = false
-                message = "Session expired. Reconnect using a new QR code."
+                message = "Session expired. Reconnect with a new code."
                 NSLog("[WatchSync] Stored refresh token expired; new pairing required")
                 return
             }
@@ -78,6 +98,7 @@ final class WatchThemeSync: ObservableObject {
                 let body = try JSONSerialization.data(withJSONObject:["action":"status","id":pairingId])
                 let statusData = try await request("/functions/v1/watch-pairing",method:"POST",body:body)
                 let status = try JSONSerialization.jsonObject(with:statusData) as? [String:Any]
+                if let flag = status?["moodOnly"] as? Bool { setMoodOnly(flag) }
                 if status?["active"] as? Bool == false {
                     // Only an explicit inactive response is a revocation.
                     signOut()
@@ -168,7 +189,9 @@ final class WatchThemeSync: ObservableObject {
 
     func signOut() {
         for key in ["watch_access","watch_refresh","watch_user","watch_pairing_id"] { storeSecret(nil,for:key) }
-        accessToken = ""; refreshToken = ""; userId = ""; pairingId = ""; pairingSecret = ""; pairingURL = ""; pairingActive = false; pairingConnecting = false; connected = false; moodLoaded = false; sessionVerified = false; needsReconnect = false; syncWarning = nil
+        accessToken = ""; refreshToken = ""; userId = ""; pairingId = ""; pairingSecret = ""; pairingCode = ""; pairingActive = false; pairingConnecting = false; connected = false; moodLoaded = false; sessionVerified = false; needsReconnect = false; syncWarning = nil
+        WatchCircleStore.shared.reset()
+        setMoodOnly(false)
         message = "Disconnected. Your watch will show local defaults."
     }
 
@@ -200,7 +223,7 @@ final class WatchThemeSync: ObservableObject {
 
     /// Uploads a watch-computed score as a `computed` stress_score row. Idempotent via source_record_key.
     func uploadStress(score:Int, at:Date, key:String) async {
-        guard connected, !userId.isEmpty, !refreshToken.isEmpty else { return }
+        guard !moodOnly, connected, !userId.isEmpty, !refreshToken.isEmpty else { return }
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let row:[String:Any] = ["user_id":userId,"metric":"stress_score","value":score,"source":"computed",
@@ -273,24 +296,30 @@ final class WatchThemeSync: ObservableObject {
         return try await request("/functions/v1/spiritual-reading",method:"POST",body:JSONSerialization.data(withJSONObject:object))
     }
 
-    @Published var pairingURL = ""
+    @Published var pairingCode = ""
     @Published var pairingActive = false
     @Published var pairingConnecting = false
     private var pairingId = ""
     private var pairingSecret = ""
 
+    private func setMoodOnly(_ value: Bool) {
+        UserDefaults.standard.set(value, forKey: "watch_mood_only")
+        moodOnly = value
+    }
+
     func startPairing() async {
         busy=true
         defer {busy=false}
         do {
-            let body=try JSONSerialization.data(withJSONObject:["action":"start","deviceName":WKInterfaceDevice.current().name.isEmpty ? "Apple Watch" : WKInterfaceDevice.current().name])
+            let family=await WatchPhoneLink.shared.isFamilyWatch()
+            let body=try JSONSerialization.data(withJSONObject:["action":"start","family":family,"deviceName":WKInterfaceDevice.current().name.isEmpty ? "Apple Watch" : WKInterfaceDevice.current().name])
             let data=try await request("/functions/v1/watch-pairing",method:"POST",body:body,authenticated:false)
             guard let obj=try JSONSerialization.jsonObject(with:data) as? [String:Any],
-              let id=obj["id"] as? String,let secret=obj["secret"] as? String else {throw SyncError.badResponse}
+              let id=obj["id"] as? String,let secret=obj["secret"] as? String,let code=obj["code"] as? String else {throw SyncError.badResponse}
             pairingId=id;pairingSecret=secret
             needsReconnect=false
             pairingConnecting=false
-            pairingURL="superdots://pair?id=\(id)&secret=\(secret)"
+            pairingCode=code
             pairingActive=true
             WatchPhoneLink.shared.offer(id:id,secret:secret)
             message="Open MoodPals on your iPhone to link automatically."
@@ -312,18 +341,20 @@ final class WatchThemeSync: ObservableObject {
                 let verify=try JSONSerialization.data(withJSONObject:["token_hash":hash,"type":"magiclink"])
                 let session=try await request("/auth/v1/verify",method:"POST",body:verify,authenticated:false)
                 try loadSession(session)
+                // Mark the request claimed before pairingActive=false dismisses the pairing view and cancels this task.
+                let completed=try JSONSerialization.data(withJSONObject:["action":"complete","id":pairingId,"secret":pairingSecret])
+                _ = try? await request("/functions/v1/watch-pairing",method:"POST",body:completed)
+                setMoodOnly(obj["moodOnly"] as? Bool ?? false)
                 connected=true
                 sessionVerified=true
                 needsReconnect=false
                 storeSecret(pairingId,for:"watch_pairing_id")
                 pairingActive=false
                 WatchPhoneLink.shared.linked()
-                let completed=try JSONSerialization.data(withJSONObject:["action":"complete","id":pairingId,"secret":pairingSecret])
-                _ = try? await request("/functions/v1/watch-pairing",method:"POST",body:completed)
-                pairingURL="";pairingSecret=""
+                pairingCode="";pairingSecret=""
                 message="Watch connected to your MoodPals account."
                 // The root view owns refreshing after the pairing screen disappears.
-                // Refreshing here inherits cancellation from the QR polling task.
+                // Refreshing here inherits cancellation from the pairing polling task.
                 let remaining=3.0-Date().timeIntervalSince(started)
                 if remaining>0 {try? await Task.sleep(for:.seconds(remaining))}
                 pairingConnecting=false
@@ -334,7 +365,18 @@ final class WatchThemeSync: ObservableObject {
         }
     }
 
+    // Concurrent renewals would spend the same rotating refresh token twice.
+    private var renewing: Task<Void, Error>?
+
     private func renewIfNeeded() async throws {
+        if let renewing { return try await renewing.value }
+        let task = Task { try await self.renewSession() }
+        renewing = task
+        defer { renewing = nil }
+        try await task.value
+    }
+
+    private func renewSession() async throws {
         guard !refreshToken.isEmpty else { throw SyncError.notSignedIn }
         let payload = try JSONSerialization.data(withJSONObject:["refresh_token":refreshToken])
         let response = try await request("/auth/v1/token?grant_type=refresh_token",method:"POST",body:payload,authenticated:false)
@@ -353,9 +395,23 @@ final class WatchThemeSync: ObservableObject {
         storeSecret(id,for:"watch_user")
     }
 
-    private func request(_ path: String,method: String,body: Data? = nil,authenticated: Bool = true,extraHeaders:[String:String] = [:]) async throws -> Data {
+    /// Calls a Postgres RPC as the signed-in user, renewing the session once if the access token expired.
+    func rpc(_ name: String, _ params: [String: Any]) async throws -> Data {
+        guard connected, !refreshToken.isEmpty else { throw SyncError.notSignedIn }
+        let body = try JSONSerialization.data(withJSONObject: params)
+        let path = "/rest/v1/rpc/\(name)"
+        // Short timeout so a stalled request can't hold up the 10 s Circle poll.
+        do { return try await request(path, method: "POST", body: body, timeout: 15) }
+        catch SyncError.server(401, _, _) {
+            try await renewIfNeeded()
+            return try await request(path, method: "POST", body: body, timeout: 15)
+        }
+    }
+
+    private func request(_ path: String,method: String,body: Data? = nil,authenticated: Bool = true,extraHeaders:[String:String] = [:],timeout: TimeInterval? = nil) async throws -> Data {
         guard let url = URL(string: path,relativeTo:base) else { throw SyncError.badResponse }
         var req = URLRequest(url:url)
+        if let timeout { req.timeoutInterval = timeout }
         req.httpMethod = method
         req.setValue(publishableKey,forHTTPHeaderField:"apikey")
         req.setValue("application/json",forHTTPHeaderField:"Content-Type")
@@ -410,9 +466,9 @@ struct WatchSyncView: View {
  @ObservedObject var sync:WatchThemeSync
  @EnvironmentObject var store:WatchStore
  @Environment(\.dismiss) private var dismiss
- private var qrImageURL:URL? {
-  guard let components=URLComponents(string:sync.pairingURL),let query=components.percentEncodedQuery else{return nil}
-  return URL(string:"https://hzoauxxpvrgahlavxmvp.supabase.co/functions/v1/watch-pairing?"+query)
+ private var spacedCode:String {
+  let c=sync.pairingCode
+  return c.count==6 ? String(c.prefix(3))+" "+String(c.suffix(3)) : c
  }
  var body:some View {
   ScrollView {
@@ -437,22 +493,16 @@ struct WatchSyncView: View {
      Text("Link with iPhone").font(.headline)
      Text("Open MoodPals on your iPhone and this watch links automatically. Using it as a guest? Create a free account there first.")
        .font(.system(size:11)).multilineTextAlignment(.center)
-     Text("Or scan: MoodPals → Settings → Connected Devices")
-       .font(.system(size:10)).foregroundStyle(.secondary).multilineTextAlignment(.center)
-     if let qrImageURL {
-      AsyncImage(url:qrImageURL){phase in
-       switch phase {
-       case .success(let image): image.resizable().interpolation(.none).scaledToFit()
-       case .failure: Image(systemName:"exclamationmark.triangle").foregroundStyle(.orange)
-       default: ProgressView()
-       }
-      }.frame(width:118,height:118).padding(4).background(.white,in:RoundedRectangle(cornerRadius:8))
-     }
-     if !sync.pairingActive {
-      Button("Show linking QR"){Task {await sync.startPairing()}}
-     } else {
+     if sync.pairingActive && !sync.pairingCode.isEmpty {
+      Text(spacedCode)
+        .font(.system(size:30,weight:.bold,design:.rounded)).monospacedDigit()
+        .accessibilityLabel("Link code "+sync.pairingCode.map(String.init).joined(separator:" "))
+      Text("Or on your iPhone: MoodPals → Settings → Connected Devices → enter this code")
+        .font(.system(size:10)).foregroundStyle(.secondary).multilineTextAlignment(.center)
       Text("Code expires in 5 minutes").font(.system(size:10)).foregroundStyle(.secondary)
-      Button("New QR code"){Task {await sync.startPairing()}}
+      Button("New code"){Task {await sync.startPairing()}}
+     } else if !sync.pairingActive {
+      Button("Show link code"){Task {await sync.startPairing()}}
      }
      if !sync.pairingActive { Text(sync.message).font(.caption2).multilineTextAlignment(.center) }
     }

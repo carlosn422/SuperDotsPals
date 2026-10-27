@@ -9,7 +9,7 @@ export const PLUS_MOCKUP=!RC_KEY;
 export const PLUS_ENTITLEMENT='plus';
 
 export type PlusPlan='monthly'|'annual';
-export type PlusFeature='general'|'trends'|'customization'|'circles'|'reflections';
+export type PlusFeature='general'|'trends'|'customization'|'circles'|'reflections'|'family';
 export type PlusPrice={price:string;period:string;label:string;note?:string};
 
 export const PLUS_PRICES:Record<PlusPlan,PlusPrice>={
@@ -23,12 +23,14 @@ export const FEATURE_COPY:Record<PlusFeature,{title:string;body:string}>={
  customization:{title:'More customization',body:'Unlock extra watch colours and ways to make MoodPals yours.'},
  circles:{title:'Bigger circles',body:'Create more private groups for the people closest to you.'},
  reflections:{title:'AI reflections',body:'Get gentle reflections on your check-ins, up to 100 a month.'},
+ family:{title:'More family watches',body:'Link up to 4 family watches, each with its own mood-only profile. Free includes 1.'},
 };
 
 export const PLAN_FEATURES:{label:string;free:string|boolean;plus:string|boolean}[]=[
  {label:'Six MoodPal characters',free:true,plus:true},
  {label:'Mood check-ins and basic history',free:true,plus:true},
  {label:'Apple Watch app and complications',free:true,plus:true},
+ {label:'Family watches (mood-only)',free:'1',plus:'Up to 4'},
  {label:'Advanced trends and full history',free:false,plus:true},
  {label:'Extra customization',free:false,plus:true},
  {label:'Private circles',free:'1 group',plus:'Expanded'},

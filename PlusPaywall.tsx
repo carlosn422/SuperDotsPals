@@ -10,6 +10,7 @@ const BENEFITS:{icon:React.ComponentProps<typeof Ionicons>['name'];text:string}[
  {icon:'stats-chart',text:'Advanced wellness trends and full history'},
  {icon:'color-palette',text:'Extra customization for app and watch'},
  {icon:'people',text:'Expanded private circles'},
+ {icon:'watch',text:'Up to 4 family watches'},
  {icon:'sparkles',text:'Up to 100 AI reflections each month'},
 ];
 const TERMS='Payment is charged to your Apple Account when you confirm. The subscription renews automatically unless cancelled at least 24 hours before the end of the current period. Manage or cancel any time in your Apple Account settings.';
@@ -62,6 +63,9 @@ const TRY:{feature:PlusFeature;label:string;icon:React.ComponentProps<typeof Ion
  {feature:'reflections',label:'Get an AI reflection',icon:'sparkles-outline'},
 ];
 
+// Apple's own subscription management page; MoodPals never cancels billing itself.
+export function openManageSubscriptions(){void Linking.openURL('https://apps.apple.com/account/subscriptions').catch(()=>Alert.alert('Manage Subscription','Open Settings → your name → Subscriptions on this iPhone.'))}
+
 export function PlusSettingsScreen({onBack,accent}:{onBack:()=>void;accent:string}){
  const {isPlus,plan,prices,showPaywall,restore,resetToFree}=usePlus();
  return <View style={{gap:14}}>
@@ -74,7 +78,7 @@ export function PlusSettingsScreen({onBack,accent}:{onBack:()=>void;accent:strin
    <View style={s.row}><Text style={[s.cell,{flex:1.6}]}/><Text style={s.head}>Free</Text><Text style={[s.head,{color:T.primary}]}>Plus</Text></View>
    {PLAN_FEATURES.map(f=><View key={f.label} style={s.row}><Text style={[s.cell,{flex:1.6}]}>{f.label}</Text><Cell v={f.free}/><Cell v={f.plus} plus/></View>)}
   </View>
-  {isPlus?null:<TouchableOpacity accessibilityRole="button" onPress={()=>showPaywall('general')} style={s.cta}><Text style={s.ctaText}>Upgrade to Plus</Text></TouchableOpacity>}
+  {isPlus?<TouchableOpacity accessibilityRole="button" onPress={openManageSubscriptions} style={s.cta}><Text style={s.ctaText}>Manage Subscription</Text></TouchableOpacity>:<TouchableOpacity accessibilityRole="button" onPress={()=>showPaywall('general')} style={s.cta}><Text style={s.ctaText}>Upgrade to Plus</Text></TouchableOpacity>}
   <TouchableOpacity accessibilityRole="button" onPress={()=>void restore().then(ok=>Alert.alert(ok?'Purchases restored':'Nothing to restore',ok?'MoodPals Plus is active.':'We couldn\'t find a MoodPals Plus subscription for this Apple Account.'))}><Text style={s.restore}>Restore Purchases</Text></TouchableOpacity>
   <Text style={s.terms}>Plus works without an account. You only need to sign in to sync across devices or use My Circle, and your subscription moves with you when you do.</Text>
   {PLUS_MOCKUP?<View style={[s.card,{gap:4}]}>

@@ -2,6 +2,10 @@ import React,{useCallback,useEffect,useState} from 'react';
 import {ActivityIndicator,Alert,AppState,Image,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {supabase} from './supabase';
+import type {User} from '@supabase/supabase-js';
+import {appleAvailable,appleCredential,hasApple,linkApple} from './AppleAuth';
+import {openManageSubscriptions} from './PlusPaywall';
+import {usePlus} from './PlusStore';
 import {APP_THEME as T} from './MoodMascot';
 
 const CALM=require('./assets/mascot-animations/disgust/preview400/frame_000.png');
@@ -17,16 +21,67 @@ export function useIsGuest(){
  return guest;
 }
 
-export function confirmDeleteAccount(){
- Alert.alert('Delete your account?','This permanently deletes your MoodPals account and everything in it: check-ins, diary, saved health readings, conversations and My Circle. This can\'t be undone.\n\nDeleting your account doesn\'t cancel MoodPals Plus. Cancel it in your Apple Account subscriptions.',[
-  {text:'Cancel',style:'cancel'},
-  {text:'Delete account',style:'destructive',onPress:()=>void (async()=>{
-   const {data,error}=await supabase.functions.invoke('delete-account',{body:{confirm:true}});
-   if(error||!data?.deleted){Alert.alert('Couldn’t delete your account','Please try again, or email hello@moodpals.com.');return;}
+const DELETED_ITEMS=['Your MoodPals profile','Your linked family profiles and their family watches','Your mood history','Your stored health and wellness data','Your Circle memberships and group assignments','Your emoji reactions and notifications','Your linked Apple Watch connections','Your account preferences and other personal information'];
+
+export function DeleteAccountScreen({accent,onBack}:{accent:string;onBack:()=>void}){
+ const {isPlus}=usePlus();
+ const [user,setUser]=useState<User|null>(null),[password,setPassword]=useState(''),[typed,setTyped]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ useEffect(()=>{void supabase.auth.getUser().then(({data})=>setUser(data.user))},[]);
+ const guest=!!user?.is_anonymous,withPassword=!!user?.identities?.some(i=>i.provider==='email'),withApple=hasApple(user?.identities);
+ const ready=typed==='DELETE'&&!busy&&!!user&&(guest||(withPassword&&password.length>0)||withApple);
+ async function remove(){
+  if(!ready||!user)return;
+  setBusy(true);setError('');
+  try{
+   // Sign in again right before deleting; the server rejects sessions older than a few minutes.
+   let appleAuthorizationCode:string|null=null;
+   if(!guest){
+    if(withPassword&&password){const {error}=await supabase.auth.signInWithPassword({email:user.email||'',password});if(error)throw Error('That password isn’t right.')}
+    else{const c=await appleCredential();if(!c)return;const {error}=await supabase.auth.signInWithIdToken({provider:'apple',token:c.token,nonce:c.nonce});if(error)throw error;appleAuthorizationCode=c.code}
+   }
+   const {data,error}=await supabase.functions.invoke('delete-account',{body:{confirm:true,...(appleAuthorizationCode?{appleAuthorizationCode}:{})}});
+   if(error||!data?.deleted){
+    let msg=data?.error;
+    if(!msg&&error&&'context' in error){try{msg=(await (error as any).context.json())?.error}catch{}}
+    throw Error(msg||'Couldn’t delete your account. Please try again, or email hello@moodpals.com.');
+   }
    await supabase.auth.signOut({scope:'local'});
    Alert.alert('Account deleted','Your MoodPals account and its data have been deleted.');
-  })()},
- ]);
+  }catch(e:any){setError(e.message||'Couldn’t delete your account.')}
+  finally{setBusy(false)}
+ }
+ return <View style={{gap:14}}>
+  <Back label="Settings" accent={accent} onPress={onBack}/>
+  <Text style={[s.title,{textAlign:'left'}]}>Permanently delete your MoodPals account?</Text>
+  <View style={s.card}>
+   <Text style={[s.body,{textAlign:'left'}]}>Deleting your account will permanently remove:</Text>
+   {DELETED_ITEMS.map(i=><Text key={i} style={[s.body,{textAlign:'left'}]}>• {i}</Text>)}
+   <Text style={[s.body,{textAlign:'left',fontWeight:'800'}]}>This action cannot be undone.</Text>
+  </View>
+  <View style={s.card}>
+   <Text style={[s.body,{textAlign:'left',fontWeight:'800'}]}>Deleting your MoodPals account does not automatically cancel your Apple subscription.</Text>
+   <Text style={[s.body,{textAlign:'left'}]}>{isPlus?'You have MoodPals Plus. Cancel it through Apple if you don’t want to be charged again.':'If you ever subscribed to MoodPals Plus, manage it through Apple.'}</Text>
+   <TouchableOpacity accessibilityRole="button" onPress={openManageSubscriptions}><Text style={{color:accent,fontWeight:'800'}}>Manage Subscription ›</Text></TouchableOpacity>
+  </View>
+  {!guest&&withPassword?<TextInput value={password} onChangeText={setPassword} secureTextEntry autoComplete="current-password" placeholder="Your password" placeholderTextColor="#9690AF" editable={!busy} style={s.input} accessibilityLabel="Your password"/>:null}
+  {!guest&&!withPassword&&withApple?<Text style={[s.body,{textAlign:'left'}]}>You’ll confirm with Apple when you tap Delete.</Text>:null}
+  {!guest&&withPassword&&withApple?<Text style={[s.body,{textAlign:'left'}]}>Or leave the password empty to confirm with Apple instead.</Text>:null}
+  <Text style={[s.body,{textAlign:'left',fontWeight:'700'}]}>Type DELETE to confirm.</Text>
+  <TextInput value={typed} onChangeText={setTyped} autoCapitalize="characters" autoCorrect={false} placeholder="DELETE" placeholderTextColor="#9690AF" editable={!busy} style={s.input} accessibilityLabel="Type DELETE to confirm"/>
+  {error?<Text style={[s.body,{color:'#D65B79'}]}>{error}</Text>:null}
+  <TouchableOpacity accessibilityRole="button" disabled={!ready} onPress={()=>void remove()} style={[s.cta,{backgroundColor:'#D65B79'},!ready&&{opacity:.45}]}>{busy?<ActivityIndicator color="#fff"/>:<Text style={s.ctaText}>Delete Account</Text>}</TouchableOpacity>
+ </View>;
+}
+
+export function useAppleLink(){
+ const [linked,setLinked]=useState(false),[available,setAvailable]=useState(false);
+ const refresh=useCallback(async()=>{const {data}=await supabase.auth.getUser();setLinked(hasApple(data.user?.identities))},[]);
+ useEffect(()=>{void refresh();void appleAvailable().then(setAvailable)},[refresh]);
+ const link=useCallback(async()=>{
+  try{if(await linkApple()==='linked'){await refresh();Alert.alert('Apple linked','You can now sign in with Apple or with your email and password. Your MoodPals data stays the same.')}}
+  catch(e:any){Alert.alert('Couldn’t link Apple',e?.message||'Please try again.')}
+ },[refresh]);
+ return {linked,available,link};
 }
 
 function Back({label,accent,onPress}:{label:string;accent:string;onPress:()=>void}){

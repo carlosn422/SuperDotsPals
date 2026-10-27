@@ -16,6 +16,15 @@ public class WatchLinkModule: Module {
     Function("getPendingPairing") { () -> [String: String]? in
       WatchLinkSession.shared.pendingPairing()
     }
+
+    Function("getWatchStatus") { () -> [String: Bool] in
+      WatchLinkSession.shared.status()
+    }
+
+    /// Asks the MoodPals watch app to start linking; it answers with its pairing request.
+    Function("requestPairing") { () -> Bool in
+      WatchLinkSession.shared.requestPairing()
+    }
   }
 }
 
@@ -34,6 +43,24 @@ final class WatchLinkSession: NSObject, WCSessionDelegate {
   func pendingPairing() -> [String: String]? {
     guard WCSession.isSupported(), WCSession.default.activationState == .activated else { return nil }
     return Self.pairing(from: WCSession.default.receivedApplicationContext)
+  }
+
+  func status() -> [String: Bool] {
+    guard WCSession.isSupported(), WCSession.default.activationState == .activated else {
+      return ["paired": false, "installed": false, "reachable": false]
+    }
+    let session = WCSession.default
+    return ["paired": session.isPaired, "installed": session.isWatchAppInstalled, "reachable": session.isReachable]
+  }
+
+  func requestPairing() -> Bool {
+    guard WCSession.isSupported() else { return false }
+    let session = WCSession.default
+    guard session.activationState == .activated, session.isPaired, session.isWatchAppInstalled else { return false }
+    let request: [String: Any] = ["requestPairing": Date().timeIntervalSince1970]
+    try? session.updateApplicationContext(request)
+    if session.isReachable { session.sendMessage(request, replyHandler: nil, errorHandler: nil) }
+    return true
   }
 
   private static func pairing(from payload: [String: Any]) -> [String: String]? {

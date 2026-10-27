@@ -31,7 +31,7 @@ export function StressHero({name,mood,onCheckin}:{name?:string;mood:string;onChe
  async function sync(silent=false){
   setSyncing(true);
   try{await syncNativeHealth();await AsyncStorage.setItem(SYNC_FLAG,'1');await reload();void enableHealthBackgroundUpdates()}
-  catch(e:any){if(!silent)Alert.alert('Health sync unavailable',e?.message||'Please retry in a native iOS build.')}
+  catch(e:any){if(!silent)Alert.alert('Health sync unavailable','Could not connect to Apple Health. Please make sure you have granted permissions in the Health app.')}
   finally{setSyncing(false)}
  }
  useEffect(()=>{if(autoSynced||!available)return;autoSynced=true;void AsyncStorage.getItem(SYNC_FLAG).then(flag=>{if(flag)void sync(true)})},[available]);

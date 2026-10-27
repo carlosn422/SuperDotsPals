@@ -9,6 +9,8 @@ struct ContentView: View {
     @State private var choosingMood = false
     @State private var moodPage = 0
     @State private var choosingTheme = false
+    @ObservedObject private var circle = WatchCircleStore.shared
+    @State private var showingCircle = false
 
     private let moods = ["Joyful", "Calm", "Sad", "Angry", "Anxious", "Tired"]
     private var purple: Color { store.theme.accent }
@@ -24,10 +26,13 @@ struct ContentView: View {
     private func selectMood(_ mood: String) {
         choosingMood = false
         store.setMood(mood, at: Date())
+        // Only a mood picked here notifies the Circle; sync and restore never do.
+        circle.recordMoodChange(mood)
         WKInterfaceDevice.current().play(.click)
         Task {
             do { try await sync.submitMood(mood, store: store) }
             catch { sync.message = "Mood could not sync. Please retry." }
+            await circle.flushMoodShares()
         }
     }
 
@@ -134,24 +139,31 @@ struct ContentView: View {
                         Text(shownMood).font(.headline)
                         Text(store.moodFromHealth(at: context.date) ? "From your heart data" : "Tap to change mood").font(.caption2).foregroundStyle(.secondary)
                         }
-                        StressSummary(reading: store.stress, calibrating: store.stressCalibrating, theme: store.theme)
+                        if !sync.moodOnly {
+                            StressSummary(reading: store.stress, calibrating: store.stressCalibrating, theme: store.theme)
+                        }
                         HStack(spacing: 6) {
-                            Button {
-                                measuring = true
-                            } label: {
-                                Label("Measure now", systemImage: "heart.circle.fill")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .padding(.horizontal, 10)
-                                    .frame(height: 26)
-                                    .background(Capsule().fill(purple))
+                            if !sync.moodOnly {
+                                Button {
+                                    measuring = true
+                                } label: {
+                                    Label("Measure now", systemImage: "heart.circle.fill")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .padding(.horizontal, 10)
+                                        .frame(height: 26)
+                                        .background(Capsule().fill(purple))
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                             Button { choosingTheme = true } label: {
                                 Circle().fill(purple).frame(width: 20, height: 20)
                                     .overlay(Circle().stroke(.white, lineWidth: 1.5))
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel("Theme colour \(store.theme.label). Tap to change.")
+                            if sync.connected {
+                                CircleButton(unread: circle.unread.count, accent: purple) { showingCircle = true }
+                            }
                         }
                         Spacer(minLength: 0)
                     }
@@ -173,11 +185,35 @@ struct ContentView: View {
         .sheet(isPresented: $choosingTheme) {
             NavigationStack { WatchThemePicker() }.environmentObject(store)
         }
+        .sheet(isPresented: $showingCircle) {
+            NavigationStack { WatchCircleList() }
+        }
+        .overlay {
+            ZStack {
+                if let reaction = circle.floating {
+                    FloatingReactionView(reaction: reaction)
+                        .transition(.asymmetric(insertion: .identity, removal: .opacity))
+                }
+                if let summary = circle.summary {
+                    FloatingSummaryView(summary: summary) { showingCircle = true }
+                        .transition(.asymmetric(insertion: .identity, removal: .opacity))
+                }
+            }
+            .animation(.easeIn(duration: WatchCircleStore.fadeDuration), value: circle.floating?.id)
+            .animation(.easeIn(duration: WatchCircleStore.fadeDuration), value: circle.summary?.id)
+        }
+        // Circle reactions only float while the app is open in the foreground.
+        .onChange(of: scenePhase == .active && sync.connected && !sync.pairingActive, initial: true) { _, isActive in
+            circle.setActive(isActive)
+        }
+        .onChange(of: choosingMood || measuring || choosingTheme || showingCircle || store.applyingTheme != nil, initial: true) { _, covered in
+            circle.hold = covered
+        }
         .task {
             #if DEBUG && targetEnvironment(simulator)
             await SimulatorDemo.seedHealthIfNeeded()
             #endif
-            if await HealthStressMonitor.shared.requestAuthorization() {
+            if !sync.moodOnly, await HealthStressMonitor.shared.requestAuthorization() {
                 HealthStressMonitor.shared.startObserving()
                 await HealthStressMonitor.shared.recompute(upload: sync.connected)
             }
@@ -185,7 +221,7 @@ struct ContentView: View {
         }
         .task(id: sync.connected) {
             guard sync.connected else { return }
-            // The root view stays alive after QR pairing completes.
+            // The root view stays alive after pairing completes.
             // Keep the latest iPhone check-in in sync while the watch is open.
             await sync.refresh(store: store)
             while !Task.isCancelled && sync.connected {

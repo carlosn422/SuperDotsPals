@@ -59,7 +59,7 @@ export function MeetYourMoods({onCheckin}:{onCheckin:()=>void}){
    </TouchableOpacity>
  </View>;
 }
-export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,onChat,onActions,onCaffeine,onJournal,onAddWater,onAddCaffeine,addingWater,addingCaffeine,socialCard}:{socialCard?:React.ReactNode;companion:string;accent:string;water:number;caffeine:number;mood:string;onCheckin:()=>void;onChat:()=>void;onActions:()=>void;onCaffeine:()=>void;onJournal:()=>void;onAddWater:()=>void;onAddCaffeine:()=>void;addingWater:boolean;addingCaffeine:boolean}){
+export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,onChat,onActions,onCaffeine,onJournal,onAddWater,onAddCaffeine,addingWater,addingCaffeine,socialCard,dayRow}:{socialCard?:React.ReactNode;dayRow?:React.ReactNode;companion:string;accent:string;water:number;caffeine:number;mood:string;onCheckin:()=>void;onChat:()=>void;onActions:()=>void;onCaffeine:()=>void;onJournal:()=>void;onAddWater:()=>void;onAddCaffeine:()=>void;addingWater:boolean;addingCaffeine:boolean}){
  const today=new Date();
  const date=today.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
  const row=(icon:any,label:string,detail:string,onPress:()=>void,quickAdd?:()=>void,adding=false)=>(
@@ -71,6 +71,7 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
  );
  return <View style={[s.page,{gap:17}]}>
   <StressHero mood={companion} onCheckin={onCheckin}/>
+  {dayRow}
   <EnergyCard/>
   <HrvTrendCard/>
   <HeartRateCard/>

@@ -4,7 +4,7 @@ import {supabase} from './supabase';
 import {WatchPairing,getPendingWatchPairing,onWatchPairingRequest} from './modules/watch-link';
 
 // The MoodPals watch app shares its one-time pairing code over WatchConnectivity,
-// so a signed-in iPhone links it without scanning the QR code. Guests are asked to
+// so a signed-in iPhone links it without typing a code. Guests are asked to
 // create an account first; the same request is approved once they have one.
 export function useWatchAutoLink(isGuest:boolean,onCreateAccount:()=>void){
  const approved=useRef(new Set<string>()),prompted=useRef(new Set<string>());

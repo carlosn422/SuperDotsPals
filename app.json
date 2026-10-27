@@ -13,7 +13,6 @@
       "appleTeamId": "Y355786FS4",
       "infoPlist": {
         "NSHealthShareUsageDescription": "Allow MoodPals to read heart rate variability, heart rate, resting heart rate, sleep, activity, daylight, mindful minutes and noise levels to estimate your stress and energy.",
-        "NSCameraUsageDescription": "Allow MoodPals to scan your Apple Watch pairing QR code.",
         "ITSAppUsesNonExemptEncryption": false,
         "NSHealthUpdateUsageDescription": "MoodPals reads your health data for wellness insights and does not write to Apple Health."
       },
@@ -21,7 +20,8 @@
         "com.apple.security.application-groups": [
           "group.com.superdotspals.wellnest"
         ]
-      }
+      },
+      "usesAppleSignIn": true
     },
     "android": {
       "package": "com.superdotspals.wellnest",
@@ -53,16 +53,11 @@
         "expo-notifications",
         {}
       ],
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "Allow MoodPals to scan an Apple Watch pairing QR code."
-        }
-      ],
       "@bacons/apple-targets",
       "./scripts/with-watch-widget-embed.cjs",
       "./scripts/with-health-privacy.cjs",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-apple-authentication"
     ],
     "extra": {
       "eas": {

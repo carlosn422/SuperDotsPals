@@ -160,7 +160,7 @@ final class HealthStressMonitor: @unchecked Sendable {
     var readTypes: Set<HKObjectType> { [hrvType, rhrType, heartRateType] }
 
     func requestAuthorization() async -> Bool {
-        guard HKHealthStore.isHealthDataAvailable() else { return false }
+        guard !WatchProfile.moodOnly, HKHealthStore.isHealthDataAvailable() else { return false }
         do {
             try await store.requestAuthorization(toShare: [HKObjectType.workoutType()], read: readTypes)
             return true
@@ -172,7 +172,7 @@ final class HealthStressMonitor: @unchecked Sendable {
 
     /// Called at launch: observer queries must be registered before HealthKit can wake the app.
     func startObserving() {
-        guard HKHealthStore.isHealthDataAvailable() else { return }
+        guard !WatchProfile.moodOnly, HKHealthStore.isHealthDataAvailable() else { return }
         lock.lock(); defer { lock.unlock() }
         guard !observing else { return }
         observing = true
@@ -226,7 +226,7 @@ final class HealthStressMonitor: @unchecked Sendable {
     /// and optionally uploads it as a `computed` stress_score row.
     @discardableResult
     func recompute(upload: Bool) async -> StressReading? {
-        guard HKHealthStore.isHealthDataAvailable() else { return nil }
+        guard !WatchProfile.moodOnly, HKHealthStore.isHealthDataAvailable() else { return nil }
         let since = Date().addingTimeInterval(-(StressEngine.baselineDays + 2) * 86400)
         let (h, r) = await history(since: since)
         guard let point = StressEngine.latestPoint(hrv: h, rhr: r) else {
