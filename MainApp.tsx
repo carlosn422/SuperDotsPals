@@ -1,7 +1,7 @@
 import ConnectedDevices from './ConnectedDevices';
 import {FamilySwitcher} from './FamilyWatches';
 import MiniMoodCalendar from './MiniMoodCalendar';
-import FamilyTab from './FamilyTab';
+
 import SpiritualReading from './SpiritualReading';
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { AppState, StatusBar, ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Alert, useWindowDimensions, NativeSyntheticEvent, NativeScrollEvent, Animated, Modal } from 'react-native';
@@ -32,10 +32,10 @@ import {useStress} from './StressDashboard';
 import {displayMood,manualMoodActive,MANUAL_MOOD_HOLD_MS} from './StressEngine';
 import Svg, { Circle, Line, Path, Rect, Defs, LinearGradient, Stop, Polygon } from 'react-native-svg';
 
-type Tab = 'Today' | 'Circle' | 'Family' | 'Actions' | 'Trends' | 'Health' | 'Settings';
+type Tab = 'Today' | 'Circle' | 'Watches' | 'Actions' | 'Trends' | 'Health' | 'Settings';
 type Period = 'Day' | 'Week' | 'Month' | 'Year';
 const C = { ink:APP_THEME.ink, muted:APP_THEME.muted, green:APP_THEME.primary, deep:APP_THEME.primary, surface:APP_THEME.surface, bg:APP_THEME.background, mint:APP_THEME.primarySoft, peach:'#FFF0DE', orange:'#F4A570', lilac:APP_THEME.primarySoft, purple:APP_THEME.primary, line:APP_THEME.border, red:'#EC7D8C' };
-const tabs: {name:Tab}[] = [{name:'Today'},{name:'Circle'},{name:'Family'},{name:'Settings'}];
+const tabs: {name:Tab}[] = [{name:'Today'},{name:'Circle'},{name:'Watches'},{name:'Settings'}];
 type MorePage='Actions'|'Health'|'Trends';
 const NAV_ITEMS=tabs.length+1;
 const MORE_ITEMS:MoreItem[]=[
@@ -129,7 +129,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   return()=>{active=false;appState.remove();if(channel)void supabase.removeChannel(channel)};
  },[]);
  useEffect(()=>{const open=(url:string|null)=>{const m=url?.match(/^wellnest:\/\/circle\/?(\w*)/);if(m)setCircleSheet([{name:m[1]==='send'?'send':'today'}])};Linking.getInitialURL().then(open).catch(()=>{});const sub=Linking.addEventListener('url',e=>open(e.url));return()=>sub.remove()},[]);
- useEffect(()=>{const sub=Notifications.addNotificationResponseReceivedListener(r=>{if(r.notification.request.content.data?.action==='breathing'){go('Actions');openAction('breathing')}else if(r.notification.request.content.data?.action==='circle'){const route=r.notification.request.content.data?.route;if(route==='family'){go('Family');return;}setCircleSheet([{name:route==='requests'?'requests':route==='friends'?'friends':'today'}])}});return()=>sub.remove()},[pageWidth]);
+ useEffect(()=>{const sub=Notifications.addNotificationResponseReceivedListener(r=>{if(r.notification.request.content.data?.action==='breathing'){go('Actions');openAction('breathing')}else if(r.notification.request.content.data?.action==='circle'){const route=r.notification.request.content.data?.route;if(route==='watches'){go('Watches');return;}setCircleSheet([{name:route==='requests'?'requests':route==='friends'?'friends':'today'}])}});return()=>sub.remove()},[pageWidth]);
  const [water,setWater]=useState(0);
  const [coffee,setCoffee]=useState(0);
  useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;
@@ -186,7 +186,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   <ScrollView ref={pager} horizontal pagingEnabled bounces={false} showsHorizontalScrollIndicator={false} scrollEventThrottle={16} onMomentumScrollEnd={onPageSettled} directionalLockEnabled style={{flex:1}} keyboardShouldPersistTaps="handled">
   <View key="Today" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><FamilySwitcher disabled={isGuest} focused={tab==='Today'&&!moreScreen} onAdd={()=>{go('Settings');setSettingsPage('devices')}}><WellnessToday dayRow={isGuest?null:<MiniMoodCalendar/>} socialCard={<LittleSignalsTodayCard onOpenSignals={()=>setCircleSheet([{name:'today'}])} onSend={()=>setCircleSheet([{name:'send'}])}/>} companion={shownMood} accent={colors.accent} water={water} caffeine={coffee} mood={mood} onCheckin={()=>{go('Actions');openAction('checkin')}} onChat={()=>{go('Actions');openAction('chat')}} onActions={()=>{go('Actions');setActionView(null);setActionDetail('water')}} onCaffeine={()=>{go('Actions');setActionView(null);setActionDetail('caffeine')}} onJournal={()=>{go('Actions');openAction('history')}} onAddWater={()=>void quickAddHabit('water')} onAddCaffeine={()=>void quickAddHabit('caffeine')} addingWater={quickAdding.water} addingCaffeine={quickAdding.caffeine}/></FamilySwitcher></ScrollView></View>
   <View key="Circle" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">{isGuest?<AccountRequired accent={colors.accent} backLabel="Today" onBack={()=>go('Today')} onCreate={()=>{go('Settings');setSettingsPage('account')}}/>:<CircleNavigator onExit={()=>go('Today')} mood={mood}/>}</ScrollView></View>
-  <View key="Family" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>{isGuest?<AccountRequired accent={colors.accent} backLabel="Today" onBack={()=>go('Today')} onCreate={()=>{go('Settings');setSettingsPage('account')}}/>:<FamilyTab onAdd={()=>{go('Settings');setSettingsPage('devices')}}/>}</ScrollView></View>
+  <View key="Watches" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>{isGuest?<AccountRequired accent={colors.accent} backLabel="Today" onBack={()=>go('Today')} onCreate={()=>{go('Settings');setSettingsPage('account')}}/>:<ConnectedDevices/>}</ScrollView></View>
   <View key="Settings" style={{width:pageWidth,flex:1}}><ScrollView ref={settingsScroll} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
    {settingsPage==='main'?<>
     <WellnessSettingsIntro companion={shownMood} accent={colors.accent}/>
@@ -237,7 +237,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
     {navWidth>0?<Animated.View pointerEvents="none" style={[s.slidingPill,{backgroundColor:NAV_PILL,width:(navWidth-8)/NAV_ITEMS,transform:[{translateX:activePosition.interpolate({inputRange:[0,NAV_ITEMS-1],outputRange:[0,(NAV_ITEMS-1)*(navWidth-8)/NAV_ITEMS]})}]}]}/>:null}
     {[...tabs.map(t=>t.name as string),'More'].map(name=>{
     const active=name==='More'?!!moreScreen:!moreScreen&&tab===name;
-    const icon=name==='Circle'?'people':name==='Family'?'watch':name==='Settings'?'settings':name==='More'?'ellipsis-horizontal':'calendar';
+    const icon=name==='Circle'?'people':name==='Watches'?'watch':name==='Settings'?'settings':name==='More'?'ellipsis-horizontal':'calendar';
     return <TouchableOpacity key={name} accessibilityRole="tab" accessibilityLabel={name==='Circle'&&circleUnread>0?`Circle, ${circleUnread} unread`:name==='More'?'More: Actions, Health, Trends and more':name}
       accessibilityState={{selected:active}} activeOpacity={0.8}
       style={s.tab} onPress={()=>name==='More'?setMoreOpen(true):go(name as Tab)}>
