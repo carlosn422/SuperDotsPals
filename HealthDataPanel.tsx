@@ -161,7 +161,7 @@ export default function HealthDataPanel(){
  async function connect(){
   setSyncing(true);try{const count=await syncNativeHealth();await reload();
    Alert.alert('Apple Health sync',count?'Synced '+count+' real measurements to your private MoodPals account.':'No permitted health samples were found. You can review Health permissions in iOS Settings.');
-  }catch(e:any){Alert.alert('Health sync unavailable',e?.message||'Please retry in a native development build.')}finally{setSyncing(false)}
+  }catch(e:any){Alert.alert('Health sync unavailable','Could not connect to Apple Health. Please make sure you have granted permissions in the Health app.')}finally{setSyncing(false)}
  }
  const measurements=[
   {metric:'hrv' as Metric,name:'HRV',unit:'ms',icon:'pulse-outline',tint:'#FFEAF0',reading:latest('hrv')},
