@@ -1,4 +1,4 @@
-import React,{useEffect,useMemo,useState} from 'react';
+import React,{createContext,useContext,useEffect,useMemo,useState} from 'react';
 import {View,Text,TouchableOpacity,StyleSheet,ActivityIndicator,Alert,Modal,ScrollView} from 'react-native';
 import Svg,{Circle,Line,Path,Rect} from 'react-native-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -59,7 +59,11 @@ export function StressHero({name,mood,onCheckin}:{name?:string;mood:string;onChe
 
 function Card({children,style}:{children:React.ReactNode;style?:any}){return <View style={[st.card,style]}>{children}</View>}
 
+export const ChartScrubContext=createContext<(active:boolean)=>void>(()=>{});
+
 export function HrvTrendCard(){
+ const setScrubbing=useContext(ChartScrubContext);
+ useEffect(()=>()=>setScrubbing(false),[setScrubbing]);
  const {readings,points}=useStress();
  const {width,onLayout}=useWidth();
  const [range,setRange]=useState<'day'|'week'>('day');
@@ -89,7 +93,7 @@ export function HrvTrendCard(){
     {sel!==null&&latest?<Line x1={x(latest.recorded_at)} x2={x(latest.recorded_at)} y1={pad} y2={H-pad} stroke={SW.ink} strokeWidth={1.5}/>:null}
     {hrv.map((r,i)=>{const p=scoreAt.get(r.recorded_at);return <Circle key={r.recorded_at} cx={x(r.recorded_at)} cy={y(r.value)} r={i===sel?7.5:5.5} fill="#fff" stroke={p?STRESS_LEVELS[p.level].color:'#B7C2C7'} strokeWidth={3}/>})}
    </Svg>:<View style={st.empty}><Ionicons name="pulse-outline" size={26} color={SW.muted}/><Text style={st.muted}>No HRV readings {range==='day'?'today':'this week'} yet. Apple Watch records HRV periodically and during Breathe sessions.</Text></View>}
-   {hrv.length?<View style={StyleSheet.absoluteFill} accessibilityHint="Drag across the chart to see each HRV reading" onStartShouldSetResponder={()=>true} onMoveShouldSetResponder={()=>true} onResponderTerminationRequest={()=>false} onResponderGrant={e=>scrub(e.nativeEvent.locationX)} onResponderMove={e=>scrub(e.nativeEvent.locationX)} onResponderRelease={()=>setSel(null)} onResponderTerminate={()=>setSel(null)}/>:null}
+   {hrv.length?<View style={StyleSheet.absoluteFill} accessibilityHint="Drag across the chart to see each HRV reading" onStartShouldSetResponder={()=>true} onMoveShouldSetResponder={()=>true} onResponderTerminationRequest={()=>false} onResponderGrant={e=>{setScrubbing(true);scrub(e.nativeEvent.locationX)}} onResponderMove={e=>scrub(e.nativeEvent.locationX)} onResponderRelease={()=>{setSel(null);setScrubbing(false)}} onResponderTerminate={()=>{setSel(null);setScrubbing(false)}}/>:null}
   </View>
   <View style={st.axis}>{labels.map((l,i)=><Text key={i} style={st.axisText}>{l}</Text>)}</View>
  </Card>;
