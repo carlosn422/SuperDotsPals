@@ -23,15 +23,7 @@ struct AnimatedMoodMascot: View {
     private var framesPerSecond: Double { Double(frameCount) / (sourceFrameCount / (30000.0 / 1001.0)) }
     private let frameCount = 36
 
-    private var emotion: String {
-        let value = mood.lowercased()
-        if ["happy","good","great","joy","excited","proud"].contains(where: value.contains) { return "joy" }
-        if ["anger","angry","frustrated","mad","irritated"].contains(where: value.contains) { return "anger" }
-        if ["fear","anxious","stress","worried","nervous","overwhelmed"].contains(where: value.contains) { return "fear" }
-        if ["tired","sleepy","exhausted","fatigued"].contains(where: value.contains) { return "tired" }
-        if ["sad","down","depressed","lonely"].contains(where: value.contains) { return "sadness" }
-        return "disgust"
-    }
+    private var emotion: String { MoodArt.emotion(mood) }
 
     private func frame(_ index: Int) -> UIImage? {
         UIImage(named: String(format: "%@_frame_%03d", emotion, index))

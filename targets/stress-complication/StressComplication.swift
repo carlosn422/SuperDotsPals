@@ -47,29 +47,21 @@ struct ComplicationTheme {
     }
 }
 
-/// Latest mood check-in written by the watch app (WatchMoodStore). A picked mood holds for an hour;
+/// Latest confirmed mood cached by the watch app (SharedMoodStore in targets/_shared). A picked mood holds for an hour;
 /// after that the MoodPal follows the latest stress score (same rule as the watch and iPhone apps).
+/// Without a cached mood (before the first sync) it shows Calm; a cached mood is never replaced while data is unavailable.
 struct ComplicationMood {
-    static let manualHold: TimeInterval = 3600
     var name: String
     var image: String
-    static var manualSetAt: Date {
-        Date(timeIntervalSince1970: UserDefaults(suiteName: "group.com.superdotspals.wellnest.watch")?.double(forKey: "currentMoodUpdated") ?? 0)
-    }
+    static var manualSetAt: Date { SharedMoodStore.load()?.updatedAt ?? Date(timeIntervalSince1970: 0) }
     static func load(at date: Date = .now) -> ComplicationMood {
-        var mood = UserDefaults(suiteName: "group.com.superdotspals.wellnest.watch")?.string(forKey: "currentMood") ?? "Calm"
-        if date.timeIntervalSince(manualSetAt) >= manualHold, let score = WatchStressSnapshot.load(at: date).score {
-            mood = score < 35 ? "Calm" : score < 60 ? "Joyful" : score < 80 ? "Anxious" : "Angry"
-        }
-        let v = mood.lowercased()
-        let key: String
-        if ["happy","good","great","joy","excited","proud"].contains(where: v.contains) { key = "joy" }
-        else if ["anger","angry","frustrated","mad","irritated"].contains(where: v.contains) { key = "anger" }
-        else if ["fear","anxious","stress","worried","nervous","overwhelmed"].contains(where: v.contains) { key = "fear" }
-        else if ["tired","sleepy","exhausted","fatigued"].contains(where: v.contains) { key = "tired" }
-        else if ["sad","down","depressed","lonely"].contains(where: v.contains) { key = "sadness" }
-        else { key = "disgust" }
-        return ComplicationMood(name: ["disgust","disgusted"].contains(v) ? "Calm" : mood.capitalized, image: "mood_\(key)")
+        let state = SharedMoodStore.load()
+        let stress = WatchStressSnapshot.load(at: date)
+        let d = UserDefaults(suiteName: SharedMoodStore.appGroup)
+        let stressAt = d.map { Date(timeIntervalSince1970: $0.double(forKey: "stressUpdated")) }
+        let mood = SharedMoodStore.display(manual: state?.mood ?? "Calm", setAt: state?.updatedAt ?? Date(timeIntervalSince1970: 0),
+                                           stressScore: stress.score, stressAt: stressAt, now: date)
+        return ComplicationMood(name: mood.capitalized, image: "mood_\(MoodArt.emotion(mood))")
     }
 }
 
@@ -109,7 +101,7 @@ struct ComplicationProvider: TimelineProvider {
     func getTimeline(in context: Context, completion: @escaping (Timeline<ComplicationEntry>) -> Void) {
         var entries = [ComplicationEntry.at(.now)]
         // Switch from the picked mood to the stress-based mood when the one-hour hold ends.
-        let holdEnds = ComplicationMood.manualSetAt.addingTimeInterval(ComplicationMood.manualHold)
+        let holdEnds = ComplicationMood.manualSetAt.addingTimeInterval(SharedMoodStore.manualHold)
         if holdEnds > .now { entries.append(.at(holdEnds.addingTimeInterval(1))) }
         completion(Timeline(entries: entries, policy: .after(.now.addingTimeInterval(1800))))
     }

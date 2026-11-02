@@ -7,6 +7,7 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { AppState, StatusBar, ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Alert, useWindowDimensions, NativeSyntheticEvent, NativeScrollEvent, Animated, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {supabase} from './supabase';
+import {sendMoodToWatch} from './modules/watch-link';
 import SuperdotMascot from './SuperdotMascot';
 import BreathingStudio from './BreathingStudio';
 import WellnessCompanion from './WellnessCompanion';
@@ -129,6 +130,11 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   });
   return()=>{active=false;appState.remove();if(channel)void supabase.removeChannel(channel)};
  },[]);
+ // Forward each saved mood to the Apple Watch so its complication updates without opening the watch app.
+ useEffect(()=>{
+  if(!mood||!moodAt)return;
+  void supabase.auth.getSession().then(({data:{session}})=>{if(session?.user.id)sendMoodToWatch(mood,moodAt,session.user.id)});
+ },[mood,moodAt]);
  useEffect(()=>{const open=(url:string|null)=>{const m=url?.match(/^wellnest:\/\/circle\/?(\w*)/);if(m)setCircleSheet([{name:m[1]==='send'?'send':'today'}])};Linking.getInitialURL().then(open).catch(()=>{});const sub=Linking.addEventListener('url',e=>open(e.url));return()=>sub.remove()},[]);
  useEffect(()=>{const sub=Notifications.addNotificationResponseReceivedListener(r=>{if(r.notification.request.content.data?.action==='breathing'){go('Actions');openAction('breathing')}else if(r.notification.request.content.data?.action==='circle'){const route=r.notification.request.content.data?.route;if(route==='watches'){go('Watches');return;}setCircleSheet([{name:route==='requests'?'requests':route==='friends'?'friends':'today'}])}});return()=>sub.remove()},[pageWidth]);
  const [water,setWater]=useState(0);

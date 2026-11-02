@@ -111,14 +111,7 @@ final class WatchThemeSync: ObservableObject {
             }
         }
         do {
-            let data = try await request("/rest/v1/wellness_journal?select=mood,occurred_at&user_id=eq.\(userId)&mood=not.is.null&order=occurred_at.desc&limit=1",method:"GET")
-            let rows = try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
-            let savedMood = (rows.first?["mood"] as? String) ?? store.currentMood
-            NSLog("[WatchSync] Latest mood from account: %@", savedMood)
-            let mood = ["disgust","disgusted"].contains(savedMood.lowercased()) ? "Calm" : savedMood
-            let savedAt = Self.parseTimestamp(rows.first?["occurred_at"] as? String)
-                ?? (mood == store.currentMood ? store.currentMoodAt : Date())
-            store.setMood(mood, at: savedAt)
+            try await reconcileMood(store: store)
             moodLoaded = true
         } catch {
             NSLog("[WatchSync] Mood sync failed: %@", error.localizedDescription)
@@ -187,7 +180,38 @@ final class WatchThemeSync: ObservableObject {
         message = syncWarning.map { "Account verified. Sync issue: \($0)" } ?? "Connected and synced: \(store.currentMood)."
     }
 
+    /// Applies the account's latest mood (the backend is authoritative) unless a newer mood was saved
+    /// on this watch or delivered by the iPhone while the request was in flight.
+    func reconcileMood(store: WatchStore?) async throws {
+        let startVersion = SharedMoodStore.version
+        let path = "/rest/v1/wellness_journal?select=mood,occurred_at&user_id=eq.\(userId)&mood=not.is.null&order=occurred_at.desc&limit=1"
+        let data: Data
+        do { data = try await request(path, method: "GET", timeout: 15) }
+        catch SyncError.server(401, _, _) {
+            try await renewIfNeeded()
+            data = try await request(path, method: "GET", timeout: 15)
+        }
+        let rows = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] ?? []
+        guard let row = rows.first, let mood = row["mood"] as? String, !mood.isEmpty,
+              let at = Self.parseTimestamp(row["occurred_at"] as? String) else { return }
+        NSLog("[WatchSync] Latest mood from account: %@", mood)
+        if let store { store.setMood(mood, at: at, if: .unchangedSince(version: startVersion)) }
+        else { WatchMoodStore.save(mood, at: at, if: .unchangedSince(version: startVersion)) }
+    }
+
+    /// Mood-only reconcile for watchOS background refresh: one small request, no token rotation unless it expired.
+    func backgroundReconcile() async {
+        guard connected, !refreshToken.isEmpty, !userId.isEmpty else { return }
+        do { try await reconcileMood(store: nil) }
+        catch { NSLog("[WatchSync] Background mood reconcile failed: %@", error.localizedDescription) }
+        await WatchCircleStore.shared.flushMoodShares()
+    }
+
+    /// Mood payloads from the iPhone are only applied for the account signed in on this watch.
+    func isSignedIn(as user: String) -> Bool { connected && !userId.isEmpty && user == userId }
+
     func signOut() {
+        WatchMoodStore.clear()
         for key in ["watch_access","watch_refresh","watch_user","watch_pairing_id"] { storeSecret(nil,for:key) }
         accessToken = ""; refreshToken = ""; userId = ""; pairingId = ""; pairingSecret = ""; pairingCode = ""; pairingActive = false; pairingConnecting = false; connected = false; moodLoaded = false; sessionVerified = false; needsReconnect = false; syncWarning = nil
         WatchCircleStore.shared.reset()
@@ -208,8 +232,11 @@ final class WatchThemeSync: ObservableObject {
         let payload = try JSONSerialization.data(withJSONObject:[
             "user_id":userId, "entry_type":"reflection", "body":"Watch mood check-in",
             "mood":mood, "reflection_answers":answers, "stress_factors":[]] as [String:Any])
-        _ = try await request("/rest/v1/wellness_journal", method:"POST", body:payload)
-        store.setMood(mood, at: Date())
+        let data = try await request("/rest/v1/wellness_journal?select=occurred_at", method:"POST", body:payload, extraHeaders:["Prefer":"return=representation"])
+        // The saved row's timestamp keeps the watch, iPhone and backend comparing the same clock.
+        let row = (try? JSONSerialization.jsonObject(with:data) as? [[String:Any]])?.first
+        let savedAt = Self.parseTimestamp(row?["occurred_at"] as? String) ?? Date()
+        store.setMood(mood, at: savedAt, if: .always)
         moodLoaded = true
     }
 

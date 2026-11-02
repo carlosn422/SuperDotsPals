@@ -84,25 +84,29 @@ struct ThemeApplyingView: View {
     }
 }
 
-/// Latest mood check-in, shared with the watch-face complication through the App Group.
-/// A picked mood holds for an hour (same rule as StressEngine.ts and StressComplication.swift);
-/// after that the MoodPal follows the latest stress reading.
+/// The watch app's view of SharedMoodStore (targets/_shared/SharedMoodState.swift), which the
+/// watch-face complications read through the App Group. Posts `.moodPalsMoodChanged` when the mood changes.
 enum WatchMoodStore {
-    static let manualHold: TimeInterval = 3600
-    private static var defaults: UserDefaults? { UserDefaults(suiteName: WatchStressStore.appGroup) }
-
-    static func save(_ mood: String, at date: Date) {
-        defaults?.set(mood, forKey: "currentMood")
-        defaults?.set(date.timeIntervalSince1970, forKey: "currentMoodUpdated")
-        WidgetCenter.shared.reloadAllTimelines()
+    @discardableResult
+    static func save(_ mood: String, at date: Date, if condition: SharedMoodStore.Condition) -> SharedMoodState? {
+        guard let state = SharedMoodStore.save(mood, at: date, if: condition) else { return nil }
+        NotificationCenter.default.post(name: .moodPalsMoodChanged, object: nil)
+        return state
     }
-    static func loadMood() -> String { defaults?.string(forKey: "currentMood") ?? "Calm" }
-    static func loadDate() -> Date { Date(timeIntervalSince1970: defaults?.double(forKey: "currentMoodUpdated") ?? 0) }
+    static func clear() {
+        SharedMoodStore.clear()
+        NotificationCenter.default.post(name: .moodPalsMoodChanged, object: nil)
+    }
+    /// "Calm" only when nothing has been saved on this watch yet.
+    static func loadMood() -> String { SharedMoodStore.load()?.mood ?? "Calm" }
+    static func loadDate() -> Date { SharedMoodStore.load()?.updatedAt ?? Date(timeIntervalSince1970: 0) }
 
-    static func isManual(_ setAt: Date, now: Date = Date()) -> Bool { now.timeIntervalSince(setAt) < manualHold }
+    static func isManual(_ setAt: Date, now: Date = Date()) -> Bool { SharedMoodStore.isManual(setAt, now: now) }
     static func display(manual: String, setAt: Date, stress: StressReading?, now: Date = Date()) -> String {
-        if isManual(setAt, now: now) { return manual }
-        guard let stress, now.timeIntervalSince(stress.at) < 24 * 3600 else { return manual }
-        return stress.level.mascotMood
+        SharedMoodStore.display(manual: manual, setAt: setAt, stressScore: stress?.score, stressAt: stress?.at, now: now)
     }
+}
+
+extension Notification.Name {
+    static let moodPalsMoodChanged = Notification.Name("moodPalsMoodChanged")
 }

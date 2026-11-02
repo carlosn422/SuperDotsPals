@@ -7,12 +7,10 @@ struct ContentView: View {
     @State private var measuring = false
     @Environment(\.scenePhase) private var scenePhase
     @State private var choosingMood = false
-    @State private var moodPage = 0
     @State private var choosingTheme = false
     @ObservedObject private var circle = WatchCircleStore.shared
     @State private var showingCircle = false
 
-    private let moods = ["Joyful", "Calm", "Sad", "Angry", "Anxious", "Tired"]
     private var purple: Color { store.theme.accent }
 
     private var simulatorDemo: Bool {
@@ -23,17 +21,23 @@ struct ContentView: View {
         #endif
     }
 
-    private func selectMood(_ mood: String) {
-        choosingMood = false
-        store.setMood(mood, at: Date())
+    /// Set Mood: backend first, then local + complication state, then the Circle share (one event id per commit).
+    private func commitMood(_ mood: String) async -> Bool {
+        if sync.connected {
+            do { try await sync.submitMood(mood, store: store) }
+            catch {
+                sync.message = "Mood could not sync. Please retry."
+                return false
+            }
+        } else if simulatorDemo {
+            store.setMood(mood, at: Date(), if: .always)
+        } else {
+            return false
+        }
         // Only a mood picked here notifies the Circle; sync and restore never do.
         circle.recordMoodChange(mood)
-        WKInterfaceDevice.current().play(.click)
-        Task {
-            do { try await sync.submitMood(mood, store: store) }
-            catch { sync.message = "Mood could not sync. Please retry." }
-            await circle.flushMoodShares()
-        }
+        Task { await circle.flushMoodShares() }
+        return true
     }
 
     var body: some View {
@@ -64,72 +68,13 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 VStack(spacing: 3) {
-                    if choosingMood {
-                        Text("How do you feel?").font(.system(size: 12, weight: .semibold)).lineLimit(1)
-                        Spacer(minLength: 0)
-                        ZStack {
-                            Button {
-                                selectMood(moods[moodPage])
-                            } label: {
-                                AnimatedMoodMascot(mood: moods[moodPage], size: 100, isActive: false)
-                                    .frame(width: 112, height: 112)
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.plain)
-                            .id(moodPage)
-                            .accessibilityLabel("Select \(moods[moodPage])")
-                            HStack {
-                                if moodPage > 0 {
-                                    Button {
-                                        withAnimation(.easeInOut(duration: 0.15)) { moodPage -= 1 }
-                                    } label: {
-                                        Image(systemName: "chevron.left").font(.system(size: 14, weight: .bold))
-                                    }
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel("Previous mood")
-                                }
-                                Spacer()
-                                if moodPage < moods.count - 1 {
-                                    Button {
-                                        withAnimation(.easeInOut(duration: 0.15)) { moodPage += 1 }
-                                    } label: {
-                                        Image(systemName: "chevron.right").font(.system(size: 14, weight: .bold))
-                                    }
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel("Next mood")
-                                }
-                            }
-                            .padding(.horizontal, 2)
-                        }
-                        .frame(height: 112)
-                        .contentShape(Rectangle())
-                        .highPriorityGesture(
-                            DragGesture(minimumDistance: 15, coordinateSpace: .local)
-                                .onEnded { value in
-                                    if abs(value.translation.width) > abs(value.translation.height) && value.translation.width < -30 && moodPage < moods.count - 1 {
-                                        withAnimation(.easeInOut(duration: 0.15)) { moodPage += 1 }
-                                    } else if abs(value.translation.width) > abs(value.translation.height) && value.translation.width > 30 && moodPage > 0 {
-                                        withAnimation(.easeInOut(duration: 0.15)) { moodPage -= 1 }
-                                    }
-                                }
-                        )
-                        Text(moods[moodPage])
-                            .font(.system(size: 12, weight: .semibold))
-                            .lineLimit(1)
-                            .frame(height: 17)
-                        Spacer(minLength: 0)
-                        Button("Back") { choosingMood = false }
-                            .font(.system(size: 12, weight: .semibold))
-                            .buttonStyle(.plain)
-                            .frame(height: 22)
-                    } else {
+                    Group {
                         Spacer(minLength: 0)
                         // Re-evaluated every minute so the MoodPal switches back to heart data when the hour is up.
                         TimelineView(.everyMinute) { context in
                         let shownMood = store.displayMood(at: context.date)
                         Button {
-                            moodPage = max(0, moods.firstIndex(of: store.displayMood()) ?? 0)
-                            withAnimation(.none) { choosingMood = true }
+                            choosingMood = true
                         } label: {
                             AnimatedMoodMascot(mood: shownMood, size: 96, isActive: scenePhase == .active)
                                 .frame(maxWidth: .infinity)
@@ -181,6 +126,9 @@ struct ContentView: View {
         }
         .sheet(isPresented: $measuring) {
             NavigationStack { MeasureNowView() }
+        }
+        .sheet(isPresented: $choosingMood) {
+            MoodPicker(current: store.displayMood(), accent: purple, commit: commitMood)
         }
         .sheet(isPresented: $choosingTheme) {
             NavigationStack { WatchThemePicker() }.environmentObject(store)

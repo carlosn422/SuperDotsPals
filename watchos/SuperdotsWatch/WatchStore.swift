@@ -33,11 +33,17 @@ final class WatchStore: ObservableObject {
     func displayMood(at now: Date = Date()) -> String { WatchMoodStore.display(manual: currentMood, setAt: currentMoodAt, stress: stress, now: now) }
     func moodFromHealth(at now: Date = Date()) -> Bool { !WatchMoodStore.isManual(currentMoodAt, now: now) && stress?.isFresh == true }
 
-    func setMood(_ mood: String, at date: Date) {
-        guard mood != currentMood || date != currentMoodAt else { return }
-        currentMood = mood
-        currentMoodAt = date
-        WatchMoodStore.save(mood, at: date)
+    /// Saves to the shared App Group state (and reloads the complications) when `condition` allows it.
+    func setMood(_ mood: String, at date: Date, if condition: SharedMoodStore.Condition) {
+        WatchMoodStore.save(mood, at: date, if: condition)
+        reloadMood()
+    }
+
+    /// Picks up moods saved by the iPhone link, background refresh or another writer.
+    func reloadMood() {
+        let mood = WatchMoodStore.loadMood(), at = WatchMoodStore.loadDate()
+        if mood != currentMood { currentMood = mood }
+        if at != currentMoodAt { currentMoodAt = at }
     }
     @Published var latestHRV: Double? = nil
     @Published var latestRestingHeartRate: Double? = nil
@@ -79,11 +85,15 @@ final class WatchStore: ObservableObject {
     var wellnessMood: String { displayMood() }
 
     private var stressObserver: NSObjectProtocol?
+    private var moodObserver: NSObjectProtocol?
 
     init() {
         companion = .bloop
         stressObserver = NotificationCenter.default.addObserver(forName: .moodPalsStressChanged, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.reloadStress() }
+        }
+        moodObserver = NotificationCenter.default.addObserver(forName: .moodPalsMoodChanged, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.reloadMood() }
         }
     }
 }
