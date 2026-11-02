@@ -84,7 +84,7 @@ struct ThemeApplyingView: View {
     }
 }
 
-/// The watch app's view of SharedMoodStore (targets/_shared/SharedMoodState.swift), which the
+/// The watch app's view of SharedMoodStore (SharedMoodState.swift), which the
 /// watch-face complications read through the App Group. Posts `.moodPalsMoodChanged` when the mood changes.
 enum WatchMoodStore {
     @discardableResult

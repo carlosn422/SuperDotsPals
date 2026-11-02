@@ -3,6 +3,7 @@ import WidgetKit
 
 /// Latest confirmed mood, shared by the watch app (writer) and its watch-face complications (reader)
 /// through the watch App Group. Holds only what the complication renders: never tokens or account data.
+/// Keep byte-identical copies in targets/stress-complication, targets/superdots-watch and watchos/SuperdotsWatch.
 struct SharedMoodState: Codable, Equatable {
     let mood: String
     let updatedAt: Date

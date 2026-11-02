@@ -47,7 +47,7 @@ struct ComplicationTheme {
     }
 }
 
-/// Latest confirmed mood cached by the watch app (SharedMoodStore in targets/_shared). A picked mood holds for an hour;
+/// Latest confirmed mood cached by the watch app (SharedMoodState.swift). A picked mood holds for an hour;
 /// after that the MoodPal follows the latest stress score (same rule as the watch and iPhone apps).
 /// Without a cached mood (before the first sync) it shows Calm; a cached mood is never replaced while data is unavailable.
 struct ComplicationMood {
