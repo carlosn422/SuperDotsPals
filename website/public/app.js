@@ -3,9 +3,9 @@ const scale = ['#EE6F86','#F2A56F','#8A9BEF','#4DBB7F'].map(c => `<i style="back
 const NAV_ICONS = {
   Today: '<path d="M7 2v2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zm-2 7h14v10H5V9zm2 2v3h3v-3H7z"/>',
   Actions: '<path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z"/>',
-  Trends: '<path d="M3 3h2v16h16v2H3V3zm4 8h3v7H7v-7zm5-5h3v12h-3V6zm5 3h3v9h-3V9z"/>',
-  Health: '<path d="M12 21s-7.5-4.6-9.6-9.4C.9 8.2 3 4.5 6.6 4.5c2.1 0 3.6 1.2 4.4 2.5.8-1.3 2.3-2.5 4.4-2.5 3.6 0 5.7 3.7 4.2 7.1C19.5 16.4 12 21 12 21z"/>',
-  Settings: '<path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1l.4 2.6h4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5-2.3-1.6zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/>'
+  Circle: '<path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm7.5 1a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 20c0-3.6 3.1-6.5 7-6.5s7 2.9 7 6.5H2zm15.5 0c0-2.1-.8-4-2.2-5.4.7-.2 1.4-.3 2.2-.3 2.9 0 4.5 2.3 4.5 5.7h-4.5z"/>',
+  Watches: '<path d="M9 1.5h6l.8 3.2A3.5 3.5 0 0 1 18.5 8v8a3.5 3.5 0 0 1-2.7 3.3L15 22.5H9l-.8-3.2A3.5 3.5 0 0 1 5.5 16V8a3.5 3.5 0 0 1 2.7-3.3L9 1.5z"/>',
+  More: '<path d="M5 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>'
 };
 const tabbar = on => `<div class="tabbar">${Object.keys(NAV_ICONS).map(t => `<span class="${t===on?'on':''}"><svg viewBox="0 0 24 24" aria-hidden="true">${NAV_ICONS[t]}</svg>${t}</span>`).join('')}</div>`;
 const hrvDots = () => {
@@ -44,7 +44,7 @@ const SCREENS = {
       <div class="entry"><span class="av" style="background:#F2A65A">T</span><div><b>Taylor</b> sent you a hug 🤗<div class="muted">1h ago</div></div></div>
       <div class="entry"><span class="av" style="background:#B79CEB">M</span><div><b>Mom</b> sent you some sunshine ☀️<div class="muted">40m ago</div></div></div></div>
     <div class="card"><h5>Send a Little Signal</h5><div class="emojis"><span>❤️</span><span>🤗</span><span>🫶</span><span>☀️</span><span>💪</span><span>🎉</span></div></div>
-    <div class="card muted">Only moods you choose to share. Never your health data.</div>${tabbar('Settings')}</div>`,
+    <div class="card muted">Only moods you choose to share. Never your health data.</div>${tabbar('Circle')}</div>`,
   // How it works: real MoodPals screens captured on the two review accounts. [file, seconds into the sequence, alt, tap point (% of screen) that leads to it]
   duoAvery: () => duoFrames([
     ['a1-checkin', 0, 'Avery\'s check-in: How are you feeling today?'],
@@ -81,7 +81,7 @@ document.querySelectorAll('.phone').forEach(phone => {
   phone.appendChild(screen);
   const slides = (phone.dataset.slides || '').split(',').filter(Boolean);
   if (slides.length) {
-    screen.innerHTML = slides.map((s, i) => `<img class="slide${i ? '' : ' on'}" src="/img/screens/${s}.webp?v=7" alt="MoodPals ${s.replace('-', ' ')} screen">`).join('');
+    screen.innerHTML = slides.map((s, i) => `<img class="slide${i ? '' : ' on'}" src="/img/screens/${s}.webp?v=8" alt="MoodPals ${s.replace('-', ' ')} screen">`).join('');
     let i = 0;
     const imgs = screen.querySelectorAll('.slide');
     setInterval(() => { imgs[i].classList.remove('on'); i = (i + 1) % imgs.length; imgs[i].classList.add('on'); }, 2800);
