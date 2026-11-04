@@ -1,13 +1,11 @@
-import React,{useEffect,useState} from 'react';
+import React from 'react';
 import {StyleSheet,Text,TouchableOpacity,View} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import SuperdotMascot from './SuperdotMascot';
 import {SW} from './StressDashboard';
 import {PlusFeature,usePlus} from './PlusStore';
 
 const PLUS='#7B5CE6',PLUS_SOFT='#F1ECFF';
-const INVITE_DISMISSED_KEY='today.inviteDismissed';
 
 export function PlusBadge(){return <View style={s.badge}><Text style={s.badgeText}>PLUS</Text></View>;}
 
@@ -58,15 +56,10 @@ export function PlusOfferCard({onAllPlans}:{onAllPlans:()=>void}){
 }
 
 export function InviteFriendsCard({onInvite}:{onInvite:()=>void}){
- const [dismissed,setDismissed]=useState(true);
- useEffect(()=>{AsyncStorage.getItem(INVITE_DISMISSED_KEY).then(v=>setDismissed(v==='1')).catch(()=>setDismissed(false))},[]);
- if(dismissed)return null;
- const dismiss=()=>{setDismissed(true);AsyncStorage.setItem(INVITE_DISMISSED_KEY,'1').catch(()=>{})};
  const orbit=(id:string,pos:object,size=40)=><View style={[s.orbit,pos,{width:size+8,height:size+8,borderRadius:(size+8)/2}]}><SuperdotMascot id={id} size={size} animate={false}/></View>;
  return <View style={{gap:10}}>
   <Text style={s.section}>Share with your circle</Text>
   <View style={[s.card,{alignItems:'center',paddingTop:8}]}>
-   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Hide invite card" onPress={dismiss} hitSlop={10} style={s.close}><Ionicons name="close" size={16} color={SW.muted}/></TouchableOpacity>
    <View style={s.art}>
     <View style={[s.ring,{width:190,height:190,borderRadius:95,opacity:0.5}]}/>
     <View style={[s.ring,{width:130,height:130,borderRadius:65}]}/>
@@ -96,7 +89,6 @@ const s=StyleSheet.create({
  offerEyebrow:{color:PLUS,fontWeight:'900',fontSize:13},offerPrice:{color:PLUS,fontWeight:'900',fontSize:30},offerPeriod:{fontSize:15,fontWeight:'800'},
  offerActions:{flexDirection:'row',borderTopWidth:1,borderTopColor:'#DCD3F7',paddingTop:4},offerAction:{flex:1,alignItems:'center',justifyContent:'center',minHeight:44},offerActionText:{color:PLUS,fontWeight:'800',fontSize:15},
  section:{fontWeight:'900',fontSize:19,color:SW.ink},
- close:{position:'absolute',top:12,right:12,width:28,height:28,borderRadius:14,backgroundColor:'#F1F4F2',alignItems:'center',justifyContent:'center',zIndex:2},
  art:{width:'100%',height:200,alignItems:'center',justifyContent:'center'},ring:{position:'absolute',backgroundColor:'#DDF2E5'},
  orbit:{position:'absolute',backgroundColor:'#fff',alignItems:'center',justifyContent:'center',shadowColor:'#2D4A3E',shadowOpacity:0.1,shadowRadius:6,shadowOffset:{width:0,height:2}},
  inviteTitle:{fontSize:18,fontWeight:'900',color:SW.ink,textAlign:'center'},
