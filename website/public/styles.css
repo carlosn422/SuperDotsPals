@@ -254,3 +254,5 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 .cta .news{font:600 22px Fredoka,sans-serif;margin:36px 0 0}
 .cta .signup{margin:14px auto 0;text-align:left}
 .hero2 .sparkles i:nth-child(2){left:84%;top:46%}
+.feature.kids{grid-template-columns:1fr;gap:30px;text-align:center}.feature.kids>div{max-width:760px;margin:0 auto}.feature.kids ul{display:inline-block;text-align:left}
+.kids-art{display:block;width:100%;max-width:1100px;height:auto;margin:0 auto;border-radius:28px;box-shadow:0 24px 60px rgba(43,30,69,.14)}
