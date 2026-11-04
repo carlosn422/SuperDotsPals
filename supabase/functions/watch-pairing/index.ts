@@ -23,18 +23,19 @@ async function approveFamily(ownerId:string,row:{id:string;device_name:string},c
  const {data:link,error:tokenError}=await admin.auth.admin.generateLink({type:"magiclink",email:profile.email});
  const token=link?.properties?.hashed_token;
  if(tokenError||!token){await discard();return json({error:"Unable to create watch session"},500)}
- const {data:approved,error}=await admin.from("watch_pairing_requests").update({status:"approved",owner_id:profile.id,login_token_hash:token}).eq("id",row.id).eq("status","pending").select("id");
+ const {data:approved,error}=await admin.from("watch_pairing_requests").update({status:"approved",kind:"family",owner_id:profile.id,login_token_hash:token}).eq("id",row.id).eq("status","pending").select("id");
  if(error||!approved?.length){await discard();return json({error:"This code has expired or was already used"},400)}
  await admin.from("connected_devices").upsert({user_id:profile.id,pairing_id:row.id,name:row.device_name,platform:"watchos",...(color?{watch_color:color}:{})},{onConflict:"pairing_id"});
  return json({status:"approved",deviceName:row.device_name,family:true,profileId:profile.id});
 }
 const CODE_WINDOW_MS=15*60*1000,CODE_MAX_FAILURES=10;
 function sixDigits(){const a=crypto.getRandomValues(new Uint32Array(1));return String(a[0]%1000000).padStart(6,"0")}
-async function approveRow(user:{id:string;email?:string},row:{id:string;device_name:string;kind:string},color:string|null=null){
- if(row.kind==="family")return await approveFamily(user.id,row,color);
+// The iPhone's choice (Add Watch vs Add Family Watch) wins: a Family Setup watch can't reliably tell it has no companion app.
+async function approveRow(user:{id:string;email?:string},row:{id:string;device_name:string;kind:string},color:string|null=null,family?:unknown){
+ if(typeof family==="boolean"?family:row.kind==="family")return await approveFamily(user.id,row,color);
  if(!user.email)return json({error:"Email-based Supabase login is required for pairing"},400);
  // Claim the request before minting a login token: a new magic link invalidates the previous one, so a losing duplicate approve must not mint.
- const {data:claimed,error}=await admin.from("watch_pairing_requests").update({status:"approved",owner_id:user.id,login_token_hash:null}).eq("id",row.id).eq("status","pending").select("id");
+ const {data:claimed,error}=await admin.from("watch_pairing_requests").update({status:"approved",kind:"self",owner_id:user.id,login_token_hash:null}).eq("id",row.id).eq("status","pending").select("id");
  if(error)return json({error:"Unable to approve"},500);
  if(!claimed?.length)return json({error:"This code has expired or was already used"},400);
  const {data:link,error:linkError}=await admin.auth.admin.generateLink({type:"magiclink",email:user.email});
@@ -97,7 +98,7 @@ Deno.serve(async req=>{
    const id=String(p.id||""),secret=String(p.secret||"");
    const {data:row}=await admin.from("watch_pairing_requests").select("*").eq("id",id).maybeSingle();
    if(!row||row.secret_hash!==await hash(secret)||row.status!=="pending"||Date.parse(row.expires_at)<Date.now())return json({error:"This code has expired or was already used"},400);
-   return await approveRow(user,row,watchColor(p.color));
+   return await approveRow(user,row,watchColor(p.color),p.family);
   }
   if(action==="approve_code"){
    const code=String(p.code||"").replace(/\D/g,"");
@@ -109,7 +110,7 @@ Deno.serve(async req=>{
     await admin.from("watch_pairing_code_attempts").insert({user_id:user.id});
     return json({error:"That code didn't match a watch. Check the 6 digits on the watch, or show a new code."},400);
    }
-   return await approveRow(user,row,watchColor(p.color));
+   return await approveRow(user,row,watchColor(p.color),p.family);
   }
   if(action==="list"){
    const {data,error}=await admin.from("connected_devices").select("id,name,platform,linked_at,last_seen_at,revoked_at,watch_color").eq("user_id",user.id).is("revoked_at",null).order("linked_at",{ascending:false}).limit(50);

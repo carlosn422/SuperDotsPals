@@ -77,7 +77,7 @@ export default function ConnectedDevices({focused=true,onOpenThemes,onCreateAcco
  },[waiting]);
  function finish(){
   if(!color||!pending)return;
-  if(pending.action==='self')linkThisWatch(color);else void approve('approve_code',{code:pending.code,color});
+  if(pending.action==='self')linkThisWatch(color);else void approve('approve_code',{code:pending.code,color,family:adding==='family'});
  }
  const digits=code.replace(/\D/g,'');
  const watches=devices.filter(d=>d.platform==='watchos');
