@@ -2,7 +2,10 @@ import React,{useEffect,useState} from 'react';
 import {Alert,Image,Linking,Modal,ScrollView,StyleSheet,Text,TouchableOpacity,View} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {APP_THEME as T} from './MoodMascot';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import {FEATURE_COPY,PLAN_FEATURES,PLUS_MOCKUP,PlusFeature,PlusPlan,usePlus} from './PlusStore';
+import {CreateAccountScreen,useIsGuest} from './Account';
+import {appleAvailable,linkApple} from './AppleAuth';
 
 const TERMS_URL='https://moodpals.com/terms',PRIVACY_URL='https://moodpals.com/privacy';
 const CALM=require('./assets/mascot-animations/disgust/preview400/frame_000.png');
@@ -19,7 +22,15 @@ export function PlusPaywallSheet(){
  const {paywall,hidePaywall,purchase,restore,isPlus,prices}=usePlus();
  const [plan,setPlan]=useState<PlusPlan>('annual');
  const [busy,setBusy]=useState(false);
- useEffect(()=>{if(paywall)setPlan('annual')},[paywall]);
+ const guest=useIsGuest();
+ const [creating,setCreating]=useState(false),[appleOk,setAppleOk]=useState(false);
+ useEffect(()=>{if(paywall){setPlan('annual');setCreating(false)}},[paywall]);
+ useEffect(()=>{void appleAvailable().then(setAppleOk)},[]);
+ // Guests are anonymous users; linking Apple or an email keeps the same user id, so the purchase belongs to a real account.
+ async function continueWithApple(){
+  setBusy(true);
+  try{await linkApple()}catch(e:any){Alert.alert('Sign in with Apple',e?.message||'Something went wrong. Please try again.')}finally{setBusy(false)}
+ }
  const feature=FEATURE_COPY[paywall?.feature||'general'];
  async function buy(){
   setBusy(true);
@@ -35,8 +46,9 @@ export function PlusPaywallSheet(){
   if(ok)hidePaywall();
  }
  return <Modal visible={!!paywall} animationType="slide" presentationStyle="pageSheet" onRequestClose={hidePaywall}>
-  <ScrollView style={{flex:1,backgroundColor:T.background}} contentContainerStyle={s.sheet}>
+  <ScrollView style={{flex:1,backgroundColor:T.background}} contentContainerStyle={s.sheet} keyboardShouldPersistTaps="handled">
    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={hidePaywall} style={s.close}><Ionicons name="close" size={24} color={T.muted}/></TouchableOpacity>
+   {creating?<View style={{alignSelf:'stretch'}}><CreateAccountScreen accent={T.primary} backLabel="MoodPals Plus" onBack={()=>setCreating(false)}/></View>:<>
    <Image source={CALM} style={s.mascot} accessibilityIgnoresInvertColors/>
    <Text style={s.kicker}>MoodPals Plus</Text>
    <Text style={s.title}>{feature.title}</Text>
@@ -47,11 +59,17 @@ export function PlusPaywallSheet(){
     <View style={{flex:1}}><Text style={s.planLabel}>{x.label}</Text><Text style={s.planSub}>{x.price} / {x.period}</Text></View>
     {x.note?<View style={s.badge}><Text style={s.badgeText}>{x.note}</Text></View>:null}
    </TouchableOpacity>})}</View>
-   <TouchableOpacity accessibilityRole="button" disabled={busy||isPlus} onPress={()=>void buy()} style={[s.cta,(busy||isPlus)&&{opacity:0.6}]}><Text style={s.ctaText}>{isPlus?'You have Plus':`Continue · ${prices[plan].price}/${prices[plan].period}`}</Text></TouchableOpacity>
+   {guest&&!isPlus?<View style={s.account}>
+    <Text style={s.accountTitle}>Create a free account to subscribe</Text>
+    <Text style={s.accountBody}>Your subscription is saved to your MoodPals account, so it stays with you on every device. Everything you saved as a guest is kept.</Text>
+    {appleOk?<AppleAuthentication.AppleAuthenticationButton buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE} buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK} cornerRadius={16} style={{height:52,alignSelf:'stretch',opacity:busy?0.6:1}} onPress={()=>{if(!busy)void continueWithApple()}}/>:null}
+    <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>setCreating(true)} style={s.emailBtn}><Ionicons name="mail-outline" size={19} color={T.ink}/><Text style={s.emailText}>Continue with Email</Text></TouchableOpacity>
+   </View>:<TouchableOpacity accessibilityRole="button" disabled={busy||isPlus} onPress={()=>void buy()} style={[s.cta,(busy||isPlus)&&{opacity:0.6}]}><Text style={s.ctaText}>{isPlus?'You have Plus':`Continue · ${prices[plan].price}/${prices[plan].period}`}</Text></TouchableOpacity>}
    <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>void onRestore()}><Text style={s.restore}>Restore Purchases</Text></TouchableOpacity>
    <Text style={s.terms}>{TERMS}</Text>
    <View style={{flexDirection:'row',gap:18}}><Text style={s.link} onPress={()=>void Linking.openURL(TERMS_URL)}>Terms of Use</Text><Text style={s.link} onPress={()=>void Linking.openURL(PRIVACY_URL)}>Privacy Policy</Text></View>
    {PLUS_MOCKUP?<Text style={s.mock}>Preview: prices are proposed and no purchase is made.</Text>:null}
+   </>}
   </ScrollView>
  </Modal>;
 }
@@ -96,6 +114,8 @@ function Cell({v,plus}:{v:string|boolean;plus?:boolean}){
 }
 
 const s=StyleSheet.create({
+ account:{alignSelf:'stretch',gap:10,backgroundColor:'#fff',borderRadius:20,padding:16,borderWidth:1,borderColor:T.border},accountTitle:{fontSize:17,fontWeight:'900',color:T.ink,textAlign:'center'},accountBody:{fontSize:13,lineHeight:18,color:T.muted,textAlign:'center'},
+ emailBtn:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,height:52,borderRadius:16,borderWidth:1.5,borderColor:T.border,backgroundColor:'#fff'},emailText:{fontSize:16,fontWeight:'800',color:T.ink},
  sheet:{padding:22,paddingBottom:44,alignItems:'center',gap:14},
  close:{alignSelf:'flex-end',padding:4},
  mascot:{width:132,height:132,marginTop:-18},

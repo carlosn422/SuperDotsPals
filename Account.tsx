@@ -103,7 +103,7 @@ export function AccountRequired({accent,backLabel,onBack,onCreate}:{accent:strin
 
 type Step='loading'|'details'|'confirm'|'password'|'done';
 
-export function CreateAccountScreen({accent,onBack}:{accent:string;onBack:()=>void}){
+export function CreateAccountScreen({accent,onBack,backLabel='Settings'}:{accent:string;onBack:()=>void;backLabel?:string}){
  const [step,setStep]=useState<Step>('loading');
  const [name,setName]=useState(''),[email,setEmail]=useState(''),[password,setPassword]=useState('');
  const [busy,setBusy]=useState(false),[message,setMessage]=useState('');
@@ -159,7 +159,7 @@ export function CreateAccountScreen({accent,onBack}:{accent:string;onBack:()=>vo
  ]);
 
  return <View style={{gap:14}}>
-  <Back label="Settings" accent={accent} onPress={onBack}/>
+  <Back label={backLabel} accent={accent} onPress={onBack}/>
   <View style={[s.card,{alignItems:'center'}]}>
    <Image source={CALM} style={s.mascot}/>
    <Text style={s.title}>{step==='done'?'You’re all set':step==='password'?'Choose a password':step==='confirm'?'Check your inbox':'Create your account'}</Text>
@@ -176,7 +176,7 @@ export function CreateAccountScreen({accent,onBack}:{accent:string;onBack:()=>vo
   {step==='password'?<TextInput style={s.input} placeholder="Password (8+ characters)" placeholderTextColor="#94A39B" value={password} onChangeText={setPassword} secureTextEntry autoComplete="new-password" accessibilityLabel="Password"/>:null}
   {message?<Text style={s.message}>{message}</Text>:null}
   {step==='details'||step==='password'||step==='confirm'||step==='done'?<TouchableOpacity accessibilityRole="button" disabled={busy} onPress={step==='details'?sendEmail:step==='password'?savePassword:step==='confirm'?()=>void run(()=>checkConfirmed(true)):onBack} style={[s.cta,{backgroundColor:accent},busy&&{opacity:.65}]}>
-   {busy?<ActivityIndicator color="#fff"/>:<Text style={s.ctaText}>{step==='details'?'Continue':step==='password'?'Save password':step==='confirm'?'I’ve confirmed my email':'Back to Settings'}</Text>}
+   {busy?<ActivityIndicator color="#fff"/>:<Text style={s.ctaText}>{step==='details'?'Continue':step==='password'?'Save password':step==='confirm'?'I’ve confirmed my email':`Back to ${backLabel}`}</Text>}
   </TouchableOpacity>:null}
   {step==='confirm'?<View style={{gap:4}}>
    <TouchableOpacity disabled={busy} onPress={sendEmail}><Text style={[s.link,{color:accent}]}>Resend email</Text></TouchableOpacity>
