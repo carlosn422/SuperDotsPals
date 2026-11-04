@@ -7,6 +7,8 @@ module.exports = {
   bundleIdentifier: '.watchkitapp',
   deploymentTarget: '10.0',
   frameworks: ['SwiftUI', 'Security', 'HealthKit', 'WidgetKit', 'WatchConnectivity', 'UserNotifications'],
+  // Sets ASSETCATALOG_COMPILER_APPICON_NAME so the watch icon is compiled; without it watch notifications show a blank icon.
+  icon: '../../assets/watch-icon.png',
   entitlements: {
     'com.apple.developer.healthkit': true,
     'com.apple.developer.healthkit.access': [],
