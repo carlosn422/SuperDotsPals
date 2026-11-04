@@ -89,8 +89,8 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
   </View>
   {socialCard}
   <InviteFriendsCard onInvite={onInvite}/>
-  <PlusOfferCard onAllPlans={onPlans}/>
   <RecoveryInsights companion={companion} onChat={onChat}/>
+  <PlusOfferCard onAllPlans={onPlans}/>
 </View>;
 }
 export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpiritual,onChat,onMood,onJournal,onBreathing,caffeine}:{companion:string;accent:string;water:number;caffeine:number;onWater:()=>void;onCaffeine:()=>void;onSpiritual:()=>void;onChat:()=>void;onMood:()=>void;onJournal:()=>void;onBreathing:()=>void}){
