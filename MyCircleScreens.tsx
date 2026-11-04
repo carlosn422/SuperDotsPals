@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
-import {ActionSheetIOS,ActivityIndicator,Alert,ScrollView,Share,Text,TextInput,TouchableOpacity,View} from 'react-native';
+import {ActionSheetIOS,ActivityIndicator,Alert,Modal,ScrollView,Share,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import {CIRCLE_MOODS,CircleGroup,CircleMood,Friend,FriendRequest,FriendSharedMood,LITTLE_SIGNALS,MOOD_REACTIONS,MOOD_TINTS,REACTION_LABELS,SignalId,isToday,signalById,timeAgo,timeLeft} from './LittleSignalsData';
@@ -124,11 +124,11 @@ function PersonCircle({p,onPress,onLongPress}:{p:Person;onPress:()=>void;onLongP
 
 function YourPeople({nav}:{nav:Nav}){
  const store=useCircle();
- const [mode,setMode]=useState<'recent'|'all'>('recent');const [q,setQ]=useState('');
+ const [allOpen,setAllOpen]=useState(false);
  const latest=new Map<string,FriendSharedMood>();
  activeFriendMoods(store).forEach(m=>{const cur=latest.get(m.friendId);if(!cur||m.sharedAt>cur.sharedAt)latest.set(m.friendId,m)});
- const people=sortPeople(store.friends.map(f=>{const mood=latest.get(f.id);return {f,mood,isNew:!!mood&&isMoodNew(store,mood)}}),mode)
-  .filter(p=>mode==='recent'||!q.trim()||p.f.name.toLowerCase().includes(q.trim().toLowerCase()));
+ const all=store.friends.map(f=>{const mood=latest.get(f.id);return {f,mood,isNew:!!mood&&isMoodNew(store,mood)}});
+ const people=sortPeople(all,'recent');
  function options(f:Friend){
   const pin=()=>store.updateFriend(f.id,{pinnedAt:f.pinnedAt?undefined:new Date().toISOString()});
   ActionSheetIOS.showActionSheetWithOptions({title:f.name,options:['Cancel',f.pinnedAt?'Unpin':'Pin to Top','View Profile'],cancelButtonIndex:0},i=>{if(i===1)pin();if(i===2)nav.push({name:'friend',id:f.id})});
@@ -136,10 +136,9 @@ function YourPeople({nav}:{nav:Nav}){
  return <CCard style={{gap:12}}>
   <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
    <Text style={[cs.rowTitle,{fontSize:19,flex:1}]} accessibilityRole="header">Your People</Text>
-   <Chip label="Most Recent" selected={mode==='recent'} onPress={()=>setMode('recent')}/>
-   <Chip label="All Friends" selected={mode==='all'} onPress={()=>setMode('all')}/>
+   <Chip label="Most Recent" selected onPress={()=>{}}/>
+   <Chip label="All Friends" selected={false} onPress={()=>setAllOpen(true)}/>
   </View>
-  {mode==='all'&&store.friends.length>6?<TextInput value={q} onChangeText={setQ} placeholder="Search friends" accessibilityLabel="Search friends" clearButtonMode="while-editing" style={{backgroundColor:CT.background,borderRadius:12,paddingHorizontal:12,paddingVertical:9,fontSize:15,color:CT.ink}}/>:null}
   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:6,paddingRight:4}} style={{marginHorizontal:-4}}>
    {people.map(p=><PersonCircle key={p.f.id} p={p} onLongPress={()=>options(p.f)} onPress={()=>nav.push(p.mood?{name:'friendMood',id:p.mood.id}:{name:'friend',id:p.f.id})}/>)}
    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add Friend" onPress={()=>nav.push({name:'invite'})} style={{width:96,alignItems:'center',gap:4}}>
@@ -147,8 +146,44 @@ function YourPeople({nav}:{nav:Nav}){
     <Text style={{fontSize:14,fontWeight:'900',color:CT.primary}}>Add Friend</Text>
    </TouchableOpacity>
   </ScrollView>
-  {mode==='recent'&&store.friends.length>1&&!store.friends.some(f=>f.pinnedAt)?<Text style={[cs.rowSub,{textAlign:'center'}]}>Tip: long-press someone to pin them to the front.</Text>:null}
+  {store.friends.length>1&&!store.friends.some(f=>f.pinnedAt)?<Text style={[cs.rowSub,{textAlign:'center'}]}>Tip: long-press someone to pin them to the front.</Text>:null}
+  <AllFriendsSheet visible={allOpen} people={all} onClose={()=>setAllOpen(false)} onOpen={p=>{setAllOpen(false);nav.push(p.mood?{name:'friendMood',id:p.mood.id}:{name:'friend',id:p.f.id})}} onAdd={()=>{setAllOpen(false);nav.push({name:'invite'})}}/>
  </CCard>;
+}
+
+function AllFriendsSheet({visible,people,onClose,onOpen,onAdd}:{visible:boolean;people:Person[];onClose:()=>void;onOpen:(p:Person)=>void;onAdd:()=>void}){
+ const [q,setQ]=useState('');
+ useEffect(()=>{if(!visible)setQ('')},[visible]);
+ const term=q.trim().toLowerCase();
+ const shown=sortPeople(people,'all').filter(p=>!term||p.f.name.toLowerCase().includes(term));
+ const sections:{letter:string;items:Person[]}[]=[];
+ shown.forEach(p=>{const ch=p.f.name.trim().charAt(0).toUpperCase();const letter=/[A-Z]/.test(ch)?ch:'#';const last=sections[sections.length-1];if(last&&last.letter===letter)last.items.push(p);else sections.push({letter,items:[p]})});
+ return <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+  <View style={{flex:1,backgroundColor:CT.background}}>
+   <View style={{flexDirection:'row',alignItems:'center',paddingHorizontal:20,paddingTop:18,paddingBottom:10}}>
+    <Text accessibilityRole="header" style={{flex:1,fontSize:24,fontWeight:'900',color:CT.ink}}>All Friends</Text>
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Done" onPress={onClose} hitSlop={10}><Text style={{color:CT.primary,fontWeight:'800',fontSize:16}}>Done</Text></TouchableOpacity>
+   </View>
+   <View style={{marginHorizontal:20,marginBottom:8,flexDirection:'row',alignItems:'center',gap:8,backgroundColor:'#fff',borderRadius:14,borderWidth:1,borderColor:CT.line,paddingHorizontal:12}}>
+    <Ionicons name="search" size={17} color={CT.muted}/>
+    <TextInput value={q} onChangeText={setQ} placeholder="Search friends" accessibilityLabel="Search friends" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" style={{flex:1,paddingVertical:11,fontSize:16,color:CT.ink}}/>
+   </View>
+   <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={{paddingHorizontal:20,paddingBottom:40,gap:10}}>
+    <Text style={cs.rowSub}>{term?shown.length+(shown.length===1?' match':' matches'):people.length+(people.length===1?' friend':' friends')}</Text>
+    {sections.map(sec=><View key={sec.letter} style={{gap:6}}>
+     <Text style={{fontSize:13,fontWeight:'900',color:CT.muted,marginLeft:4}}>{sec.letter}</Text>
+     <CCard style={{paddingVertical:4}}>
+      {sec.items.map((p,i)=><CRow key={p.f.id} last={i===sec.items.length-1} onPress={()=>onOpen(p)} title={p.f.name}
+       subtitle={p.mood?p.mood.mood+' · '+timeAgo(p.mood.sharedAt):'No mood yet'}
+       leading={p.mood?<MoodPalThumb mood={p.mood.mood} size={40}/>:<Avatar initials={p.f.initials} color={p.f.color} size={40}/>}
+       right={p.f.pinnedAt?<View style={{flexDirection:'row',alignItems:'center',gap:6}}><Ionicons name="pin" size={15} color={CT.primary}/><Ionicons name="chevron-forward" size={18} color={CT.primary}/></View>:undefined}/>)}
+     </CCard>
+    </View>)}
+    {term&&!shown.length?<Text style={[cs.rowSub,{textAlign:'center',marginTop:20}]}>No friends match “{q.trim()}”.</Text>:null}
+    <SoftButton label="Add Friend" icon="person-add-outline" onPress={onAdd}/>
+   </ScrollView>
+  </View>
+ </Modal>;
 }
 
 function RecentActivity({nav}:{nav:Nav}){
