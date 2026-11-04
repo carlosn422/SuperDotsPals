@@ -543,6 +543,20 @@ function SendSignal({friendId,nav}:{friendId?:string;nav:Nav}){
  const store=useCircle();const [to,setTo]=useState<string[]>(friendId?[friendId]:[]);const [sig,setSig]=useState<SignalId|null>(null);
  const sentToday=store.sentSignals.filter(s=>isToday(s.at)).reduce((n,s)=>n+s.friendIds.length,0);
  if(!store.friends.length)return <EmptyState title="Add a friend first" detail="Little Signals can only be sent to approved friends." action="Invite Friends" onAction={()=>nav.push({name:'invite'})}/>;
+ const only=friendId?store.friends.find(f=>f.id===friendId):undefined;
+ // Replying to one friend: no picker, one tap on a signal sends it.
+ if(only){
+  const limited=sentToday>=20;
+  return <>
+   <CCard style={{flexDirection:'row',alignItems:'center',gap:12}}>
+    <Avatar initials={only.initials} color={only.color} size={46}/>
+    <View style={{flex:1,gap:2}}><Text style={cs.rowTitle}>To {only.name}</Text><Text style={cs.rowSub}>Tap a signal to send it.</Text></View>
+   </CCard>
+   <CHeading title="Signal"/>
+   <View style={{flexDirection:'row',flexWrap:'wrap',gap:9}}>{LITTLE_SIGNALS.map(s=><TouchableOpacity key={s.id} disabled={limited} onPress={()=>{store.sendSignal([only.id],s.id);nav.replace({name:'signalSent',signal:s.id,friendIds:[only.id]})}} accessibilityRole="button" accessibilityLabel={'Send '+only.name+' '+s.label} style={{width:'48%',flexGrow:1,flexDirection:'row',alignItems:'center',gap:9,padding:12,borderRadius:16,borderWidth:1.5,borderColor:CT.border,backgroundColor:'#fff',opacity:limited?0.5:1}}><Text style={{fontSize:24}}>{s.emoji}</Text><Text style={{flex:1,fontWeight:'800',fontSize:13,color:CT.ink}}>{s.label}</Text></TouchableOpacity>)}</View>
+   {limited?<Text style={[cs.muted,{textAlign:'center'}]}>You’ve sent a lot of signals today. Try again tomorrow.</Text>:null}
+  </>;
+ }
  return <>
   <Text style={[cs.muted,{marginTop:-6}]}>A quick, wordless way to show you care. No mood share needed.</Text>
   <CHeading title="To"/>
