@@ -2,7 +2,7 @@ import React,{useEffect,useMemo,useState} from 'react';
 import {ActionSheetIOS,ActivityIndicator,Alert,ScrollView,Share,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import {CIRCLE_MOODS,CircleGroup,CircleMood,Friend,FriendSharedMood,LITTLE_SIGNALS,MOOD_REACTIONS,MOOD_TINTS,REACTION_LABELS,SignalId,isToday,signalById,timeAgo,timeLeft} from './LittleSignalsData';
+import {CIRCLE_MOODS,CircleGroup,CircleMood,Friend,FriendRequest,FriendSharedMood,LITTLE_SIGNALS,MOOD_REACTIONS,MOOD_TINTS,REACTION_LABELS,SignalId,isToday,signalById,timeAgo,timeLeft} from './LittleSignalsData';
 import {CodePreview,activeFriendMoods,circleNewCount,familyFriend,friendName,isMoodNew,uniqueAudience,useCircle} from './CircleStore';
 import {usePlus} from './PlusStore';
 import {Avatar,CCard,CHeading,CRow,CT,Chip,EmptyState,MoodPalThumb,MoodTag,OfflineBanner,PrimaryButton,SampleDataNote,SignalBurst,SoftButton,ToggleRow,cs} from './CircleComponents';
@@ -56,7 +56,7 @@ type Nav={push:(r:CircleRoute)=>void;replace:(r:CircleRoute)=>void;back:()=>void
 function Screen({route,nav,mood}:{route:CircleRoute;nav:Nav;mood?:string}){
  switch(route.name){
   case 'home':return <Home nav={nav}/>;
-  case 'invite':return <Invite/>;
+  case 'invite':return <Invite nav={nav}/>;
   case 'enterCode':return <EnterCode nav={nav}/>;
   case 'requests':return <Requests groupId={route.groupId} groupName={route.groupName} nav={nav}/>;
   case 'assignGroups':return <AssignGroups id={route.requestId} groupId={route.groupId} groupName={route.groupName} nav={nav}/>;
@@ -188,12 +188,7 @@ function Home({nav}:{nav:Nav}){
    </View>
    <View style={{flexDirection:'row',gap:9}}><View style={{flex:1}}><PrimaryButton label="Invite Friends" icon="person-add-outline" onPress={()=>nav.push({name:'invite'})}/></View><View style={{flex:1}}><SoftButton label="Enter Code" icon="keypad-outline" onPress={()=>nav.push({name:'enterCode'})}/></View></View>
   </CCard>
-  {pending?<TouchableOpacity accessibilityRole="button" accessibilityLabel={pending+' friend '+(pending===1?'request':'requests')+'. People want to join your Circle.'} onPress={()=>nav.push({name:'requests'})}
-   style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:MOOD_TINTS.Joyful.tint,borderRadius:20,padding:12}}>
-   <MoodPalThumb mood="Joyful" size={52}/>
-   <View style={{flex:1}}><Text style={[cs.rowTitle,{fontSize:17}]}>{pending} Friend {pending===1?'Request':'Requests'}</Text><Text style={cs.rowSub}>{pending===1?'Someone wants':'People want'} to join your Circle.</Text></View>
-   <Ionicons name="chevron-forward" size={20} color={MOOD_TINTS.Joyful.color}/>
-  </TouchableOpacity>:null}
+  {pending?<RequestsCard pending={pending} onPress={()=>nav.push({name:'requests'})}/>:null}
   {!store.friends.length?<EmptyState mood="Joyful" title="Your circle is empty" detail="Invite close friends or family with your personal code. Nobody can find you by searching — only people you share your code with." action="Invite Friends" onAction={()=>nav.push({name:'invite'})}/>:<>
    <YourPeople nav={nav}/>
    <RecentActivity nav={nav}/>
@@ -202,7 +197,7 @@ function Home({nav}:{nav:Nav}){
    <Text style={[cs.rowTitle,{fontSize:19}]} accessibilityRole="header">Groups</Text>
    {store.groups.length?<View>{store.groups.map((g,i)=><CRow key={g.id} last={i===store.groups.length-1} icon={g.icon} tint={g.color+'22'} color={g.color} title={g.name} subtitle={g.memberIds.length+(g.memberIds.length===1?' member':' members')} onPress={()=>nav.push({name:'group',id:g.id})}/>)}</View>
     :<Text style={cs.rowSub}>Groups like Family or Close Friends let you choose who sees which moods.</Text>}
-   <SoftButton label="Create a Group" icon="add" onPress={()=>!isPlus&&store.groups.length>=1?showPaywall('circles'):nav.push({name:'group'})}/>
+   <SoftButton label="Create a Group" icon="add" onPress={()=>!isPlus?showPaywall('circles'):nav.push({name:'group'})}/>
   </CCard>
   {store.live?null:<PrototypeControls nav={nav}/>}
  </>;
@@ -232,26 +227,61 @@ function PrototypeControls({nav}:{nav:Nav}){
  </CCard>;
 }
 
-function Invite(){
- const {invite,regenerateCode}=useCircle();
+function RequestsCard({pending,onPress}:{pending:number;onPress:()=>void}){
+ return <TouchableOpacity accessibilityRole="button" accessibilityLabel={pending+' friend '+(pending===1?'request':'requests')+'. People want to join your Circle.'} onPress={onPress}
+   style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:MOOD_TINTS.Joyful.tint,borderRadius:20,padding:12}}>
+   <MoodPalThumb mood="Joyful" size={52}/>
+   <View style={{flex:1}}><Text style={[cs.rowTitle,{fontSize:17}]}>{pending} Friend {pending===1?'Request':'Requests'}</Text><Text style={cs.rowSub}>{pending===1?'Someone wants':'People want'} to join your Circle.</Text></View>
+   <Ionicons name="chevron-forward" size={20} color={MOOD_TINTS.Joyful.color}/>
+  </TouchableOpacity>;
+}
+
+function expiryLabel(iso:string){
+ const hours=Math.max(0,Math.round((new Date(iso).getTime()-Date.now())/36e5));
+ return hours>=36?Math.round(hours/24)+' days':hours>=1?hours+(hours===1?' hour':' hours'):'less than an hour';
+}
+
+function GroupInviteCard({group}:{group:CircleGroup}){
+ const store=useCircle();const [inv,setInv]=useState<{code:string;expiresAt:string}|null>(null);const [copied,setCopied]=useState(false);
+ useEffect(()=>{let live=true;void store.groupInvite(group.id).then(v=>{if(live)setInv(v)});return()=>{live=false}},[group.id]);
+ useEffect(()=>{if(!copied)return;const t=setTimeout(()=>setCopied(false),2000);return()=>clearTimeout(t)},[copied]);
+ const name=group.name.trim()||'this group';
+ return <>
+  <CHeading title={'Invite to '+name} detail={'Approved friends join '+name}/>
+  <CCard style={{alignItems:'center',gap:8,paddingVertical:18}}>
+   {inv?<><Text accessibilityLabel={'Invite code '+inv.code.split('').join(' ')} style={{fontSize:28,fontWeight:'900',letterSpacing:3,color:CT.ink}}>{inv.code}</Text>
+    <View style={{flexDirection:'row',alignItems:'center',gap:6}}><Ionicons name="time-outline" size={14} color={CT.muted}/><Text style={cs.muted}>Expires in {expiryLabel(inv.expiresAt)}</Text></View></>:<ActivityIndicator/>}
+  </CCard>
+  {inv?<View style={{flexDirection:'row',gap:9}}>
+   <View style={{flex:1}}><SoftButton label={copied?'Copied':'Copy Code'} icon={copied?'checkmark-circle-outline':'copy-outline'} onPress={()=>void Clipboard.setStringAsync(inv.code).then(()=>setCopied(true))}/></View>
+   <View style={{flex:1}}><PrimaryButton label="Share Invite" icon="share-outline" onPress={()=>void Share.share({message:'Join my '+name+' group on MoodPals 💚 Open the app and enter my invite code: '+inv.code})}/></View>
+  </View>:null}
+ </>;
+}
+
+function Invite({nav}:{nav:Nav}){
+ const {invite,regenerateCode,requests,groups}=useCircle();
+ const def=groups.find(g=>g.isDefault)?.name;
+ const incoming=requests.filter(r=>r.status==='pending'&&r.direction==='incoming');
  const [copied,setCopied]=useState(false);
  useEffect(()=>{if(!copied)return;const t=setTimeout(()=>setCopied(false),2000);return()=>clearTimeout(t)},[copied]);
  const copy=async()=>{await Clipboard.setStringAsync(invite.code);setCopied(true)};
- const hours=Math.max(0,Math.round((new Date(invite.expiresAt).getTime()-Date.now())/36e5));
- const left=hours>=36?Math.round(hours/24)+' days':hours>=1?hours+(hours===1?' hour':' hours'):'less than an hour';
+ const left=expiryLabel(invite.expiresAt);
  if(!invite.code)return <EmptyState mood="Calm" title="Getting your code…" detail="Connect to the internet to create your invite code."/>;
  const share=()=>void Share.share({message:'Join my circle on MoodPals 💚 Open the app and enter my invite code: '+invite.code});
  return <>
+  {incoming.length?<><CHeading title="Waiting for you" detail="Approve to add them to your circle"/><CCard style={{paddingVertical:4}}>{incoming.map((r,i)=><RequestRow key={r.id} r={r} tab="incoming" last={i===incoming.length-1} nav={nav}/>)}</CCard></>:null}
   <CCard style={{alignItems:'center',gap:10,paddingVertical:24}}>
    <MoodPalThumb mood="Joyful" size={84}/>
    <Text style={[cs.muted,{fontSize:13}]}>Your personal invite code</Text>
    <Text accessibilityLabel={'Invite code '+invite.code.split('').join(' ')} style={{fontSize:34,fontWeight:'900',letterSpacing:3,color:CT.ink}}>{invite.code}</Text>
-   <View style={{flexDirection:'row',alignItems:'center',gap:6}}><Ionicons name="time-outline" size={14} color={CT.muted}/><Text style={cs.muted}>Expires in {left} · anyone you share it with can send you a request</Text></View>
+   <View style={{flexDirection:'row',alignItems:'center',gap:6}}><Ionicons name="time-outline" size={14} color={CT.muted}/><Text style={cs.muted}>Expires in {left}</Text></View>
+   {def?<Text style={[cs.muted,{textAlign:'center'}]}>Approved friends join “{def}”</Text>:null}
   </CCard>
   <View style={{flexDirection:'row',gap:9}}><View style={{flex:1}}><SoftButton label={copied?"Copied":"Copy Code"} icon={copied?"checkmark-circle-outline":"copy-outline"} onPress={()=>void copy()}/></View><View style={{flex:1}}><PrimaryButton label="Share Invite" icon="share-outline" onPress={share}/></View></View>
   <SoftButton label="Regenerate Code" icon="refresh-outline" onPress={()=>Alert.alert('Regenerate code?','Your current code will stop working immediately. Pending requests already sent stay in your Friend Requests.',[{text:'Cancel',style:'cancel'},{text:'Regenerate',style:'destructive',onPress:regenerateCode}])}/>
   <CCard style={{gap:8}}><CHeading title="How it works"/>
-   {['Share your code with someone you trust.','They enter it in MoodPals and send you a request.','You approve the request and choose their groups.','Nothing is shared until you decide to share a mood.'].map((t,i)=><View key={i} style={{flexDirection:'row',gap:10,alignItems:'flex-start'}}><View style={{width:22,height:22,borderRadius:11,backgroundColor:CT.primarySoft,alignItems:'center',justifyContent:'center'}}><Text style={{color:CT.primary,fontWeight:'900',fontSize:12}}>{i+1}</Text></View><Text style={{flex:1,color:CT.ink,fontSize:13,lineHeight:19}}>{t}</Text></View>)}
+   {['Share your code with someone you trust.','They enter it in MoodPals and send you a request.',def?'You approve, and they join “'+def+'”. Change their groups anytime.':'You approve the request and choose their groups.','Nothing is shared until you decide to share a mood.'].map((t,i)=><View key={i} style={{flexDirection:'row',gap:10,alignItems:'flex-start'}}><View style={{width:22,height:22,borderRadius:11,backgroundColor:CT.primarySoft,alignItems:'center',justifyContent:'center'}}><Text style={{color:CT.primary,fontWeight:'900',fontSize:12}}>{i+1}</Text></View><Text style={{flex:1,color:CT.ink,fontSize:13,lineHeight:19}}>{t}</Text></View>)}
   </CCard>
  </>;
 }
@@ -292,20 +322,25 @@ function EnterCode({nav}:{nav:Nav}){
 }
 function StateCard({icon,color,title,detail}:{icon:any;color:string;title:string;detail:string}){return <CCard style={{flexDirection:'row',gap:12,alignItems:'flex-start'}}><Ionicons name={icon} size={24} color={color}/><View style={{flex:1,gap:3}}><Text style={cs.rowTitle}>{title}</Text><Text style={cs.rowSub}>{detail}</Text></View></CCard>;}
 
+function RequestRow({r,tab,last,nav,groupId,groupName}:{r:FriendRequest;tab:'incoming'|'outgoing';last:boolean;nav:Nav;groupId?:string;groupName?:string}){
+ const store=useCircle();
+ return <View style={[cs.row,last&&{borderBottomWidth:0},{flexWrap:'wrap'}]}>
+   <Avatar initials={r.initials} color={r.color}/>
+   <View style={{flex:1,gap:2}}><Text style={cs.rowTitle}>{r.name}</Text><Text style={cs.rowSub}>{r.status==='declined'?'Not accepted':(tab==='incoming'?(r.groupName?'Joins '+r.groupName+' · ':'Wants to join your circle · '):'Sent ')+timeAgo(r.sentAt)}</Text></View>
+   {tab==='incoming'?<View style={{flexDirection:'row',gap:7}}>
+    <TouchableOpacity accessibilityRole="button" onPress={()=>Alert.alert('Decline '+r.name+'?','They won’t be told you declined. Their request just disappears.',[{text:'Cancel',style:'cancel'},{text:'Decline',style:'destructive',onPress:()=>store.declineRequest(r.id)}])} style={[cs.soft,{backgroundColor:'#F3F5F4',paddingVertical:9}]}><Text style={{fontWeight:'800',color:CT.muted,fontSize:13}}>Decline</Text></TouchableOpacity>
+    <TouchableOpacity accessibilityRole="button" onPress={()=>!groupId&&r.groupId?store.acceptRequest(r.id,[r.groupId]):nav.push({name:'assignGroups',requestId:r.id,groupId,groupName})} style={[cs.soft,{backgroundColor:CT.primary,paddingVertical:9}]}><Text style={{fontWeight:'800',color:'#fff',fontSize:13}}>Accept</Text></TouchableOpacity>
+   </View>:r.status==='declined'?<Ionicons name="close-circle" size={22} color="#C9D2CE"/>:<TouchableOpacity onPress={()=>store.cancelRequest(r.id)}><Text style={{color:CT.danger,fontWeight:'800',fontSize:12}}>Cancel</Text></TouchableOpacity>}
+  </View>;
+}
+
 function Requests({groupId,groupName,nav}:{groupId?:string;groupName?:string;nav:Nav}){
  const store=useCircle();const [tab,setTab]=useState<'incoming'|'outgoing'>('incoming');
  const list=store.requests.filter(r=>r.direction===tab);
  return <>
   <Segmented value={tab} options={[['incoming','Received'],['outgoing','Sent']]} onChange={v=>setTab(v as any)}/>
   {!list.length?<EmptyState mood="Calm" title={tab==='incoming'?'No requests right now':'No sent requests'} detail={tab==='incoming'?'When someone enters your invite code, their request appears here for your approval.':'Requests you send with a friend’s code show here until they respond.'}/>:
-  <CCard style={{paddingVertical:4}}>{list.map((r,i)=><View key={r.id} style={[cs.row,i===list.length-1&&{borderBottomWidth:0},{flexWrap:'wrap'}]}>
-   <Avatar initials={r.initials} color={r.color}/>
-   <View style={{flex:1,gap:2}}><Text style={cs.rowTitle}>{r.name}</Text><Text style={cs.rowSub}>{r.status==='declined'?'Not accepted':(tab==='incoming'?'Wants to join your circle · ':'Sent ')+timeAgo(r.sentAt)}</Text></View>
-   {tab==='incoming'?<View style={{flexDirection:'row',gap:7}}>
-    <TouchableOpacity accessibilityRole="button" onPress={()=>Alert.alert('Decline '+r.name+'?','They won’t be told you declined. Their request just disappears.',[{text:'Cancel',style:'cancel'},{text:'Decline',style:'destructive',onPress:()=>store.declineRequest(r.id)}])} style={[cs.soft,{backgroundColor:'#F3F5F4',paddingVertical:9}]}><Text style={{fontWeight:'800',color:CT.muted,fontSize:13}}>Decline</Text></TouchableOpacity>
-    <TouchableOpacity accessibilityRole="button" onPress={()=>nav.push({name:'assignGroups',requestId:r.id,groupId,groupName})} style={[cs.soft,{backgroundColor:CT.primary,paddingVertical:9}]}><Text style={{fontWeight:'800',color:'#fff',fontSize:13}}>Accept</Text></TouchableOpacity>
-   </View>:r.status==='declined'?<Ionicons name="close-circle" size={22} color="#C9D2CE"/>:<TouchableOpacity onPress={()=>store.cancelRequest(r.id)}><Text style={{color:CT.danger,fontWeight:'800',fontSize:12}}>Cancel</Text></TouchableOpacity>}
-  </View>)}</CCard>}
+  <CCard style={{paddingVertical:4}}>{list.map((r,i)=><RequestRow key={r.id} r={r} tab={tab} last={i===list.length-1} nav={nav} groupId={groupId} groupName={groupName}/>)}</CCard>}
  </>;
 }
 export function Segmented({value,options,onChange}:{value:string;options:[string,string][];onChange:(v:string)=>void}){
@@ -323,14 +358,14 @@ function GroupPicker({selected,onToggle}:{selected:string[];onToggle:(id:string)
 const toggle=(arr:string[],id:string)=>arr.includes(id)?arr.filter(x=>x!==id):[...arr,id];
 
 function AssignGroups({id,groupId,groupName,nav}:{id:string;groupId?:string;groupName?:string;nav:Nav}){
- const store=useCircle();const r=store.requests.find(x=>x.id===id);const [sel,setSel]=useState<string[]>(()=>groupId&&store.groups.some(g=>g.id===groupId)?[groupId]:[]);
+ const store=useCircle();const r=store.requests.find(x=>x.id===id);const [sel,setSel]=useState<string[]>(()=>groupId&&store.groups.some(g=>g.id===groupId)?[groupId]:r?.groupId?[r.groupId]:[]);
  const draftOnly=!!groupId&&!store.groups.some(g=>g.id===groupId);
  if(!r)return <EmptyState title="Request handled" detail="This request is no longer pending."/>;
  return <>
   <CCard style={{flexDirection:'row',alignItems:'center',gap:12}}><Avatar initials={r.initials} color={r.color} size={52}/><View style={{flex:1}}><Text style={{fontSize:18,fontWeight:'900',color:CT.ink}}>{r.name}</Text><Text style={cs.muted}>Choose which groups {r.name} belongs to. Only you can see your groups.</Text></View></CCard>
   {draftOnly&&!store.groups.length?null:<GroupPicker selected={sel} onToggle={g=>setSel(s=>toggle(s,g))}/>}
-  <Text style={[cs.muted,{textAlign:'center'}]}>{draftOnly?r.name+' will be added to '+(groupName?'“'+groupName+'”':'your new group')+' when you create it.':sel.length?'':'No group selected — '+r.name+' can send you signals but won’t see your moods.'}</Text>
-  <PrimaryButton label={'Accept '+r.name} icon="checkmark" onPress={()=>{store.acceptRequest(id,sel);if(groupId)nav.popTo('group');else nav.replace({name:'friends'})}}/>
+  <Text style={[cs.muted,{textAlign:'center'}]}>{draftOnly?r.name+' will be added to '+(groupName?'“'+groupName+'”':'your new group')+' when you create it.':sel.length?'':'Choose at least one group for '+r.name+'.'}</Text>
+  <PrimaryButton label={'Accept '+r.name} icon="checkmark" disabled={!draftOnly&&!sel.length} onPress={()=>{store.acceptRequest(id,sel);if(groupId)nav.popTo('group');else nav.replace({name:'friends'})}}/>
  </>;
 }
 
@@ -374,7 +409,7 @@ function Groups({nav}:{nav:Nav}){
  return <>
   {!store.groups.length?<EmptyState mood="Calm" title="No groups yet" detail="Groups like Close Friends, Family or Support Team let you choose who sees which moods."/>:
   <CCard style={{paddingVertical:4}}>{store.groups.map((g,i)=><CRow key={g.id} last={i===store.groups.length-1} icon={g.icon} tint={g.color+'22'} color={g.color} title={g.name} subtitle={g.memberIds.length+' members · '+(g.moods.length===6?'All moods':g.moods.length+' of 6 moods')} onPress={()=>nav.push({name:'group',id:g.id})}/>)}</CCard>}
-  <PrimaryButton label="Create Group" icon="add" onPress={()=>!isPlus&&store.groups.length>=1?showPaywall('circles'):nav.push({name:'group'})}/>
+  <PrimaryButton label="Create Group" icon="add" onPress={()=>!isPlus?showPaywall('circles'):nav.push({name:'group'})}/>
   <Text style={[cs.muted,{textAlign:'center'}]}>A friend can be in more than one group. Group names and members are only visible to you.</Text>
  </>;
 }
@@ -413,8 +448,9 @@ function GroupEdit({id,draft,nav}:{id?:string;draft?:GroupDraft;nav:Nav}){
    {pending?<CRow icon="mail-unread-outline" title={'Review '+pending+(pending===1?' friend request':' friend requests')} subtitle="Approve and add them to this group" onPress={()=>leave({name:'requests',groupId:g.id,groupName:g.name.trim()})} right={<View style={cs.badge}><Text style={{color:'#fff',fontWeight:'900',fontSize:11}}>{pending}</Text></View>}/>:null}
    <CRow icon="person-add-outline" title={store.friends.length?'Invite more friends':'Invite Friends'} subtitle="Share your personal invite code" onPress={()=>leave({name:'invite'})} last/>
   </CCard>
+  {existing?<GroupInviteCard group={existing}/>:null}
   <PrimaryButton label={existing?'Save Group':'Create Group'} disabled={!g.name.trim()} onPress={()=>{store.saveGroup({...g,name:g.name.trim()});nav.back()}}/>
-  {existing?<SoftButton danger label="Delete Group" icon="trash-outline" onPress={()=>Alert.alert('Delete '+g.name+'?','Members stay your friends. They’ll stop seeing moods shared only with this group.',[{text:'Cancel',style:'cancel'},{text:'Delete',style:'destructive',onPress:()=>{store.deleteGroup(g.id);nav.back()}}])}/>:null}
+  {existing&&!existing.isDefault?<SoftButton danger label="Delete Group" icon="trash-outline" onPress={()=>Alert.alert('Delete '+g.name+'?','Members stay your friends. They’ll stop seeing moods shared only with this group.',[{text:'Cancel',style:'cancel'},{text:'Delete',style:'destructive',onPress:()=>{store.deleteGroup(g.id);nav.back()}}])}/>:null}
  </>;
 }
 

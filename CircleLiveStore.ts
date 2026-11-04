@@ -51,7 +51,7 @@ export function useLiveCircleState():CircleStore{
     supabase.rpc('circle_my_invite'),
     supabase.rpc('circle_friends'),
     supabase.rpc('circle_requests'),
-    supabase.from('circle_groups').select('id,name,icon,color,allowed_moods,created_at,circle_group_members(member_id)').order('created_at'),
+    supabase.from('circle_groups').select('id,name,icon,color,allowed_moods,is_default,created_at,circle_group_members(member_id)').order('is_default',{ascending:false}).order('created_at'),
     supabase.from('circle_shared_moods').select('id,mood,group_ids,shared_at,expires_at,stopped_at,circle_reactions(reactor_id,emoji,updated_at)').eq('owner_id',uid).order('shared_at',{ascending:false}).limit(30),
     supabase.from('circle_shared_moods').select('id,owner_id,mood,shared_at,expires_at').neq('owner_id',uid).order('shared_at',{ascending:false}).limit(30),
     supabase.from('circle_reactions').select('shared_mood_id,emoji').eq('reactor_id',uid),
@@ -73,8 +73,8 @@ export function useLiveCircleState():CircleStore{
    setSt(s=>({...s,offline:false,
     invite:inv?{code:inv.code,expiresAt:inv.expires_at}:s.invite,
     friends:friendList,
-    requests:((requests.data||[]) as any[]).map(r=>({id:r.link_id,direction:r.direction,name:r.display_name,initials:initialsOf(r.display_name),color:r.avatar_color,sentAt:r.created_at,status:r.status==='declined'?'declined':'pending'})),
-    groups:((groups.data||[]) as any[]).map((g):CircleGroup=>({id:g.id,name:g.name,icon:g.icon,color:g.color,memberIds:(g.circle_group_members||[]).map((m:any)=>m.member_id),
+    requests:((requests.data||[]) as any[]).map(r=>({id:r.link_id,direction:r.direction,name:r.display_name,initials:initialsOf(r.display_name),color:r.avatar_color,sentAt:r.created_at,status:r.status==='declined'?'declined':'pending',groupId:r.group_id||undefined,groupName:r.group_name||undefined})),
+    groups:((groups.data||[]) as any[]).map((g):CircleGroup=>({id:g.id,name:g.name,icon:g.icon,color:g.color,isDefault:!!g.is_default,memberIds:(g.circle_group_members||[]).map((m:any)=>m.member_id),
      moods:CIRCLE_MOODS.filter(m=>(g.allowed_moods||[]).includes(m))})),
     myMoods:((mine.data||[]) as any[]).map(m=>({id:m.id,mood:asMood(m.mood),sharedAt:m.shared_at,expiresAt:m.stopped_at||m.expires_at,groupIds:m.group_ids||[],
      active:!m.stopped_at&&new Date(m.expires_at).getTime()>now,
@@ -115,7 +115,8 @@ export function useLiveCircleState():CircleStore{
   const app=AppState.addEventListener('change',s=>{if(s==='active')void refresh()});
   const received=Notifications.addNotificationReceivedListener(n=>{if(n.request.content.data?.action==='circle')void refresh()});
   const timer=setInterval(()=>{if(AppState.currentState==='active')void refresh()},45000);
-  return()=>{auth.data.subscription.unsubscribe();app.remove();received.remove();clearInterval(timer)};
+  const live=supabase.channel('circle-links').on('postgres_changes',{event:'*',schema:'public',table:'circle_links'},()=>void refresh()).subscribe();
+  return()=>{auth.data.subscription.unsubscribe();app.remove();received.remove();clearInterval(timer);void supabase.removeChannel(live)};
  },[refresh]);
 
  // Runs an action, reports failures, then reloads from the server so the screen reflects what was actually saved.
@@ -140,6 +141,8 @@ export function useLiveCircleState():CircleStore{
   sendRequest:(_n:string,_i:string,_c:string)=>{},
   regenerateCode:()=>{void (async()=>{const r=await supabase.rpc('circle_regenerate_invite');if(r.error){Alert.alert('Couldn’t create a new code',r.error.message);return;}
    const row=(r.data as any[])?.[0];if(row)up(()=>({invite:{code:row.code,expiresAt:row.expires_at}}));})()},
+  groupInvite:async(groupId:string):Promise<{code:string;expiresAt:string}|null>=>{const r=await supabase.rpc('circle_group_invite',{p_group:groupId});if(r.error){Alert.alert('Couldn’t get the group code',r.error.message);return null;}
+   const row=(r.data as any[])?.[0];return row?{code:row.code,expiresAt:row.expires_at}:null},
   previewCode:async(code:string,_own:string):Promise<CodePreview>=>{
    const r=await supabase.rpc('circle_preview_invite',{p_code:code});
    if(r.error){if(isNetworkError(r.error))up(()=>({offline:true}));throw r.error;}

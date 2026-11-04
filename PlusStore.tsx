@@ -33,7 +33,7 @@ export const PLAN_FEATURES:{label:string;free:string|boolean;plus:string|boolean
  {label:'Family watches (mood-only)',free:'1',plus:'Up to 4'},
  {label:'Advanced trends and full history',free:false,plus:true},
  {label:'Extra customization',free:false,plus:true},
- {label:'Private circles',free:'1 group',plus:'Expanded'},
+ {label:'Private circles',free:'Friends group',plus:'Unlimited groups'},
  {label:'AI reflections',free:false,plus:'100 / month'},
 ];
 
