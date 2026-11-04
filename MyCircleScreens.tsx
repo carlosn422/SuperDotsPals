@@ -197,7 +197,7 @@ function Home({nav}:{nav:Nav}){
    <Text style={[cs.rowTitle,{fontSize:19}]} accessibilityRole="header">Groups</Text>
    {store.groups.length?<View>{store.groups.map((g,i)=><CRow key={g.id} last={i===store.groups.length-1} icon={g.icon} tint={g.color+'22'} color={g.color} title={g.name} subtitle={g.memberIds.length+(g.memberIds.length===1?' member':' members')} onPress={()=>nav.push({name:'group',id:g.id})}/>)}</View>
     :<Text style={cs.rowSub}>Groups like Family or Close Friends let you choose who sees which moods.</Text>}
-   <SoftButton label="Create a Group" icon="add" onPress={()=>!isPlus&&store.groups.filter(g=>!g.isDefault).length>=1?showPaywall('circles'):nav.push({name:'group'})}/>
+   <SoftButton label="Create a Group" icon="add" onPress={()=>!isPlus?showPaywall('circles'):nav.push({name:'group'})}/>
   </CCard>
   {store.live?null:<PrototypeControls nav={nav}/>}
  </>;
@@ -364,8 +364,8 @@ function AssignGroups({id,groupId,groupName,nav}:{id:string;groupId?:string;grou
  return <>
   <CCard style={{flexDirection:'row',alignItems:'center',gap:12}}><Avatar initials={r.initials} color={r.color} size={52}/><View style={{flex:1}}><Text style={{fontSize:18,fontWeight:'900',color:CT.ink}}>{r.name}</Text><Text style={cs.muted}>Choose which groups {r.name} belongs to. Only you can see your groups.</Text></View></CCard>
   {draftOnly&&!store.groups.length?null:<GroupPicker selected={sel} onToggle={g=>setSel(s=>toggle(s,g))}/>}
-  <Text style={[cs.muted,{textAlign:'center'}]}>{draftOnly?r.name+' will be added to '+(groupName?'“'+groupName+'”':'your new group')+' when you create it.':sel.length?'':'No group selected — '+r.name+' can send you signals but won’t see your moods.'}</Text>
-  <PrimaryButton label={'Accept '+r.name} icon="checkmark" onPress={()=>{store.acceptRequest(id,sel);if(groupId)nav.popTo('group');else nav.replace({name:'friends'})}}/>
+  <Text style={[cs.muted,{textAlign:'center'}]}>{draftOnly?r.name+' will be added to '+(groupName?'“'+groupName+'”':'your new group')+' when you create it.':sel.length?'':'Choose at least one group for '+r.name+'.'}</Text>
+  <PrimaryButton label={'Accept '+r.name} icon="checkmark" disabled={!draftOnly&&!sel.length} onPress={()=>{store.acceptRequest(id,sel);if(groupId)nav.popTo('group');else nav.replace({name:'friends'})}}/>
  </>;
 }
 
@@ -409,7 +409,7 @@ function Groups({nav}:{nav:Nav}){
  return <>
   {!store.groups.length?<EmptyState mood="Calm" title="No groups yet" detail="Groups like Close Friends, Family or Support Team let you choose who sees which moods."/>:
   <CCard style={{paddingVertical:4}}>{store.groups.map((g,i)=><CRow key={g.id} last={i===store.groups.length-1} icon={g.icon} tint={g.color+'22'} color={g.color} title={g.name} subtitle={g.memberIds.length+' members · '+(g.moods.length===6?'All moods':g.moods.length+' of 6 moods')} onPress={()=>nav.push({name:'group',id:g.id})}/>)}</CCard>}
-  <PrimaryButton label="Create Group" icon="add" onPress={()=>!isPlus&&store.groups.filter(g=>!g.isDefault).length>=1?showPaywall('circles'):nav.push({name:'group'})}/>
+  <PrimaryButton label="Create Group" icon="add" onPress={()=>!isPlus?showPaywall('circles'):nav.push({name:'group'})}/>
   <Text style={[cs.muted,{textAlign:'center'}]}>A friend can be in more than one group. Group names and members are only visible to you.</Text>
  </>;
 }
