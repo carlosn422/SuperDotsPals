@@ -6,6 +6,8 @@ module.exports = {
   // Keep the watch app embedded in the existing MoodPals iOS bundle.
   bundleIdentifier: '.watchkitapp',
   deploymentTarget: '10.0',
+  // Sets ASSETCATALOG_COMPILER_APPICON_NAME so the watch icon is compiled; without it watch notifications show a blank icon.
+  icon: '../../assets/watch-icon.png',
   frameworks: ['SwiftUI', 'Security', 'HealthKit', 'WidgetKit', 'WatchConnectivity'],
   entitlements: {
     'com.apple.developer.healthkit': true,
