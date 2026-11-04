@@ -4,7 +4,9 @@ import {supabase} from './supabase';
 import {useIsGuest} from './Account';
 import FamilyWatches,{familyProfilesChanged,shortProfileName} from './FamilyWatches';
 import {usePlus} from './PlusStore';
-import {getPendingWatchPairing,getWatchStatus,onWatchPairingRequest,requestWatchPairing,WatchStatus} from './modules/watch-link';
+import {getPendingWatchPairing,onWatchPairingRequest,requestWatchPairing} from './modules/watch-link';
+import {WatchSetupCard,useWatchSetup} from './WatchSetupStatus';
+import {SettingsItem} from './SettingsComponents';
 import {COLOR_NOTE,SectionHeader,WatchColor,WatchColorGrid,WatchColorSheet,WatchImage,WatchRow,colorName,isWatchColor} from './WatchArt';
 
 type Device={id:string;name:string;platform:string;linked_at:string;last_seen_at:string|null;revoked_at:string|null;watch_color:string|null};
@@ -12,14 +14,15 @@ type Pending={action:'self'}|{action:'approve_code';code:string};
 const purple='#6953CA',red='#C64F67';
 const deviceName=(d:Device)=>d.name?.trim()||'Apple Watch';
 const deviceStatus=(d:Device)=>d.last_seen_at?'Linked · last active '+new Date(d.last_seen_at).toLocaleDateString():'Linked '+new Date(d.linked_at).toLocaleDateString();
-export default function ConnectedDevices(){
+export default function ConnectedDevices({focused=true,onOpenThemes,onCreateAccount}:{focused?:boolean;onOpenThemes?:()=>void;onCreateAccount?:()=>void}){
  const [devices,setDevices]=useState<Device[]>([]),[connecting,setConnecting]=useState(false),[loading,setLoading]=useState(false),[message,setMessage]=useState('');
- const [code,setCode]=useState(''),[watch,setWatch]=useState<WatchStatus>(getWatchStatus()),[waiting,setWaiting]=useState(false);
+ const [code,setCode]=useState(''),[waiting,setWaiting]=useState(false),[loaded,setLoaded]=useState(false);
  const [familyReload,setFamilyReload]=useState(0);
  const [adding,setAdding]=useState<'mine'|'family'|null>(null),[step,setStep]=useState<'link'|'color'>('link'),[pending,setPending]=useState<Pending|null>(null);
  const [color,setColor]=useState<WatchColor|null>(null),[details,setDetails]=useState<Device|null>(null),[recoloring,setRecoloring]=useState(false);
  const waitColor=useRef<WatchColor|null>(null);
  const isGuest=useIsGuest();
+ const {setup,status:watch,checkAgain}=useWatchSetup(focused);
  const {isPlus,showPaywall}=usePlus();
  async function call(action:string,extra:Record<string,unknown>={}){
   const {data,error}=await supabase.functions.invoke('watch-pairing',{body:{action,...extra}});
@@ -30,14 +33,14 @@ export default function ConnectedDevices(){
   }
   return data;
  }
- async function load(){setLoading(true);try{setDevices((await call('list')).devices||[])}catch(e:any){setMessage(e.message)}finally{setLoading(false)}}
- useEffect(()=>{void load()},[]);
+ async function load(){setLoading(true);try{setDevices((await call('list')).devices||[]);setLoaded(true)}catch(e:any){setMessage(e.message)}finally{setLoading(false)}}
+ // Refresh linked watches whenever the Watches tab is shown again or the app returns to the foreground.
+ useEffect(()=>{if(!focused||isGuest)return;void load();setFamilyReload(n=>n+1)},[focused,isGuest]);
  useEffect(()=>{
-  const refresh=()=>setWatch(getWatchStatus());
-  const t=setTimeout(refresh,800);
-  const app=AppState.addEventListener('change',st=>{if(st==='active')refresh()});
-  return()=>{clearTimeout(t);app.remove()};
- },[]);
+  if(isGuest)return;
+  const app=AppState.addEventListener('change',st=>{if(st==='active'&&focused)void load()});
+  return()=>app.remove();
+ },[focused,isGuest]);
  function closeAdd(){setAdding(null);setStep('link');setPending(null);setColor(null);setCode('');setWaiting(false)}
  async function approve(action:'approve'|'approve_code',details:Record<string,unknown>){
   if(isGuest){setMessage('Create an account in Settings to link your Apple Watch.');return}
@@ -83,19 +86,26 @@ export default function ConnectedDevices(){
  async function remove(device:Device){Alert.alert('Remove device?',deviceName(device)+' will be permanently removed from your connected devices. It will need a new code to link again. Existing access tokens may remain valid until they expire.',[{text:'Cancel',style:'cancel'},{text:'Remove Device',style:'destructive',onPress:()=>{void (async()=>{setLoading(true);try{await call('remove',{deviceId:device.id});setDetails(null);setDevices(current=>current.filter(d=>d.id!==device.id));await load()}catch(e:any){Alert.alert('Removal failed',e.message)}finally{setLoading(false)}})()}}])}
  const previewName=adding==='family'?'Family Watch':shortProfileName(watches[0]?.name||'Apple Watch');
  return <View style={{gap:13}}>
-  <Text style={[styles.title,{fontSize:24}]}>Connected devices</Text>
-  <Text style={styles.sub}>Open MoodPals on your Apple Watch while MoodPals is open on this iPhone and the watch links automatically. You can also add a watch with the code it shows.</Text>
-  {isGuest?<Text style={[styles.sub,{color:'#D65B79'}]}>Create an account in Settings to link your Apple Watch.</Text>:null}
+  <Text style={[styles.title,{fontSize:28}]} accessibilityRole="header">Watches</Text>
+  <WatchSetupCard setup={setup} linked={isGuest?null:loaded?ownWatchLinked:null} onCheckAgain={checkAgain}
+   onLink={isGuest?undefined:()=>{setMessage('');setAdding('mine');setPending({action:'self'});setStep('color')}}/>
+  {isGuest?<View style={[styles.card,{paddingVertical:14}]}>
+   <Text style={{fontWeight:'800',color:'#271C49'}}>Link your watch to an account</Text>
+   <Text style={styles.sub}>Create a free account to sync your moods, watch theme and Circle with your Apple Watch and to add family watches.</Text>
+   {onCreateAccount?<TouchableOpacity accessibilityRole="button" style={styles.button} onPress={onCreateAccount}><Text style={styles.buttonText}>Create free account</Text></TouchableOpacity>:null}
+  </View>:null}
   {message&&!adding?<Text style={[styles.sub,{fontWeight:'700'}]}>{message}</Text>:null}
+  {!isGuest?<>
   <SectionHeader title="My Watches" action="Add Watch" disabled={isGuest} onAction={()=>{setMessage('');setAdding('mine')}}/>
   <View style={styles.card}>
    {loading&&!devices.length?<ActivityIndicator color={purple}/>:null}
-   {!loading&&!watches.length?<Text style={[styles.sub,{paddingVertical:8}]}>No watches connected yet</Text>:null}
+   {!loading&&!watches.length?<Text style={[styles.sub,{paddingVertical:8}]}>No watch linked yet. Open MoodPals on your watch, or tap Add Watch to enter the code it shows.</Text>:null}
    {watches.map((d,i)=><WatchRow key={d.id} last={i===watches.length-1} color={isWatchColor(d.watch_color)?d.watch_color:null} name={shortProfileName(deviceName(d))} title={deviceName(d)} label={'Device details for '+deviceName(d)}
     lines={[deviceStatus(d),isWatchColor(d.watch_color)?'':'Choose Watch Color in details']} onPress={()=>setDetails(d)}/>)}
   </View>
-  <TouchableOpacity onPress={()=>void load()}><Text style={{color:purple,fontWeight:'700'}}>Refresh device list ↻</Text></TouchableOpacity>
-  {!isGuest?<FamilyWatches reloadKey={familyReload} onAdd={()=>{setMessage('');setAdding('family')}}/>:null}
+  {onOpenThemes?<SettingsItem title="Watch Theme" subtitle="Choose your Apple Watch colour" status="Syncs to your watch automatically" icon="watch-outline" accent={purple} onPress={onOpenThemes}/>:null}
+  <FamilyWatches reloadKey={familyReload} onAdd={()=>{setMessage('');setAdding('family')}}/>
+  </>:null}
 
   <Modal visible={!!adding} animationType="slide" presentationStyle="pageSheet" onRequestClose={connecting?undefined:closeAdd}>
    <ScrollView contentContainerStyle={{padding:22,gap:14}} keyboardShouldPersistTaps="handled">

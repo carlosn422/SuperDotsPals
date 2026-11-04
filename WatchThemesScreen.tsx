@@ -106,7 +106,7 @@ function AddToWatchFaceGuide({theme}:{theme:WatchTheme}){
  </View>;
 }
 
-export default function WatchThemesScreen({onBack}:{onBack:()=>void}){
+export default function WatchThemesScreen({onBack,backLabel='Settings'}:{onBack:()=>void;backLabel?:string}){
  const [current,setCurrent]=useState<string|null>(null);
  const [selected,setSelected]=useState<WatchTheme|null>(null);
  const [saving,setSaving]=useState(false);
@@ -124,7 +124,7 @@ export default function WatchThemesScreen({onBack}:{onBack:()=>void}){
    Alert.alert('Sending to your watch','Your Apple Watch shows a short loading screen, then switches to the new colour the next time the MoodPals watch app syncs — within about a minute while it’s open. Complications follow right after.');
   }catch(e:any){Alert.alert('Couldn’t save the theme',e?.message||'Please try again.')}finally{setSaving(false)}
  };
- const back=<TouchableOpacity onPress={guide?()=>setGuide(false):selected?()=>setSelected(null):onBack} accessibilityRole="button" style={{flexDirection:'row',alignItems:'center',gap:4,paddingVertical:6,alignSelf:'flex-start'}}><Ionicons name="chevron-back" size={18} color={active.color}/><Text style={{color:active.color,fontWeight:'800'}}>{guide||selected?'Watch Themes':'Settings'}</Text></TouchableOpacity>;
+ const back=<TouchableOpacity onPress={guide?()=>setGuide(false):selected?()=>setSelected(null):onBack} accessibilityRole="button" style={{flexDirection:'row',alignItems:'center',gap:4,paddingVertical:6,alignSelf:'flex-start'}}><Ionicons name="chevron-back" size={18} color={active.color}/><Text style={{color:active.color,fontWeight:'800'}}>{guide||selected?'Watch Themes':backLabel}</Text></TouchableOpacity>;
  if(guide)return <View style={{gap:14}}>{back}<Text style={{fontSize:28,fontWeight:'900',color:ink}}>Add to Watch Face</Text><AddToWatchFaceGuide theme={active}/></View>;
  if(selected)return <View style={{gap:14}}>
   {back}

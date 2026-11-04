@@ -4,11 +4,14 @@ import WatchConnectivity
 public class WatchLinkModule: Module {
   public func definition() -> ModuleDefinition {
     Name("WatchLink")
-    Events("onPairingRequest")
+    Events("onPairingRequest", "onWatchStatus")
 
     OnCreate {
       WatchLinkSession.shared.onPairing = { [weak self] pairing in
         self?.sendEvent("onPairingRequest", pairing)
+      }
+      WatchLinkSession.shared.onStatus = { [weak self] status in
+        self?.sendEvent("onWatchStatus", status)
       }
       WatchLinkSession.shared.activate()
     }
@@ -37,6 +40,8 @@ public class WatchLinkModule: Module {
 final class WatchLinkSession: NSObject, WCSessionDelegate {
   static let shared = WatchLinkSession()
   var onPairing: (([String: String]) -> Void)?
+  /// Fires when activation completes or the paired watch, app install or reachability changes.
+  var onStatus: (([String: Bool]) -> Void)?
   /// Latest mood waiting for the session to activate.
   private var pendingMood: [String: Any]?
 
@@ -53,11 +58,19 @@ final class WatchLinkSession: NSObject, WCSessionDelegate {
   }
 
   func status() -> [String: Bool] {
-    guard WCSession.isSupported(), WCSession.default.activationState == .activated else {
-      return ["paired": false, "installed": false, "reachable": false]
+    guard WCSession.isSupported() else {
+      return ["supported": false, "activated": false, "paired": false, "installed": false, "reachable": false]
+    }
+    guard WCSession.default.activationState == .activated else {
+      return ["supported": true, "activated": false, "paired": false, "installed": false, "reachable": false]
     }
     let session = WCSession.default
-    return ["paired": session.isPaired, "installed": session.isWatchAppInstalled, "reachable": session.isReachable]
+    return ["supported": true, "activated": true, "paired": session.isPaired, "installed": session.isWatchAppInstalled, "reachable": session.isReachable]
+  }
+
+  private func statusChanged() {
+    let current = status()
+    DispatchQueue.main.async { self.onStatus?(current) }
   }
 
   func requestPairing() -> Bool {
@@ -113,7 +126,10 @@ final class WatchLinkSession: NSObject, WCSessionDelegate {
       deliver(session.receivedApplicationContext)
       DispatchQueue.main.async { if let mood = self.pendingMood { _ = self.sendMood(mood) } }
     }
+    statusChanged()
   }
+  func sessionWatchStateDidChange(_ session: WCSession) { statusChanged() }
+  func sessionReachabilityDidChange(_ session: WCSession) { statusChanged() }
   func sessionDidBecomeInactive(_ session: WCSession) {}
   func sessionDidDeactivate(_ session: WCSession) { session.activate() }
   func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) { deliver(applicationContext) }
