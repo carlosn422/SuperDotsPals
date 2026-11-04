@@ -272,6 +272,8 @@ function Invite({groupId,nav}:{groupId?:string;nav:Nav}){
  const waitingFor=incoming.length?<><CHeading title="Waiting for you" detail="Approve to add them to your circle"/><CCard style={{paddingVertical:4}}>{incoming.map((r,i)=><RequestRow key={r.id} r={r} tab="incoming" last={i===incoming.length-1} nav={nav}/>)}</CCard></>:null;
  if(!groupId&&groups.length)return <>
   {waitingFor}
+  <CHeading title="Got a friend’s code?" detail="Enter it to send them a request."/>
+  <EnterCode nav={nav}/>
   <CHeading title="Who are you inviting?" detail="Pick a group. Approved friends join it."/>
   <CCard style={{paddingVertical:4}}>
    {groups.map(g=><CRow key={g.id} icon={g.icon} tint={g.color+'22'} color={g.color} title={g.name} subtitle={g.memberIds.length+(g.memberIds.length===1?' member':' members')} onPress={()=>nav.push({name:'invite',groupId:g.id})}/>)}
@@ -316,7 +318,7 @@ function EnterCode({nav}:{nav:Nav}){
   if(!known.current){known.current=store.friends.map(f=>f.id);return}
   if(store.friends.some(f=>!known.current!.includes(f.id)))nav.popTo('home');
  },[waiting,store.friends]);
- const format=(t:string)=>{const raw=t.toUpperCase().replace(/[^A-Z0-9]/g,'').replace(/^MP/,'').slice(0,5);return raw?'MP-'+raw:''};
+ const format=(t:string)=>{const up=t.toUpperCase().replace(/[^A-Z0-9-]/g,'');if('MP-'.startsWith(up))return up;const raw=up.replace(/-/g,'').replace(/^MP/,'').slice(0,5);return raw?'MP-'+raw:''};
  const name=found?.name||'your friend';
  return <>
   <CCard style={{gap:12}}>
