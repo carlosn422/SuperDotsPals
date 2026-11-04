@@ -627,9 +627,9 @@ function NotificationSettings(){
    <ToggleRow title="Invitations" subtitle="When someone sends you a friend request" value={p.invites} onChange={v=>store.setPref('invites',v)}/>
    <ToggleRow title="Request approved" subtitle="When a friend accepts your request" value={p.approvals} onChange={v=>store.setPref('approvals',v)}/>
    <ToggleRow title="Little Signals" value={p.signals} onChange={v=>store.setPref('signals',v)}/>
-   <ToggleRow title="Reactions to my moods" value={p.reactions} onChange={v=>store.setPref('reactions',v)}/>
-   <ToggleRow title="Quiet hours" subtitle="No circle notifications 10 PM – 7 AM. Everything still shows in Today’s Signals." value={p.quietHours} onChange={v=>store.setPref('quietHours',v)} last/>
+   <ToggleRow title="Reactions to my moods" value={p.reactions} onChange={v=>store.setPref('reactions',v)} last/>
   </CCard>
+  <Text style={{color:CT.muted,fontSize:12,lineHeight:17,paddingHorizontal:6}}>To silence MoodPals at night, use Sleep or a Focus in your iPhone’s Settings.</Text>
   <CHeading title="Lock screen privacy"/>
   <CCard style={{paddingVertical:4}}>
    <ToggleRow title="Show names in previews" value={p.showNamesInPreview} onChange={v=>store.setPref('showNamesInPreview',v)}/>

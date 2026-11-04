@@ -9,8 +9,8 @@ import type {CircleStore,CodePreview,State} from './CircleStore';
 import {CIRCLE_MOODS,CircleGroup,CircleMood,Friend,NotificationPrefs,SignalId,isToday,signalById} from './LittleSignalsData';
 
 // My Circle backed by Supabase (see supabase/migrations/20261023_my_circle_little_signals.sql).
-const EMPTY_PREFS:NotificationPrefs={invites:true,approvals:true,signals:true,reactions:true,quietHours:true,showNamesInPreview:true,showMoodOnLockScreen:false};
-const PREF_COLUMNS:Record<keyof NotificationPrefs,string>={invites:'invites',approvals:'approvals',signals:'signals',reactions:'reactions',quietHours:'quiet_hours',showNamesInPreview:'show_names_in_preview',showMoodOnLockScreen:'show_mood_on_lock_screen'};
+const EMPTY_PREFS:NotificationPrefs={invites:true,approvals:true,signals:true,reactions:true,showNamesInPreview:true,showMoodOnLockScreen:false};
+const PREF_COLUMNS:Record<keyof NotificationPrefs,string>={invites:'invites',approvals:'approvals',signals:'signals',reactions:'reactions',showNamesInPreview:'show_names_in_preview',showMoodOnLockScreen:'show_mood_on_lock_screen'};
 const EAS_PROJECT_ID=(Constants.expoConfig?.extra as any)?.eas?.projectId||'7fce274d-e6b2-4944-a9b0-ef08fa13f871';
 const initialsOf=(name:string)=>(name.trim()[0]||'?').toUpperCase();
 const asMood=(m:string)=>(CIRCLE_MOODS.includes(m as CircleMood)?m:'Calm') as CircleMood;
@@ -84,7 +84,7 @@ export function useLiveCircleState():CircleStore{
     sentSignals:((sent.data||[]) as any[]).map(x=>({friendIds:[x.recipient_id],signal:x.signal as SignalId,at:x.sent_at})),
     inbox:((inbox.data||[]) as any[]).map(n=>({id:n.id,moodId:n.shared_mood_id,mood:asMood(n.mood),friendId:n.reactor_id,name:nickById.get(n.reactor_id)||n.reactor_name,emoji:n.emoji,at:n.reacted_at,read:!!n.read_at||pendingReads.includes(n.id)})),
     familyNames:Object.fromEntries(((family.data||[]) as any[]).map(n=>[n.profile_id,{name:n.display_name,owner:n.owner_name}])),
-    prefs:p?{invites:p.invites,approvals:p.approvals,signals:p.signals,reactions:p.reactions,quietHours:p.quiet_hours,showNamesInPreview:p.show_names_in_preview,showMoodOnLockScreen:p.show_mood_on_lock_screen}:s.prefs,
+    prefs:p?{invites:p.invites,approvals:p.approvals,signals:p.signals,reactions:p.reactions,showNamesInPreview:p.show_names_in_preview,showMoodOnLockScreen:p.show_mood_on_lock_screen}:s.prefs,
    }));
    const tz=deviceTimezone();
    if(p&&p.timezone!==tz)supabase.from('circle_notification_prefs').update({timezone:tz}).eq('user_id',uid).then(()=>{});
