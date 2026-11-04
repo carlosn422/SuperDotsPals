@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useState} from 'react';
-import {Alert,Share,Text,TextInput,TouchableOpacity,View} from 'react-native';
+import {ActivityIndicator,Alert,Share,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import {CIRCLE_MOODS,CircleGroup,CircleMood,LITTLE_SIGNALS,MOOD_REACTIONS,MOOD_TINTS,SignalId,isToday,signalById,timeAgo,timeLeft} from './LittleSignalsData';
@@ -12,9 +12,9 @@ export type CircleRoute=
  |{name:'friends'}|{name:'friend';id:string}|{name:'groups'}|{name:'group';id?:string;draft?:GroupDraft}|{name:'permissions'}
  |{name:'share';mood:CircleMood}|{name:'send';friendId?:string}|{name:'signalSent';signal:SignalId;friendIds:string[]}
  |{name:'signalReceived';signalId:string}|{name:'friendMood';id:string}|{name:'room';id:string}|{name:'today'}
- |{name:'notifications'}|{name:'widgets'}|{name:'revoked'};
+ |{name:'notifications'}|{name:'widgets'}|{name:'revoked'}|{name:'fromNotification';ref:string};
 
-const TITLES:Record<CircleRoute['name'],string>={home:'My Circle',invite:'Invite Friends',enterCode:'Enter Invite Code',requests:'Friend Requests',assignGroups:'Add to Groups',friends:'Friends',friend:'Friend',groups:'Manage Groups',group:'Group',permissions:'Mood Sharing',share:'Choose Audience',send:'Send a Little Signal',signalSent:'Signal Sent',signalReceived:'Little Signal',friendMood:'Shared Mood',room:'Reactions',today:"Today's Signals",notifications:'Circle Notifications',widgets:'Widgets',revoked:'Not Available'};
+const TITLES:Record<CircleRoute['name'],string>={fromNotification:'My Circle',home:'My Circle',invite:'Invite Friends',enterCode:'Enter Invite Code',requests:'Friend Requests',assignGroups:'Add to Groups',friends:'Friends',friend:'Friend',groups:'Manage Groups',group:'Group',permissions:'Mood Sharing',share:'Choose Audience',send:'Send a Little Signal',signalSent:'Signal Sent',signalReceived:'Little Signal',friendMood:'Shared Mood',room:'Reactions',today:"Today's Signals",notifications:'Circle Notifications',widgets:'Widgets',revoked:'Not Available'};
 type GroupDraft={group:CircleGroup;knownFriendIds:string[]};
 const GROUP_ICONS=['heart','home','leaf','star','people','sunny','musical-notes','paw'] as const;
 const GROUP_COLORS=['#E76B8A','#488CD9','#3BA986','#E3A426','#7139E9','#D9704B'];
@@ -66,6 +66,7 @@ function Screen({route,nav,mood}:{route:CircleRoute;nav:Nav;mood?:string}){
   case 'today':return <TodaySignals nav={nav}/>;
   case 'notifications':return <NotificationSettings/>;
   case 'widgets':return <WidgetPreviews/>;
+  case 'fromNotification':return <OpenFromNotification id={route.ref} nav={nav}/>;
   case 'revoked':return <EmptyState mood="Sad" title="This mood is no longer available" detail="It may have expired after 24 hours, or the person stopped sharing with you. Shared moods are only visible to people they were shared with."/>;
  }
 }
@@ -435,6 +436,20 @@ function ReactionRoom({id,nav}:{id:string;nav:Nav}){
 }
 
 // Reactions to my shared moods: name, emoji and the original mood only. Unread ones are marked one at a time when opened.
+// A push only carries the row id; refresh first so a signal or reaction that arrived while the app was closed is found.
+function OpenFromNotification({id,nav}:{id:string;nav:Nav}){
+ const store=useCircle();const [ready,setReady]=useState(false);
+ useEffect(()=>{let on=true;void Promise.resolve(store.refresh()).catch(()=>{}).finally(()=>{if(on)setReady(true)});return()=>{on=false}},[id]);
+ useEffect(()=>{
+  if(!ready)return;
+  if(store.signals.some(s=>s.id===id))nav.replace({name:'signalReceived',signalId:id});
+  else if(store.myMoods.some(m=>m.id===id)){store.inbox.filter(n=>n.moodId===id&&!n.read).forEach(n=>store.markReactionRead(n.id));nav.replace({name:'room',id});}
+  else if(store.friendMoods.some(m=>m.id===id))nav.replace({name:'friendMood',id});
+  else nav.replace({name:'today'});
+ },[ready]);
+ return <View style={{paddingVertical:48,alignItems:'center'}}><ActivityIndicator color={CT.ink}/></View>;
+}
+
 function ReactionNotices({nav}:{nav:Nav}){
  const store=useCircle();const [all,setAll]=useState(false);
  const unread=store.inbox.filter(n=>!n.read).length;

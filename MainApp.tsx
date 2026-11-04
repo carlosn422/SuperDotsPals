@@ -136,7 +136,26 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   void supabase.auth.getSession().then(({data:{session}})=>{if(session?.user.id)sendMoodToWatch(mood,moodAt,session.user.id)});
  },[mood,moodAt]);
  useEffect(()=>{const open=(url:string|null)=>{const m=url?.match(/^wellnest:\/\/circle\/?(\w*)/);if(m)setCircleSheet([{name:m[1]==='send'?'send':'today'}])};Linking.getInitialURL().then(open).catch(()=>{});const sub=Linking.addEventListener('url',e=>open(e.url));return()=>sub.remove()},[]);
- useEffect(()=>{const sub=Notifications.addNotificationResponseReceivedListener(r=>{if(r.notification.request.content.data?.action==='breathing'){go('Actions');openAction('breathing')}else if(r.notification.request.content.data?.action==='circle'){const route=r.notification.request.content.data?.route;if(route==='watches'){go('Watches');return;}setCircleSheet([{name:route==='requests'?'requests':route==='friends'?'friends':'today'}])}});return()=>sub.remove()},[pageWidth]);
+ // Opens the screen a notification points at, whether the tap launched the app or arrived while it was running.
+ const openNotification=(r:Notifications.NotificationResponse)=>{
+  const key=r.notification.request.identifier;if(handledNotifications.has(key))return;handledNotifications.add(key);
+  const d=(r.notification.request.content.data||{}) as Record<string,unknown>;
+  const ref=typeof d.ref==='string'&&d.ref?d.ref:undefined;
+  if(d.action==='breathing'){setCircleSheet(null);go('Actions');openAction('breathing');return;}
+  if(d.action==='circle'){
+   if(d.route==='watches'){setCircleSheet(null);go('Watches');return;}
+   setCircleSheet([d.route==='requests'?{name:'requests'}:d.route==='friends'?{name:'friends'}:ref?{name:'fromNotification',ref}:{name:'today'}]);
+   return;
+  }
+  if(d.screen==='Actions'){setCircleSheet(null);go('Actions');openAction('checkin');}
+ };
+ useEffect(()=>{
+  const sub=Notifications.addNotificationResponseReceivedListener(openNotification);
+  // A tap that cold-launched the app fired before this screen mounted (sign-in and onboarding come first).
+  const last=Notifications.getLastNotificationResponse();
+  const t=last?setTimeout(()=>{openNotification(last);Notifications.clearLastNotificationResponse()},300):undefined;
+  return()=>{sub.remove();if(t)clearTimeout(t)};
+ },[pageWidth]);
  const [water,setWater]=useState(0);
  const [coffee,setCoffee]=useState(0);
  useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;
@@ -262,6 +281,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   </Modal>
  </View>;
 }
+const handledNotifications=new Set<string>();
 export default function MainApp({selectedTheme='grape',selectedCompanion='bloop',onEditProfile=()=>{},onThemeChanged=()=>{}}:{selectedTheme?:string;selectedCompanion?:string;onEditProfile?:()=>void;onThemeChanged?:(theme:string,companion:string)=>void}){return <CircleProvider><AppContent selectedTheme={selectedTheme} selectedCompanion={selectedCompanion} onEditProfile={onEditProfile} onThemeChanged={onThemeChanged}/></CircleProvider>}
 // Frosted bottom navigation: soft grey active pill, green active tab, near-black icons.
 const NAV_GREEN='#6DBE8C',NAV_INK='#161616',NAV_PILL='#E5E7E7';
