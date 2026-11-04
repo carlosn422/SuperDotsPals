@@ -1,9 +1,9 @@
 import React,{useEffect,useMemo,useState} from 'react';
-import {ActivityIndicator,Alert,Share,Text,TextInput,TouchableOpacity,View} from 'react-native';
+import {ActionSheetIOS,ActivityIndicator,Alert,ScrollView,Share,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import {CIRCLE_MOODS,CircleGroup,CircleMood,LITTLE_SIGNALS,MOOD_REACTIONS,MOOD_TINTS,SignalId,isToday,signalById,timeAgo,timeLeft} from './LittleSignalsData';
-import {CodePreview,familyFriend,friendName,uniqueAudience,useCircle} from './CircleStore';
+import {CIRCLE_MOODS,CircleGroup,CircleMood,Friend,FriendSharedMood,LITTLE_SIGNALS,MOOD_REACTIONS,MOOD_TINTS,SignalId,isToday,signalById,timeAgo,timeLeft} from './LittleSignalsData';
+import {CodePreview,activeFriendMoods,circleNewCount,familyFriend,friendName,isMoodNew,uniqueAudience,useCircle} from './CircleStore';
 import {usePlus} from './PlusStore';
 import {Avatar,CCard,CHeading,CRow,CT,Chip,EmptyState,MoodPalThumb,MoodTag,OfflineBanner,PrimaryButton,SampleDataNote,SignalBurst,SoftButton,ToggleRow,cs} from './CircleComponents';
 
@@ -12,16 +12,16 @@ export type CircleRoute=
  |{name:'friends'}|{name:'friend';id:string}|{name:'groups'}|{name:'group';id?:string;draft?:GroupDraft}|{name:'permissions'}
  |{name:'share';mood:CircleMood}|{name:'send';friendId?:string}|{name:'signalSent';signal:SignalId;friendIds:string[]}
  |{name:'signalReceived';signalId:string}|{name:'friendMood';id:string}|{name:'room';id:string}|{name:'today'}
- |{name:'notifications'}|{name:'widgets'}|{name:'revoked'}|{name:'fromNotification';ref:string};
+ |{name:'notifications'}|{name:'widgets'}|{name:'circleSettings'}|{name:'revoked'}|{name:'fromNotification';ref:string};
 
-const TITLES:Record<CircleRoute['name'],string>={fromNotification:'My Circle',home:'My Circle',invite:'Invite Friends',enterCode:'Enter Invite Code',requests:'Friend Requests',assignGroups:'Add to Groups',friends:'Friends',friend:'Friend',groups:'Manage Groups',group:'Group',permissions:'Mood Sharing',share:'Choose Audience',send:'Send a Little Signal',signalSent:'Signal Sent',signalReceived:'Little Signal',friendMood:'Shared Mood',room:'Reactions',today:"Today's Signals",notifications:'Circle Notifications',widgets:'Widgets',revoked:'Not Available'};
+const TITLES:Record<CircleRoute['name'],string>={circleSettings:'Circle Settings',fromNotification:'My Circle',home:'My Circle',invite:'Invite Friends',enterCode:'Enter Invite Code',requests:'Friend Requests',assignGroups:'Add to Groups',friends:'Friends',friend:'Friend',groups:'Manage Groups',group:'Group',permissions:'Mood Sharing',share:'Choose Audience',send:'Send a Little Signal',signalSent:'Signal Sent',signalReceived:'Little Signal',friendMood:'Shared Mood',room:'Reactions',today:"Today's Signals",notifications:'Circle Notifications',widgets:'Widgets',revoked:'Not Available'};
 type GroupDraft={group:CircleGroup;knownFriendIds:string[]};
 const GROUP_ICONS=['heart','home','leaf','star','people','sunny','musical-notes','paw'] as const;
 const GROUP_COLORS=['#E76B8A','#488CD9','#3BA986','#E3A426','#7139E9','#D9704B'];
 
 export default function CircleNavigator({initial=[{name:'home'}],exitLabel='Settings',onExit,mood,onRouteChange}:{initial?:CircleRoute[];exitLabel?:string;onExit:()=>void;mood?:string;onRouteChange?:()=>void}){
  const [stack,setStack]=useState<CircleRoute[]>(initial);
- const {refresh}=useCircle();
+ const store=useCircle();const {refresh}=store;
  useEffect(()=>{onRouteChange?.();void refresh()},[stack.length,stack[stack.length-1]?.name]);
  useEffect(()=>{setStack(initial)},[JSON.stringify(initial)]);
  const route=stack[stack.length-1];
@@ -31,6 +31,14 @@ export default function CircleNavigator({initial=[{name:'home'}],exitLabel='Sett
  const prev=stack.length>1?TITLES[stack[stack.length-2].name]:exitLabel;
  const nav={push,replace,back,popTo:(name:CircleRoute['name'])=>setStack(s=>{const i=s.map(x=>x.name).lastIndexOf(name);return i>=0?s.slice(0,i+1):[{name:'home'}]})};
  return <View style={{gap:14}}>
+  {route.name==='home'&&stack.length===1?<View style={{gap:2}}>
+   <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
+    <Text style={[cs.title,{flex:1,textAlign:'left'}]} accessibilityRole="header">My Circle</Text>
+    <HeaderButton icon="notifications-outline" label="Today's Signals" dot={circleNewCount(store)>0} onPress={()=>push({name:'today'})}/>
+    <HeaderButton icon="settings-outline" label="Circle Settings" onPress={()=>push({name:'circleSettings'})}/>
+   </View>
+   <Text style={[cs.muted,{fontSize:14}]}>Stay close to the people you care about.</Text>
+  </View>:
   <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center', position: 'relative'}}>
     {stack.length > 1 && (
         <TouchableOpacity onPress={back} style={{position: 'absolute', left: 0, padding: 4}}>
@@ -38,7 +46,7 @@ export default function CircleNavigator({initial=[{name:'home'}],exitLabel='Sett
         </TouchableOpacity>
     )}
     <Text style={cs.title}>{TITLES[route.name]}</Text>
-</View>
+</View>}
   <OfflineBanner/>
   <Screen route={route} nav={nav} mood={mood}/>
  </View>;
@@ -66,40 +74,149 @@ function Screen({route,nav,mood}:{route:CircleRoute;nav:Nav;mood?:string}){
   case 'today':return <TodaySignals nav={nav}/>;
   case 'notifications':return <NotificationSettings/>;
   case 'widgets':return <WidgetPreviews/>;
+  case 'circleSettings':return <CircleSettings nav={nav}/>;
   case 'fromNotification':return <OpenFromNotification id={route.ref} nav={nav}/>;
   case 'revoked':return <EmptyState mood="Sad" title="This mood is no longer available" detail="It may have expired after 24 hours, or the person stopped sharing with you. Shared moods are only visible to people they were shared with."/>;
  }
 }
 
-function Stat({value,label}:{value:number;label:string}){return <View style={{flex:1,alignItems:'center',backgroundColor:CT.background,borderRadius:16,paddingVertical:12}}><Text style={{fontSize:24,fontWeight:'900',color:CT.ink}}>{value}</Text><Text style={{fontSize:11,color:CT.muted,fontWeight:'700'}}>{label}</Text></View>;}
+function HeaderButton({icon,label,dot,onPress}:{icon:any;label:string;dot?:boolean;onPress:()=>void}){
+ return <TouchableOpacity accessibilityRole="button" accessibilityLabel={label+(dot?', new activity':'')} onPress={onPress} style={{width:44,height:44,borderRadius:22,backgroundColor:CT.primarySoft,alignItems:'center',justifyContent:'center'}}>
+  <Ionicons name={icon} size={21} color={CT.primary}/>{dot?<View style={{position:'absolute',top:9,right:10,width:9,height:9,borderRadius:5,backgroundColor:CT.danger,borderWidth:1.5,borderColor:'#fff'}}/>:null}
+ </TouchableOpacity>;
+}
+function Stat({value,label,icon,dot,onPress}:{value:number;label:string;icon:any;dot?:boolean;onPress:()=>void}){
+ return <TouchableOpacity accessibilityRole="button" accessibilityLabel={value+' '+label+(dot?', waiting for you':'')} onPress={onPress} style={{flex:1,alignItems:'center',backgroundColor:CT.background,borderRadius:16,paddingVertical:12,gap:2}}>
+  <View><Ionicons name={icon} size={20} color={CT.primary}/>{dot?<View style={{position:'absolute',top:-2,right:-5,width:8,height:8,borderRadius:4,backgroundColor:CT.danger}}/>:null}</View>
+  <Text style={{fontSize:24,fontWeight:'900',color:CT.ink}}>{value}</Text><Text style={{fontSize:11,color:CT.muted,fontWeight:'700'}}>{label}</Text>
+ </TouchableOpacity>;
+}
 
+type Person={f:Friend;mood?:FriendSharedMood;isNew:boolean};
+// Pinned first (in the order they were pinned), then latest shared mood, then everyone else by name.
+function sortPeople(people:Person[],mode:'recent'|'all'){
+ const byName=(a:Person,b:Person)=>a.f.name.localeCompare(b.f.name);
+ if(mode==='all')return [...people].sort(byName);
+ return [...people].sort((a,b)=>{
+  if(!!a.f.pinnedAt!==!!b.f.pinnedAt)return a.f.pinnedAt?-1:1;
+  if(a.f.pinnedAt&&b.f.pinnedAt)return a.f.pinnedAt.localeCompare(b.f.pinnedAt);
+  if(!!a.mood!==!!b.mood)return a.mood?-1:1;
+  if(a.mood&&b.mood)return b.mood.sharedAt.localeCompare(a.mood.sharedAt);
+  return byName(a,b);
+ });
+}
+function whenLabel(iso:string){const d=new Date(iso);const t=d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});return (isToday(iso)?'Today':d.toLocaleDateString(undefined,{weekday:'short'}))+' · '+t;}
 
+function PersonCircle({p,onPress,onLongPress}:{p:Person;onPress:()=>void;onLongPress:()=>void}){
+ const t=p.mood?MOOD_TINTS[p.mood.mood]:undefined;
+ const label=p.f.name+(p.mood?', '+p.mood.mood+', '+timeAgo(p.mood.sharedAt)+(p.isNew?', new':''):', no mood shared')+(p.f.pinnedAt?', pinned':'');
+ return <TouchableOpacity accessibilityRole="button" accessibilityLabel={label} accessibilityHint="Long press for pin options" onPress={onPress} onLongPress={onLongPress} delayLongPress={350} style={{width:96,alignItems:'center',gap:4}}>
+  <View style={{width:84,height:84,borderRadius:42,borderWidth:p.isNew?3:1.5,borderColor:p.isNew&&t?t.color:'#DCE5E0',backgroundColor:t?t.tint:CT.background,alignItems:'center',justifyContent:'center'}}>
+   {p.mood?<MoodPalThumb mood={p.mood.mood} size={58}/>:<Avatar initials={p.f.initials} color={p.f.color} size={54}/>}
+   {p.f.pinnedAt?<View style={{position:'absolute',top:-3,right:-3,width:24,height:24,borderRadius:12,backgroundColor:'#fff',borderWidth:1,borderColor:'#DCE5E0',alignItems:'center',justifyContent:'center'}}><Ionicons name="pin" size={13} color={CT.primary}/></View>:null}
+  </View>
+  <Text numberOfLines={1} style={{fontSize:14,fontWeight:'900',color:CT.ink,maxWidth:94}}>{p.f.name}</Text>
+  {p.mood&&t?<><View style={{backgroundColor:t.tint,paddingHorizontal:9,paddingVertical:3,borderRadius:10}}><Text style={{color:t.color,fontWeight:'800',fontSize:11}}>{p.mood.mood}</Text></View>
+   <Text style={[cs.rowSub,p.isNew?{color:t.color,fontWeight:'800'}:null]}>{p.isNew?'New · ':''}{timeAgo(p.mood.sharedAt)}</Text></>
+   :<Text style={cs.rowSub}>No mood yet</Text>}
+ </TouchableOpacity>;
+}
+
+function YourPeople({nav}:{nav:Nav}){
+ const store=useCircle();
+ const [mode,setMode]=useState<'recent'|'all'>('recent');const [q,setQ]=useState('');
+ const latest=new Map<string,FriendSharedMood>();
+ activeFriendMoods(store).forEach(m=>{const cur=latest.get(m.friendId);if(!cur||m.sharedAt>cur.sharedAt)latest.set(m.friendId,m)});
+ const people=sortPeople(store.friends.map(f=>{const mood=latest.get(f.id);return {f,mood,isNew:!!mood&&isMoodNew(store,mood)}}),mode)
+  .filter(p=>mode==='recent'||!q.trim()||p.f.name.toLowerCase().includes(q.trim().toLowerCase()));
+ function options(f:Friend){
+  const pin=()=>store.updateFriend(f.id,{pinnedAt:f.pinnedAt?undefined:new Date().toISOString()});
+  ActionSheetIOS.showActionSheetWithOptions({title:f.name,options:['Cancel',f.pinnedAt?'Unpin':'Pin to Top','View Profile'],cancelButtonIndex:0},i=>{if(i===1)pin();if(i===2)nav.push({name:'friend',id:f.id})});
+ }
+ return <CCard style={{gap:12}}>
+  <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
+   <Text style={[cs.rowTitle,{fontSize:19,flex:1}]} accessibilityRole="header">Your People</Text>
+   <Chip label="Most Recent" selected={mode==='recent'} onPress={()=>setMode('recent')}/>
+   <Chip label="All Friends" selected={mode==='all'} onPress={()=>setMode('all')}/>
+  </View>
+  {mode==='all'&&store.friends.length>6?<TextInput value={q} onChangeText={setQ} placeholder="Search friends" accessibilityLabel="Search friends" clearButtonMode="while-editing" style={{backgroundColor:CT.background,borderRadius:12,paddingHorizontal:12,paddingVertical:9,fontSize:15,color:CT.ink}}/>:null}
+  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:6,paddingRight:4}} style={{marginHorizontal:-4}}>
+   {people.map(p=><PersonCircle key={p.f.id} p={p} onLongPress={()=>options(p.f)} onPress={()=>nav.push(p.mood?{name:'friendMood',id:p.mood.id}:{name:'friend',id:p.f.id})}/>)}
+   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add Friend" onPress={()=>nav.push({name:'invite'})} style={{width:96,alignItems:'center',gap:4}}>
+    <View style={{width:84,height:84,borderRadius:42,borderWidth:1.5,borderStyle:'dashed',borderColor:CT.primary,alignItems:'center',justifyContent:'center',backgroundColor:CT.primarySoft}}><Ionicons name="person-add-outline" size={28} color={CT.primary}/></View>
+    <Text style={{fontSize:14,fontWeight:'900',color:CT.primary}}>Add Friend</Text>
+   </TouchableOpacity>
+  </ScrollView>
+  {mode==='recent'&&store.friends.length>1&&!store.friends.some(f=>f.pinnedAt)?<Text style={[cs.rowSub,{textAlign:'center'}]}>Tip: long-press someone to pin them to the front.</Text>:null}
+ </CCard>;
+}
+
+function RecentActivity({nav}:{nav:Nav}){
+ const store=useCircle();
+ type Item={id:string;at:string;unread:boolean;title:string;leading:React.ReactNode;onPress:()=>void;right?:React.ReactNode};
+ const items:Item[]=[
+  ...activeFriendMoods(store).map(m=>({id:'m'+m.id,at:m.sharedAt,unread:isMoodNew(store,m),title:friendName(store,m.friendId)+' is feeling '+m.mood,leading:<MoodPalThumb mood={m.mood} size={44}/>,onPress:()=>nav.push({name:'friendMood',id:m.id}),
+   right:<TouchableOpacity accessibilityRole="button" accessibilityLabel={m.myReaction?'You reacted '+m.myReaction:'React to '+friendName(store,m.friendId)} onPress={()=>nav.push({name:'friendMood',id:m.id})} style={{width:44,height:44,borderRadius:14,backgroundColor:CT.primarySoft,alignItems:'center',justifyContent:'center'}}>{m.myReaction?<Text style={{fontSize:22}}>{m.myReaction}</Text>:<Ionicons name="heart-outline" size={22} color={CT.primary}/>}</TouchableOpacity>})),
+  ...store.signals.map(x=>({id:'s'+x.id,at:x.at,unread:!x.seen,title:signalById(x.signal).notify(friendName(store,x.friendId)),leading:<View style={cs.signalEmoji}><Text style={{fontSize:22}}>{signalById(x.signal).emoji}</Text></View>,onPress:()=>nav.push({name:'signalReceived',signalId:x.id})})),
+  ...store.inbox.map(n=>({id:'r'+n.id,at:n.at,unread:!n.read,title:n.name+' reacted '+n.emoji+' to your '+n.mood.toLowerCase()+' mood',leading:<MoodPalThumb mood={n.mood} size={44}/>,onPress:()=>{store.markReactionRead(n.id);if(store.myMoods.some(m=>m.id===n.moodId))nav.push({name:'room',id:n.moodId})}})),
+ ].sort((a,b)=>b.at.localeCompare(a.at)).slice(0,2);
+ return <CCard style={{gap:8}}>
+  <View style={{flexDirection:'row',alignItems:'center'}}>
+   <Text style={[cs.rowTitle,{fontSize:19,flex:1}]} accessibilityRole="header">Recent Activity</Text>
+   <TouchableOpacity accessibilityRole="button" onPress={()=>nav.push({name:'today'})} style={{flexDirection:'row',alignItems:'center',paddingVertical:6}}><Text style={{color:CT.primary,fontWeight:'800',fontSize:14}}>See All</Text><Ionicons name="chevron-forward" size={16} color={CT.primary}/></TouchableOpacity>
+  </View>
+  {items.length?items.map(it=><TouchableOpacity key={it.id} accessibilityRole="button" accessibilityLabel={it.title+', '+whenLabel(it.at)+(it.unread?', new':'')} onPress={it.onPress}
+   style={{flexDirection:'row',alignItems:'center',gap:10,padding:10,borderRadius:16,backgroundColor:it.unread?CT.primarySoft:CT.background}}>
+   {it.leading}
+   <View style={{flex:1}}><Text style={cs.rowTitle}>{it.title}</Text><Text style={cs.rowSub}>{it.unread?'New · ':''}{whenLabel(it.at)}</Text></View>
+   {it.right}
+  </TouchableOpacity>):<Text style={cs.rowSub}>When friends share a mood or send a Little Signal, it shows up here.</Text>}
+ </CCard>;
+}
 
 function Home({nav}:{nav:Nav}){
  const store=useCircle();
+ const {isPlus,showPaywall}=usePlus();
  useEffect(()=>{void store.ensurePush()},[]);
  const pending=store.requests.filter(r=>r.status==='pending'&&r.direction==='incoming').length;
- const todayCount=store.signals.filter(s=>isToday(s.at)).length+store.myMoods.filter(m=>m.active).reduce((n,m)=>n+m.reactions.length,0);
  return <>
-  <Text style={[cs.muted,{marginTop:-8,fontSize:13,lineHeight:19}]}>A private space for the people you trust. Share how you feel only when you want to, and send little emoji signals of support.</Text>
   <CCard style={{gap:14}}>
-   <View style={{flexDirection:'row',gap:9}}><Stat value={store.friends.length} label="Friends"/><Stat value={store.groups.length} label="Groups"/><Stat value={pending} label="Pending"/></View>
+   <View style={{flexDirection:'row',gap:9}}>
+    <Stat icon="people-outline" value={store.friends.length} label={store.friends.length===1?'Friend':'Friends'} onPress={()=>nav.push({name:'friends'})}/>
+    <Stat icon="albums-outline" value={store.groups.length} label={store.groups.length===1?'Group':'Groups'} onPress={()=>nav.push({name:'groups'})}/>
+    <Stat icon="mail-outline" value={pending} label={pending===1?'Request':'Requests'} dot={pending>0} onPress={()=>nav.push({name:'requests'})}/>
+   </View>
    <View style={{flexDirection:'row',gap:9}}><View style={{flex:1}}><PrimaryButton label="Invite Friends" icon="person-add-outline" onPress={()=>nav.push({name:'invite'})}/></View><View style={{flex:1}}><SoftButton label="Enter Code" icon="keypad-outline" onPress={()=>nav.push({name:'enterCode'})}/></View></View>
   </CCard>
-  <ReactionNotices nav={nav}/>
-  {!store.friends.length?<EmptyState mood="Joyful" title="Your circle is empty" detail="Invite close friends or family with your personal code. Nobody can find you by searching — only people you share your code with." action="Invite Friends" onAction={()=>nav.push({name:'invite'})}/>:null}
-  <CCard style={{paddingVertical:4}}>
-   <CRow icon="mail-unread-outline" title="Friend Requests" subtitle={pending?pending+' waiting for your approval':'No new requests'} onPress={()=>nav.push({name:'requests'})} right={pending?<View style={cs.badge}><Text style={{color:'#fff',fontWeight:'900',fontSize:11}}>{pending}</Text></View>:undefined}/>
-   <CRow icon="people-outline" title="Friends" subtitle={store.friends.length+' approved friends'} onPress={()=>nav.push({name:'friends'})}/>
-   <CRow icon="albums-outline" title="Manage Groups" subtitle={store.groups.map(g=>g.name).join(', ')||'Create your first group'} onPress={()=>nav.push({name:'groups'})}/>
-   <CRow icon="happy-outline" title="Mood Sharing Settings" subtitle="Choose which moods each group can see" onPress={()=>nav.push({name:'permissions'})}/>
-      <CRow icon="sparkles-outline" title="Today's Signals" subtitle={todayCount?todayCount+' signals and reactions today':'Nothing yet today'} onPress={()=>nav.push({name:'today'})}/>
-  
-   <CRow icon="notifications-outline" title="Notification Settings" subtitle="Signals, reactions and lock-screen privacy" onPress={()=>nav.push({name:'notifications'})}/>
-   <CRow icon="apps-outline" title="Home Screen Widgets" subtitle="Little Signals small and medium widgets" onPress={()=>nav.push({name:'widgets'})} last/>
+  {pending?<TouchableOpacity accessibilityRole="button" accessibilityLabel={pending+' friend '+(pending===1?'request':'requests')+'. People want to join your Circle.'} onPress={()=>nav.push({name:'requests'})}
+   style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:MOOD_TINTS.Joyful.tint,borderRadius:20,padding:12}}>
+   <MoodPalThumb mood="Joyful" size={52}/>
+   <View style={{flex:1}}><Text style={[cs.rowTitle,{fontSize:17}]}>{pending} Friend {pending===1?'Request':'Requests'}</Text><Text style={cs.rowSub}>{pending===1?'Someone wants':'People want'} to join your Circle.</Text></View>
+   <Ionicons name="chevron-forward" size={20} color={MOOD_TINTS.Joyful.color}/>
+  </TouchableOpacity>:null}
+  {!store.friends.length?<EmptyState mood="Joyful" title="Your circle is empty" detail="Invite close friends or family with your personal code. Nobody can find you by searching — only people you share your code with." action="Invite Friends" onAction={()=>nav.push({name:'invite'})}/>:<>
+   <YourPeople nav={nav}/>
+   <RecentActivity nav={nav}/>
+  </>}
+  <CCard style={{gap:8}}>
+   <Text style={[cs.rowTitle,{fontSize:19}]} accessibilityRole="header">Groups</Text>
+   {store.groups.length?<View>{store.groups.map((g,i)=><CRow key={g.id} last={i===store.groups.length-1} icon={g.icon} tint={g.color+'22'} color={g.color} title={g.name} subtitle={g.memberIds.length+(g.memberIds.length===1?' member':' members')} onPress={()=>nav.push({name:'group',id:g.id})}/>)}</View>
+    :<Text style={cs.rowSub}>Groups like Family or Close Friends let you choose who sees which moods.</Text>}
+   <SoftButton label="Create a Group" icon="add" onPress={()=>!isPlus&&store.groups.length>=1?showPaywall('circles'):nav.push({name:'group'})}/>
   </CCard>
   {store.live?null:<PrototypeControls nav={nav}/>}
  </>;
+}
+
+function CircleSettings({nav}:{nav:Nav}){
+ const store=useCircle();
+ return <CCard style={{paddingVertical:4}}>
+  <CRow icon="people-outline" title="Friends" subtitle={store.friends.length+' approved friends'} onPress={()=>nav.push({name:'friends'})}/>
+  <CRow icon="albums-outline" title="Manage Groups" subtitle={store.groups.map(g=>g.name).join(', ')||'Create your first group'} onPress={()=>nav.push({name:'groups'})}/>
+  <CRow icon="happy-outline" title="Mood Sharing Settings" subtitle="Choose which moods each group can see" onPress={()=>nav.push({name:'permissions'})}/>
+  <CRow icon="notifications-outline" title="Notification Settings" subtitle="Signals, reactions and lock-screen privacy" onPress={()=>nav.push({name:'notifications'})}/>
+  <CRow icon="apps-outline" title="Home Screen Widgets" subtitle="Little Signals small and medium widgets" onPress={()=>nav.push({name:'widgets'})} last/>
+ </CCard>;
 }
 
 function PrototypeControls({nav}:{nav:Nav}){
@@ -405,6 +522,7 @@ function ReactionPicker({mood,value,onPick}:{mood:CircleMood;value?:string;onPic
 
 function FriendMood({id,nav}:{id:string;nav:Nav}){
  const store=useCircle();const fm=store.friendMoods.find(m=>m.id===id);
+ useEffect(()=>{if(fm)store.markMoodSeen(fm.id)},[fm?.id]);
  const f=fm&&(store.friends.find(x=>x.id===fm.friendId)||familyFriend(store,fm.friendId));
  if(!fm||!f||new Date(fm.expiresAt).getTime()<Date.now())return <Screen route={{name:'revoked'}} nav={nav}/>;
  return <>
@@ -496,6 +614,7 @@ function TodaySignals({nav}:{nav:Nav}){
   </CCard>})}
   {signals.length?<><CHeading title="Little Signals"/><CCard style={{paddingVertical:4}}>{signals.map((s,i)=><CRow key={s.id} last={i===signals.length-1} leading={<View style={cs.signalEmoji}><Text style={{fontSize:22}}>{signalById(s.signal).emoji}</Text></View>} title={signalById(s.signal).notify(friendName(store,s.friendId))} subtitle={timeAgo(s.at)} onPress={()=>nav.push({name:'signalReceived',signalId:s.id})}/>)}</CCard></>:null}
   {friendMoods.length?<><CHeading title="Shared with you" detail="Visible for 24 hours after they share"/><CCard style={{paddingVertical:4}}>{friendMoods.map((m,i)=><CRow key={m.id} last={i===friendMoods.length-1} leading={<MoodPalThumb mood={m.mood} size={40}/>} title={friendName(store,m.friendId)+' · '+m.mood} subtitle={(m.myReaction?'You reacted '+m.myReaction+' · ':'Tap to react · ')+timeAgo(m.sharedAt)} onPress={()=>nav.push({name:'friendMood',id:m.id})}/>)}</CCard></>:null}
+  <ReactionNotices nav={nav}/>
  </>;
 }
 

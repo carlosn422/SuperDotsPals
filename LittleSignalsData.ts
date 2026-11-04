@@ -35,7 +35,7 @@ export const LITTLE_SIGNALS=[
 export type SignalId=typeof LITTLE_SIGNALS[number]['id'];
 export const signalById=(id:SignalId)=>LITTLE_SIGNALS.find(x=>x.id===id)!;
 
-export type Friend={id:string;name:string;initials:string;color:string;since:string;muted:boolean;hideMyMoods:boolean;realName?:string;nickname?:string};
+export type Friend={id:string;name:string;initials:string;color:string;since:string;muted:boolean;hideMyMoods:boolean;realName?:string;nickname?:string;pinnedAt?:string};
 export type CircleGroup={id:string;name:string;icon:string;color:string;memberIds:string[];moods:CircleMood[]};
 export type FriendRequest={id:string;direction:'incoming'|'outgoing';name:string;initials:string;color:string;sentAt:string;status:'pending'|'declined'};
 export type Reaction={friendId:string;emoji:string;at:string};
