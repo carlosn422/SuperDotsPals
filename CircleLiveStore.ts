@@ -66,10 +66,12 @@ export function useLiveCircleState():CircleStore{
    const reactionByMood=new Map<string,string>(((myReactions.data||[]) as any[]).map(r=>[r.shared_mood_id,r.emoji]));
    const inv=((invite.data||[]) as any[])[0];
    const p:any=prefs.data;
+   const friendList=((friends.data||[]) as any[]).map((f):Friend=>({id:f.friend_id,name:f.display_name,initials:initialsOf(f.display_name),color:f.avatar_color,
+    since:new Date(f.since).toLocaleDateString(undefined,{month:'short',year:'numeric'}),muted:f.muted,hideMyMoods:f.hide_my_moods,realName:f.real_name??f.display_name,nickname:f.nickname||undefined}));
+   const nickById=new Map(friendList.filter(f=>f.nickname).map(f=>[f.id,f.nickname as string]));
    setSt(s=>({...s,offline:false,
     invite:inv?{code:inv.code,expiresAt:inv.expires_at}:s.invite,
-    friends:((friends.data||[]) as any[]).map((f):Friend=>({id:f.friend_id,name:f.display_name,initials:initialsOf(f.display_name),color:f.avatar_color,
-     since:new Date(f.since).toLocaleDateString(undefined,{month:'short',year:'numeric'}),muted:f.muted,hideMyMoods:f.hide_my_moods})),
+    friends:friendList,
     requests:((requests.data||[]) as any[]).map(r=>({id:r.link_id,direction:r.direction,name:r.display_name,initials:initialsOf(r.display_name),color:r.avatar_color,sentAt:r.created_at,status:r.status==='declined'?'declined':'pending'})),
     groups:((groups.data||[]) as any[]).map((g):CircleGroup=>({id:g.id,name:g.name,icon:g.icon,color:g.color,memberIds:(g.circle_group_members||[]).map((m:any)=>m.member_id),
      moods:CIRCLE_MOODS.filter(m=>(g.allowed_moods||[]).includes(m))})),
@@ -79,7 +81,7 @@ export function useLiveCircleState():CircleStore{
     friendMoods:((shared.data||[]) as any[]).map(m=>({id:m.id,friendId:m.owner_id,mood:asMood(m.mood),sharedAt:m.shared_at,expiresAt:m.expires_at,myReaction:reactionByMood.get(m.id)})),
     signals:((signals.data||[]) as any[]).map(x=>({id:x.id,friendId:x.sender_id,signal:x.signal as SignalId,at:x.sent_at,seen:!!x.seen_at})),
     sentSignals:((sent.data||[]) as any[]).map(x=>({friendIds:[x.recipient_id],signal:x.signal as SignalId,at:x.sent_at})),
-    inbox:((inbox.data||[]) as any[]).map(n=>({id:n.id,moodId:n.shared_mood_id,mood:asMood(n.mood),friendId:n.reactor_id,name:n.reactor_name,emoji:n.emoji,at:n.reacted_at,read:!!n.read_at||pendingReads.includes(n.id)})),
+    inbox:((inbox.data||[]) as any[]).map(n=>({id:n.id,moodId:n.shared_mood_id,mood:asMood(n.mood),friendId:n.reactor_id,name:nickById.get(n.reactor_id)||n.reactor_name,emoji:n.emoji,at:n.reacted_at,read:!!n.read_at||pendingReads.includes(n.id)})),
     familyNames:Object.fromEntries(((family.data||[]) as any[]).map(n=>[n.profile_id,{name:n.display_name,owner:n.owner_name}])),
     prefs:p?{invites:p.invites,approvals:p.approvals,signals:p.signals,reactions:p.reactions,quietHours:p.quiet_hours,showNamesInPreview:p.show_names_in_preview,showMoodOnLockScreen:p.show_mood_on_lock_screen}:s.prefs,
    }));
@@ -149,7 +151,7 @@ export function useLiveCircleState():CircleStore{
   updateFriend:(id:string,patch:Partial<Friend>)=>{
    const f={...stRef.current.friends.find(x=>x.id===id),...patch} as Friend;
    up(s=>({friends:s.friends.map(x=>x.id===id?f:x)}));
-   void run('Couldn’t update this friend',async()=>supabase.from('circle_friend_settings').upsert({owner_id:await userId(),friend_id:id,muted:!!f.muted,hide_my_moods:!!f.hideMyMoods},{onConflict:'owner_id,friend_id'}));
+   void run('Couldn’t update this friend',async()=>supabase.from('circle_friend_settings').upsert({owner_id:await userId(),friend_id:id,muted:!!f.muted,hide_my_moods:!!f.hideMyMoods,nickname:f.nickname||null},{onConflict:'owner_id,friend_id'}));
   },
   setFriendGroups:(id:string,groupIds:string[])=>{
    const before=stRef.current.groups;

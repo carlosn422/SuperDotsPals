@@ -228,8 +228,17 @@ function FriendDetail({id,nav}:{id:string;nav:Nav}){
  const store=useCircle();const f=store.friends.find(x=>x.id===id);
  if(!f)return <EmptyState mood="Sad" title="No longer in your circle" detail="This person was removed. They can no longer see anything you share."/>;
  const groupIds=store.groups.filter(g=>g.memberIds.includes(id)).map(g=>g.id);
+ const real=f.realName||f.name;
+ function save(v?:string){
+  const nick=v?.trim().slice(0,40)||undefined,name=nick||real;
+  store.updateFriend(id,{nickname:nick,name,initials:(name.trim()[0]||'?').toUpperCase()});
+ }
+ function rename(){
+  Alert.prompt('Rename '+real,'Only you see this name.',[{text:'Cancel',style:'cancel'},...(f!.nickname?[{text:'Use '+real,onPress:()=>save()}]:[]),{text:'Save',onPress:(v?:string)=>save(v)}],'plain-text',f!.nickname||'');
+ }
  return <>
-  <CCard style={{alignItems:'center',gap:6,paddingVertical:20}}><Avatar initials={f.initials} color={f.color} size={70}/><Text style={{fontSize:21,fontWeight:'900',color:CT.ink}}>{f.name}</Text><Text style={cs.muted}>In your circle since {f.since}</Text>
+  <CCard style={{alignItems:'center',gap:6,paddingVertical:20}}><Avatar initials={f.initials} color={f.color} size={70}/><Text style={{fontSize:21,fontWeight:'900',color:CT.ink}}>{f.name}</Text>{f.nickname&&f.realName&&f.realName!==f.nickname?<Text style={cs.muted}>{f.realName}</Text>:null}<Text style={cs.muted}>In your circle since {f.since}</Text>
+   <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Rename '+f.name} onPress={rename} style={{flexDirection:'row',alignItems:'center',gap:5,paddingVertical:6,paddingHorizontal:12}}><Ionicons name="pencil" size={14} color={CT.primary}/><Text style={{fontSize:14,fontWeight:'800',color:CT.primary}}>{f.nickname?'Edit name':'Rename'}</Text></TouchableOpacity>
    <View style={{alignSelf:'stretch',marginTop:8}}><SoftButton label={'Send '+f.name+' a Little Signal'} icon="heart-outline" onPress={()=>nav.push({name:'send',friendId:f.id})}/></View></CCard>
   <CHeading title="Groups" detail="Private to you — friends never see your group names."/>
   <GroupPicker selected={groupIds} onToggle={g=>store.setFriendGroups(id,toggle(groupIds,g))}/>
