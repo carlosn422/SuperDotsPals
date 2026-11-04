@@ -59,7 +59,7 @@ export function MeetYourMoods({onCheckin}:{onCheckin:()=>void}){
    </TouchableOpacity>
  </View>;
 }
-export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,onChat,onActions,onCaffeine,onJournal,onAddWater,onAddCaffeine,addingWater,addingCaffeine,socialCard,dayRow}:{socialCard?:React.ReactNode;dayRow?:React.ReactNode;companion:string;accent:string;water:number;caffeine:number;mood:string;onCheckin:()=>void;onChat:()=>void;onActions:()=>void;onCaffeine:()=>void;onJournal:()=>void;onAddWater:()=>void;onAddCaffeine:()=>void;addingWater:boolean;addingCaffeine:boolean}){
+export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,onChat,onBreathing,onActions,onCaffeine,onJournal,onAddWater,onAddCaffeine,addingWater,addingCaffeine,socialCard,dayRow}:{socialCard?:React.ReactNode;dayRow?:React.ReactNode;companion:string;accent:string;water:number;caffeine:number;mood:string;onCheckin:()=>void;onChat:()=>void;onBreathing:()=>void;onActions:()=>void;onCaffeine:()=>void;onJournal:()=>void;onAddWater:()=>void;onAddCaffeine:()=>void;addingWater:boolean;addingCaffeine:boolean}){
  const today=new Date();
  const date=today.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
  const row=(icon:any,label:string,detail:string,onPress:()=>void,quickAdd?:()=>void,adding=false)=>(
@@ -72,6 +72,11 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
  return <View style={[s.page,{gap:17}]}>
   <StressHero mood={companion} onCheckin={onCheckin}/>
   {dayRow}
+  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Breathing for Calm. Start a one-minute breathing exercise" onPress={onBreathing} style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#FFFAF2',borderRadius:22,paddingVertical:12,paddingHorizontal:14,borderWidth:1,borderColor:'#EAF3EC'}}>
+   <SuperdotMascot id="calm" size={54} animate={false}/>
+   <View style={{flex:1,gap:3}}><Text style={{fontWeight:'900',color:'#2E1F5E',fontSize:16}}>Breathing for Calm</Text><Text style={{color:'#8276A5',fontSize:12}}>A one-minute reset with your MoodPal</Text></View>
+   <View style={{flexDirection:'row',alignItems:'center',gap:5,backgroundColor:APP_THEME.primary,borderRadius:18,paddingHorizontal:13,minHeight:36}}><Ionicons name="play" size={14} color="#fff"/><Text style={{color:'#fff',fontWeight:'900',fontSize:13}}>Breathe</Text></View>
+  </TouchableOpacity>
   <EnergyCard/>
   <HrvTrendCard/>
   <HeartRateCard/>
