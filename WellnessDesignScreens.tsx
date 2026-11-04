@@ -8,6 +8,7 @@ import {supabase} from './supabase';
 import {usePlus} from './PlusStore';
 import HealthDataPanel,{HealthMiniStats,useSavedHealth} from './HealthDataPanel';
 import RecoveryInsights from './RecoveryInsights';
+import {InviteFriendsCard,LockedPreviewCard,PlusOfferCard,UpgradePill} from './TodayUpsell';
 import HealthTrendOverview from './HealthTrendOverview';
 import {StressHero,EnergyCard,HrvTrendCard,HeartRateCard,HealthActionsGrid,StressTrendCard} from './StressDashboard';
 
@@ -59,7 +60,7 @@ export function MeetYourMoods({onCheckin}:{onCheckin:()=>void}){
    </TouchableOpacity>
  </View>;
 }
-export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,onChat,onActions,onCaffeine,onJournal,onAddWater,onAddCaffeine,addingWater,addingCaffeine,socialCard,dayRow}:{socialCard?:React.ReactNode;dayRow?:React.ReactNode;companion:string;accent:string;water:number;caffeine:number;mood:string;onCheckin:()=>void;onChat:()=>void;onActions:()=>void;onCaffeine:()=>void;onJournal:()=>void;onAddWater:()=>void;onAddCaffeine:()=>void;addingWater:boolean;addingCaffeine:boolean}){
+export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,onChat,onActions,onCaffeine,onJournal,onAddWater,onAddCaffeine,addingWater,addingCaffeine,socialCard,dayRow,onInvite,onPlans}:{onInvite:()=>void;onPlans:()=>void;socialCard?:React.ReactNode;dayRow?:React.ReactNode;companion:string;accent:string;water:number;caffeine:number;mood:string;onCheckin:()=>void;onChat:()=>void;onActions:()=>void;onCaffeine:()=>void;onJournal:()=>void;onAddWater:()=>void;onAddCaffeine:()=>void;addingWater:boolean;addingCaffeine:boolean}){
  const today=new Date();
  const date=today.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
  const row=(icon:any,label:string,detail:string,onPress:()=>void,quickAdd?:()=>void,adding=false)=>(
@@ -70,10 +71,12 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
   </TouchableOpacity>
  );
  return <View style={[s.page,{gap:17}]}>
+  <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',minHeight:40}}><Text accessibilityRole="header" style={{fontWeight:'900',fontSize:28,color:INK}}>MoodPals</Text><UpgradePill/></View>
   <StressHero mood={companion} onCheckin={onCheckin}/>
   {dayRow}
   <EnergyCard/>
   <HrvTrendCard/>
+  <LockedPreviewCard title="Mood & Stress Trends" feature="trends" body="See how your mood and stress change over 30 days and 6 months."/>
   <HeartRateCard/>
   <View style={{gap:10}}>
    <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={{fontWeight:'900',fontSize:19,color:INK}}>Today</Text><Text style={{color:MUTED,fontSize:12}}>{date}</Text></View>
@@ -85,6 +88,8 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
    </View>
   </View>
   {socialCard}
+  <InviteFriendsCard onInvite={onInvite}/>
+  <PlusOfferCard onAllPlans={onPlans}/>
   <RecoveryInsights companion={companion} onChat={onChat}/>
 </View>;
 }
