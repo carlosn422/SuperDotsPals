@@ -43,8 +43,8 @@ export type SignalId=typeof LITTLE_SIGNALS[number]['id'];
 export const signalById=(id:SignalId)=>LITTLE_SIGNALS.find(x=>x.id===id)!;
 
 export type Friend={id:string;name:string;initials:string;color:string;since:string;muted:boolean;hideMyMoods:boolean;realName?:string;nickname?:string;pinnedAt?:string};
-export type CircleGroup={id:string;name:string;icon:string;color:string;memberIds:string[];moods:CircleMood[]};
-export type FriendRequest={id:string;direction:'incoming'|'outgoing';name:string;initials:string;color:string;sentAt:string;status:'pending'|'declined'};
+export type CircleGroup={id:string;name:string;icon:string;color:string;memberIds:string[];moods:CircleMood[];isDefault?:boolean};
+export type FriendRequest={id:string;direction:'incoming'|'outgoing';name:string;initials:string;color:string;sentAt:string;status:'pending'|'declined';groupId?:string;groupName?:string};
 export type Reaction={friendId:string;emoji:string;at:string};
 // One reaction to one of my shared moods; read state is stored on the server (circle_reactions.read_at).
 export type ReactionNotice={id:string;moodId:string;mood:CircleMood;friendId:string;name:string;emoji:string;at:string;read:boolean};

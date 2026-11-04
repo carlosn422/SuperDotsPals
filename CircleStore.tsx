@@ -18,6 +18,7 @@ function useMockCircleState(){
   showEmpty:()=>setSt(empty()),
   setOffline:(offline:boolean)=>up(()=>({offline})),
   regenerateCode:()=>up(()=>({invite:{code:'MP-'+Math.random().toString(36).slice(2,7).toUpperCase().replace(/[O0I1L]/g,'7'),expiresAt:new Date(Date.now()+7*864e5).toISOString()}})),
+  groupInvite:async(_groupId:string):Promise<{code:string;expiresAt:string}|null>=>({code:'MP-GRP7A',expiresAt:new Date(Date.now()+2*864e5).toISOString()}),
   sendRequest:(name:string,initials:string,color:string)=>up(s=>({requests:[{id:'rq'+Date.now(),direction:'outgoing',name,initials,color,sentAt:new Date().toISOString(),status:'pending'},...s.requests]})),
   acceptRequest:(id:string,groupIds:string[])=>up(s=>{const r=s.requests.find(x=>x.id===id);if(!r)return {};const fid='f'+id;
    return {requests:s.requests.filter(x=>x.id!==id),friends:[...s.friends,{id:fid,name:r.name,initials:r.initials,color:r.color,since:'Today',muted:false,hideMyMoods:false}],groups:s.groups.map(g=>groupIds.includes(g.id)?{...g,memberIds:[...g.memberIds,fid]}:g)}}),
