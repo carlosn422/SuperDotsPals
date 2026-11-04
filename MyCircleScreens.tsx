@@ -469,7 +469,8 @@ function ReactionNotices({nav}:{nav:Nav}){
 }
 
 function TodaySignals({nav}:{nav:Nav}){
- const store=useCircle();const [tab,setTab]=useState<'today'|'earlier'>('today');const [open,setOpen]=useState<Record<string,boolean>>({});
+ const store=useCircle();
+ useEffect(()=>{store.markMoodsSeen();if(store.signals.some(s=>!s.seen))store.markSignalsSeen()},[]);const [tab,setTab]=useState<'today'|'earlier'>('today');const [open,setOpen]=useState<Record<string,boolean>>({});
  const mine=store.myMoods.filter(m=>tab==='today'?isToday(m.sharedAt):!isToday(m.sharedAt));
  const signals=store.signals.filter(s=>tab==='today'?isToday(s.at):!isToday(s.at));
  const friendMoods=tab==='today'?store.friendMoods.filter(m=>new Date(m.expiresAt).getTime()>Date.now()):[];

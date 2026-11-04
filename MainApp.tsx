@@ -21,7 +21,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import MoreSheet,{type MoreItem} from './MoreSheet';
 import * as Notifications from 'expo-notifications';
 import {Linking} from 'react-native';
-import {CircleProvider,useCircle} from './CircleStore';
+import {CircleProvider,circleNewCount,useCircle} from './CircleStore';
 import CircleNavigator,{CircleRoute} from './MyCircleScreens';
 import {LittleSignalsTodayCard} from './CircleComponents';
 import WatchThemesScreen from './WatchThemesScreen';
@@ -75,7 +75,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  // Each Settings sub-page opens at its top, not at the list's scroll position.
  useEffect(()=>{settingsScroll.current?.scrollTo({y:0,animated:false})},[settingsPage]);
  const isGuest=useIsGuest();
- const circleUnread=useCircle().inbox.filter(n=>!n.read).length;
+ const circleUnread=circleNewCount(useCircle());
  const appleLink=useAppleLink();
  useWatchAutoLink(isGuest,()=>{go('Settings');setSettingsPage('account')});
  const [circleSheet,setCircleSheet]=useState<CircleRoute[]|null>(null);
@@ -211,7 +211,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   <View style={s.top}></View>
   <View style={{flex:1}}>
   <ScrollView ref={pager} horizontal pagingEnabled scrollEnabled={!chartScrubbing} bounces={false} showsHorizontalScrollIndicator={false} scrollEventThrottle={16} onMomentumScrollEnd={onPageSettled} directionalLockEnabled style={{flex:1}} keyboardShouldPersistTaps="handled">
-  <View key="Today" style={{width:pageWidth,flex:1}}><ChartScrubContext.Provider value={setChartScrubbing}><ScrollView scrollEnabled={!chartScrubbing} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><FamilySwitcher disabled={isGuest} focused={tab==='Today'&&!moreScreen} onAdd={()=>go('Watches')}><WellnessToday dayRow={isGuest?null:<MiniMoodCalendar/>} socialCard={<LittleSignalsTodayCard onOpenSignals={()=>setCircleSheet([{name:'today'}])} onSend={()=>setCircleSheet([{name:'send'}])}/>} companion={shownMood} accent={colors.accent} water={water} caffeine={coffee} mood={mood} onCheckin={()=>{go('Actions');openAction('checkin')}} onBreathing={()=>{go('Actions');openAction('breathing')}} onChat={()=>{go('Actions');openAction('chat')}} onActions={()=>{go('Actions');setActionView(null);setActionDetail('water')}} onCaffeine={()=>{go('Actions');setActionView(null);setActionDetail('caffeine')}} onJournal={()=>{go('Actions');openAction('history')}} onAddWater={()=>void quickAddHabit('water')} onAddCaffeine={()=>void quickAddHabit('caffeine')} addingWater={quickAdding.water} addingCaffeine={quickAdding.caffeine}/></FamilySwitcher></ScrollView></ChartScrubContext.Provider></View>
+  <View key="Today" style={{width:pageWidth,flex:1}}><ChartScrubContext.Provider value={setChartScrubbing}><ScrollView scrollEnabled={!chartScrubbing} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><FamilySwitcher disabled={isGuest} focused={tab==='Today'&&!moreScreen} onAdd={()=>go('Watches')}><WellnessToday dayRow={isGuest?null:<MiniMoodCalendar/>} socialCard={<LittleSignalsTodayCard onOpenSignals={()=>setCircleSheet([{name:'today'}])} onOpenMood={id=>setCircleSheet([{name:'friendMood',id}])} onOpenSignal={id=>setCircleSheet([{name:'signalReceived',signalId:id}])} onSend={()=>setCircleSheet([{name:'send'}])}/>} companion={shownMood} accent={colors.accent} water={water} caffeine={coffee} mood={mood} onCheckin={()=>{go('Actions');openAction('checkin')}} onBreathing={()=>{go('Actions');openAction('breathing')}} onChat={()=>{go('Actions');openAction('chat')}} onActions={()=>{go('Actions');setActionView(null);setActionDetail('water')}} onCaffeine={()=>{go('Actions');setActionView(null);setActionDetail('caffeine')}} onJournal={()=>{go('Actions');openAction('history')}} onAddWater={()=>void quickAddHabit('water')} onAddCaffeine={()=>void quickAddHabit('caffeine')} addingWater={quickAdding.water} addingCaffeine={quickAdding.caffeine}/></FamilySwitcher></ScrollView></ChartScrubContext.Provider></View>
   <View key="Circle" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">{isGuest?<AccountRequired accent={colors.accent} backLabel="Today" onBack={()=>go('Today')} onCreate={()=>{go('Settings');setSettingsPage('account')}}/>:<CircleNavigator onExit={()=>go('Today')} mood={mood}/>}</ScrollView></View>
   <View key="Watches" style={{width:pageWidth,flex:1}}><ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>{watchesPage==='themes'?<WatchThemesScreen backLabel="Watches" onBack={()=>setWatchesPage('main')}/>:<ConnectedDevices focused={tab==='Watches'&&!moreScreen} onOpenThemes={()=>setWatchesPage('themes')} onCreateAccount={()=>{go('Settings');setSettingsPage('account')}}/>}</ScrollView></View>
   <View key="Settings" style={{width:pageWidth,flex:1}}><ScrollView ref={settingsScroll} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">

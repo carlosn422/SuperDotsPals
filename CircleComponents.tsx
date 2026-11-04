@@ -4,7 +4,7 @@ import {Ionicons} from '@expo/vector-icons';
 import SuperdotMascot from './SuperdotMascot';
 import {APP_THEME} from './MoodMascot';
 import {CircleMood,MOOD_TINTS,signalById,timeAgo} from './LittleSignalsData';
-import {friendName,useCircle} from './CircleStore';
+import {activeFriendMoods,friendName,useCircle} from './CircleStore';
 
 export const CT={...APP_THEME,line:'#EEF3F0',danger:'#D65B79'};
 
@@ -85,21 +85,29 @@ export function SignalBurst({mood,emoji,size=150,play=true}:{mood:CircleMood;emo
  </View>;
 }
 
-export function LittleSignalsTodayCard({onOpenSignals,onSend}:{onOpenSignals:()=>void;onSend:()=>void}){
+export function LittleSignalsTodayCard({onOpenSignals,onOpenMood,onOpenSignal,onSend}:{onOpenSignals:()=>void;onOpenMood:(id:string)=>void;onOpenSignal:(id:string)=>void;onSend:()=>void}){
  const store=useCircle();
- const today=store.signals.filter(s=>Date.now()-new Date(s.at).getTime()<864e5);
- const latest=today[0];const unseen=today.filter(s=>!s.seen).length;
+ const items=[
+  ...store.signals.filter(s=>Date.now()-new Date(s.at).getTime()<864e5).map(s=>({key:'s'+s.id,at:s.at,isNew:!s.seen,open:()=>onOpenSignal(s.id),
+   leading:<View style={cs.signalEmoji}><Text style={{fontSize:22}}>{signalById(s.signal).emoji}</Text></View>,title:signalById(s.signal).notify(friendName(store,s.friendId))})),
+  ...activeFriendMoods(store).map(m=>({key:'m'+m.id,at:m.sharedAt,isNew:!store.moodsSeenAt||m.sharedAt>store.moodsSeenAt,open:()=>onOpenMood(m.id),
+   leading:<MoodPalThumb mood={m.mood} size={44}/>,title:friendName(store,m.friendId)+' is feeling '+m.mood+(m.myReaction?' · you sent '+m.myReaction:'')})),
+ ].sort((x,y)=>y.at.localeCompare(x.at));
+ const unseen=items.filter(i=>i.isNew).length;
  const reactions=store.myMoods.filter(m=>m.active).reduce((n,m)=>n+m.reactions.length,0);
+ const shown=items.slice(0,3);
  return <View style={[cs.card,{gap:12}]}>
   <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
-   <View style={{flexDirection:'row',alignItems:'center',gap:8}}><Text style={{fontWeight:'900',fontSize:17,color:CT.ink}}>Little Signals</Text>{unseen?<View style={cs.badge}><Text style={{color:'#fff',fontSize:11,fontWeight:'900'}}>{unseen} new</Text></View>:null}</View>
-   <TouchableOpacity onPress={onOpenSignals} accessibilityRole="button"><Text style={{color:CT.primary,fontWeight:'800',fontSize:12}}>See all</Text></TouchableOpacity>
+   <View style={{flexDirection:'row',alignItems:'center',gap:8}}><Text accessibilityRole="header" style={{fontWeight:'900',fontSize:17,color:CT.ink}}>Your Circle</Text>{unseen?<View style={cs.badge} accessibilityLabel={unseen+' new'}><Text style={{color:'#fff',fontSize:11,fontWeight:'900'}}>{unseen} new</Text></View>:null}</View>
+   <TouchableOpacity onPress={onOpenSignals} accessibilityRole="button" accessibilityLabel="See all of today's signals" style={{minHeight:44,justifyContent:'center'}}><Text style={{color:CT.primary,fontWeight:'800',fontSize:12}}>See all</Text></TouchableOpacity>
   </View>
-  <TouchableOpacity onPress={onOpenSignals} accessibilityRole="button" style={{flexDirection:'row',alignItems:'center',gap:12}}>
-   {latest?<><View style={cs.signalEmoji}><Text style={{fontSize:24}}>{signalById(latest.signal).emoji}</Text></View>
-    <View style={{flex:1,gap:2}}><Text style={cs.rowTitle}>{signalById(latest.signal).notify(friendName(store,latest.friendId))}</Text><Text style={cs.rowSub}>{timeAgo(latest.at)}{today.length>1?' · '+(today.length-1)+' more today':''}{reactions?' · '+reactions+' reactions':''}</Text></View></>:
-    <><View style={cs.signalEmoji}><Text style={{fontSize:24}}>🫶</Text></View><View style={{flex:1}}><Text style={cs.rowTitle}>No signals yet today</Text><Text style={cs.rowSub}>Send a little support to someone in your circle.</Text></View></>}
-  </TouchableOpacity>
+  {shown.length?shown.map(i=><TouchableOpacity key={i.key} onPress={i.open} accessibilityRole="button" accessibilityLabel={i.title+', '+timeAgo(i.at)+(i.isNew?', new':'')} style={{flexDirection:'row',alignItems:'center',gap:12}}>
+    {i.leading}
+    <View style={{flex:1,gap:2}}><Text style={cs.rowTitle}>{i.title}</Text><Text style={cs.rowSub}>{timeAgo(i.at)}</Text></View>
+    {i.isNew?<View style={{width:9,height:9,borderRadius:5,backgroundColor:'#E76B8A'}}/>:<Ionicons name="chevron-forward" size={16} color={CT.muted}/>}
+   </TouchableOpacity>):
+   <TouchableOpacity onPress={onOpenSignals} accessibilityRole="button" style={{flexDirection:'row',alignItems:'center',gap:12}}><View style={cs.signalEmoji}><Text style={{fontSize:24}}>🫶</Text></View><View style={{flex:1}}><Text style={cs.rowTitle}>No signals yet today</Text><Text style={cs.rowSub}>Send a little support to someone in your circle.</Text></View></TouchableOpacity>}
+  {items.length>shown.length||reactions?<TouchableOpacity onPress={onOpenSignals} accessibilityRole="button" style={{minHeight:32,justifyContent:'center'}}><Text style={cs.rowSub}>{[items.length>shown.length?(items.length-shown.length)+' more today':'',reactions?reactions+' reactions to your mood':''].filter(Boolean).join(' · ')}</Text></TouchableOpacity>:null}
   <SoftButton label="Send a Little Signal" icon="heart-outline" onPress={onSend} disabled={!store.friends.length}/>
  </View>;
 }
