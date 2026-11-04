@@ -18,8 +18,9 @@ const isNetworkError=(e:any)=>/network|fetch|timed? ?out|offline/i.test(String(e
 const deviceTimezone=()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'}catch{return 'UTC'}};
 const startOfToday=()=>{const d=new Date();d.setHours(0,0,0,0);return d.toISOString();};
 
-const emptyState=():State=>({familyNames:{},friends:[],groups:[],requests:[],myMoods:[],friendMoods:[],signals:[],invite:{code:'',expiresAt:new Date().toISOString()},prefs:{...EMPTY_PREFS},revokedFriendIds:[],blockedNames:[],sentSignals:[],offline:false,widgetHideMood:true,inbox:[]});
+const emptyState=():State=>({moodsSeenAt:'',familyNames:{},friends:[],groups:[],requests:[],myMoods:[],friendMoods:[],signals:[],invite:{code:'',expiresAt:new Date().toISOString()},prefs:{...EMPTY_PREFS},revokedFriendIds:[],blockedNames:[],sentSignals:[],offline:false,widgetHideMood:true,inbox:[]});
 const WIDGET_HIDE_MOOD_KEY='circle.widgetHideMood';
+const MOODS_SEEN_KEY='circle.moodsSeenAt';
 // Read acknowledgements that couldn't reach the server yet; retried on every refresh.
 const PENDING_READS_KEY='circle.pendingReactionReads';
 const loadPendingReads=async():Promise<string[]>=>{try{return JSON.parse((await AsyncStorage.getItem(PENDING_READS_KEY))||'[]')}catch{return []}};
@@ -90,6 +91,7 @@ export function useLiveCircleState():CircleStore{
   }finally{setLoading(false)}
  },[]);
 
+ useEffect(()=>{AsyncStorage.getItem(MOODS_SEEN_KEY).then(v=>{if(v)up(s=>({moodsSeenAt:v>s.moodsSeenAt?v:s.moodsSeenAt}))}).catch(()=>{})},[]);
  useEffect(()=>{AsyncStorage.getItem(WIDGET_HIDE_MOOD_KEY).then(v=>{if(v!==null)up(()=>({widgetHideMood:v==='1'}))}).catch(()=>{})},[]);
 
  useEffect(()=>{
@@ -203,6 +205,7 @@ export function useLiveCircleState():CircleStore{
    up(s=>({inbox:s.inbox.map(x=>x.id===id?{...x,read:true}:x)}));
    supabase.rpc('circle_mark_reactions_read',{p_ids:[id]}).then(r=>{if(r.error)void loadPendingReads().then(ids=>savePendingReads([...ids,id]))},()=>{void loadPendingReads().then(ids=>savePendingReads([...ids,id]))});
   },
+  markMoodsSeen:()=>{const at=new Date().toISOString();up(()=>({moodsSeenAt:at}));AsyncStorage.setItem(MOODS_SEEN_KEY,at).catch(()=>{})},
   markSignalsSeen:()=>{up(s=>({signals:s.signals.map(x=>({...x,seen:true}))}));supabase.rpc('circle_mark_signals_seen').then(()=>{})},
   setPref:(k:keyof NotificationPrefs,v:boolean)=>{up(s=>({prefs:{...s.prefs,[k]:v}}));
    void run('Couldn’t save notification settings',async()=>supabase.from('circle_notification_prefs').upsert({user_id:await userId(),[PREF_COLUMNS[k]]:v,timezone:deviceTimezone()},{onConflict:'user_id'}))},
