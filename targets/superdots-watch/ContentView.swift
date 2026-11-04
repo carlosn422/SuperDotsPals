@@ -136,7 +136,8 @@ struct ContentView: View {
         .sheet(isPresented: $showingCircle, onDismiss: { circle.path = [] }) {
             NavigationStack(path: $circle.path) { WatchCircleList() }
         }
-        .onChange(of: circle.openRequest) { _, _ in
+        .onChange(of: circle.openRequest, initial: true) { _, request in
+            guard request > 0 else { return }
             choosingMood = false; measuring = false; choosingTheme = false
             showingCircle = true
         }

@@ -40,6 +40,7 @@ final class WatchCircleStore: ObservableObject {
     @Published var path: [WatchReaction] = []
     /// Bumped when a notification tap asks the home screen to show Circle.
     @Published private(set) var openRequest = 0
+    private var pendingOpenRef: String?
 
     /// True while the mood picker or a sheet covers the home screen; animations wait until it clears.
     var hold = false {
@@ -146,6 +147,7 @@ final class WatchCircleStore: ObservableObject {
         }
         baselined = true
         playNext()
+        if pendingOpenRef != nil { await resolvePendingOpen() }
     }
 
     private func playNext() {
@@ -220,26 +222,34 @@ final class WatchCircleStore: ObservableObject {
     }
 
     /// Notification tap: show Circle, then the item the push was about once it's found.
+    /// The ref is kept until found, so a cold launch resolves it after the account loads and the first poll runs.
     func openFromNotification(ref: String?) {
         path = []
         openRequest += 1
-        guard let ref, !ref.isEmpty else { return }
+        pendingOpenRef = (ref?.isEmpty == false) ? ref : nil
         Task {
-            if let item = await find(ref: ref) { path = [item] }
+            for _ in 0..<20 where pendingOpenRef != nil {
+                if await resolvePendingOpen() { return }
+                try? await Task.sleep(for: .seconds(1))
+            }
         }
     }
 
-    private func find(ref: String) async -> WatchReaction? {
+    @discardableResult
+    private func resolvePendingOpen() async -> Bool {
+        guard let ref = pendingOpenRef else { return true }
+        guard sync.connected else { return false }
         let match: (WatchReaction) -> Bool = { $0.id == ref || $0.refId == ref }
-        if let item = unread.first(where: match) { return item }
-        for _ in 0..<5 {
-            if sync.connected, let data = try? await sync.rpc("circle_watch_inbox", ["p_unread_only": false, "p_limit": 50]) {
-                return Self.parse(data).first(where: match)
-            }
-            // Cold launch from a notification: wait briefly for the account to load.
-            try? await Task.sleep(for: .seconds(1))
+        var item = unread.first(where: match)
+        if item == nil, let data = try? await sync.rpc("circle_watch_inbox", ["p_unread_only": false, "p_limit": 50]) {
+            item = Self.parse(data).first(where: match)
+            // Server answered without it: stop retrying.
+            if item == nil { pendingOpenRef = nil; return true }
         }
-        return nil
+        guard let item, pendingOpenRef == ref else { return false }
+        pendingOpenRef = nil
+        path = [item]
+        return true
     }
 
     private func flushReads() async {
