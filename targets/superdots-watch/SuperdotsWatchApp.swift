@@ -1,7 +1,27 @@
 import SwiftUI
 import WatchKit
+import UserNotifications
 
-final class WatchAppDelegate: NSObject, WKApplicationDelegate {
+final class WatchAppDelegate: NSObject, WKApplicationDelegate, UNUserNotificationCenterDelegate {
+    override init() {
+        super.init()
+        // Set before launch finishes so a tap that launched the app is delivered here.
+        UNUserNotificationCenter.current().delegate = self
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+        [.banner, .list, .sound]
+    }
+
+    /// Circle pushes (`{action:"circle",route,ref}`; Expo nests custom data under "body") open the watch Circle screen.
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        let info = response.notification.request.content.userInfo
+        let data = (info["body"] as? [String: Any]) ?? (info as? [String: Any]) ?? [:]
+        guard data["action"] as? String == "circle" else { return }
+        let ref = data["ref"] as? String
+        await MainActor.run { WatchCircleStore.shared.openFromNotification(ref: ref) }
+    }
+
     func applicationDidFinishLaunching() {
         // HealthKit background delivery only wakes the app for observer queries registered at launch.
         HealthStressMonitor.shared.startObserving()
