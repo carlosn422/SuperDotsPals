@@ -259,10 +259,10 @@ final class WatchThemeSync: ObservableObject {
         let headers = ["Prefer":"resolution=ignore-duplicates,return=minimal"]
         do {
             let body = try JSONSerialization.data(withJSONObject:[row])
-            do { _ = try await request(path,method:"POST",body:body,extraHeaders:headers) }
+            do { _ = try await request(path,method:"POST",body:body,extraHeaders:headers,timeout:8) }
             catch SyncError.server(401, _, _) {
                 try await renewIfNeeded()
-                _ = try await request(path,method:"POST",body:body,extraHeaders:headers)
+                _ = try await request(path,method:"POST",body:body,extraHeaders:headers,timeout:8)
             }
             NSLog("[WatchSync] Uploaded stress_score %ld (%@)", score, key)
         } catch {

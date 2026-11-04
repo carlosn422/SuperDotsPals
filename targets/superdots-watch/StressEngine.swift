@@ -148,6 +148,21 @@ enum WatchStressStore {
 
 /// Reads the watch's own HealthKit HRV / resting heart rate and keeps the stress score current,
 /// including HealthKit background delivery so the complication updates while the app is closed.
+private final class OnceCallback: @unchecked Sendable {
+    private let lock = NSLock()
+    private var callback: (() -> Void)?
+
+    init(_ callback: @escaping () -> Void) { self.callback = callback }
+
+    func callAsFunction() {
+        lock.lock()
+        let pending = callback
+        callback = nil
+        lock.unlock()
+        pending?()
+    }
+}
+
 final class HealthStressMonitor: @unchecked Sendable {
     static let shared = HealthStressMonitor()
     let store = HKHealthStore()
@@ -179,9 +194,15 @@ final class HealthStressMonitor: @unchecked Sendable {
         for type in [hrvType, rhrType] {
             let query = HKObserverQuery(sampleType: type, predicate: nil) { [weak self] _, completion, error in
                 guard let self, error == nil else { completion(); return }
+                // watchOS kills a background HealthKit wake that runs past ~15 s, so report done by 10 s at the latest.
+                let finish = OnceCallback(completion)
                 Task {
                     await self.recompute(upload: true)
-                    completion()
+                    finish()
+                }
+                Task {
+                    try? await Task.sleep(for: .seconds(10))
+                    finish()
                 }
             }
             store.execute(query)
