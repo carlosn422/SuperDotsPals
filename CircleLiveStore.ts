@@ -115,7 +115,8 @@ export function useLiveCircleState():CircleStore{
   const app=AppState.addEventListener('change',s=>{if(s==='active')void refresh()});
   const received=Notifications.addNotificationReceivedListener(n=>{if(n.request.content.data?.action==='circle')void refresh()});
   const timer=setInterval(()=>{if(AppState.currentState==='active')void refresh()},45000);
-  return()=>{auth.data.subscription.unsubscribe();app.remove();received.remove();clearInterval(timer)};
+  const live=supabase.channel('circle-links').on('postgres_changes',{event:'*',schema:'public',table:'circle_links'},()=>void refresh()).subscribe();
+  return()=>{auth.data.subscription.unsubscribe();app.remove();received.remove();clearInterval(timer);void supabase.removeChannel(live)};
  },[refresh]);
 
  // Runs an action, reports failures, then reloads from the server so the screen reflects what was actually saved.
