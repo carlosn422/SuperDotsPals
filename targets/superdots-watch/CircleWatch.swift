@@ -40,8 +40,11 @@ final class WatchCircleStore: ObservableObject {
     @Published var path: [WatchReaction] = []
     /// Bumped when a notification tap asks the home screen to show Circle.
     @Published private(set) var openRequest = 0
-    /// Set while a notification tap waits for its item, so the list shows a spinner instead of "All caught up".
-    @Published private(set) var pendingOpenRef: String?
+    private var pendingOpenRef: String? {
+        didSet { if pendingOpenRef == nil { openingFromNotification = false } }
+    }
+    /// True while a notification tap waits for its item, so the list shows a spinner instead of "All caught up".
+    @Published private(set) var openingFromNotification = false
 
     /// True while the mood picker or a sheet covers the home screen; animations wait until it clears.
     var hold = false {
@@ -228,12 +231,14 @@ final class WatchCircleStore: ObservableObject {
         path = []
         openRequest += 1
         pendingOpenRef = (ref?.isEmpty == false) ? ref : nil
+        openingFromNotification = pendingOpenRef != nil
         Task {
             for _ in 0..<20 where pendingOpenRef != nil {
                 if await resolvePendingOpen() { return }
                 try? await Task.sleep(for: .seconds(1))
             }
-            pendingOpenRef = nil
+            // Keep the ref so the first poll after a slow account load still opens it.
+            openingFromNotification = false
         }
     }
 
@@ -460,7 +465,7 @@ struct WatchCircleList: View {
 
     var body: some View {
         Group {
-            if circle.pendingOpenRef != nil {
+            if circle.openingFromNotification {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if circle.unread.isEmpty {
                 VStack(spacing: 4) {
