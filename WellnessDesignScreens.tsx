@@ -70,8 +70,9 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
    {quickAdd?<TouchableOpacity accessibilityRole="button" accessibilityLabel={'Add one '+(label==='Water'?'cup of water':'caffeine serving')} disabled={adding} onPress={quickAdd} style={{width:38,height:38,borderRadius:19,backgroundColor:APP_THEME.primarySoft,alignItems:'center',justifyContent:'center',opacity:adding?0.5:1}}><Ionicons name={adding?'ellipsis-horizontal':'add'} color={accent} size={23}/></TouchableOpacity>:<Ionicons name="chevron-forward" color={accent} size={18}/>}
   </TouchableOpacity>
  );
+ const {isPlus}=usePlus();
  return <View style={[s.page,{gap:17}]}>
-  <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',minHeight:40}}><Text accessibilityRole="header" style={{fontWeight:'900',fontSize:28,color:INK}}>MoodPals</Text><UpgradePill/></View>
+  {isPlus?null:<View style={{flexDirection:'row',justifyContent:'flex-end'}}><UpgradePill/></View>}
   <StressHero mood={companion} onCheckin={onCheckin}/>
   {dayRow}
   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Breathing for Calm. Start a one-minute breathing exercise" onPress={onBreathing} style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#FFFAF2',borderRadius:22,paddingVertical:12,paddingHorizontal:14,borderWidth:1,borderColor:'#EAF3EC'}}>
