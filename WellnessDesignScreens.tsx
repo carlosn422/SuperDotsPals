@@ -142,6 +142,7 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpi
     <Text style={{fontSize:13,fontWeight:'800',color:accent,marginTop:3}}>Check in  →</Text></View>
    <SuperdotMascot id={companion} size={91}/>
   </TouchableOpacity>
+  {day===0?<View style={{gap:9}}><SectionHeading title="Body & recovery" detail="Apple Health"/><HealthActionsGrid onMindfulness={onBreathing}/></View>:null}
   <View style={{gap:9}}><SectionHeading title="Daily essentials"/>
    <View style={{flexDirection:'row',gap:10}}>
     <TouchableOpacity onPress={day===0?onWater:undefined} disabled={day!==0} style={{flex:1,backgroundColor:'#FFFFFF',borderRadius:20,padding:16,borderWidth:1,borderColor:'#ECEAF2',gap:7}}>
@@ -161,7 +162,6 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpi
    {item('chatbubble-ellipses-outline','Ask AI about your stress','Chat with MoodPals about your readings','#EFE9FF',onChat)}
    {item('leaf-outline','Breathing break','Calm, box and unwind exercises','#E4F6EA',onBreathing)}
   </View>
-  {day===0?<View style={{gap:9}}><SectionHeading title="Body & recovery" detail="Apple Health"/><HealthActionsGrid onMindfulness={onBreathing}/></View>:null}
  </View>;
 }
 export function WellnessTrends({companion,accent,period,onPeriod,mood}:{companion:string;accent:string;period:string;onPeriod:(p:'Day'|'Week'|'Month'|'Year')=>void;mood:string}){
