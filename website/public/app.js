@@ -112,11 +112,11 @@ form.addEventListener('submit', async e => {
     msg.textContent = "You're on the list! 🎉 We'll email you when the beta opens.";
   } catch (err) {
     msg.className = 'form-msg err'; msg.textContent = err.message;
-  } finally { button.disabled = false; button.textContent = 'Get early access'; }
+  } finally { button.disabled = false; button.textContent = 'Get updates'; }
 });
 document.getElementById('yr').textContent = new Date().getFullYear();
 
-// "Join early access" buttons: scroll to the very top so the whole signup form is visible, then focus the email field.
+// [data-join] links: scroll to the very top so the whole signup form is visible, then focus the email field.
 document.querySelectorAll('[data-join]').forEach(link => link.addEventListener('click', e => {
   e.preventDefault();
   window.scrollTo({ top: 0, behavior: 'smooth' });
