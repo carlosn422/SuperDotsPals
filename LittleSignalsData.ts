@@ -16,12 +16,19 @@ export const MOOD_TINTS:Record<CircleMood,{color:string;tint:string}>={
 };
 
 export const MOOD_REACTIONS:Record<CircleMood,string[]>={
- Joyful:['🎉','🥳','🙌','✨','❤️'],
- Calm:['🌿','💚','☀️','🧘','✨'],
- Sad:['❤️','🫂','🫶','🌷','💙'],
- Angry:['🫂','❤️','💪','🌿','🫶'],
- Anxious:['🫶','🤗','🌿','💛','☀️'],
- Tired:['🌙','💤','🫂','☕','💜'],
+ Joyful:['🎉','🙌','✨','❤️'],
+ Calm:['🌿','☀️','💚','❤️'],
+ Sad:['🫂','🫶','💙','❤️'],
+ Angry:['🫂','🫶','🌿','💪'],
+ Anxious:['🌿','🫶','🫂','☀️'],
+ Tired:['🌙','☕','🫂','💜'],
+};
+
+// Keep in sync with public.circle_reaction_label (push notification text).
+export const REACTION_LABELS:Record<string,string>={
+ '🎉':'So happy for you','🙌':'Love this','✨':'Keep shining','❤️':'Thinking of you','💜':'Thinking of you',
+ '🌿':'Take a breath','☀️':'Sending sunshine','💚':'Glad you’re feeling good','🫂':'Sending a hug',
+ '🫶':'Here for you','💙':'You’re not alone','💪':'You’ve got this','🌙':'Rest well','☕':'Coffee’s on me',
 };
 
 export const LITTLE_SIGNALS=[
@@ -79,7 +86,7 @@ export const MOCK_MY_MOODS:MySharedMood[]=[
 ];
 export const MOCK_FRIEND_MOODS:FriendSharedMood[]=[
  {id:'f1',friendId:'taylor',mood:'Sad',sharedAt:minutesAgo(35),expiresAt:hoursFromNow(23.4)},
- {id:'f2',friendId:'mom',mood:'Joyful',sharedAt:minutesAgo(60*3),expiresAt:hoursFromNow(21),myReaction:'🥳'},
+ {id:'f2',friendId:'mom',mood:'Joyful',sharedAt:minutesAgo(60*3),expiresAt:hoursFromNow(21),myReaction:'🎉'},
  {id:'f3',friendId:'riley',mood:'Tired',sharedAt:minutesAgo(60*9),expiresAt:hoursFromNow(15)},
 ];
 export const MOCK_SIGNALS:ReceivedSignal[]=[

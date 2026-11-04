@@ -2,7 +2,7 @@ import React,{useEffect,useMemo,useState} from 'react';
 import {ActionSheetIOS,ActivityIndicator,Alert,ScrollView,Share,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import {CIRCLE_MOODS,CircleGroup,CircleMood,Friend,FriendSharedMood,LITTLE_SIGNALS,MOOD_REACTIONS,MOOD_TINTS,SignalId,isToday,signalById,timeAgo,timeLeft} from './LittleSignalsData';
+import {CIRCLE_MOODS,CircleGroup,CircleMood,Friend,FriendSharedMood,LITTLE_SIGNALS,MOOD_REACTIONS,MOOD_TINTS,REACTION_LABELS,SignalId,isToday,signalById,timeAgo,timeLeft} from './LittleSignalsData';
 import {CodePreview,activeFriendMoods,circleNewCount,familyFriend,friendName,isMoodNew,uniqueAudience,useCircle} from './CircleStore';
 import {usePlus} from './PlusStore';
 import {Avatar,CCard,CHeading,CRow,CT,Chip,EmptyState,MoodPalThumb,MoodTag,OfflineBanner,PrimaryButton,SampleDataNote,SignalBurst,SoftButton,ToggleRow,cs} from './CircleComponents';
@@ -516,15 +516,18 @@ function SignalReceived({id,nav,mood}:{id:string;nav:Nav;mood?:string}){
  </>;
 }
 
-function ReactionPicker({mood,value,onPick}:{mood:CircleMood;value?:string;onPick:(e?:string)=>void}){
- return <View style={{flexDirection:'row',justifyContent:'space-between'}}>{MOOD_REACTIONS[mood].map(e=>{const on=value===e;return <TouchableOpacity key={e} onPress={()=>onPick(on?undefined:e)} accessibilityRole="button" accessibilityLabel={'React '+e} accessibilityState={{selected:on}} style={{width:54,height:54,borderRadius:27,alignItems:'center',justifyContent:'center',backgroundColor:on?MOOD_TINTS[mood].tint:'#F5F8F6',borderWidth:2,borderColor:on?MOOD_TINTS[mood].color:'transparent'}}><Text style={{fontSize:26}}>{e}</Text></TouchableOpacity>})}</View>;
+function ReactionPicker({mood,value,onPick}:{mood:CircleMood;value?:string;onPick:(e:string)=>void}){
+ return <View style={{flexDirection:'row',flexWrap:'wrap',gap:9}}>{MOOD_REACTIONS[mood].map(e=>{const on=value===e;const label=REACTION_LABELS[e]||e;return <TouchableOpacity key={e} onPress={()=>onPick(e)} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{selected:on}} style={{width:'48%',flexGrow:1,flexDirection:'row',alignItems:'center',gap:9,padding:12,borderRadius:16,borderWidth:1.5,borderColor:on?CT.primary:CT.border,backgroundColor:on?CT.primarySoft:'#fff'}}><Text style={{fontSize:24}}>{e}</Text><Text style={{flex:1,fontWeight:'800',fontSize:13,color:CT.ink}}>{label}</Text>{on?<Ionicons name="checkmark-circle" size={20} color={CT.primary}/>:null}</TouchableOpacity>})}</View>
 }
 
 function FriendMood({id,nav}:{id:string;nav:Nav}){
  const store=useCircle();const fm=store.friendMoods.find(m=>m.id===id);
  useEffect(()=>{if(fm)store.markMoodSeen(fm.id)},[fm?.id]);
+ const [undoFor,setUndoFor]=useState<string|undefined>();
+ useEffect(()=>{if(!undoFor)return;const t=setTimeout(()=>setUndoFor(undefined),5000);return()=>clearTimeout(t)},[undoFor]);
  const f=fm&&(store.friends.find(x=>x.id===fm.friendId)||familyFriend(store,fm.friendId));
  if(!fm||!f||new Date(fm.expiresAt).getTime()<Date.now())return <Screen route={{name:'revoked'}} nav={nav}/>;
+ const first=f.name.split(' ')[0]||f.name;
  return <>
   <CCard style={{alignItems:'center',gap:8,paddingVertical:20,backgroundColor:MOOD_TINTS[fm.mood].tint}}>
    <View style={{flexDirection:'row',alignItems:'center',gap:8}}><Avatar initials={f.initials} color={f.color} size={30}/><Text style={cs.rowTitle}>{f.name}</Text><Text style={cs.rowSub}>· {timeAgo(fm.sharedAt)}</Text></View>
@@ -532,10 +535,12 @@ function FriendMood({id,nav}:{id:string;nav:Nav}){
    <Text style={{fontSize:16,color:CT.ink}}>{f.name} is feeling <Text style={{fontWeight:'900',color:MOOD_TINTS[fm.mood].color}}>{fm.mood.toLowerCase()}</Text></Text>
    <Text style={cs.rowSub}>Visible for {timeLeft(fm.expiresAt)}</Text>
   </CCard>
-  <CHeading title={fm.myReaction?'Your reaction':'Send a reaction'} detail="Tap again to remove it. Only emoji — no messages."/>
-  <CCard><ReactionPicker mood={fm.mood} value={fm.myReaction} onPick={e=>store.react(fm.id,e)}/></CCard>
-  {fm.myReaction?<Text style={[cs.muted,{textAlign:'center'}]}>{f.name} will see your {fm.myReaction}</Text>:null}
-  <SoftButton label={'Send '+f.name+' a Little Signal'} icon="heart-outline" onPress={()=>nav.push({name:'send',friendId:f.id})}/>
+  <CHeading title={'Send '+first+' a response'}/>
+  <ReactionPicker mood={fm.mood} value={fm.myReaction} onPick={e=>{if(e===fm.myReaction)return;store.react(fm.id,e);setUndoFor(e)}}/>
+  {fm.myReaction?<View style={{flexDirection:'row',justifyContent:'center',alignItems:'center',gap:6}}>
+   <Ionicons name="checkmark" size={16} color={CT.primary}/><Text style={cs.muted}>Sent to {first}</Text>
+   {undoFor===fm.myReaction?<TouchableOpacity accessibilityRole="button" accessibilityLabel="Undo response" hitSlop={10} onPress={()=>{store.react(fm.id,undefined);setUndoFor(undefined)}}><Text style={{color:CT.primary,fontWeight:'800'}}>Undo</Text></TouchableOpacity>:null}
+  </View>:null}
  </>;
 }
 
