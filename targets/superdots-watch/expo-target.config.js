@@ -6,7 +6,7 @@ module.exports = {
   // Keep the watch app embedded in the existing MoodPals iOS bundle.
   bundleIdentifier: '.watchkitapp',
   deploymentTarget: '10.0',
-  frameworks: ['SwiftUI', 'Security', 'HealthKit', 'WidgetKit', 'WatchConnectivity'],
+  frameworks: ['SwiftUI', 'Security', 'HealthKit', 'WidgetKit', 'WatchConnectivity', 'UserNotifications'],
   entitlements: {
     'com.apple.developer.healthkit': true,
     'com.apple.developer.healthkit.access': [],

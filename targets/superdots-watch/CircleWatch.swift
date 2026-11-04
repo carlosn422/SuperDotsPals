@@ -1,12 +1,22 @@
 import SwiftUI
 
-/// A Circle member's emoji reaction to one of my shared moods (`circle_reaction_inbox`).
+/// One unread Circle item from `circle_watch_inbox`: a response to my shared mood or a Little Signal sent to me.
 struct WatchReaction: Identifiable, Hashable {
     let id: String
-    let mood: String
+    let kind: String
+    /// Push `ref` for this item: shared mood id for responses, signal id for Little Signals.
+    let refId: String
+    /// Shared mood for responses; nil for Little Signals.
+    let mood: String?
     let name: String
     let emoji: String
+    let label: String?
     let at: Date
+
+    var isSignal: Bool { kind == "signal" }
+    /// Pending-read key; signals are prefixed so they're marked read with their own RPC.
+    var readKey: String { isSignal ? "s:" + id : id }
+    var subtitle: String { label ?? mood ?? (isSignal ? "Little Signal" : "Response") }
 }
 
 /// "+N more" bubble shown instead of animating every reaction in a large batch.
@@ -26,6 +36,10 @@ final class WatchCircleStore: ObservableObject {
     @Published private(set) var floating: WatchReaction?
     /// Summary for the rest of a batch after `maxIndividualFloats`; those reactions stay unread.
     @Published private(set) var summary: WatchReactionSummary?
+    /// Navigation inside the Circle sheet; set when a notification tap opens a specific item.
+    @Published var path: [WatchReaction] = []
+    /// Bumped when a notification tap asks the home screen to show Circle.
+    @Published private(set) var openRequest = 0
 
     /// True while the mood picker or a sheet covers the home screen; animations wait until it clears.
     var hold = false {
@@ -107,7 +121,7 @@ final class WatchCircleStore: ObservableObject {
         await flushMoodShares()
         let rows: [WatchReaction]
         do {
-            let data = try await sync.rpc("circle_reaction_inbox", ["p_unread_only": true, "p_limit": 50])
+            let data = try await sync.rpc("circle_watch_inbox", ["p_unread_only": true, "p_limit": 50])
             rows = Self.parse(data)
         } catch {
             NSLog("[WatchCircle] Inbox failed: %@", error.localizedDescription)
@@ -115,7 +129,7 @@ final class WatchCircleStore: ObservableObject {
         }
         guard active else { return }
         let acked = Set(pendingReads).union(markedRead)
-        let fresh = rows.filter { !acked.contains($0.id) }
+        let fresh = rows.filter { !acked.contains($0.readKey) }
         unread = fresh
         let ids = Set(fresh.map(\.id))
         // Read elsewhere (e.g. on the iPhone) before it could float: never animate it.
@@ -153,7 +167,7 @@ final class WatchCircleStore: ObservableObject {
             self.floatTask = nil
             // Finished playing while the app stayed active: the reaction has been seen.
             guard self.active else { return }
-            self.markRead(next.id)
+            self.markRead(next)
             try? await Task.sleep(for: .seconds(0.3))
             self.playNext()
         }
@@ -193,25 +207,52 @@ final class WatchCircleStore: ObservableObject {
         }
     }
 
-    /// Marks one reaction read; the server call is retried until it succeeds.
-    func markRead(_ id: String) {
-        guard !markedRead.contains(id) else { return }
-        markedRead.insert(id)
-        queue.removeAll { $0.id == id }
-        unread.removeAll { $0.id == id }
-        if !known.contains(id) { known = known + [id] }
-        if !pendingReads.contains(id) { pendingReads = pendingReads + [id] }
+    /// Marks one item read; the server call is retried until it succeeds.
+    func markRead(_ item: WatchReaction) {
+        let key = item.readKey
+        guard !markedRead.contains(key) else { return }
+        markedRead.insert(key)
+        queue.removeAll { $0.id == item.id }
+        unread.removeAll { $0.id == item.id }
+        if !known.contains(item.id) { known = known + [item.id] }
+        if !pendingReads.contains(key) { pendingReads = pendingReads + [key] }
         Task { await flushReads() }
     }
 
+    /// Notification tap: show Circle, then the item the push was about once it's found.
+    func openFromNotification(ref: String?) {
+        path = []
+        openRequest += 1
+        guard let ref, !ref.isEmpty else { return }
+        Task {
+            if let item = await find(ref: ref) { path = [item] }
+        }
+    }
+
+    private func find(ref: String) async -> WatchReaction? {
+        let match: (WatchReaction) -> Bool = { $0.id == ref || $0.refId == ref }
+        if let item = unread.first(where: match) { return item }
+        for _ in 0..<5 {
+            if sync.connected, let data = try? await sync.rpc("circle_watch_inbox", ["p_unread_only": false, "p_limit": 50]) {
+                return Self.parse(data).first(where: match)
+            }
+            // Cold launch from a notification: wait briefly for the account to load.
+            try? await Task.sleep(for: .seconds(1))
+        }
+        return nil
+    }
+
     private func flushReads() async {
-        let ids = pendingReads
-        guard !ids.isEmpty, !flushingReads, sync.connected else { return }
+        let keys = pendingReads
+        guard !keys.isEmpty, !flushingReads, sync.connected else { return }
         flushingReads = true
         defer { flushingReads = false }
+        let signals = keys.filter { $0.hasPrefix("s:") }.map { String($0.dropFirst(2)) }
+        let reactions = keys.filter { !$0.hasPrefix("s:") }
         do {
-            _ = try await sync.rpc("circle_mark_reactions_read", ["p_ids": ids])
-            pendingReads = pendingReads.filter { !ids.contains($0) }
+            if !reactions.isEmpty { _ = try await sync.rpc("circle_mark_reactions_read", ["p_ids": reactions]) }
+            if !signals.isEmpty { _ = try await sync.rpc("circle_mark_signals_read", ["p_ids": signals]) }
+            pendingReads = pendingReads.filter { !keys.contains($0) }
         } catch {
             NSLog("[WatchCircle] Read sync pending: %@", error.localizedDescription)
         }
@@ -244,6 +285,7 @@ final class WatchCircleStore: ObservableObject {
     func reset() {
         setActive(false)
         unread = []
+        path = []
         markedRead = []
         for key in [knownKey, readsKey, sharesKey] { defaults.removeObject(forKey: key) }
     }
@@ -253,10 +295,13 @@ final class WatchCircleStore: ObservableObject {
         return rows.compactMap { row in
             guard let id = row["id"] as? String, let emoji = row["emoji"] as? String else { return nil }
             return WatchReaction(id: id,
-                                 mood: row["mood"] as? String ?? "Calm",
-                                 name: row["reactor_name"] as? String ?? "A friend",
+                                 kind: row["kind"] as? String ?? "reaction",
+                                 refId: row["ref_id"] as? String ?? id,
+                                 mood: row["mood"] as? String,
+                                 name: row["name"] as? String ?? "A friend",
                                  emoji: emoji,
-                                 at: WatchThemeSync.parseTimestamp(row["reacted_at"] as? String) ?? Date())
+                                 label: row["label"] as? String,
+                                 at: WatchThemeSync.parseTimestamp(row["at"] as? String) ?? Date())
         }
     }
 }
@@ -285,7 +330,7 @@ struct FloatingReactionView: View {
         .offset(y: -34)
         .allowsHitTesting(false)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(reaction.name) reacted \(reaction.emoji)")
+        .accessibilityLabel("\(reaction.name): \(reaction.subtitle) \(reaction.emoji)")
     }
 }
 
@@ -319,7 +364,7 @@ struct FloatingSummaryView: View {
         .modifier(FloatIn(duration: WatchCircleStore.fadeInDuration + WatchCircleStore.summaryVisibleDuration + WatchCircleStore.fadeDuration))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .offset(y: -34)
-        .accessibilityLabel("\(summary.count) more reactions. Open Circle.")
+        .accessibilityLabel("\(summary.count) more from your Circle. Open Circle.")
     }
 }
 
@@ -397,7 +442,7 @@ struct CircleButton: View {
     }
 }
 
-/// Unread reactions only; opened or floated ones drop out. Read-only: no replies on Apple Watch.
+/// Unread responses and Little Signals; opened or floated ones drop out. Read-only: no replies on Apple Watch.
 struct WatchCircleList: View {
     @ObservedObject private var circle = WatchCircleStore.shared
 
@@ -406,7 +451,7 @@ struct WatchCircleList: View {
             if circle.unread.isEmpty {
                 VStack(spacing: 4) {
                     Text("All caught up! 💚").font(.headline)
-                    Text("No unread responses.").font(.caption2).foregroundStyle(.secondary)
+                    Text("No new signals or responses.").font(.caption2).foregroundStyle(.secondary)
                 }
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -418,7 +463,7 @@ struct WatchCircleList: View {
                                 Text(reaction.name)
                                     .font(.system(size: 15, weight: .semibold))
                                     .lineLimit(1)
-                                Text("\(reaction.mood) · \(Self.ago(reaction.at))")
+                                Text("\(reaction.subtitle) · \(Self.ago(reaction.at))")
                                     .font(.system(size: 11))
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
@@ -427,7 +472,7 @@ struct WatchCircleList: View {
                             Text(reaction.emoji).font(.system(size: 22))
                         }
                     }
-                    .accessibilityLabel("\(reaction.name) \(reaction.emoji), \(reaction.mood), \(Self.ago(reaction.at))")
+                    .accessibilityLabel("\(reaction.name) \(reaction.emoji), \(reaction.subtitle), \(Self.ago(reaction.at))")
                 }
             }
         }
@@ -452,13 +497,21 @@ struct WatchReactionDetail: View {
             VStack(spacing: 4) {
                 Text(reaction.name).font(.headline).lineLimit(1)
                 Text(reaction.emoji).font(.system(size: 36))
-                AnimatedMoodMascot(mood: reaction.mood, size: 70)
-                    .frame(width: 70, height: 70)
-                Text(reaction.mood).font(.caption2).foregroundStyle(.secondary)
+                if let label = reaction.label {
+                    Text(label).font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .multilineTextAlignment(.center)
+                }
+                if let mood = reaction.mood {
+                    AnimatedMoodMascot(mood: mood, size: 70)
+                        .frame(width: 70, height: 70)
+                    Text("Your \(mood.lowercased()) mood").font(.caption2).foregroundStyle(.secondary)
+                } else {
+                    Text("Little Signal").font(.caption2).foregroundStyle(.secondary)
+                }
                 Text(reaction.at, style: .relative).font(.caption2).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
         }
-        .onAppear { WatchCircleStore.shared.markRead(reaction.id) }
+        .onAppear { WatchCircleStore.shared.markRead(reaction) }
     }
 }

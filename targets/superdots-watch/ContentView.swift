@@ -133,8 +133,12 @@ struct ContentView: View {
         .sheet(isPresented: $choosingTheme) {
             NavigationStack { WatchThemePicker() }.environmentObject(store)
         }
-        .sheet(isPresented: $showingCircle) {
-            NavigationStack { WatchCircleList() }
+        .sheet(isPresented: $showingCircle, onDismiss: { circle.path = [] }) {
+            NavigationStack(path: $circle.path) { WatchCircleList() }
+        }
+        .onChange(of: circle.openRequest) { _, _ in
+            choosingMood = false; measuring = false; choosingTheme = false
+            showingCircle = true
         }
         .overlay {
             ZStack {
