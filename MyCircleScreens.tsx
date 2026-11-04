@@ -1,4 +1,4 @@
-import React,{useEffect,useMemo,useState} from 'react';
+import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {ActionSheetIOS,ActivityIndicator,Alert,ScrollView,Share,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -292,6 +292,12 @@ function EnterCode({nav}:{nav:Nav}){
  const [result,setResult]=useState<null|CodePreview['state']|'sent'>(null);const [found,setFound]=useState<CodePreview|null>(null);
  const check=async()=>{setBusy(true);try{const r=await store.previewCode(code,store.invite.code);setFound(r);setResult(r.state);}catch(e:any){Alert.alert('Couldn’t check that code',e?.message||'Please try again.')}finally{setBusy(false)}};
  const send=async()=>{setBusy(true);try{const r=await store.redeemCode(code);setResult(r==='sent'?'sent':r==='pending'?'pending':r==='already_friends'?'already_friends':'invalid');}catch(e:any){Alert.alert('Couldn’t send your request',e?.message||'Please try again.')}finally{setBusy(false)}};
+ const known=useRef<string[]|null>(null);
+ const waiting=result==='sent'||result==='pending';
+ useEffect(()=>{if(!waiting){known.current=null;return}
+  if(!known.current){known.current=store.friends.map(f=>f.id);return}
+  if(store.friends.some(f=>!known.current!.includes(f.id)))nav.popTo('home');
+ },[waiting,store.friends]);
  const format=(t:string)=>{const raw=t.toUpperCase().replace(/[^A-Z0-9]/g,'').replace(/^MP/,'').slice(0,5);return raw?'MP-'+raw:''};
  const name=found?.name||'your friend';
  return <>
