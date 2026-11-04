@@ -251,3 +251,4 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 @media(max-width:480px){.hero-feats li{font-size:14px;gap:8px;padding:4px 6px}.hero-feats svg{width:26px;height:26px}}
 .cta .news{font:600 22px Fredoka,sans-serif;margin:36px 0 0}
 .cta .signup{margin:14px auto 0;text-align:left}
+.hero2 .sparkles i:nth-child(2){left:84%;top:46%}
