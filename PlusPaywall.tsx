@@ -18,8 +18,10 @@ const BENEFITS:{icon:React.ComponentProps<typeof Ionicons>['name'];text:string}[
 ];
 const TERMS='Payment is charged to your Apple Account when you confirm. The subscription renews automatically unless cancelled at least 24 hours before the end of the current period. Manage or cancel any time in your Apple Account settings.';
 
-export function PlusPaywallSheet(){
- const {paywall,hidePaywall,purchase,restore,isPlus,prices}=usePlus();
+// iOS can't present a second modal from the root while a sheet (e.g. Circle) is up, so open sheets mount a nested copy that takes over.
+export function PlusPaywallSheet({nested=false}:{nested?:boolean}){
+ const {paywall,hidePaywall,purchase,restore,isPlus,prices,nestedPaywalls,setNestedPaywalls}=usePlus();
+ useEffect(()=>{if(!nested)return;setNestedPaywalls(n=>n+1);return()=>setNestedPaywalls(n=>n-1)},[nested]);
  const [plan,setPlan]=useState<PlusPlan>('annual');
  const [busy,setBusy]=useState(false);
  const guest=useIsGuest();
@@ -45,7 +47,7 @@ export function PlusPaywallSheet(){
   Alert.alert(ok?'Purchases restored':'Nothing to restore',ok?'MoodPals Plus is active.':'We couldn\'t find a MoodPals Plus subscription for this Apple Account.');
   if(ok)hidePaywall();
  }
- return <Modal visible={!!paywall} animationType="slide" presentationStyle="pageSheet" onRequestClose={hidePaywall}>
+ return <Modal visible={!!paywall&&(nested||nestedPaywalls===0)} animationType="slide" presentationStyle="pageSheet" onRequestClose={hidePaywall}>
   <ScrollView style={{flex:1,backgroundColor:T.background}} contentContainerStyle={s.sheet} keyboardShouldPersistTaps="handled">
    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={hidePaywall} style={s.close}><Ionicons name="close" size={24} color={T.muted}/></TouchableOpacity>
    {creating?<View style={{alignSelf:'stretch'}}><CreateAccountScreen accent={T.primary} backLabel="MoodPals Plus" onBack={()=>setCreating(false)}/></View>:<>

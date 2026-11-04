@@ -40,7 +40,7 @@ export const PLAN_FEATURES:{label:string;free:string|boolean;plus:string|boolean
 type PlusState={
  isPlus:boolean;plan:PlusPlan|null;prices:Record<PlusPlan,PlusPrice>;
  paywall:{feature:PlusFeature}|null;
- showPaywall:(feature?:PlusFeature)=>void;hidePaywall:()=>void;
+ showPaywall:(feature?:PlusFeature)=>void;hidePaywall:()=>void;nestedPaywalls:number;setNestedPaywalls:React.Dispatch<React.SetStateAction<number>>;
  purchase:(plan:PlusPlan)=>Promise<boolean>;restore:()=>Promise<boolean>;resetToFree:()=>void;
 };
 const Ctx=createContext<PlusState|null>(null);
@@ -57,6 +57,7 @@ export function PlusProvider({children}:{children:React.ReactNode}){
  const [prices,setPrices]=useState(PLUS_PRICES);
  const [packages,setPackages]=useState<Partial<Record<PlusPlan,PurchasesPackage>>>({});
  const [paywall,setPaywall]=useState<{feature:PlusFeature}|null>(null);
+ const [nestedPaywalls,setNestedPaywalls]=useState(0);
  const userRef=useRef<string|null>(null);
 
  useEffect(()=>{
@@ -122,7 +123,7 @@ export function PlusProvider({children}:{children:React.ReactNode}){
   }
  },[plan]);
  const resetToFree=useCallback(()=>{if(PLUS_MOCKUP)setPlan(null)},[]);
- const value=useMemo(()=>({isPlus:plan!==null,plan,prices,paywall,showPaywall,hidePaywall,purchase,restore,resetToFree}),[plan,prices,paywall,showPaywall,hidePaywall,purchase,restore,resetToFree]);
+ const value=useMemo(()=>({isPlus:plan!==null,plan,prices,paywall,showPaywall,hidePaywall,nestedPaywalls,setNestedPaywalls,purchase,restore,resetToFree}),[plan,prices,paywall,showPaywall,hidePaywall,nestedPaywalls,purchase,restore,resetToFree]);
  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

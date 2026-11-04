@@ -25,7 +25,7 @@ import {CircleProvider,circleNewCount,useCircle} from './CircleStore';
 import CircleNavigator,{CircleRoute} from './MyCircleScreens';
 import {LittleSignalsTodayCard} from './CircleComponents';
 import WatchThemesScreen from './WatchThemesScreen';
-import {PlusSettingsScreen} from './PlusPaywall';
+import {PlusPaywallSheet,PlusSettingsScreen} from './PlusPaywall';
 import {AccountRequired,CreateAccountScreen,DeleteAccountScreen,useAppleLink,useIsGuest} from './Account';
 import {useWatchAutoLink} from './WatchAutoLink';
 import {CIRCLE_MOODS} from './LittleSignalsData';
@@ -278,6 +278,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
    <View style={{flex:1,backgroundColor:C.bg}}><ScrollView contentContainerStyle={[s.scroll,{paddingTop:18,paddingBottom:48}]} keyboardShouldPersistTaps="handled">
     {circleSheet?(isGuest?<AccountRequired accent={colors.accent} backLabel="Close" onBack={()=>setCircleSheet(null)} onCreate={()=>{setCircleSheet(null);go('Settings');setSettingsPage('account')}}/>:<CircleNavigator initial={circleSheet} exitLabel="Close" onExit={()=>setCircleSheet(null)} mood={mood}/>):null}
    </ScrollView></View>
+   {circleSheet?<PlusPaywallSheet nested/>:null}
   </Modal>
  </View>;
 }
