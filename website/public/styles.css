@@ -221,7 +221,7 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 .appstore small{font:500 12px/1.2 -apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;letter-spacing:.2px}
 .nav-dl{gap:7px}.nav-dl svg{width:14px;height:17px}
 .dl-short{display:none}@media(max-width:760px){.dl-long{display:none}.dl-short{display:inline}}
-.hero.hero2{display:block;text-align:center;padding-top:10px;padding-bottom:90px;margin-bottom:0;isolation:isolate;clip-path:inset(-300px -100vw 0 -100vw)}
+.hero.hero2{display:block;text-align:center;padding-top:40px;padding-bottom:90px;margin-bottom:0;isolation:isolate;clip-path:inset(-300px -100vw 0 -100vw)}
 .hero2::after{content:"";position:absolute;z-index:0;left:50%;transform:translateX(-50%);width:max(170vw,1800px);height:600px;bottom:-300px;border-radius:50%;background:linear-gradient(180deg,#fff 0,rgba(255,253,249,.92) 22%,rgba(255,248,238,0) 50%);box-shadow:0 -30px 60px rgba(255,255,255,.55);pointer-events:none}
 .hero2>*{position:relative}.hero2>.sparkles,.hero2>.hero-wave{position:absolute}
 .hero2 .hero-copy{max-width:760px;margin:0 auto}
