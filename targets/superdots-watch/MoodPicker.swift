@@ -1,7 +1,7 @@
 import SwiftUI
 import WatchKit
 
-/// Mood picker: a large preview of the highlighted MoodPal inside a ring of small circular MoodPals.
+/// Mood picker: a large preview of the highlighted MoodPal over a row of the other moods as small circular MoodPals.
 /// Tap, swipe or turn the Digital Crown to browse; only Set Mood saves (browsing never changes the mood).
 struct MoodPicker: View {
     struct Option: Equatable {
@@ -93,26 +93,15 @@ struct MoodPicker: View {
                     Text("Mood set to \(option.label)").font(.system(size: 13, weight: .semibold))
                     Spacer(minLength: 0)
                 } else {
-                    let ring = min(geo.size.width, max(80, geo.size.height - 36))
-                    let count = Self.options.count
-                    let dot = min(28, ring * 0.2)
-                    let radius = (ring - dot) / 2
-                    let center = max(30, (radius - dot / 2) * 2 * 0.6)
-                    ZStack {
-                        VStack(spacing: 0) {
-                            AnimatedMoodMascot(mood: option.mood, size: center, isActive: true)
-                                .id(index)
-                                .transition(.opacity)
-                                .frame(width: center, height: center)
-                                .accessibilityLabel("\(option.label) MoodPal preview")
-                            Text(failed ? "Couldn't save" : option.label)
-                                .font(.system(size: failed ? 10 : 12, weight: .semibold))
-                                .foregroundStyle(failed ? .orange : .primary)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
-                        }
-                        .frame(width: center + 16, height: center + 16)
-                        .contentShape(Circle())
+                    let others = Self.options.indices.filter { $0 != index }
+                    let dot = max(24, min(30, (geo.size.width - 4 * CGFloat(others.count - 1)) / CGFloat(others.count)))
+                    let preview = max(44, min(100, geo.size.height - dot - 72))
+                    AnimatedMoodMascot(mood: option.mood, size: preview, isActive: true)
+                        .id(index)
+                        .transition(.opacity)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: preview)
+                        .contentShape(Rectangle())
                         .highPriorityGesture(
                             DragGesture(minimumDistance: 15)
                                 .onEnded { value in
@@ -121,24 +110,28 @@ struct MoodPicker: View {
                                     select(index + (dx < 0 ? 1 : -1))
                                 }
                         )
-                        ForEach(Self.options.indices, id: \.self) { i in
-                            let selected = i == index
-                            let angle = Double(i) / Double(count) * 2 * .pi - .pi / 2
-                            Button { select(i) } label: {
-                                AnimatedMoodMascot(mood: Self.options[i].mood, size: dot * 0.8, isActive: false)
-                                    .frame(width: dot, height: dot)
-                                    .background(Circle().fill(selected ? accent.opacity(0.35) : Color.white.opacity(0.12)))
-                                    .overlay(Circle().stroke(selected ? accent : .clear, lineWidth: 2))
-                                    .clipShape(Circle())
-                                    .scaleEffect(selected ? 1.15 : 0.92)
+                        .accessibilityLabel("\(option.label) MoodPal preview")
+                    Text(failed ? "Couldn't save" : option.label)
+                        .font(.system(size: failed ? 11 : 13, weight: .semibold))
+                        .foregroundStyle(failed ? .orange : .primary)
+                        .lineLimit(1)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 4) {
+                            ForEach(others, id: \.self) { i in
+                                Button { select(i) } label: {
+                                    AnimatedMoodMascot(mood: Self.options[i].mood, size: dot * 0.8, isActive: false)
+                                        .frame(width: dot, height: dot)
+                                        .background(Circle().fill(Color.white.opacity(0.12)))
+                                        .clipShape(Circle())
+                                }
+                                .buttonStyle(.plain)
+                                .transition(.scale.combined(with: .opacity))
+                                .accessibilityLabel(Self.options[i].label)
                             }
-                            .buttonStyle(.plain)
-                            .offset(x: cos(angle) * radius, y: sin(angle) * radius)
-                            .accessibilityLabel(Self.options[i].label + (selected ? ", selected" : ""))
                         }
+                        .frame(minWidth: geo.size.width)
                     }
-                    .frame(width: ring, height: ring)
-                    .frame(maxWidth: .infinity)
+                    .frame(height: dot)
                     Button(action: setMood) {
                         Group {
                             if saving { ProgressView().tint(.white) } else { Text("Set Mood") }
