@@ -1,4 +1,4 @@
-// MoodPals Founding Members Giveaway: runtime kill switches, public pages/API, free entry and the admin API.
+// MoodPals Founding Members Giveaway: runtime kill switches, public pages/API, app-account entries and the admin API.
 // Everything is off unless GIVEAWAY_ENABLED is exactly "true". Flags are read from process.env on every request.
 const fs = require('fs');
 const path = require('path');
@@ -8,10 +8,8 @@ const VIEWS = path.join(__dirname, 'views');
 const view = (name) => fs.readFileSync(path.join(VIEWS, name), 'utf8');
 const TEMPLATES = Object.fromEntries(['giveaway-section', 'giveaway-page', 'giveaway-rules', 'giveaway-unavailable', 'admin-giveaway']
   .map((n) => [n, view(`${n}.html`)]));
-const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,24}$/;
 const CAMPAIGN_ID = /^[a-z0-9-]{1,64}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'];
 const STATS_TTL_MS = 60 * 1000;
 const NO_STORE = 'no-store, max-age=0';
 
@@ -71,20 +69,17 @@ function supabaseStore({ url, key }) {
   const q = encodeURIComponent;
   return {
     campaign: (id) => rpc('giveaway_public_stats', { p_campaign: id }, { timeout: 2500 }),
-    enter: (id, e) => rpc('giveaway_enter', {
-      p_campaign: id, p_email: e.email, p_first_name: e.firstName, p_last_name: e.lastName, p_region: e.region,
-      p_country: e.country, p_age_confirmed: e.ageConfirmed, p_rules_accepted: e.rulesAccepted, p_ip_hash: e.ipHash,
-    }),
+    syncEntries: (id) => rpc('giveaway_sync_entries', { p_campaign: id }),
     adminStats: (id) => rpc('giveaway_admin_stats', { p_campaign: id }),
     campaignRow: async (id) => (await rest(`giveaway_campaigns?id=eq.${q(id)}&select=*`))[0] || null,
-    entries: (id) => rest(`giveaway_entries?campaign_id=eq.${q(id)}&select=id,email,first_name,last_name,region,country,entry_method,eligibility_status,eligibility_note,entered_at,entrant_id&order=entered_at.asc&limit=10000`),
+    entries: (id) => rest(`giveaway_entries?campaign_id=eq.${q(id)}&select=id,email,first_name,last_name,entry_method,eligibility_status,eligibility_note,entered_at,entrant_id&order=entered_at.asc&limit=10000`),
     setEntryStatus: (id, status, note) => patch(`giveaway_entries?id=eq.${q(id)}`, { eligibility_status: status, eligibility_note: note }),
     payments: () => rest('subscription_events?select=id,user_id,event_type,product_id,store,environment,period_type,cancel_reason,price_usd,event_at,stale&order=event_at.desc&limit=1000'),
     emails: (status) => rest(`email_events?select=id,user_id,to_email,email_type,delivery_status,attempts,last_error,created_at,sent_at${status ? `&delivery_status=eq.${q(status)}` : ''}&order=created_at.desc&limit=500`),
     retryEmail: (id) => patch(`email_events?id=eq.${q(id)}&delivery_status=in.(failed,suppressed)`, { delivery_status: 'queued', attempts: 0, last_error: null, updated_at: new Date().toISOString() }),
     draw: (id, winners, alternates, by, notes) => rpc('giveaway_draw', { p_campaign: id, p_winners: winners, p_alternates: alternates, p_by: by, p_notes: notes || null }),
     drawings: (id) => rest(`giveaway_drawings?campaign_id=eq.${q(id)}&order=drawn_at.asc`),
-    winners: (id) => rest(`giveaway_winners?campaign_id=eq.${q(id)}&select=id,role,draw_order,status,notes,updated_at,updated_by,drawing_id,entry:giveaway_entries(id,email,first_name,last_name,region)&order=drawing_id.asc,draw_order.asc`),
+    winners: (id) => rest(`giveaway_winners?campaign_id=eq.${q(id)}&select=id,role,draw_order,status,notes,updated_at,updated_by,drawing_id,entry:giveaway_entries(id,email,first_name,last_name)&order=drawing_id.asc,draw_order.asc`),
     setWinner: (id, body) => patch(`giveaway_winners?id=eq.${q(id)}`, body),
     queueEmail: (row) => rest('email_events?on_conflict=idempotency_key', { method: 'POST', body: JSON.stringify(row), headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' } }),
   };
@@ -99,16 +94,10 @@ function demoStore() {
     start_date: new Date(now - 864e5).toISOString(), end_date: new Date(now + 30 * 864e5).toISOString(), drawing_date: new Date(now + 33 * 864e5).toISOString(),
     min_age: 18, eligible_countries: ['US'], excluded_regions: [], sponsor_name: 'MoodPals (demo sponsor)', sponsor_address: '123 Example St, Austin, TX 78701', official_rules_url: null,
   };
-  const entries = [];
+  const entries = ['ana', 'ben', 'cam'].map((n, i) => ({ id: crypto.randomUUID(), campaign_id: campaign.id, email: `${n}@example.com`, first_name: n[0].toUpperCase() + n.slice(1), last_name: null, entry_method: 'app_account', eligibility_status: i === 2 ? 'ineligible' : 'eligible', eligibility_note: i === 2 ? 'Under the minimum age (birth year from onboarding)' : null, entered_at: new Date(now - i * 36e5).toISOString() }));
   return {
     campaign: async (id) => (id === campaign.id ? { ...campaign } : null),
-    enter: async (id, e) => {
-      if (id !== campaign.id || !campaign.entries_open) return 'closed';
-      if (!e.ageConfirmed || !e.rulesAccepted || e.country !== 'US') return 'ineligible';
-      if (entries.some((x) => x.email === e.email)) return 'duplicate';
-      entries.push({ id: crypto.randomUUID(), campaign_id: id, email: e.email, first_name: e.firstName, last_name: e.lastName, region: e.region, country: e.country, entry_method: 'free_online', eligibility_status: 'eligible', entered_at: new Date().toISOString() });
-      return 'entered';
-    },
+    syncEntries: async () => 0,
     adminStats: async () => ({ registered_accounts: 1840, guest_accounts: 312, active_paid_members: 684, monthly_members: 431, annual_members: 253, cancelled_still_paid: 22, new_purchases_30d: 96, trial_starts_30d: 0, renewals_30d: 388, cancellations_30d: 31, refunds_30d: 2, expirations_30d: 17, estimated_mrr_usd: 1279.17, entries_total: entries.length, entries_valid: entries.filter((e) => e.eligibility_status === 'eligible').length, winners: 0, winners_verified: 0, alternates: 0, emails_failed: 0, emails_queued: 0 }),
     campaignRow: async () => ({ ...campaign, approved_at: new Date(now - 2 * 864e5).toISOString(), approved_by: 'demo' }),
     entries: async () => entries,
@@ -140,7 +129,7 @@ async function supabaseUser(token, env = process.env) {
 }
 const PUBLISHABLE_KEY = 'sb_publishable_pPPqosRo1SqwrbW-8MWURA_UxTED6Vs';
 
-function mount(app, { store = defaultStore(), getUser = supabaseUser, env = process.env, limited = () => false } = {}) {
+function mount(app, { store = defaultStore(), getUser = supabaseUser, env = process.env } = {}) {
   let cache = { id: null, at: 0, data: null };
   async function campaign(id) {
     if (cache.id === id && Date.now() - cache.at < STATS_TTL_MS) return cache.data;
@@ -172,10 +161,9 @@ function mount(app, { store = defaultStore(), getUser = supabaseUser, env = proc
       sponsorName: c.sponsor_name || 'MoodPals', sponsorAddress: c.sponsor_address || 'To be announced',
       rulesUrl: c.official_rules_url || '/giveaway/rules',
       entryState: entriesOpen ? 'open' : opens ? 'soon' : 'closed',
-      entryNote: entriesOpen ? `Entries close ${fmtDateTime(c.end_date)}.` : opens ? `Entries open ${fmtDateTime(c.start_date)}.` : 'Entries are closed. Thank you to everyone who entered!',
+      entryNote: entriesOpen ? `Create your free account in the app by ${fmtDateTime(c.end_date)} to be entered.` : opens ? `Entries open ${fmtDateTime(c.start_date)}.` : 'Entries are closed. Thank you to everyone who took part!',
       goal: `<div class="gw-goal"><div class="gw-goal-head"><b>Our Goal: ${esc(c.target_members.toLocaleString('en-US'))} Premium Members</b><span>${pct}%</span></div><div class="gw-bar" role="progressbar" aria-label="Verified paid members" aria-valuemin="0" aria-valuemax="${c.target_members}" aria-valuenow="${Math.min(c.current_paid_members, c.target_members)}"><i style="width:${pct}%"></i></div><p class="gw-count"><b>${esc(c.current_paid_members.toLocaleString('en-US'))}</b> verified paid members so far</p></div>`,
       watches: `<div class="gw-prizes">${[['joy', 'Joy'], ['disgust', 'Calm']].map(([img, mood], i) => `<figure class="gw-prize${i ? ' alt' : ''}"><div class="watch big gw-watch" aria-hidden="true"><div class="band top"></div><div class="case"><div class="face"><img src="/img/mascots/${img}.webp" alt=""><div class="mood">${mood}</div><div class="hint">Prize ${i + 1}</div></div></div><div class="band bottom"></div></div><figcaption><b>Winner ${i + 1}</b>${esc(c.prize_description)}</figcaption></figure>`).join('')}<span class="gw-badge">${esc(c.prize_count)} Winners</span></div>`,
-      stateOptions: US_STATES.map((s) => `<option value="${s}">${s}</option>`).join(''),
     };
   }
 
@@ -218,38 +206,17 @@ function mount(app, { store = defaultStore(), getUser = supabaseUser, env = proc
     });
   });
 
-  app.post('/api/giveaway/entries', async (req, res) => {
-    noStore(res);
-    const s = await state();
-    if (!s.entriesOpen) return res.status(403).json({ error: 'Giveaway entries are not open right now.' });
-    const b = req.body || {};
-    if (b.company) return res.json({ ok: true, status: 'entered' }); // honeypot
-    if (limited(req.ip)) return res.status(429).json({ error: 'Too many attempts. Please try again in a few minutes.' });
-    const entry = {
-      email: String(b.email || '').trim().toLowerCase(),
-      firstName: String(b.firstName || '').trim().slice(0, 80),
-      lastName: String(b.lastName || '').trim().slice(0, 80),
-      region: String(b.region || '').trim().toUpperCase(),
-      country: 'US',
-      ageConfirmed: b.ageConfirmed === true,
-      rulesAccepted: b.rulesAccepted === true,
-      ipHash: crypto.createHash('sha256').update(`giveaway:${req.ip}`).digest('hex').slice(0, 32),
-    };
-    if (!entry.firstName || !entry.lastName) return res.status(400).json({ error: 'Please enter your first and last name.' });
-    if (!EMAIL.test(entry.email)) return res.status(400).json({ error: 'Please enter a valid email address.' });
-    if (!US_STATES.includes(entry.region)) return res.status(400).json({ error: 'Please choose your state.' });
-    if (!entry.ageConfirmed || !entry.rulesAccepted) return res.status(400).json({ error: `Please confirm you are ${s.c.min_age || 18} or older and agree to the Official Rules.` });
-    try {
-      const result = await store.enter(s.f.campaignId, entry);
-      if (result === 'entered') return res.json({ ok: true, status: 'entered', message: "You're entered! Check your inbox for a confirmation email." });
-      if (result === 'duplicate') return res.json({ ok: true, status: 'duplicate', message: "You're already entered. Each person can enter once." });
-      if (result === 'ineligible') return res.status(400).json({ error: 'Sorry, you are not eligible for this giveaway. See the Official Rules.' });
-      return res.status(403).json({ error: 'Giveaway entries are not open right now.' });
-    } catch (err) {
-      console.error('giveaway entry:', err.message);
-      return res.status(500).json({ error: 'We could not save your entry right now. Please try again.' });
-    }
-  });
+  // Entries are registered app accounts, recorded only while GIVEAWAY_ENTRIES_ENABLED=true. There is no web entry form.
+  async function syncEntries() {
+    const f = flags(env);
+    if (!f.entries || !store) return null;
+    return store.syncEntries(f.campaignId);
+  }
+  if (store) {
+    const run = () => syncEntries().catch((err) => console.error('giveaway entries sync:', err.message));
+    setTimeout(run, 10 * 1000).unref();
+    setInterval(run, 5 * 60 * 1000).unref();
+  }
 
   // ---------- Admin ----------
   app.get('/admin/giveaway', (_req, res) => {
@@ -301,12 +268,16 @@ function mount(app, { store = defaultStore(), getUser = supabaseUser, env = proc
   app.get('/api/admin/giveaway/entries', ...admin(async (_req, res, f) => res.json(await store.entries(cid(f)))));
   app.get('/api/admin/giveaway/entries.csv', ...admin(async (_req, res, f) => {
     const rows = await store.entries(cid(f));
-    res.type('text/csv').attachment(`${cid(f)}-entries.csv`).send(toCsv(rows, ['id', 'entered_at', 'first_name', 'last_name', 'email', 'region', 'country', 'entry_method', 'eligibility_status', 'eligibility_note']));
+    res.type('text/csv').attachment(`${cid(f)}-entries.csv`).send(toCsv(rows, ['id', 'entered_at', 'first_name', 'last_name', 'email', 'entry_method', 'eligibility_status', 'eligibility_note', 'entrant_id']));
   }));
   app.post('/api/admin/giveaway/entries/:id/status', ...admin(async (req, res) => {
     const status = req.body?.status;
     if (!UUID.test(req.params.id) || !['eligible', 'ineligible', 'disqualified'].includes(status)) return res.status(400).json({ error: 'Invalid entry or status.' });
     res.json(await store.setEntryStatus(req.params.id, status, String(req.body?.note || '').slice(0, 300) || null));
+  }));
+  app.post('/api/admin/giveaway/sync', ...admin(async (_req, res, f) => {
+    if (!f.entries) return res.status(409).json({ error: 'GIVEAWAY_ENTRIES_ENABLED is not "true" on Hostinger, so new entries are not being recorded.' });
+    res.json({ ok: true, added: (await syncEntries()) ?? 0 });
   }));
   app.get('/api/admin/giveaway/payments', ...admin(async (_req, res) => res.json(await store.payments())));
   app.get('/api/admin/giveaway/payments.csv', ...admin(async (_req, res) => {
@@ -335,7 +306,7 @@ function mount(app, { store = defaultStore(), getUser = supabaseUser, env = proc
     if (notify) {
       if (!f.enabled) return res.status(409).json({ error: 'GIVEAWAY_ENABLED is not "true", so giveaway emails are turned off. Notify the winner directly by email instead.' });
       const winner = (await store.winners(cid(f))).find((w) => w.id === req.params.id);
-      if (!winner || winner.role !== 'winner') return res.status(400).json({ error: 'Only selected winners can be notified. Promote an alternate first.' });
+      if (!winner || winner.role !== 'winner' || !winner.entry) return res.status(400).json({ error: 'Only selected winners can be notified. Promote an alternate first.' });
       const c = await store.campaignRow(cid(f));
       await store.queueEmail({
         to_email: winner.entry.email, email_type: 'giveaway_winner', idempotency_key: `giveaway_winner:${winner.id}`,

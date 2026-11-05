@@ -67,18 +67,18 @@ on conflict (id) do nothing;
 create table if not exists public.giveaway_entries (
   id uuid primary key default gen_random_uuid(),
   campaign_id text not null references public.giveaway_campaigns(id),
-  entrant_id uuid references auth.users(id) on delete set null,
+  entrant_id uuid references auth.users(id) on delete cascade,
   email text not null check (email = lower(email) and length(email) <= 254),
-  first_name text not null check (length(first_name) between 1 and 80),
-  last_name text not null check (length(last_name) between 1 and 80),
-  region text not null check (length(region) between 2 and 40),
-  country text not null default 'US',
-  entry_method text not null default 'free_online' check (entry_method in ('free_online','mail_in')),
+  first_name text check (first_name is null or length(first_name) between 1 and 80),
+  last_name text check (last_name is null or length(last_name) between 1 and 80),
+  region text,
+  country text,
+  entry_method text not null default 'app_account' check (entry_method in ('app_account','mail_in')),
   eligibility_status text not null default 'eligible' check (eligibility_status in ('eligible','ineligible','disqualified')),
   eligibility_note text,
-  ip_hash text,
   entered_at timestamptz not null default now(),
-  unique (campaign_id, email)
+  unique (campaign_id, email),
+  unique (campaign_id, entrant_id)
 );
 create index if not exists giveaway_entries_campaign_idx on public.giveaway_entries (campaign_id, eligibility_status);
 alter table public.giveaway_entries enable row level security;
@@ -101,7 +101,7 @@ create table if not exists public.giveaway_winners (
   id uuid primary key default gen_random_uuid(),
   campaign_id text not null references public.giveaway_campaigns(id),
   drawing_id uuid not null references public.giveaway_drawings(id),
-  entry_id uuid not null references public.giveaway_entries(id),
+  entry_id uuid references public.giveaway_entries(id) on delete set null, -- null if the entrant later deleted their account
   role text not null check (role in ('winner','alternate')),
   draw_order int not null,
   status text not null default 'selected' check (status in ('selected','notified','verified','declined','forfeited','awarded')),
@@ -173,32 +173,26 @@ returns json language sql stable security definer set search_path = public as $$
   from giveaway_campaigns c where c.id = p_campaign;
 $$;
 
--- One free entry per email. Eligibility and dates are enforced here as well as on the website.
-create or replace function public.giveaway_enter(
-  p_campaign text, p_email text, p_first_name text, p_last_name text,
-  p_region text, p_country text, p_age_confirmed boolean, p_rules_accepted boolean, p_ip_hash text)
-returns text language plpgsql security definer set search_path = public as $$
-declare c giveaway_campaigns; v_email text := lower(trim(p_email)); v_id uuid;
+-- Entry = a registered MoodPals app account (not a guest) with a confirmed email, created before the entry period
+-- ends. One entry per account; accounts are free, so no purchase is needed. The website calls this only while
+-- GIVEAWAY_ENTRIES_ENABLED=true on Hostinger. A birth year from onboarding under the minimum age marks the entry ineligible.
+create or replace function public.giveaway_sync_entries(p_campaign text)
+returns int language plpgsql security definer set search_path = public, auth as $$
+declare c giveaway_campaigns; n int;
 begin
   select * into c from giveaway_campaigns where id = p_campaign;
-  if not found or not giveaway_entries_open(c) then return 'closed'; end if;
-  if not coalesce(p_age_confirmed, false) or not coalesce(p_rules_accepted, false)
-     or not (upper(p_country) = any (c.eligible_countries))
-     or upper(p_region) = any (c.excluded_regions) then
-    return 'ineligible';
-  end if;
-  insert into giveaway_entries (campaign_id, entrant_id, email, first_name, last_name, region, country, ip_hash)
-  values (c.id, (select id from auth.users where lower(email) = v_email and not coalesce(is_anonymous, false) limit 1),
-          v_email, trim(p_first_name), trim(p_last_name), upper(trim(p_region)), upper(p_country), p_ip_hash)
-  on conflict (campaign_id, email) do nothing
-  returning id into v_id;
-  if v_id is null then return 'duplicate'; end if;
-  insert into email_events (to_email, email_type, idempotency_key, payload)
-  values (v_email, 'giveaway_entry', 'giveaway_entry:' || v_id,
-          json_build_object('first_name', trim(p_first_name), 'campaign_name', c.name, 'end_date', c.end_date,
-                            'drawing_date', c.drawing_date, 'prize_count', c.prize_count, 'prize', c.prize_description))
-  on conflict (idempotency_key) do nothing;
-  return 'entered';
+  if not found or c.approved_at is null or c.status not in ('active','closed') or now() < c.start_date then return 0; end if;
+  insert into giveaway_entries (campaign_id, entrant_id, email, first_name, entry_method, eligibility_status, eligibility_note, entered_at)
+  select c.id, u.id, lower(u.email), nullif(left(trim(p.display_name), 80), ''), 'app_account',
+         case when p.birth_year is not null and extract(year from c.end_date)::int - p.birth_year < c.min_age then 'ineligible' else 'eligible' end,
+         case when p.birth_year is not null and extract(year from c.end_date)::int - p.birth_year < c.min_age then 'Under the minimum age (birth year from onboarding)' end,
+         greatest(u.email_confirmed_at, c.start_date)
+  from auth.users u left join profiles p on p.id = u.id
+  where not coalesce(u.is_anonymous, false) and u.email is not null and u.email_confirmed_at is not null
+    and u.created_at < c.end_date and u.email_confirmed_at < c.end_date
+  on conflict do nothing;
+  get diagnostics n = row_count;
+  return n;
 end $$;
 
 create or replace function public.giveaway_admin_stats(p_campaign text)
@@ -304,11 +298,11 @@ returns boolean language sql stable security definer set search_path = public, v
 $$;
 
 revoke all on function public.giveaway_paid_member_count(), public.giveaway_public_stats(text),
-  public.giveaway_enter(text,text,text,text,text,text,boolean,boolean,text), public.giveaway_admin_stats(text),
+  public.giveaway_sync_entries(text), public.giveaway_admin_stats(text),
   public.giveaway_draw(text,int,int,text,text), public.queue_membership_milestones(), public.claim_email_events(int),
   public.email_outbox_key_ok(text) from public, anon, authenticated;
 grant execute on function public.giveaway_paid_member_count(), public.giveaway_public_stats(text),
-  public.giveaway_enter(text,text,text,text,text,text,boolean,boolean,text), public.giveaway_admin_stats(text),
+  public.giveaway_sync_entries(text), public.giveaway_admin_stats(text),
   public.giveaway_draw(text,int,int,text,text), public.queue_membership_milestones(), public.claim_email_events(int),
   public.email_outbox_key_ok(text) to service_role;
 

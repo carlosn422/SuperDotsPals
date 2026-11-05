@@ -10,7 +10,7 @@ const LOCAL_FILE = path.join(__dirname, 'data', 'subscribers.json');
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,24}$/;
 const INTERESTS = ['stress', 'sleep', 'journaling', 'scripture', 'watch', 'inner-circle'];
 
-// Small per-IP limiter so the public forms can't be used to flood the lists.
+// Small per-IP limiter so the public form can't be used to flood the list.
 const hits = new Map();
 function limited(ip) {
   const now = Date.now();
@@ -26,7 +26,7 @@ app.disable('x-powered-by');
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '10kb' }));
 // Giveaway routes (including the homepage, which gets the giveaway section only while it is switched on) come first.
-giveaway.mount(app, { limited, ...options });
+giveaway.mount(app, options);
 app.use(express.static(path.join(__dirname, 'public'), {
   index: false,
   extensions: ['html'],

@@ -33,14 +33,17 @@ $('.ga-login').addEventListener('submit', async (e) => {
 let entries = [];
 function renderEntries() {
   const q = $('.ga-filter').value.trim().toLowerCase();
-  const rows = entries.filter((r) => !q || `${r.first_name} ${r.last_name} ${r.email} ${r.region} ${r.eligibility_status}`.toLowerCase().includes(q));
+  const rows = entries.filter((r) => !q || `${r.first_name || ''} ${r.last_name || ''} ${r.email} ${r.eligibility_status}`.toLowerCase().includes(q));
   $('.ga-entries').innerHTML = `<p class="fine">${rows.length} of ${entries.length} entries</p>` + table(rows, [
-    ['entered_at', 'Entered', (r) => when(r.entered_at)], ['first_name', 'Name', (r) => esc(`${r.first_name} ${r.last_name}`)], ['email', 'Email'], ['region', 'State'],
+    ['entered_at', 'Entered', (r) => when(r.entered_at)], ['first_name', 'Name', (r) => esc(`${r.first_name || ''} ${r.last_name || ''}`.trim() || '—')], ['email', 'Email'],
     ['entry_method', 'Method'], ['eligibility_status', 'Status', (r) => `<select data-entry="${r.id}">${['eligible', 'ineligible', 'disqualified'].map((s) => `<option${s === r.eligibility_status ? ' selected' : ''}>${s}</option>`).join('')}</select>`],
     ['eligibility_note', 'Note'],
   ]);
 }
 $('.ga-filter').addEventListener('input', renderEntries);
+$('.ga-sync').addEventListener('click', async () => {
+  try { const r = await api('/sync', { method: 'POST' }); alert(`${r.added} new entries added.`); await load(); } catch (err) { alert(err.message); }
+});
 $('.ga-entries').addEventListener('change', async (e) => {
   const id = e.target.dataset.entry; if (!id) return;
   const note = e.target.value === 'eligible' ? '' : prompt('Reason (kept for the audit record):') || '';
@@ -106,7 +109,7 @@ async function load() {
     ['Eligibility', `${c.min_age}+, ${(c.eligible_countries || []).join(', ')}${(c.excluded_regions || []).length ? `, excluding ${c.excluded_regions.join(', ')}` : ''}`], ['Rules URL', c.official_rules_url || '/giveaway/rules'],
   ].map(([k, v]) => ({ k, v })), [['k', 'Setting'], ['v', 'Value']]) + '<p class="fine">Campaign settings are edited in Supabase (table giveaway_campaigns). They can never turn on a giveaway that Hostinger has turned off.</p>';
   $('.ga-winners').innerHTML = (s.drawings || []).map((d) => `<p class="fine">Drawing ${when(d.drawn_at)} by ${esc(d.drawn_by)} · pool ${d.pool_size} · seed <code>${esc(d.seed)}</code> · pool hash <code>${esc(d.pool_sha256.slice(0, 16))}…</code></p>`).join('') + table(s.winners || [], [
-    ['draw_order', '#'], ['role', 'Role'], ['entry', 'Entrant', (w) => esc(`${w.entry.first_name} ${w.entry.last_name} · ${w.entry.email} · ${w.entry.region}`)], ['status', 'Status'], ['updated_by', 'Updated', (w) => `${esc(w.updated_by)}<br>${when(w.updated_at)}`],
+    ['draw_order', '#'], ['role', 'Role'], ['entry', 'Entrant', (w) => (w.entry ? esc([`${w.entry.first_name || ''} ${w.entry.last_name || ''}`.trim(), w.entry.email].filter(Boolean).join(' · ')) : '<i>Account deleted</i>')], ['status', 'Status'], ['updated_by', 'Updated', (w) => `${esc(w.updated_by)}<br>${when(w.updated_at)}`],
     ['id', 'Actions', (w) => (w.role === 'winner'
       ? [['notify', 'Send winner email'], ['verified', 'Mark verified'], ['awarded', 'Mark prize sent'], ['forfeited', 'Mark forfeited'], ['declined', 'Mark declined']]
       : [['promote', 'Promote to winner']]).map(([a, l]) => `<button class="btn btn-sm" data-w="${w.id}" data-action="${a}">${l}</button>`).join(' ')],

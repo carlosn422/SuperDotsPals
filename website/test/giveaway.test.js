@@ -4,7 +4,7 @@ const { createApp } = require('../server');
 const { flags, demoStore, toCsv } = require('../giveaway');
 
 const ON = { GIVEAWAY_ENABLED: 'true', GIVEAWAY_ENTRIES_ENABLED: 'true', GIVEAWAY_CAMPAIGN_ID: 'founding-members-2026', GIVEAWAY_ADMIN_EMAILS: 'admin@moodpals.com' };
-const ENTRY = { firstName: 'Ana', lastName: 'Lee', email: 'ana@example.com', region: 'TX', ageConfirmed: true, rulesAccepted: true };
+const ENTRY = { firstName: 'Ana', lastName: 'Lee', email: 'ana@example.com' };
 const USERS = {
   admin: { email: 'admin@moodpals.com', email_confirmed_at: '2026-01-01' },
   member: { email: 'member@example.com', email_confirmed_at: '2026-01-01' },
@@ -51,8 +51,7 @@ test('disabled by default: no promotion anywhere and entries rejected', async ()
     }
     const api = await s.req('/api/giveaway');
     assert.deepEqual(api.json, { campaign_enabled: false });
-    const post = await s.req('/api/giveaway/entries', { method: 'POST', body: ENTRY });
-    assert.equal(post.status, 403);
+    assert.equal((await s.req('/api/giveaway/entries', { method: 'POST', body: ENTRY })).status, 404);
     for (const p of ['/index.html', '/index', '/views/giveaway-page.html', '/giveaway-page.html']) {
       const r = await s.req(p);
       assert.doesNotMatch(r.text, /Apple Watches\. Two Winners|gw-card/, p);
@@ -60,8 +59,10 @@ test('disabled by default: no promotion anywhere and entries rejected', async ()
   } finally { await s.close(); }
 });
 
-test('promotion on, entries off: pages show, the API blocks entries', async () => {
-  const s = await start({ env: { ...ON, GIVEAWAY_ENTRIES_ENABLED: 'false' } });
+test('promotion on, entries off: pages show, entries are not recorded', async () => {
+  let synced = 0;
+  const store = { ...demoStore(), syncEntries: async () => { synced++; return 1; } };
+  const s = await start({ env: { ...ON, GIVEAWAY_ENTRIES_ENABLED: 'false' }, store });
   try {
     const home = await s.req('/');
     assert.match(home.text, /Two Apple Watches\. Two Winners\. One Growing Community\./);
@@ -71,32 +72,37 @@ test('promotion on, entries off: pages show, the API blocks entries', async () =
     const page = await s.req('/giveaway');
     assert.equal(page.status, 200);
     assert.match(page.text, /We're Giving Away 2 Apple Watch SE 3 Devices!/);
-    assert.match(page.text, /data-state="closed"|data-state="soon"/);
+    assert.match(page.text, /Entries open|Entries are closed/);
     assert.match(page.text, /Apple is not a participant in or sponsor/);
     const api = await s.req('/api/giveaway');
-    assert.equal(api.json.campaign_enabled, true);
     assert.equal(api.json.entries_open, false);
     assert.deepEqual(Object.keys(api.json).sort(), ['campaign_enabled', 'current_paid_members', 'drawing_date', 'end_date', 'entries_open', 'prize_count', 'start_date', 'status', 'target_members']);
-    assert.equal((await s.req('/api/giveaway/entries', { method: 'POST', body: ENTRY })).status, 403);
+    const sync = await s.req('/api/admin/giveaway/sync', { method: 'POST', token: 'admin' });
+    assert.equal(sync.status, 409);
+    assert.equal(synced, 0);
   } finally { await s.close(); }
 });
 
-test('entries on: one free entry per email, validation, then switching off takes effect on the next request', async () => {
-  const s = await start({ env: { ...ON } });
+test('entries on: the website only explains how to enter in the app; there is no web entry form or API', async () => {
+  let synced = 0;
+  const store = { ...demoStore(), syncEntries: async () => { synced++; return 3; } };
+  const s = await start({ env: { ...ON }, store });
   try {
-    assert.match((await s.req('/giveaway')).text, /data-state="open"/);
-    const ok = await s.req('/api/giveaway/entries', { method: 'POST', body: ENTRY });
-    assert.equal(ok.json.status, 'entered');
-    const dup = await s.req('/api/giveaway/entries', { method: 'POST', body: { ...ENTRY, email: 'ANA@example.com' } });
-    assert.equal(dup.json.status, 'duplicate');
-    for (const bad of [{ ageConfirmed: false }, { rulesAccepted: false }, { region: 'ZZ' }, { email: 'nope' }, { firstName: '' }, { ageConfirmed: 'true' }]) {
-      assert.equal((await s.req('/api/giveaway/entries', { method: 'POST', body: { ...ENTRY, email: 'x@example.com', ...bad } })).status, 400, JSON.stringify(bad));
-    }
+    const page = await s.req('/giveaway');
+    assert.match(page.text, /How to enter/);
+    assert.match(page.text, /apps\.apple\.com\/us\/app\/moodpals-tracker\/id6823441439/);
+    assert.match(page.text, /Create your free account in the app by/);
+    assert.doesNotMatch(page.text, /<form|<input|type="email"/);
+    for (const method of ['POST', 'PUT']) assert.equal((await s.req('/api/giveaway/entries', { method, body: ENTRY })).status, 404);
+    const sync = await s.req('/api/admin/giveaway/sync', { method: 'POST', token: 'admin' });
+    assert.deepEqual([sync.status, sync.json.added, synced], [200, 3, 1]);
+    assert.equal((await s.req('/api/admin/giveaway/sync', { method: 'POST', token: 'member' })).status, 403);
     s.env.GIVEAWAY_ENABLED = 'false';
     assert.equal((await s.req('/giveaway')).status, 404);
     assert.doesNotMatch((await s.req('/')).text, /gw-card/);
-    assert.equal((await s.req('/api/giveaway/entries', { method: 'POST', body: { ...ENTRY, email: 'later@example.com' } })).status, 403);
     assert.deepEqual((await s.req('/api/giveaway')).json, { campaign_enabled: false });
+    assert.equal((await s.req('/api/admin/giveaway/sync', { method: 'POST', token: 'admin' })).status, 409);
+    assert.equal(synced, 1);
   } finally { await s.close(); }
 });
 
@@ -112,7 +118,6 @@ test('flag on but rules not approved, cancelled, or database down: stays hidden'
     try {
       assert.equal((await s.req('/giveaway')).status, 404);
       assert.deepEqual((await s.req('/api/giveaway')).json, { campaign_enabled: false });
-      assert.equal((await s.req('/api/giveaway/entries', { method: 'POST', body: ENTRY })).status, 403);
     } finally { await s.close(); }
   }
   const s = await start({ env: { ...ON }, store: null });

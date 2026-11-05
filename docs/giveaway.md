@@ -1,6 +1,6 @@
 # MoodPals Founding Members Giveaway
 
-Two Apple Watch SE 3 prizes, two winners, a free entry for everyone. The 1,000 paid-member goal is a community
+Two Apple Watch SE 3 prizes, two winners. **Entering = having a registered MoodPals app account** (free; not guest mode; email confirmed). The website only explains the giveaway and rules; it has no entry form, and the app is unchanged. The 1,000 paid-member goal is a community
 milestone shown as progress. It is **not** an entry requirement and does not change anyone's odds.
 
 ## How it fits together
@@ -10,7 +10,7 @@ milestone shown as progress. It is **not** an entry requirement and does not cha
 | Kill switches | Hostinger env vars, read by `website/giveaway.js` on every request | Nothing giveaway-related renders, answers or sends unless `GIVEAWAY_ENABLED` is exactly `true` |
 | Homepage section, `/giveaway`, `/giveaway/rules` | `website/views/*.html`, injected by the server | Server-rendered with `Cache-Control: no-store`, so turning it off can't leave a cached copy |
 | Public API | `GET /api/giveaway` | Aggregate numbers only (target, verified paid count, prize count, dates). Disabled → `{"campaign_enabled":false}` |
-| Free entry | `POST /api/giveaway/entries` → `giveaway_enter()` | Flags checked on the server, then dates, approval, status and eligibility checked again in SQL. One entry per email |
+| Entries | `giveaway_sync_entries()` called by the website every 5 min (and from admin) **only while `GIVEAWAY_ENTRIES_ENABLED=true`** | Adds one entry per registered, email-confirmed, non-guest account created before `end_date` (existing accounts included). Under-age birth years from onboarding are marked ineligible. Deleting an account deletes its entry |
 | Paid-member count | RevenueCat → `revenuecat-webhook` → `plus_entitlements` | Reuses the existing path. Counts production App Store/Play/Stripe purchases with a paid period still running. Trials, promo grants, sandbox, refunds and expired subscriptions don't count. Turning off auto-renew keeps a member counted until their period ends |
 | Event history | `subscription_events` | Every RevenueCat event once (keyed by event id). Late, out-of-order events are logged with `stale = true` and don't overwrite newer state |
 | Emails | `email_events` outbox → `email-outbox` Edge Function → Resend | Duplicate-proof (`idempotency_key`), retried 3 times automatically, then `failed` (retry from admin). Giveaway emails send only while `https://moodpals.com/api/giveaway` reports the campaign enabled |
@@ -19,7 +19,7 @@ milestone shown as progress. It is **not** an entry requirement and does not cha
 
 The promotion shows only when **all** of these are true: `GIVEAWAY_ENABLED=true`, a valid `GIVEAWAY_CAMPAIGN_ID`,
 the campaign row has `approved_at` set (official rules approved) and its status isn't `draft` or `cancelled`.
-Entries additionally need `GIVEAWAY_ENTRIES_ENABLED=true`, status `active` and the current time inside the start and end dates.
+Entries are recorded only while `GIVEAWAY_ENTRIES_ENABLED=true`, the campaign is approved and active/closed, and the start date has passed; only accounts created before the end date count.
 Nothing in the database or admin dashboard can turn on what Hostinger has turned off.
 
 ## Hostinger: turning it on and off
@@ -43,9 +43,9 @@ SUPABASE_SERVICE_ROLE_KEY=...                # already used by the waitlist; wit
 
 | Goal | Values | Result |
 |---|---|---|
-| Promotion only | `GIVEAWAY_ENABLED=true`, `GIVEAWAY_ENTRIES_ENABLED=false` | Homepage section, `/giveaway`, rules and progress show. Entry form says entries aren't open; the API rejects entries |
-| Promotion and entries | `GIVEAWAY_ENABLED=true`, `GIVEAWAY_ENTRIES_ENABLED=true` | Entries accepted while the campaign is active and inside its dates |
-| Emergency stop | `GIVEAWAY_ENABLED=false`, `GIVEAWAY_ENTRIES_ENABLED=false` | Everything hidden, `/giveaway` returns a neutral 404, entries blocked, giveaway emails held as `suppressed` |
+| Promotion only | `GIVEAWAY_ENABLED=true`, `GIVEAWAY_ENTRIES_ENABLED=false` | Homepage section, `/giveaway`, rules and progress show. No new entries are recorded |
+| Promotion and entries | `GIVEAWAY_ENABLED=true`, `GIVEAWAY_ENTRIES_ENABLED=true` | Registered app accounts are added as entries every 5 minutes |
+| Emergency stop | `GIVEAWAY_ENABLED=false`, `GIVEAWAY_ENTRIES_ENABLED=false` | Everything hidden, `/giveaway` returns a neutral 404, no new entries, giveaway emails held as `suppressed` |
 
 The emergency stop keeps existing entries, subscriptions, Plus access and membership emails. It is a technical stop,
 not a legal cancellation: the published Official Rules still apply, so talk to your lawyer before stopping a live giveaway.
@@ -80,14 +80,22 @@ The draft rules in `website/views/giveaway-rules.html` fill in these values. Hav
 
 ## After the entry period
 
-1. Review entries in `/admin/giveaway`, marking any ineligible ones with a reason.
+1. In `/admin/giveaway`, click **Add new accounts now** (while entries are still on), then review entries and mark ineligible ones (staff, duplicates, test accounts) with a reason.
 2. Run the drawing (2 winners + alternates). The seed and pool hash are recorded.
 3. **Send winner email** for each winner (needs `GIVEAWAY_ENABLED=true`; otherwise email them yourself), then mark them verified and prize sent.
 4. If a winner doesn't reply in time or isn't eligible, mark them forfeited and promote the next alternate.
 5. Announce winners publicly only after they are verified and notified.
 
+## Sign-up email text (Supabase → Authentication → Email Templates → Confirm signup)
+
+Add under the confirm button:
+
+> **You're entered in the MoodPals Founding Members Giveaway!** Once you confirm your email, your account gets one entry for a chance to win one of two Apple Watch SE 3 devices. No purchase necessary; MoodPals Plus does not improve your odds. Rules: https://moodpals.com/giveaway/rules. Apple is not a sponsor of this giveaway.
+
+Remove it when the entry period ends.
+
 ## Tests
 
-- `cd website && npm test`: flag parsing, disabled-by-default, direct `/giveaway` and API bypass attempts, caching headers, entry validation and duplicates, unapproved/cancelled/database-down states, admin sign-in and allow-list, CSV escaping.
-- SQL (run in a rolled-back transaction against the project): paid counting (trial, sandbox, refund, cancelled-but-paid), entry rules, duplicate emails, drawing before/after the end date, the prize-count limit, distinct winners, milestone email de-duplication, and that `anon`/`authenticated` cannot read the tables or call the functions.
+- `cd website && npm test`: flag parsing, disabled-by-default, direct `/giveaway` and API bypass attempts, caching headers, no web entry form/API, entry recording only while `GIVEAWAY_ENTRIES_ENABLED=true`, unapproved/cancelled/database-down states, admin sign-in and allow-list, CSV escaping.
+- SQL (run in a rolled-back transaction against the project): paid counting (trial, sandbox, refund, cancelled-but-paid), account entries (guests, unconfirmed, post-deadline and under-age accounts excluded; re-sync adds nothing; account deletion removes the entry), drawing before/after the end date, the prize-count limit, distinct winners, milestone email de-duplication, and that `anon`/`authenticated` cannot read the tables or call the functions.
 - Local preview with demo data: `GIVEAWAY_LOCAL_DEMO=true GIVEAWAY_ENABLED=true GIVEAWAY_ENTRIES_ENABLED=true GIVEAWAY_CAMPAIGN_ID=founding-members-2026 npm start` (only works without a Supabase key).
