@@ -95,7 +95,7 @@ struct MoodPicker: View {
                 } else {
                     let others = Self.options.indices.filter { $0 != index }
                     let dot = max(24, min(30, (geo.size.width - 4 * CGFloat(others.count - 1)) / CGFloat(others.count)))
-                    let preview = max(44, min(100, geo.size.height - dot - 72))
+                    let preview = max(44, min(96, geo.size.height - dot - 86))
                     AnimatedMoodMascot(mood: option.mood, size: preview, isActive: true)
                         .id(index)
                         .transition(.opacity)
@@ -132,6 +132,7 @@ struct MoodPicker: View {
                         .frame(minWidth: geo.size.width)
                     }
                     .frame(height: dot)
+                    Spacer(minLength: 14)
                     Button(action: setMood) {
                         Group {
                             if saving { ProgressView().tint(.white) } else { Text("Set Mood") }
