@@ -69,6 +69,15 @@ export default function FamilyWatches({reloadKey,onAdd}:{reloadKey:number;onAdd?
 export function ManageFamilyProfile({profile,onClose,onDeleted}:{profile:FamilyProfile;onClose:()=>void;onDeleted:()=>void|Promise<void>}){
  const [confirming,setConfirming]=useState(false),[typed,setTyped]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [color,setColor]=useState(isWatchColor(profile.watchColor)?profile.watchColor:null),[recoloring,setRecoloring]=useState(false);
+ const [name,setName]=useState(profile.name),[renaming,setRenaming]=useState(false),[draft,setDraft]=useState(''),[savingName,setSavingName]=useState(false),[nameError,setNameError]=useState('');
+ async function saveName(){
+  const next=draft.replace(/\s+/g,' ').trim();
+  if(!next||savingName)return;
+  setSavingName(true);setNameError('');
+  try{const d=await familyCall('rename',{profileId:profile.id,name:next});setName(d?.name||next);setRenaming(false);familyProfilesChanged()}
+  catch(e:any){setNameError(e.message)}
+  finally{setSavingName(false)}
+ }
  async function saveColor(c:NonNullable<typeof color>){await familyCall('set_color',{profileId:profile.id,color:c});setColor(c);familyProfilesChanged()}
  async function remove(){
   if(typed!=='DELETE'||busy)return;
@@ -83,19 +92,29 @@ export function ManageFamilyProfile({profile,onClose,onDeleted}:{profile:FamilyP
  return <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={busy?undefined:onClose}>
   <ScrollView contentContainerStyle={{padding:22,gap:14}}>
    <TouchableOpacity disabled={busy} onPress={onClose}><Text style={{color:purple,fontWeight:'800'}}>‹ Back</Text></TouchableOpacity>
-   <View style={{alignItems:'center',gap:6}}><WatchImage color={color} name={shortProfileName(profile.name)} width={130}/><Text style={styles.title}>{profile.name}</Text></View>
+   <View style={{alignItems:'center',gap:6}}><WatchImage color={color} name={shortProfileName(name)} width={130}/><Text style={styles.title}>{name}</Text></View>
    <View style={styles.card}>
-    <Text style={styles.sub}>Profile: {shortProfileName(profile.name)} (mood-only family watch)</Text>
+    <Text style={styles.sub}>Profile: {shortProfileName(name)} (mood-only family watch)</Text>
     <Text style={styles.sub}>Watch color: {color?colorName(color):'not chosen yet'}</Text>
     <Text style={styles.sub}>Mood-only family profile. No heart rate, HRV, sleep, activity or other Health data is collected.</Text>
     <Text style={styles.sub}>Latest mood: {profile.mood?profile.mood+' · '+new Date(profile.moodAt||'').toLocaleString():'none yet'}</Text>
     <Text style={styles.sub}>Watch: {profile.connected?'linked':'not linked'}{profile.lastSeenAt?' · last seen '+new Date(profile.lastSeenAt).toLocaleString():''}</Text>
    </View>
+   {!renaming?<TouchableOpacity accessibilityRole="button" style={styles.button} disabled={busy} onPress={()=>{setDraft(shortProfileName(name));setNameError('');setRenaming(true)}}><Text style={styles.buttonText}>Rename Watch</Text></TouchableOpacity>:
+   <View style={styles.card}>
+    <Text style={[styles.sub,{fontWeight:'700'}]}>Name shown in your profile switcher and to your Circle</Text>
+    <TextInput value={draft} onChangeText={setDraft} maxLength={40} autoFocus autoCapitalize="words" returnKeyType="done" onSubmitEditing={()=>void saveName()} editable={!savingName} placeholder="Tristan" style={styles.input} accessibilityLabel="Watch name"/>
+    {nameError?<Text style={[styles.sub,{color:red}]}>{nameError}</Text>:null}
+    <TouchableOpacity accessibilityRole="button" disabled={!draft.trim()||savingName} style={[styles.button,{opacity:draft.trim()&&!savingName?1:0.45}]} onPress={()=>void saveName()}>
+     {savingName?<ActivityIndicator color="white"/>:<Text style={styles.buttonText}>Save Name</Text>}
+    </TouchableOpacity>
+    <TouchableOpacity disabled={savingName} onPress={()=>{setRenaming(false);setNameError('')}}><Text style={{color:purple,fontWeight:'800',textAlign:'center'}}>Cancel</Text></TouchableOpacity>
+   </View>}
    {profile.connected?<TouchableOpacity accessibilityRole="button" style={styles.button} onPress={()=>setRecoloring(true)}><Text style={styles.buttonText}>{color?'Change Watch Color':'Choose Watch Color'}</Text></TouchableOpacity>:null}
-   <WatchColorSheet visible={recoloring} name={shortProfileName(profile.name)} initial={color} onSave={saveColor} onClose={()=>setRecoloring(false)}/>
+   <WatchColorSheet visible={recoloring} name={shortProfileName(name)} initial={color} onSave={saveColor} onClose={()=>setRecoloring(false)}/>
    {!confirming?<TouchableOpacity style={[styles.button,{backgroundColor:red}]} onPress={()=>setConfirming(true)}><Text style={styles.buttonText}>Remove Linked Profile</Text></TouchableOpacity>:
    <View style={[styles.card,{borderColor:'#F1C7D0'}]}>
-    <Text style={{fontWeight:'900',color:red}}>Permanently remove {profile.name}?</Text>
+    <Text style={{fontWeight:'900',color:red}}>Permanently remove {name}?</Text>
     <Text style={styles.sub}>The watch is signed out first. Then this MoodPals data is permanently deleted:</Text>
     {DELETED_ITEMS.map(i=><Text key={i} style={styles.sub}>• {i}</Text>)}
     <Text style={styles.sub}>Your account, your own data, your other family watches and your Circle friends' accounts are not affected. Copies in MoodPals database backups can't be removed immediately and are erased when those backups expire. Purchases and subscriptions stay with your account.</Text>

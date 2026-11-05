@@ -6,7 +6,7 @@ const noSession={auth:{persistSession:false,autoRefreshToken:false}};
 const admin=createClient(url,service,noSession);
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Family Watches owned by the signed-in primary account: list and permanent removal.
+// Family Watches owned by the signed-in primary account: list, rename, recolor and permanent removal.
 Deno.serve(async req=>{
  if(req.method!=="POST"||!url||!anon||!service)return json({error:"Not available"},503);
  try{
@@ -38,6 +38,19 @@ Deno.serve(async req=>{
    const {data,error}=await admin.from("connected_devices").update({watch_color:color}).eq("user_id",id).is("revoked_at",null).select("id");
    if(error)return json({error:"Unable to save color"},500);
    return data?.length?json({watchColor:color}):json({error:"This family watch isn't linked right now"},404);
+  }
+  if(action==="rename"){
+   const id=String(p.profileId||""),name=String(p.name||"").replace(/\s+/g," ").trim();
+   if(name.length<1||name.length>40)return json({error:"Use 1 to 40 characters"},400);
+   const {data:row}=uuid.test(id)?await admin.from("family_profiles").select("owner_id").eq("profile_user_id",id).maybeSingle():{data:null};
+   if(!row||row.owner_id!==user.id)return json({error:"Profile not found"},404);
+   // Circle friends see the same name as the owner's profile switcher.
+   const [a,b]=await Promise.all([
+    admin.from("family_profiles").update({device_name:name}).eq("profile_user_id",id),
+    admin.from("circle_profiles").update({display_name:name}).eq("user_id",id),
+   ]);
+   if(a.error||b.error)return json({error:"Unable to save name"},500);
+   return json({name});
   }
   if(action==="remove"){
    const id=String(p.profileId||"");
