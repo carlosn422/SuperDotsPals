@@ -1,7 +1,7 @@
 import SwiftUI
 import WatchKit
 
-/// Mood picker: a large preview of the highlighted MoodPal over five small circular MoodPals.
+/// Mood picker: a large preview of the highlighted MoodPal over six small circular MoodPals.
 /// Tap, swipe or turn the Digital Crown to browse; only Set Mood saves (browsing never changes the mood).
 struct MoodPicker: View {
     struct Option: Equatable {
@@ -13,12 +13,13 @@ struct MoodPicker: View {
     static let options: [Option] = [
         Option(label: "Calm", mood: "Calm"),
         Option(label: "Joy", mood: "Joyful"),
+        Option(label: "Anxious", mood: "Anxious"),
         Option(label: "Sad", mood: "Sad"),
         Option(label: "Angry", mood: "Angry"),
         Option(label: "Tired", mood: "Tired"),
     ]
 
-    /// The highlighted option for a saved mood; older moods without a picker option (e.g. Anxious) start on Calm.
+    /// The highlighted option for a saved mood; moods without a picker option start on Calm.
     static func index(for mood: String) -> Int {
         let emotion = MoodArt.emotion(mood)
         return options.firstIndex { MoodArt.emotion($0.mood) == emotion } ?? 0
@@ -78,6 +79,7 @@ struct MoodPicker: View {
     var body: some View {
         GeometryReader { geo in
             let preview = max(44, min(100, geo.size.height - 98))
+            let dot = min(28, (geo.size.width - 12) / CGFloat(Self.options.count) - 2)
             VStack(spacing: 4) {
                 if saved {
                     Spacer(minLength: 0)
@@ -115,8 +117,8 @@ struct MoodPicker: View {
                         ForEach(Self.options.indices, id: \.self) { i in
                             let selected = i == index
                             Button { select(i) } label: {
-                                AnimatedMoodMascot(mood: Self.options[i].mood, size: 22, isActive: false)
-                                    .frame(width: 28, height: 28)
+                                AnimatedMoodMascot(mood: Self.options[i].mood, size: dot * 0.8, isActive: false)
+                                    .frame(width: dot, height: dot)
                                     .background(Circle().fill(selected ? accent.opacity(0.35) : Color.white.opacity(0.12)))
                                     .overlay(Circle().stroke(selected ? accent : .clear, lineWidth: 2))
                                     .clipShape(Circle())
