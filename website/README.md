@@ -16,5 +16,10 @@ Subscribers are stored in Supabase table `waitlist_subscribers` when `SUPABASE_S
 | `PORT` | `3000` |
 | `SUPABASE_URL` | MoodPals project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | unset → local JSON file |
+| `GIVEAWAY_ENABLED` / `GIVEAWAY_ENTRIES_ENABLED` | unset → giveaway off (only `true` turns it on) |
+| `GIVEAWAY_CAMPAIGN_ID` | unset → giveaway off |
+| `GIVEAWAY_ADMIN_EMAILS` | unset → nobody can open `/admin/giveaway` |
+
+Giveaway setup, Hostinger on/off steps and the launch checklist: [`docs/giveaway.md`](../docs/giveaway.md). Tests: `npm test`.
 
 iPhone screenshots live in `public/img/screens/` (`today.png`, `actions.png`, `diary.png`, `ask.png`). Until they exist the phones show HTML previews of those screens.

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{name}} · MoodPals</title>
+<meta name="description" content="Enter free for a chance to win one of {{prizeCount}} {{prize}} devices. No purchase necessary.">
+<link rel="icon" href="/img/mascots/disgust.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css?v=29">
+</head>
+<body>
+<header class="nav">
+  <a class="brand" href="/"><img src="/img/mascots/disgust.png" alt="" width="36" height="36"><span class="logo-sm"><b class="o">Mood</b><b class="t">Pals</b></span></a>
+  <nav><a href="/#features">Features</a><a href="/#pricing">Pricing</a><a href="#enter">Enter</a><a href="#faq">FAQ</a><a class="btn btn-sm" href="#enter">Enter Giveaway</a></nav>
+</header>
+<main>
+  <section class="giveaway gw-top">
+    <div class="gw-card">
+      <div class="gw-copy">
+        <span class="gw-eyebrow">{{name}}</span>
+        <h1 class="gw-h1">We're Giving Away {{prizeCount}} {{prize}} Devices!</h1>
+        <p class="gw-lead">Help us grow the MoodPals community! We're celebrating our launch with a chance to win one of {{prizeCount}} {{prize}} devices. {{prizeCount}} winners, one watch each. No purchase necessary.</p>
+        {{{goal}}}
+        <p class="fine">The 1,000-member goal is a community milestone, not an entry requirement. The drawing happens on the dates below whether or not we reach it.</p>
+      </div>
+      {{{watches}}}
+    </div>
+  </section>
+
+  <section class="gw-dates" aria-label="Key dates">
+    <div><span>Entries open</span><b>{{startDateTime}}</b></div>
+    <div><span>Entries close</span><b>{{endDateTime}}</b></div>
+    <div><span>Winners drawn</span><b>On or about {{drawingDate}}</b></div>
+  </section>
+
+  <section class="gw-enter" id="enter" data-state="{{entryState}}">
+    <h2>Enter for free</h2>
+    <p class="sub">One entry per person. Every entry has the same chance to win, whether or not you have MoodPals Plus.</p>
+    <form class="signup gw-form" id="gw-form" novalidate>
+      <div class="gw-fields">
+        <input name="firstName" type="text" placeholder="First name" autocomplete="given-name" maxlength="80" required aria-label="First name">
+        <input name="lastName" type="text" placeholder="Last name" autocomplete="family-name" maxlength="80" required aria-label="Last name">
+        <input name="email" type="email" placeholder="you@email.com" autocomplete="email" required aria-label="Email address">
+        <select name="region" required aria-label="State"><option value="">State</option>{{{stateOptions}}}</select>
+        <input name="company" type="text" tabindex="-1" autocomplete="off" class="hp" aria-hidden="true">
+      </div>
+      <label class="gw-check"><input type="checkbox" name="ageConfirmed"> I am {{minAge}} or older and a legal resident of the United States.</label>
+      <label class="gw-check"><input type="checkbox" name="rulesAccepted"> I have read and agree to the <a href="{{rulesUrl}}" target="_blank" rel="noopener">Official Rules</a>.</label>
+      <button class="btn" type="submit">Enter Giveaway</button>
+      <p class="form-msg" role="status" aria-live="polite"></p>
+    </form>
+    <p class="gw-closed">{{entryNote}}</p>
+    <p class="fine center">We use your details only to run this giveaway and contact winners. See our <a href="/privacy">Privacy Policy</a>.</p>
+  </section>
+
+  <section class="gw-info">
+    <div class="gw-tile"><img class="mini-pal" src="/img/mascots/joy.webp" alt="" width="56" height="56"><h3>Who can enter</h3><p>{{eligibility}}</p></div>
+    <div class="gw-tile"><img class="mini-pal" src="/img/mascots/disgust.webp" alt="" width="56" height="56"><h3>The prizes</h3><p>{{prizeCount}} winners each get one {{prize}} (approximate retail value {{prizeValue}} each).</p></div>
+    <div class="gw-tile"><img class="mini-pal" src="/img/mascots/tired.webp" alt="" width="56" height="56"><h3>How winners are chosen</h3><p>{{prizeCount}} winners are drawn at random from all eligible entries on or about {{drawingDate}}, then contacted by email and verified.</p></div>
+  </section>
+
+  <section class="faq" id="faq">
+    <h2>Giveaway FAQ</h2>
+    <details><summary>Do I need to buy anything to enter?</summary><p>No. Entering is free, and buying MoodPals Plus does not improve your chances of winning.</p></details>
+    <details><summary>Do Plus members get extra entries?</summary><p>No. Everyone gets one entry, and every eligible entry has the same chance to win.</p></details>
+    <details><summary>What is the 1,000-member goal?</summary><p>It's a community milestone we're celebrating together. It is not an entry requirement, and the drawing happens on the published dates whether or not we reach it. The count includes only verified paid Plus memberships.</p></details>
+    <details><summary>How many times can I enter?</summary><p>Once per person and once per email address. Duplicate or automated entries are not counted.</p></details>
+    <details><summary>How will I know if I won?</summary><p>We'll email the potential winners after the drawing. Winners must confirm eligibility within the time in the Official Rules, or an alternate may be chosen. We'll never ask you to pay to claim a prize.</p></details>
+    <details><summary>Is Apple involved?</summary><p>No. Apple is not a sponsor of, and is not involved in, this giveaway. Apple Watch is a trademark of Apple Inc.</p></details>
+    <details><summary>Where are the full rules?</summary><p>Read the <a href="{{rulesUrl}}">Official Rules</a>. Questions? Email <a href="mailto:hello@moodpals.com">hello@moodpals.com</a>.</p></details>
+  </section>
+
+  <p class="fine center gw-apple">Apple is not a participant in or sponsor of this promotion. Apple, Apple Watch and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. No purchase necessary. Void where prohibited.</p>
+</main>
+<footer><span>© MoodPals</span><span class="foot-links"><a href="{{rulesUrl}}">Official Rules</a><a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Use</a><a href="mailto:hello@moodpals.com">hello@moodpals.com</a></span><span>Made with <span class="heart">♥</span> for calmer days</span></footer>
+<script src="/giveaway.js?v=1" defer></script>
+</body>
+</html>

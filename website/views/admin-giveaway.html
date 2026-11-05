@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Giveaway admin · MoodPals</title>
+<link rel="icon" href="/img/mascots/disgust.png">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css?v=29">
+</head>
+<body class="gw-admin" data-supabase-url="{{supabaseUrl}}" data-publishable-key="{{publishableKey}}">
+<header class="nav">
+  <a class="brand" href="/"><img src="/img/mascots/disgust.png" alt="" width="36" height="36"><span class="logo-sm"><b class="o">Mood</b><b class="t">Pals</b></span></a>
+  <nav><span class="ga-who"></span><button class="btn btn-sm ga-out" type="button" hidden>Sign out</button></nav>
+</header>
+<main class="ga">
+  <h1>Giveaway admin</h1>
+  <form class="signup ga-login" novalidate>
+    <p>Sign in with your MoodPals account email and password. Only emails listed in <code>GIVEAWAY_ADMIN_EMAILS</code> on Hostinger can open this dashboard.</p>
+    <div class="gw-fields"><input name="email" type="email" placeholder="Email" autocomplete="username" required><input name="password" type="password" placeholder="Password" autocomplete="current-password" required><button class="btn" type="submit">Sign in</button></div>
+    <p class="form-msg" role="status"></p>
+  </form>
+  <div class="ga-app" hidden>
+    <div class="ga-warnings"></div>
+    <div class="ga-grid ga-stats"></div>
+    <section class="ga-panel"><h2>Hostinger switches and campaign</h2><div class="ga-flags"></div><div class="ga-campaign"></div></section>
+    <section class="ga-panel"><h2>Winners</h2><p class="fine">Draw only after the entry period ends. Every eligible entry has one equal chance; paid status is not used. The seed and the hash of the entry pool are saved so the drawing can be checked later.</p>
+      <form class="ga-draw"><label>Winners <input name="winners" type="number" min="0" max="10" value="2"></label><label>Alternates <input name="alternates" type="number" min="0" max="10" value="3"></label><label>Type DRAW <input name="confirm" autocomplete="off"></label><input name="notes" placeholder="Notes (witness, time)"><button class="btn btn-sm" type="submit">Run drawing</button></form>
+      <div class="ga-winners"></div></section>
+    <section class="ga-panel"><h2>Entries <a class="ga-dl" data-csv="entries.csv" href="#">Export CSV</a></h2><input class="ga-filter" placeholder="Search entries"><div class="ga-entries"></div></section>
+    <section class="ga-panel"><h2>Emails <select class="ga-email-status"><option value="failed">Failed</option><option value="suppressed">Suppressed</option><option value="queued">Queued</option><option value="sent">Sent</option><option value="">All</option></select></h2><div class="ga-emails"></div></section>
+    <section class="ga-panel"><h2>Payment history <a class="ga-dl" data-csv="payments.csv" href="#">Export CSV</a></h2><div class="ga-payments"></div></section>
+    <section class="ga-panel"><h2>Turning the giveaway on or off</h2>
+      <ol><li>Hostinger hPanel → Websites → moodpals.com → <b>Node.js</b> (Deployments) → <b>Environment variables</b>.</li>
+      <li>Set <code>GIVEAWAY_ENABLED</code>, <code>GIVEAWAY_ENTRIES_ENABLED</code> and <code>GIVEAWAY_CAMPAIGN_ID</code>. Only the exact value <code>true</code> turns a switch on.</li>
+      <li>Save, then <b>Redeploy / Restart</b> the app so the new values load.</li>
+      <li>Check <a href="/api/giveaway" target="_blank" rel="noopener">/api/giveaway</a> and reload this page. The switches above show what the server is using now.</li></ol>
+      <p class="fine">Emergency stop: set <code>GIVEAWAY_ENABLED=false</code> and redeploy. This hides the giveaway, blocks entries and holds giveaway emails. It keeps existing entries, subscriptions, Plus access and purchase emails. Turning it off is a technical stop, not a legal cancellation: the published Official Rules still apply.</p></section>
+  </div>
+</main>
+<script src="/admin-giveaway.js?v=1" defer></script>
+</body>
+</html>

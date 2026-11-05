@@ -1,6 +1,7 @@
 const express = require('express');
 const fs = require('fs/promises');
 const path = require('path');
+const giveaway = require('./giveaway');
 
 const PORT = Number(process.env.PORT) || 3000;
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://hzoauxxpvrgahlavxmvp.supabase.co';
@@ -9,18 +10,7 @@ const LOCAL_FILE = path.join(__dirname, 'data', 'subscribers.json');
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,24}$/;
 const INTERESTS = ['stress', 'sleep', 'journaling', 'scripture', 'watch', 'inner-circle'];
 
-const app = express();
-app.disable('x-powered-by');
-app.use(express.json({ limit: '10kb' }));
-app.use(express.static(path.join(__dirname, 'public'), {
-  extensions: ['html'],
-  setHeaders: (res, file) => {
-    // Always revalidate page code so visitors never see a stale mix of HTML/JS/CSS; images can cache.
-    res.setHeader('Cache-Control', /\.(html|js|css)$/.test(file) ? 'no-cache' : 'public, max-age=3600');
-  },
-}));
-
-// Small per-IP limiter so the public form can't be used to flood the list.
+// Small per-IP limiter so the public forms can't be used to flood the lists.
 const hits = new Map();
 function limited(ip) {
   const now = Date.now();
@@ -29,6 +19,22 @@ function limited(ip) {
   hits.set(ip, recent);
   return recent.length > 8;
 }
+
+function createApp(options = {}) {
+const app = express();
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+app.use(express.json({ limit: '10kb' }));
+// Giveaway routes (including the homepage, which gets the giveaway section only while it is switched on) come first.
+giveaway.mount(app, { limited, ...options });
+app.use(express.static(path.join(__dirname, 'public'), {
+  index: false,
+  extensions: ['html'],
+  setHeaders: (res, file) => {
+    // Always revalidate page code so visitors never see a stale mix of HTML/JS/CSS; images can cache.
+    res.setHeader('Cache-Control', /\.(html|js|css)$/.test(file) ? 'no-cache' : 'public, max-age=3600');
+  },
+}));
 
 async function saveToSupabase(row) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/waitlist_subscribers?on_conflict=email`, {
@@ -75,7 +81,13 @@ app.post('/api/subscribe', async (req, res) => {
 });
 
 app.get('/healthz', (_req, res) => res.json({ ok: true, storage: SUPABASE_KEY ? 'supabase' : 'local-file' }));
+return app;
+}
 
-app.listen(PORT, () => {
-  console.log(`MoodPals website on http://localhost:${PORT} (subscribers -> ${SUPABASE_KEY ? 'Supabase' : LOCAL_FILE})`);
-});
+if (require.main === module) {
+  createApp().listen(PORT, () => {
+    console.log(`MoodPals website on http://localhost:${PORT} (subscribers -> ${SUPABASE_KEY ? 'Supabase' : LOCAL_FILE})`);
+  });
+}
+
+module.exports = { createApp };
