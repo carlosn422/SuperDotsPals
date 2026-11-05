@@ -1,13 +1,26 @@
 import SwiftUI
 import UIKit
 
+enum WatchHardware {
+    /// Series 5, SE (1st generation) and older have too little memory to play the 36-frame mascots, so they show frame 0.
+    static let isOlderModel: Bool = {
+        var info = utsname()
+        uname(&info)
+        let machine = withUnsafeBytes(of: &info.machine) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }
+        let model = ProcessInfo.processInfo.environment["SIMULATOR_MODEL_IDENTIFIER"] ?? machine
+        guard model.hasPrefix("Watch"), let major = Int(model.dropFirst(5).prefix { $0.isNumber }) else { return false }
+        return major <= 5
+    }()
+}
+
 /// Plays the 36 watch frames over the same loop length as the iPhone animation. Missing or temporarily unavailable
 /// frames never cause the mascot to flash to a system symbol.
 struct AnimatedMoodMascot: View {
     let mood: String
     var size: CGFloat = 100
     var isActive: Bool = true
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    private var reduceMotion: Bool { accessibilityReduceMotion || WatchHardware.isOlderModel }
     @State private var lastImage: UIImage?
     @State private var lastEmotion = ""
 
