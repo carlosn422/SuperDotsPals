@@ -466,14 +466,19 @@ final class WatchThemeSync: ObservableObject {
         return String(data:data,encoding:.utf8)
     }
 
+    /// Keychain writes go through securityd and can stall for seconds, which blocks the main thread past watchOS's watchdog.
+    private static let keychainQueue = DispatchQueue(label: "com.superdotspals.watch.keychain", qos: .utility)
+
     private func storeSecret(_ value:String?,for key:String) {
-        let query:[String:Any] = [kSecClass as String:kSecClassGenericPassword,kSecAttrAccount as String:key]
-        SecItemDelete(query as CFDictionary)
-        if let value,let data=value.data(using:.utf8) {
-            var add=query
-            add[kSecValueData as String]=data
-            add[kSecAttrAccessible as String]=kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-            SecItemAdd(add as CFDictionary,nil)
+        Self.keychainQueue.async {
+            let query:[String:Any] = [kSecClass as String:kSecClassGenericPassword,kSecAttrAccount as String:key]
+            SecItemDelete(query as CFDictionary)
+            if let value,let data=value.data(using:.utf8) {
+                var add=query
+                add[kSecValueData as String]=data
+                add[kSecAttrAccessible as String]=kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+                SecItemAdd(add as CFDictionary,nil)
+            }
         }
     }
 
