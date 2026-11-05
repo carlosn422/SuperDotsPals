@@ -69,6 +69,7 @@ export default function FamilyWatches({reloadKey,onAdd}:{reloadKey:number;onAdd?
 export function ManageFamilyProfile({profile,onClose,onDeleted}:{profile:FamilyProfile;onClose:()=>void;onDeleted:()=>void|Promise<void>}){
  const [confirming,setConfirming]=useState(false),[typed,setTyped]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [color,setColor]=useState(isWatchColor(profile.watchColor)?profile.watchColor:null),[recoloring,setRecoloring]=useState(false);
+ const scroll=useRef<ScrollView>(null),renameY=useRef(0);
  const [name,setName]=useState(profile.name),[renaming,setRenaming]=useState(false),[draft,setDraft]=useState(''),[savingName,setSavingName]=useState(false),[nameError,setNameError]=useState('');
  async function saveName(){
   const next=draft.replace(/\s+/g,' ').trim();
@@ -90,7 +91,7 @@ export function ManageFamilyProfile({profile,onClose,onDeleted}:{profile:FamilyP
   finally{setBusy(false)}
  }
  return <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={busy?undefined:onClose}>
-  <ScrollView contentContainerStyle={{padding:22,gap:14}}>
+  <ScrollView ref={scroll} contentContainerStyle={{padding:22,gap:14}} automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled">
    <TouchableOpacity disabled={busy} onPress={onClose}><Text style={{color:purple,fontWeight:'800'}}>‹ Back</Text></TouchableOpacity>
    <View style={{alignItems:'center',gap:6}}><WatchImage color={color} name={shortProfileName(name)} width={130}/><Text style={styles.title}>{name}</Text></View>
    <View style={styles.card}>
@@ -101,9 +102,9 @@ export function ManageFamilyProfile({profile,onClose,onDeleted}:{profile:FamilyP
     <Text style={styles.sub}>Watch: {profile.connected?'linked':'not linked'}{profile.lastSeenAt?' · last seen '+new Date(profile.lastSeenAt).toLocaleString():''}</Text>
    </View>
    {!renaming?<TouchableOpacity accessibilityRole="button" style={styles.button} disabled={busy} onPress={()=>{setDraft(shortProfileName(name));setNameError('');setRenaming(true)}}><Text style={styles.buttonText}>Rename Watch</Text></TouchableOpacity>:
-   <View style={styles.card}>
+   <View style={styles.card} onLayout={e=>{renameY.current=e.nativeEvent.layout.y}}>
     <Text style={[styles.sub,{fontWeight:'700'}]}>Name shown in your profile switcher and to your Circle</Text>
-    <TextInput value={draft} onChangeText={setDraft} maxLength={40} autoFocus autoCapitalize="words" returnKeyType="done" onSubmitEditing={()=>void saveName()} editable={!savingName} placeholder="Tristan" style={styles.input} accessibilityLabel="Watch name"/>
+    <TextInput value={draft} onChangeText={setDraft} maxLength={40} autoFocus autoCapitalize="words" returnKeyType="done" onSubmitEditing={()=>void saveName()} onFocus={()=>setTimeout(()=>scroll.current?.scrollTo({y:Math.max(0,renameY.current-16),animated:true}),300)} editable={!savingName} placeholder="Tristan" style={styles.input} accessibilityLabel="Watch name"/>
     {nameError?<Text style={[styles.sub,{color:red}]}>{nameError}</Text>:null}
     <TouchableOpacity accessibilityRole="button" disabled={!draft.trim()||savingName} style={[styles.button,{opacity:draft.trim()&&!savingName?1:0.45}]} onPress={()=>void saveName()}>
      {savingName?<ActivityIndicator color="white"/>:<Text style={styles.buttonText}>Save Name</Text>}
