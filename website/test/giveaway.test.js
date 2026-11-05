@@ -54,7 +54,7 @@ test('disabled by default: no promotion anywhere and entries rejected', async ()
     assert.equal((await s.req('/api/giveaway/entries', { method: 'POST', body: ENTRY })).status, 404);
     for (const p of ['/index.html', '/index', '/views/giveaway-page.html', '/giveaway-page.html']) {
       const r = await s.req(p);
-      assert.doesNotMatch(r.text, /Apple Watches\. Two Winners|gw-card/, p);
+      assert.doesNotMatch(r.text, /gw-announce|gw-card/, p);
     }
   } finally { await s.close(); }
 });
@@ -65,12 +65,14 @@ test('promotion on, entries off: pages show, entries are not recorded', async ()
   const s = await start({ env: { ...ON, GIVEAWAY_ENTRIES_ENABLED: 'false' }, store });
   try {
     const home = await s.req('/');
-    assert.match(home.text, /Two Apple Watches\. Two Winners\. One Growing Community\./);
-    assert.match(home.text, /Our Goal: 1,000 Premium Members/);
-    assert.match(home.text, /684<\/b> verified paid members/);
+    assert.match(home.text, /class="gw-announce" href="\/giveaway"/);
+    assert.match(home.text, /win one of 2 Apple Watch SE 3s\. No purchase necessary\./);
+    assert.doesNotMatch(home.text, /gw-card|Our Goal/, 'homepage keeps its normal layout: announcement bar only');
     assert.match(home.text, /href="\/giveaway">Giveaway<\/a>/);
     const page = await s.req('/giveaway');
     assert.equal(page.status, 200);
+    assert.match(page.text, /Our Goal: 1,000 Premium Members/);
+    assert.match(page.text, /684<\/b> verified paid members/);
     assert.match(page.text, /We're Giving Away 2 Apple Watch SE 3 Devices!/);
     assert.match(page.text, /Entries open|Entries are closed/);
     assert.match(page.text, /Apple is not a participant in or sponsor/);
@@ -99,7 +101,7 @@ test('entries on: the website only explains how to enter in the app; there is no
     assert.equal((await s.req('/api/admin/giveaway/sync', { method: 'POST', token: 'member' })).status, 403);
     s.env.GIVEAWAY_ENABLED = 'false';
     assert.equal((await s.req('/giveaway')).status, 404);
-    assert.doesNotMatch((await s.req('/')).text, /gw-card/);
+    assert.doesNotMatch((await s.req('/')).text, /gw-announce|Giveaway/);
     assert.deepEqual((await s.req('/api/giveaway')).json, { campaign_enabled: false });
     assert.equal((await s.req('/api/admin/giveaway/sync', { method: 'POST', token: 'admin' })).status, 409);
     assert.equal(synced, 1);
