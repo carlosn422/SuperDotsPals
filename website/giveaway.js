@@ -169,14 +169,14 @@ function mount(app, { store = defaultStore(), getUser = supabaseUser, env = proc
 
   const unavailable = (res) => noStore(res).status(404).set('X-Robots-Tag', 'noindex').type('html').send(TEMPLATES['giveaway-unavailable']);
 
-  // Homepage: inject the giveaway section and nav link only while enabled.
+  // Homepage: keep the normal layout; add only the announcement bar while enabled.
   const index = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
   app.get(['/', '/index.html'], async (_req, res) => {
     const s = await state();
     let html = index.replace('<!--giveaway-nav-->', '').replace('<!--giveaway-section-->', '');
     if (s.visible) {
       html = index
-        .replace('<!--giveaway-nav-->', '<a href="/giveaway">Giveaway</a>')
+        .replace('<!--giveaway-nav-->', '')
         .replace('<!--giveaway-section-->', render(TEMPLATES['giveaway-section'], vars(s.c, s.entriesOpen)));
     }
     noStore(res).type('html').send(html);

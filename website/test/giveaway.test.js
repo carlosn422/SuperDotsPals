@@ -68,7 +68,7 @@ test('promotion on, entries off: pages show, entries are not recorded', async ()
     assert.match(home.text, /class="gw-announce" href="\/giveaway"/);
     assert.match(home.text, /win one of 2 Apple Watch SE 3s\. No purchase necessary\./);
     assert.doesNotMatch(home.text, /gw-card|Our Goal/, 'homepage keeps its normal layout: announcement bar only');
-    assert.match(home.text, /href="\/giveaway">Giveaway<\/a>/);
+    assert.doesNotMatch(home.text, /href="\/giveaway">Giveaway<\/a>/, 'no extra nav item');
     const page = await s.req('/giveaway');
     assert.equal(page.status, 200);
     assert.match(page.text, /Our Goal: 1,000 Premium Members/);
