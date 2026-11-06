@@ -1,18 +1,17 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {Alert,AppState,Platform} from 'react-native';
+import {Alert,AppState} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {publishCircleSnapshot} from './WidgetBridge';
 import * as Notifications from 'expo-notifications';
-import Constants from 'expo-constants';
 import {supabase} from './supabase';
+import {registerPushToken} from './PushRegistration';
 import type {CircleStore,CodePreview,State} from './CircleStore';
 import type {EmojiStyle} from './EmojiCatalog';
 import {CIRCLE_MOODS,CircleGroup,CircleMood,Friend,NotificationPrefs,SignalId,isToday,signalById} from './LittleSignalsData';
 
 // My Circle backed by Supabase (see supabase/migrations/20261023_my_circle_little_signals.sql).
-const EMPTY_PREFS:NotificationPrefs={invites:true,approvals:true,signals:true,reactions:true,showNamesInPreview:true,showMoodOnLockScreen:false};
-const PREF_COLUMNS:Record<keyof NotificationPrefs,string>={invites:'invites',approvals:'approvals',signals:'signals',reactions:'reactions',showNamesInPreview:'show_names_in_preview',showMoodOnLockScreen:'show_mood_on_lock_screen'};
-const EAS_PROJECT_ID=(Constants.expoConfig?.extra as any)?.eas?.projectId||'7fce274d-e6b2-4944-a9b0-ef08fa13f871';
+const EMPTY_PREFS:NotificationPrefs={invites:true,approvals:true,signals:true,reactions:true,moods:true,showNamesInPreview:true,showMoodOnLockScreen:false};
+const PREF_COLUMNS:Record<keyof NotificationPrefs,string>={invites:'invites',approvals:'approvals',signals:'signals',reactions:'reactions',moods:'moods',showNamesInPreview:'show_names_in_preview',showMoodOnLockScreen:'show_mood_on_lock_screen'};
 const initialsOf=(name:string)=>(name.trim()[0]||'?').toUpperCase();
 const asMood=(m:string)=>(CIRCLE_MOODS.includes(m as CircleMood)?m:'Calm') as CircleMood;
 const isNetworkError=(e:any)=>/network|fetch|timed? ?out|offline/i.test(String(e?.message||e));
@@ -87,7 +86,7 @@ export function useLiveCircleState():CircleStore{
     sentSignals:((sent.data||[]) as any[]).map(x=>({friendIds:[x.recipient_id],signal:x.signal as SignalId,at:x.sent_at})),
     inbox:((inbox.data||[]) as any[]).map(n=>({id:n.id,moodId:n.shared_mood_id,mood:asMood(n.mood),friendId:n.reactor_id,name:nickById.get(n.reactor_id)||n.reactor_name,emoji:n.emoji,at:n.reacted_at,read:!!n.read_at||pendingReads.includes(n.id)})),
     familyNames:Object.fromEntries(((family.data||[]) as any[]).map(n=>[n.profile_id,{name:n.display_name,owner:n.owner_name}])),
-    prefs:p?{invites:p.invites,approvals:p.approvals,signals:p.signals,reactions:p.reactions,showNamesInPreview:p.show_names_in_preview,showMoodOnLockScreen:p.show_mood_on_lock_screen}:s.prefs,
+    prefs:p?{invites:p.invites,approvals:p.approvals,signals:p.signals,reactions:p.reactions,moods:p.moods??true,showNamesInPreview:p.show_names_in_preview,showMoodOnLockScreen:p.show_mood_on_lock_screen}:s.prefs,
    }));
    const tz=deviceTimezone();
    if(p&&p.timezone!==tz)supabase.from('circle_notification_prefs').update({timezone:tz}).eq('user_id',uid).then(()=>{});
@@ -114,8 +113,8 @@ export function useLiveCircleState():CircleStore{
  },[loading,st.signals,st.friends,st.myMoods,st.prefs.showNamesInPreview,st.widgetHideMood]);
 
  useEffect(()=>{
-  void refresh();
-  const auth=supabase.auth.onAuthStateChange((_e,session)=>{const id=session?.user.id||null;if(id!==me.current){me.current=id;setSt(emptyState());if(id)void refresh();}});
+  void refresh();void registerPushToken(false);
+  const auth=supabase.auth.onAuthStateChange((_e,session)=>{const id=session?.user.id||null;if(id!==me.current){me.current=id;setSt(emptyState());if(id){void refresh();void registerPushToken(false);}}});
   const app=AppState.addEventListener('change',s=>{if(s==='active')void refresh()});
   const received=Notifications.addNotificationReceivedListener(n=>{if(n.request.content.data?.action==='circle')void refresh()});
   const timer=setInterval(()=>{if(AppState.currentState==='active')void refresh()},45000);
@@ -247,15 +246,7 @@ export function useLiveCircleState():CircleStore{
    void run('Couldn’t save notification settings',async()=>supabase.from('circle_notification_prefs').upsert({user_id:await userId(),[PREF_COLUMNS[k]]:v,timezone:deviceTimezone()},{onConflict:'user_id'}))},
   setWidgetHideMood:(v:boolean)=>{up(()=>({widgetHideMood:v}));AsyncStorage.setItem(WIDGET_HIDE_MOOD_KEY,v?'1':'0').catch(()=>{})},
   refresh,
-  ensurePush:async()=>{
-   try{
-    let perm=await Notifications.getPermissionsAsync();
-    if(!perm.granted&&perm.canAskAgain)perm=await Notifications.requestPermissionsAsync();
-    if(!perm.granted)return;
-    const token=(await Notifications.getExpoPushTokenAsync({projectId:EAS_PROJECT_ID})).data;
-    if(token)await supabase.rpc('circle_register_push_token',{p_token:token});
-   }catch(e){if(Platform.OS==='ios')console.log('Push token unavailable (simulators cannot receive remote push):',String(e))}
-  },
+  ensurePush:()=>registerPushToken(true),
  }),[refresh]);
 
  return {...st,...actions,live:true,loading};

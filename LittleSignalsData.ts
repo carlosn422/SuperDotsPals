@@ -53,7 +53,7 @@ export type ReactionNotice={id:string;moodId:string;mood:CircleMood;friendId:str
 export type MySharedMood={id:string;mood:CircleMood;sharedAt:string;expiresAt:string;groupIds:string[];reactions:Reaction[];active:boolean};
 export type FriendSharedMood={id:string;friendId:string;mood:CircleMood;sharedAt:string;expiresAt:string;myReaction?:string;myReactionAt?:string;myReactionStyle?:EmojiStyle};
 export type ReceivedSignal={id:string;friendId:string;signal:SignalId;at:string;seen:boolean};
-export type NotificationPrefs={invites:boolean;approvals:boolean;signals:boolean;reactions:boolean;showMoodOnLockScreen:boolean;showNamesInPreview:boolean};
+export type NotificationPrefs={invites:boolean;approvals:boolean;signals:boolean;reactions:boolean;moods:boolean;showMoodOnLockScreen:boolean;showNamesInPreview:boolean};
 
 const minutesAgo=(m:number)=>new Date(Date.now()-m*60000).toISOString();
 const hoursFromNow=(h:number)=>new Date(Date.now()+h*3600000).toISOString();
@@ -104,7 +104,7 @@ export const MOCK_CODE_LOOKUP:Record<string,{state:'valid'|'expired'|'revoked';n
  'MP-2EXP1':{state:'expired',name:'Chris',initials:'C',color:'#9DB4C9'},
  'MP-9RVK0':{state:'revoked',name:'Lee',initials:'L',color:'#C3A6E0'},
 };
-export const DEFAULT_PREFS:NotificationPrefs={invites:true,approvals:true,signals:true,reactions:true,showMoodOnLockScreen:false,showNamesInPreview:true};
+export const DEFAULT_PREFS:NotificationPrefs={invites:true,approvals:true,signals:true,reactions:true,moods:true,showMoodOnLockScreen:false,showNamesInPreview:true};
 
 export function timeAgo(iso:string){
  const m=Math.max(0,Math.round((Date.now()-new Date(iso).getTime())/60000));

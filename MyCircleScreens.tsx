@@ -649,6 +649,7 @@ function NotificationSettings(){
   <CCard style={{paddingVertical:4}}>
    <ToggleRow title="Invitations" subtitle="When someone sends you a friend request" value={p.invites} onChange={v=>store.setPref('invites',v)}/>
    <ToggleRow title="Request approved" subtitle="When a friend accepts your request" value={p.approvals} onChange={v=>store.setPref('approvals',v)}/>
+   <ToggleRow title="Friends’ moods" subtitle="When a friend shares a mood with you" value={p.moods} onChange={v=>store.setPref('moods',v)}/>
    <ToggleRow title="Little Signals" value={p.signals} onChange={v=>store.setPref('signals',v)}/>
    <ToggleRow title="Reactions to my moods" value={p.reactions} onChange={v=>store.setPref('reactions',v)} last/>
   </CCard>

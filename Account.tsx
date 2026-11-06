@@ -2,6 +2,7 @@ import React,{useCallback,useEffect,useState} from 'react';
 import {ActivityIndicator,Alert,AppState,Image,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {supabase} from './supabase';
+import {signOutAndUnregister} from './PushRegistration';
 import type {User} from '@supabase/supabase-js';
 import {appleAvailable,appleCredential,hasApple,linkApple} from './AppleAuth';
 import {openManageSubscriptions} from './PlusPaywall';
@@ -155,7 +156,7 @@ export function CreateAccountScreen({accent,onBack,backLabel='Settings'}:{accent
 
  const signInInstead=()=>Alert.alert('Sign in to another account?','Check-ins you made as a guest stay with this guest profile and won’t move to that account.',[
   {text:'Cancel',style:'cancel'},
-  {text:'Sign in',style:'destructive',onPress:()=>void supabase.auth.signOut()},
+  {text:'Sign in',style:'destructive',onPress:()=>void signOutAndUnregister()},
  ]);
 
  return <View style={{gap:14}}>
