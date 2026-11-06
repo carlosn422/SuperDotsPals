@@ -1,6 +1,7 @@
 import React,{createContext,useContext,useMemo,useState} from 'react';
 import {useLiveCircleState} from './CircleLiveStore';
 import {CIRCLE_PROTOTYPE,MOCK_CODE_LOOKUP,CIRCLE_MOODS,CircleGroup,CircleMood,DEFAULT_PREFS,Friend,FriendRequest,FriendSharedMood,MOCK_FRIENDS,MOCK_FRIEND_MOODS,MOCK_GROUPS,MOCK_INVITE,MOCK_MY_MOODS,MOCK_REQUESTS,MOCK_SIGNALS,MySharedMood,NotificationPrefs,ReactionNotice,ReceivedSignal,SignalId} from './LittleSignalsData';
+import type {EmojiStyle} from './EmojiCatalog';
 
 // Local, in-memory sample data for reviewing My Circle without a backend (CIRCLE_PROTOTYPE=true).
 // The real feature uses useLiveCircleState (Supabase).
@@ -33,7 +34,7 @@ function useMockCircleState(){
   toggleGroupMood:(id:string,mood:CircleMood)=>up(s=>({groups:s.groups.map(g=>g.id!==id?g:{...g,moods:g.moods.includes(mood)?g.moods.filter(m=>m!==mood):CIRCLE_MOODS.filter(m=>m===mood||g.moods.includes(m))})})),
   shareMood:(mood:CircleMood,groupIds:string[])=>{const id='m'+Date.now();up(s=>({myMoods:[{id,mood,sharedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+864e5).toISOString(),groupIds,reactions:[],active:true},...s.myMoods]}));return id;},
   stopSharing:(id:string)=>up(s=>({myMoods:s.myMoods.map(m=>m.id===id?{...m,active:false,expiresAt:new Date().toISOString()}:m)})),
-  react:async(friendMoodId:string,emoji?:string):Promise<boolean>=>{up(s=>({friendMoods:s.friendMoods.map(m=>m.id===friendMoodId?{...m,myReaction:emoji,myReactionAt:emoji?new Date().toISOString():undefined}:m)}));return true;},
+  react:async(friendMoodId:string,emoji?:string,style:EmojiStyle='standard'):Promise<boolean>=>{up(s=>({friendMoods:s.friendMoods.map(m=>m.id===friendMoodId?{...m,myReaction:emoji,myReactionAt:emoji?new Date().toISOString():undefined,myReactionStyle:emoji?style:undefined}:m)}));return true;},
   sendSignal:(friendIds:string[],signal:SignalId)=>up(s=>({sentSignals:[{friendIds,signal,at:new Date().toISOString()},...s.sentSignals]})),
   markSignalsSeen:()=>up(s=>({signals:s.signals.map(x=>({...x,seen:true}))})),
   markSignalSeen:(id:string|string[])=>{const ids=Array.isArray(id)?id:[id];up(s=>({signals:s.signals.map(x=>ids.includes(x.id)?{...x,seen:true}:x)}))},

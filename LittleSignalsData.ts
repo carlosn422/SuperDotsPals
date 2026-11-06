@@ -1,3 +1,4 @@
+import type {EmojiStyle} from './EmojiCatalog';
 // My Circle & Little Signals — shared constants plus the sample data used in prototype mode.
 // The MOCK_* data is fictional and never read from or written to Supabase.
 // Set to true to review the screens with local sample data instead of the live backend.
@@ -46,11 +47,11 @@ export const signalById=(id:SignalId)=>LITTLE_SIGNALS.find(x=>x.id===id)!;
 export type Friend={id:string;name:string;initials:string;color:string;since:string;muted:boolean;hideMyMoods:boolean;realName?:string;nickname?:string;pinnedAt?:string};
 export type CircleGroup={id:string;name:string;icon:string;color:string;memberIds:string[];moods:CircleMood[];isDefault?:boolean};
 export type FriendRequest={id:string;direction:'incoming'|'outgoing';name:string;initials:string;color:string;sentAt:string;status:'pending'|'declined';groupId?:string;groupName?:string};
-export type Reaction={friendId:string;emoji:string;at:string};
+export type Reaction={friendId:string;emoji:string;at:string;style?:EmojiStyle};
 // One reaction to one of my shared moods; read state is stored on the server (circle_reactions.read_at).
 export type ReactionNotice={id:string;moodId:string;mood:CircleMood;friendId:string;name:string;emoji:string;at:string;read:boolean};
 export type MySharedMood={id:string;mood:CircleMood;sharedAt:string;expiresAt:string;groupIds:string[];reactions:Reaction[];active:boolean};
-export type FriendSharedMood={id:string;friendId:string;mood:CircleMood;sharedAt:string;expiresAt:string;myReaction?:string;myReactionAt?:string};
+export type FriendSharedMood={id:string;friendId:string;mood:CircleMood;sharedAt:string;expiresAt:string;myReaction?:string;myReactionAt?:string;myReactionStyle?:EmojiStyle};
 export type ReceivedSignal={id:string;friendId:string;signal:SignalId;at:string;seen:boolean};
 export type NotificationPrefs={invites:boolean;approvals:boolean;signals:boolean;reactions:boolean;showMoodOnLockScreen:boolean;showNamesInPreview:boolean};
 

@@ -1,17 +1,20 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
-import {ActivityIndicator,Alert,Animated,AppState,ScrollView,Text,TouchableOpacity,View} from 'react-native';
+import {ActivityIndicator,Alert,Animated,AppState,PanResponder,ScrollView,Text,TouchableOpacity,View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {CircleMood,Friend,FriendSharedMood,MOOD_REACTIONS,MOOD_TINTS,REACTION_LABELS,ReceivedSignal,SignalId,signalById} from './LittleSignalsData';
 import {CircleStore,familyFriend,isMoodNew,useCircle} from './CircleStore';
 import {Avatar,CT,EmptyState,MoodPalThumb,OfflineBanner,cs,useReduceMotion} from './CircleComponents';
+import {Emoji,EmojiStyle} from './EmojiCatalog';
+import EmojiPickerSheet from './EmojiPickerSheet';
+import {usePlus} from './PlusStore';
 
 // Circle conversations: one thread per person, built only from existing Circle data
 // (moods they shared with me, my reactions, their reactions to my moods, Little Signals). No text messages.
 
 type ThreadItem=
  |{kind:'theirMood';key:string;at:string;mood:FriendSharedMood}
- |{kind:'myMood';key:string;at:string;moodId:string;mood:CircleMood;sharedAt?:string;emoji:string;unread:boolean}
+ |{kind:'myMood';key:string;at:string;moodId:string;mood:CircleMood;sharedAt?:string;emoji:string;style?:EmojiStyle;unread:boolean}
  |{kind:'signal';key:string;at:string;signal:ReceivedSignal}
  |{kind:'sentSignal';key:string;at:string;signal:SignalId};
 
@@ -33,9 +36,9 @@ export function threadItems(store:CircleStore,id:string):ThreadItem[]{
  store.friendMoods.filter(m=>m.friendId===id&&isActive(m)).forEach(m=>items.push({kind:'theirMood',key:'m'+m.id,at:m.sharedAt,mood:m}));
  const seen=new Set<string>();
  store.inbox.filter(n=>n.friendId===id).forEach(n=>{if(seen.has(n.moodId))return;seen.add(n.moodId);
-  items.push({kind:'myMood',key:'r'+n.moodId,at:n.at,moodId:n.moodId,mood:n.mood,sharedAt:store.myMoods.find(m=>m.id===n.moodId)?.sharedAt,emoji:n.emoji,unread:!n.read})});
+  items.push({kind:'myMood',key:'r'+n.moodId,at:n.at,moodId:n.moodId,mood:n.mood,sharedAt:store.myMoods.find(m=>m.id===n.moodId)?.sharedAt,emoji:n.emoji,style:store.myMoods.find(m=>m.id===n.moodId)?.reactions.find(r=>r.friendId===n.friendId)?.style,unread:!n.read})});
  store.myMoods.forEach(m=>m.reactions.filter(r=>r.friendId===id&&!seen.has(m.id)).forEach(r=>{seen.add(m.id);
-  items.push({kind:'myMood',key:'r'+m.id,at:r.at,moodId:m.id,mood:m.mood,sharedAt:m.sharedAt,emoji:r.emoji,unread:false})}));
+  items.push({kind:'myMood',key:'r'+m.id,at:r.at,moodId:m.id,mood:m.mood,sharedAt:m.sharedAt,emoji:r.emoji,style:r.style,unread:false})}));
  store.signals.filter(s=>s.friendId===id).forEach(s=>items.push({kind:'signal',key:'s'+s.id,at:s.at,signal:s}));
  store.sentSignals.forEach((s,i)=>{if(s.friendIds.includes(id))items.push({kind:'sentSignal',key:'x'+s.at+i,at:s.at,signal:s.signal})});
  return items.sort((a,b)=>a.at.localeCompare(b.at));
@@ -170,6 +173,21 @@ function Pop({children,trigger}:{children:React.ReactNode;trigger:string}){
 const bubble={borderRadius:22,paddingHorizontal:12,paddingVertical:10,maxWidth:'80%' as const};
 const meta={fontSize:11,color:CT.muted,fontWeight:'600' as const};
 
+const UNDO_MS=8000;
+type Draft={e:string;style:EmojiStyle;until:number};
+
+function UndoPill({draft,onUndo}:{draft:Draft;onUndo:()=>void}){
+ const [now,setNow]=useState(Date.now());
+ useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),200);return()=>clearInterval(t)},[]);
+ const left=Math.max(0,draft.until-now);
+ return <View style={{alignSelf:'flex-end',flexDirection:'row',alignItems:'center',gap:8,backgroundColor:'#fff',borderRadius:18,borderBottomRightRadius:6,borderWidth:1,borderColor:CT.line,paddingLeft:11,paddingRight:5,paddingVertical:5,overflow:'hidden'}}>
+  <Emoji e={draft.e} style={draft.style} size={17}/>
+  <Text style={{fontSize:13,fontWeight:'800',color:CT.ink}}>Sending in {Math.ceil(left/1000)}s</Text>
+  <TouchableOpacity onPress={onUndo} accessibilityRole="button" accessibilityLabel="Undo reaction" hitSlop={8} style={{width:30,height:30,borderRadius:15,backgroundColor:'#FDECEF',alignItems:'center',justifyContent:'center'}}><Ionicons name="trash-outline" size={16} color={CT.danger}/></TouchableOpacity>
+  <View style={{position:'absolute',left:0,bottom:0,height:3,width:(left/UNDO_MS*100)+'%' as any,backgroundColor:CT.primary}}/>
+ </View>;
+}
+
 type ThreadProps={id:string;focus?:string;onBack:()=>void;onInfo:()=>void;onSend:()=>void;fill?:boolean;padding?:number};
 
 // Full conversation: header, thread (newest at the bottom) and the reaction bar. With `fill` it owns its scrolling.
@@ -194,14 +212,39 @@ export function ConversationScreen({id,focus,onBack,onInfo,onSend,fill,padding=2
  },[id,unreadKey]);
  useEffect(()=>{const t=setInterval(()=>{if(AppState.currentState==='active')void store.refresh()},20000);return()=>clearInterval(t)},[id]);
 
- const react=async(m:FriendSharedMood,e:string)=>{
-  if(e===m.myReaction||pending[m.id])return;
-  Haptics.selectionAsync().catch(()=>{});
-  setPending(p=>({...p,[m.id]:true}));
-  const ok=await store.react(m.id,e);
-  setPending(p=>{const n={...p};delete n[m.id];return n});
+ // A reaction waits UNDO_MS before it's sent (trash can to undo); once sent it's final.
+ const {isPlus}=usePlus();
+ const [sheet,setSheet]=useState(false);
+ const [drafts,setDrafts]=useState<Record<string,Draft>>({});
+ const draftsRef=useRef(drafts);
+ const timers=useRef<Record<string,ReturnType<typeof setTimeout>>>({});
+ const putDraft=(id:string,d?:Draft)=>{clearTimeout(timers.current[id]);delete timers.current[id];const n={...draftsRef.current};if(d)n[id]=d;else delete n[id];draftsRef.current=n;setDrafts(n)};
+ const commit=async(id:string)=>{
+  const d=draftsRef.current[id];if(!d)return;
+  putDraft(id);
+  setPending(p=>({...p,[id]:true}));
+  const ok=await store.react(id,d.e,d.style);
+  setPending(p=>{const n={...p};delete n[id];return n});
   Haptics.notificationAsync(ok?Haptics.NotificationFeedbackType.Success:Haptics.NotificationFeedbackType.Error).catch(()=>{});
  };
+ const commitRef=useRef(commit);commitRef.current=commit;
+ const undo=(id:string)=>{putDraft(id);Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(()=>{})};
+ const react=(m:FriendSharedMood,e:string,style:EmojiStyle='standard')=>{
+  if(m.myReaction||pending[m.id])return;
+  Haptics.selectionAsync().catch(()=>{});
+  putDraft(m.id,{e,style,until:Date.now()+UNDO_MS});
+  timers.current[m.id]=setTimeout(()=>void commitRef.current(m.id),UNDO_MS);
+ };
+ // Leaving the app or the conversation sends anything still waiting so it can't get lost.
+ useEffect(()=>{
+  const flush=()=>Object.keys(draftsRef.current).forEach(id=>void commitRef.current(id));
+  const sub=AppState.addEventListener('change',st=>{if(st!=='active')flush()});
+  return()=>{sub.remove();flush()};
+ },[]);
+ const swipe=useRef(PanResponder.create({
+  onMoveShouldSetPanResponder:(_,g)=>g.dy<-12&&Math.abs(g.dy)>Math.abs(g.dx),
+  onPanResponderRelease:(_,g)=>{if(g.dy<-30)setSheet(true)},
+ })).current;
 
  const scroll=useRef<ScrollView>(null);const atBottom=useRef(true);const didInitial=useRef(false);
  const shown=items.slice(-limit);
@@ -232,10 +275,10 @@ export function ConversationScreen({id,focus,onBack,onInfo,onSend,fill,padding=2
          </View>
         </TouchableOpacity>
        </View>
-       {m.myReaction?<View style={{alignSelf:'flex-end'}}><Pop trigger={m.myReaction}>
+       {drafts[m.id]?<UndoPill draft={drafts[m.id]} onUndo={()=>undo(m.id)}/>:m.myReaction?<View style={{alignSelf:'flex-end'}}><Pop trigger={m.myReaction}>
         <View accessible accessibilityLabel={'You reacted '+(REACTION_LABELS[m.myReaction]||m.myReaction)+' to '+first+'’s '+m.mood+' mood'+(pending[m.id]?', sending':'')}
          style={{flexDirection:'row',alignItems:'center',gap:6,backgroundColor:CT.primarySoft,borderRadius:18,borderBottomRightRadius:6,paddingHorizontal:11,paddingVertical:6}}>
-         <Text style={{fontSize:17}}>{m.myReaction}</Text>
+         <Emoji e={m.myReaction} style={m.myReactionStyle} size={17}/>
          <Text style={{fontSize:13,fontWeight:'800',color:CT.ink}}>You reacted</Text>
          <Text style={meta}>{m.myReactionAt?clock(m.myReactionAt):''}</Text>
          <Ionicons name={pending[m.id]?'time-outline':'checkmark'} size={13} color={pending[m.id]?CT.muted:CT.primary}/>
@@ -247,7 +290,7 @@ export function ConversationScreen({id,focus,onBack,onInfo,onSend,fill,padding=2
        <TouchableOpacity activeOpacity={1} onLongPress={mine?stop:undefined} delayLongPress={350} accessibilityRole={mine?'button':undefined} accessibilityHint={mine?'Long press to stop sharing this mood':undefined} accessibilityActions={mine?[{name:'longpress',label:'Stop sharing'}]:undefined} onAccessibilityAction={stop} accessibilityLabel={first+' reacted '+(REACTION_LABELS[it.emoji]||it.emoji)+' to your '+it.mood+' mood, '+clock(it.at)}
         style={[bubble,{backgroundColor:'#fff',borderBottomRightRadius:6,flexDirection:'row',alignItems:'center',gap:12,borderWidth:lit?2:1,borderColor:lit?CT.primary:CT.line}]}>
         <View><View style={{width:46,height:46,borderRadius:23,backgroundColor:t.tint,alignItems:'center',justifyContent:'center'}}><MoodPalThumb mood={it.mood} size={38}/></View>
-         <View style={{position:'absolute',right:-9,bottom:-7,backgroundColor:'#fff',borderRadius:14,paddingHorizontal:3,borderWidth:1,borderColor:CT.line}}><Text style={{fontSize:16}}>{it.emoji}</Text></View></View>
+         <View style={{position:'absolute',right:-9,bottom:-7,backgroundColor:'#fff',borderRadius:14,paddingHorizontal:3,borderWidth:1,borderColor:CT.line}}><Emoji e={it.emoji} style={it.style} size={16}/></View></View>
         <View style={{gap:2,flexShrink:1,paddingLeft:4}}>
          <Text style={{fontSize:13,fontWeight:'700',color:CT.ink}}>{first} reacted {it.emoji}</Text>
          <Text style={{fontSize:14,fontWeight:'800',color:CT.ink}}>to your <Text style={{color:t.color}}>{it.mood}</Text> mood</Text>
@@ -268,17 +311,28 @@ export function ConversationScreen({id,focus,onBack,onInfo,onSend,fill,padding=2
   </View>;
 
  const isFriend=store.friends.some(f=>f.id===id);
- const bar=<View style={{backgroundColor:'#fff',borderRadius:24,padding:12,gap:10,borderWidth:1,borderColor:CT.line}}>
-  {target?<>
-   <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
-    <Text numberOfLines={1} style={{flex:1,fontSize:13,fontWeight:'800',color:CT.ink}}>React to {first}’s <Text style={{color:MOOD_TINTS[target.mood.mood].color}}>{target.mood.mood}</Text> mood{active.length>1?' · '+clock(target.mood.sharedAt):''}</Text>
+ const bar=<View {...(target&&!(target.mood.myReaction&&!drafts[target.mood.id])?swipe.panHandlers:{})} style={{backgroundColor:'#fff',borderRadius:24,padding:12,gap:10,borderWidth:1,borderColor:CT.line}}>
+  {target?(()=>{const m=target.mood;const d=drafts[m.id];const done=!!m.myReaction&&!d;const tint=MOOD_TINTS[m.mood].color;
+   const btn={width:56,height:52,borderRadius:26,alignItems:'center' as const,justifyContent:'center' as const};
+   return <>
+   {done?null:<View style={{alignSelf:'center',width:34,height:4,borderRadius:2,backgroundColor:'#E3EAE6',marginTop:-4}}/>}
+   <View style={{flexDirection:'row',alignItems:'center',gap:6}}>
+    {done?<><Text numberOfLines={1} style={{flexShrink:1,fontSize:13,fontWeight:'800',color:CT.ink}}>You reacted to {first}’s <Text style={{color:tint}}>{m.mood}</Text> mood</Text><Emoji e={m.myReaction!} style={m.myReactionStyle} size={16}/></>
+     :<Text numberOfLines={1} style={{flex:1,fontSize:13,fontWeight:'800',color:CT.ink}}>React to {first}’s <Text style={{color:tint}}>{m.mood}</Text> mood{active.length>1?' · '+clock(m.sharedAt):''}</Text>}
    </View>
-   <View style={{flexDirection:'row',justifyContent:'space-between'}}>
-    {MOOD_REACTIONS[target.mood.mood].map(e=>{const on=target.mood.myReaction===e;return <TouchableOpacity key={e} disabled={!!pending[target.mood.id]} onPress={()=>void react(target.mood,e)} accessibilityRole="button"
-     accessibilityLabel={'React '+(REACTION_LABELS[e]||e)+' to '+first+'’s '+target.mood.mood+' mood'} accessibilityState={{selected:on}}
-     style={{width:60,height:52,borderRadius:26,alignItems:'center',justifyContent:'center',backgroundColor:on?CT.primarySoft:'#F5F8F6',borderWidth:on?2:0,borderColor:CT.primary}}><Text style={{fontSize:27}}>{e}</Text></TouchableOpacity>})}
-   </View>
-  </>:<View style={{flexDirection:'row',alignItems:'center',gap:10}}>
+   {done?<Text style={[cs.rowSub,{fontSize:12}]}>Sent reactions can’t be changed.{active.length>1?' Tap another mood above to react to it.':''}</Text>
+   :<View style={{flexDirection:'row',justifyContent:'space-between'}}>
+    {MOOD_REACTIONS[m.mood].map(e=>{const on=d?.e===e&&d.style==='standard';return <TouchableOpacity key={e} disabled={!!pending[m.id]} onPress={()=>react(m,e)} accessibilityRole="button"
+     accessibilityLabel={'React '+(REACTION_LABELS[e]||e)+' to '+first+'’s '+m.mood+' mood'} accessibilityState={{selected:on}}
+     style={[btn,{backgroundColor:on?CT.primarySoft:'#F5F8F6',borderWidth:on?2:0,borderColor:CT.primary}]}><Text style={{fontSize:27}}>{e}</Text></TouchableOpacity>})}
+    <TouchableOpacity disabled={!!pending[m.id]} onPress={()=>setSheet(true)} accessibilityRole="button" accessibilityLabel={isPlus?'More emoji':'More emoji, Plus'} style={[btn,{backgroundColor:'#F5F8F6'}]}>
+     <Ionicons name="add" size={28} color={CT.primary}/>
+     {!isPlus?<View style={{position:'absolute',top:4,right:6,backgroundColor:CT.primary,borderRadius:8,width:16,height:16,alignItems:'center',justifyContent:'center'}}><Ionicons name="lock-closed" size={9} color="#fff"/></View>:null}
+    </TouchableOpacity>
+   </View>}
+   <EmojiPickerSheet visible={sheet} title={'React to '+first+'’s '+m.mood+' mood'} onClose={()=>setSheet(false)} onPick={(e,st)=>{setSheet(false);react(m,e,st)}}/>
+  </>})()
+:<View style={{flexDirection:'row',alignItems:'center',gap:10}}>
    <Text style={[cs.rowSub,{flex:1,fontSize:12}]}>You can react when {first} shares a mood.</Text>
    {isFriend?<TouchableOpacity onPress={onSend} accessibilityRole="button" style={{flexDirection:'row',alignItems:'center',gap:6,backgroundColor:CT.primarySoft,borderRadius:16,paddingHorizontal:12,paddingVertical:9}}><Ionicons name="heart-outline" size={17} color={CT.primary}/><Text style={{color:CT.primary,fontWeight:'800',fontSize:13}}>Little Signal</Text></TouchableOpacity>:null}
   </View>}

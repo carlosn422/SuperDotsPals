@@ -6,6 +6,7 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import {supabase} from './supabase';
 import type {CircleStore,CodePreview,State} from './CircleStore';
+import type {EmojiStyle} from './EmojiCatalog';
 import {CIRCLE_MOODS,CircleGroup,CircleMood,Friend,NotificationPrefs,SignalId,isToday,signalById} from './LittleSignalsData';
 
 // My Circle backed by Supabase (see supabase/migrations/20261023_my_circle_little_signals.sql).
@@ -54,9 +55,9 @@ export function useLiveCircleState():CircleStore{
     supabase.rpc('circle_friends'),
     supabase.rpc('circle_requests'),
     supabase.from('circle_groups').select('id,name,icon,color,allowed_moods,is_default,created_at,circle_group_members(member_id)').order('is_default',{ascending:false}).order('created_at'),
-    supabase.from('circle_shared_moods').select('id,mood,group_ids,shared_at,expires_at,stopped_at,circle_reactions(reactor_id,emoji,updated_at)').eq('owner_id',uid).order('shared_at',{ascending:false}).limit(30),
+    supabase.from('circle_shared_moods').select('id,mood,group_ids,shared_at,expires_at,stopped_at,circle_reactions(reactor_id,emoji,style,updated_at)').eq('owner_id',uid).order('shared_at',{ascending:false}).limit(30),
     supabase.from('circle_shared_moods').select('id,owner_id,mood,shared_at,expires_at').neq('owner_id',uid).order('shared_at',{ascending:false}).limit(30),
-    supabase.from('circle_reactions').select('shared_mood_id,emoji,updated_at').eq('reactor_id',uid),
+    supabase.from('circle_reactions').select('shared_mood_id,emoji,style,updated_at').eq('reactor_id',uid),
     supabase.from('circle_signals').select('id,sender_id,signal,sent_at,seen_at').eq('recipient_id',uid).order('sent_at',{ascending:false}).limit(50),
     supabase.from('circle_signals').select('recipient_id,signal,sent_at').eq('sender_id',uid).gte('sent_at',startOfToday()),
     supabase.from('circle_notification_prefs').select('*').eq('user_id',uid).maybeSingle(),
@@ -66,7 +67,7 @@ export function useLiveCircleState():CircleStore{
    const failed=[invite,friends,requests,groups,mine,shared,myReactions,signals,sent,prefs,inbox,family].find(r=>r.error);
    if(failed?.error)throw failed.error;
    const now=Date.now();
-   const reactionByMood=new Map<string,{emoji:string;at:string}>(((myReactions.data||[]) as any[]).map(r=>[r.shared_mood_id,{emoji:r.emoji,at:r.updated_at}]));
+   const reactionByMood=new Map<string,{emoji:string;at:string;style:EmojiStyle}>(((myReactions.data||[]) as any[]).map(r=>[r.shared_mood_id,{emoji:r.emoji,at:r.updated_at,style:r.style}]));
    const inv=((invite.data||[]) as any[])[0];
    const p:any=prefs.data;
    const friendList=((friends.data||[]) as any[]).map((f):Friend=>({id:f.friend_id,name:f.display_name,initials:initialsOf(f.display_name),color:f.avatar_color,
@@ -80,8 +81,8 @@ export function useLiveCircleState():CircleStore{
      moods:CIRCLE_MOODS.filter(m=>(g.allowed_moods||[]).includes(m))})),
     myMoods:((mine.data||[]) as any[]).map(m=>({id:m.id,mood:asMood(m.mood),sharedAt:m.shared_at,expiresAt:m.stopped_at||m.expires_at,groupIds:m.group_ids||[],
      active:!m.stopped_at&&new Date(m.expires_at).getTime()>now,
-     reactions:(m.circle_reactions||[]).map((r:any)=>({friendId:r.reactor_id,emoji:r.emoji,at:r.updated_at})).sort((a:any,b:any)=>a.at.localeCompare(b.at))})),
-    friendMoods:((shared.data||[]) as any[]).map(m=>({id:m.id,friendId:m.owner_id,mood:asMood(m.mood),sharedAt:m.shared_at,expiresAt:m.expires_at,myReaction:reactionByMood.get(m.id)?.emoji,myReactionAt:reactionByMood.get(m.id)?.at})),
+     reactions:(m.circle_reactions||[]).map((r:any)=>({friendId:r.reactor_id,emoji:r.emoji,at:r.updated_at,style:r.style})).sort((a:any,b:any)=>a.at.localeCompare(b.at))})),
+    friendMoods:((shared.data||[]) as any[]).map(m=>({id:m.id,friendId:m.owner_id,mood:asMood(m.mood),sharedAt:m.shared_at,expiresAt:m.expires_at,myReaction:reactionByMood.get(m.id)?.emoji,myReactionAt:reactionByMood.get(m.id)?.at,myReactionStyle:reactionByMood.get(m.id)?.style})),
     signals:((signals.data||[]) as any[]).map(x=>({id:x.id,friendId:x.sender_id,signal:x.signal as SignalId,at:x.sent_at,seen:!!x.seen_at||s.seenSignalIds.includes(x.id)})),
     sentSignals:((sent.data||[]) as any[]).map(x=>({friendIds:[x.recipient_id],signal:x.signal as SignalId,at:x.sent_at})),
     inbox:((inbox.data||[]) as any[]).map(n=>({id:n.id,moodId:n.shared_mood_id,mood:asMood(n.mood),friendId:n.reactor_id,name:nickById.get(n.reactor_id)||n.reactor_name,emoji:n.emoji,at:n.reacted_at,read:!!n.read_at||pendingReads.includes(n.id)})),
@@ -198,18 +199,18 @@ export function useLiveCircleState():CircleStore{
   },
   stopSharing:(id:string)=>{up(s=>({myMoods:s.myMoods.map(m=>m.id===id?{...m,active:false,expiresAt:new Date().toISOString()}:m)}));void run('Couldn’t stop sharing',()=>supabase.rpc('circle_stop_share',{p_mood:id}))},
   // Optimistic; returns false (and restores the previous reaction) when the server rejects it or we're offline.
-  react:async(friendMoodId:string,emoji?:string):Promise<boolean>=>{
+  react:async(friendMoodId:string,emoji?:string,style:EmojiStyle='standard'):Promise<boolean>=>{
    const prev=stRef.current.friendMoods.find(m=>m.id===friendMoodId);
-   const set=(e?:string,at?:string)=>up(s=>({friendMoods:s.friendMoods.map(m=>m.id===friendMoodId?{...m,myReaction:e,myReactionAt:at}:m)}));
-   set(emoji,emoji?new Date().toISOString():undefined);
+   const set=(e?:string,at?:string,st?:EmojiStyle)=>up(s=>({friendMoods:s.friendMoods.map(m=>m.id===friendMoodId?{...m,myReaction:e,myReactionAt:at,myReactionStyle:st}:m)}));
+   set(emoji,emoji?new Date().toISOString():undefined,emoji?style:undefined);
    try{
     const uid=await userId();
-    const {error}=emoji?await supabase.from('circle_reactions').upsert({shared_mood_id:friendMoodId,reactor_id:uid,emoji,updated_at:new Date().toISOString()},{onConflict:'shared_mood_id,reactor_id'})
+    const {error}=emoji?await supabase.from('circle_reactions').upsert({shared_mood_id:friendMoodId,reactor_id:uid,emoji,style,updated_at:new Date().toISOString()},{onConflict:'shared_mood_id,reactor_id'})
      :await supabase.from('circle_reactions').delete().eq('shared_mood_id',friendMoodId).eq('reactor_id',uid);
     if(error)throw error;
     return true;
    }catch(e:any){
-    set(prev?.myReaction,prev?.myReactionAt);
+    set(prev?.myReaction,prev?.myReactionAt,prev?.myReactionStyle);
     if(isNetworkError(e))up(()=>({offline:true}));
     Alert.alert('Couldn’t send your reaction',isNetworkError(e)?'You’re offline. Try again when you’re connected.':/row-level security/i.test(String(e?.message))?'This mood can’t receive that reaction. It may have expired or stopped being shared.':(e?.message||'Please try again.'));
     return false;
