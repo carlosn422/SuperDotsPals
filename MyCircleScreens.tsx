@@ -13,7 +13,7 @@ export type CircleRoute=
  |{name:'friends'}|{name:'friend';id:string}|{name:'groups'}|{name:'group';id?:string;draft?:GroupDraft}|{name:'permissions'}
  |{name:'share';mood:CircleMood}|{name:'send';friendId?:string}|{name:'signalSent';signal:SignalId;friendIds:string[]}
  |{name:'signalReceived';signalId:string}|{name:'friendMood';id:string}|{name:'room';id:string}|{name:'today'}
- |{name:'notifications'}|{name:'widgets'}|{name:'circleSettings'}|{name:'revoked'}|{name:'fromNotification';ref:string}|{name:'chat';id:string;focus?:string};
+ |{name:'notifications'}|{name:'widgets'}|{name:'circleSettings'}|{name:'revoked'}|{name:'fromNotification';ref:string}|{name:'chat';id:string;focus?:string;day?:string};
 
 const TITLES:Record<CircleRoute['name'],string>={chat:'Messages',circleSettings:'Circle Settings',fromNotification:'Circle',home:'Circle',invite:'Invite Friends',enterCode:'Enter Invite Code',requests:'Friend Requests',assignGroups:'Add to Groups',friends:'Friends',friend:'Friend',groups:'Manage Groups',group:'Group',permissions:'Mood Sharing',share:'Choose Audience',send:'Send a Little Signal',signalSent:'Signal Sent',signalReceived:'Little Signal',friendMood:'Shared Mood',room:'Your Mood',today:'Messages',notifications:'Circle Notifications',widgets:'Widgets',revoked:'Not Available'};
 type GroupDraft={group:CircleGroup;knownFriendIds:string[]};
@@ -25,6 +25,8 @@ type HomeTab='messages'|'people';
 export default function CircleNavigator({initial=[{name:'home'}],exitLabel='Settings',onExit,mood,onRouteChange,contentStyle,resetKey=0}:{initial?:CircleRoute[];exitLabel?:string;onExit:()=>void;mood?:string;onRouteChange?:()=>void;contentStyle?:any;resetKey?:number}){
  const [stack,setStack]=useState<CircleRoute[]>(initial);
  const [homeTab,setHomeTab]=useState<HomeTab>('messages');
+ // History date chosen in Messages; kept while opening a conversation and coming back, until the user clears it.
+ const [historyDay,setHistoryDay]=useState<string|undefined>();
  const store=useCircle();const {refresh}=store;
  useEffect(()=>{onRouteChange?.();void refresh()},[stack.length,stack[stack.length-1]?.name]);
  useEffect(()=>{setStack(initial)},[JSON.stringify(initial)]);
@@ -35,7 +37,7 @@ export default function CircleNavigator({initial=[{name:'home'}],exitLabel='Sett
  const back=()=>{if(stack.length<=1)onExit();else setStack(s=>s.slice(0,-1));};
  const nav={push,replace,back,popTo:(name:CircleRoute['name'])=>setStack(s=>{const i=s.map(x=>x.name).lastIndexOf(name);return i>=0?s.slice(0,i+1):[{name:'home'}]})};
  if(route.name==='chat'){
-  const props={id:route.id,focus:route.focus,onBack:back,onInfo:()=>push({name:'friend',id:route.id}),onSend:()=>push({name:'send',friendId:route.id})};
+  const props={id:route.id,focus:route.focus,day:route.day,onBack:back,onInfo:()=>push({name:'friend',id:route.id}),onSend:()=>push({name:'send',friendId:route.id})};
   return contentStyle?<ConversationScreen key={route.id} {...props} fill/>:<ConversationScreen key={route.id} {...props}/>;
  }
  const isHome=(route.name==='home'||route.name==='today')&&stack.length===1;
@@ -54,15 +56,15 @@ export default function CircleNavigator({initial=[{name:'home'}],exitLabel='Sett
     <Text style={cs.title}>{TITLES[route.name]}</Text>
   </View>}
   <OfflineBanner/>
-  <Screen route={route} nav={nav} mood={mood} homeTab={homeTab} setHomeTab={setHomeTab}/>
+  <Screen route={route} nav={nav} mood={mood} homeTab={homeTab} setHomeTab={setHomeTab} historyDay={historyDay} setHistoryDay={setHistoryDay}/>
  </View>;
  return contentStyle?<ScrollView key={stack.length+route.name+resetKey} style={{flex:1}} contentContainerStyle={contentStyle} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">{body}</ScrollView>:body;
 }
 type Nav={push:(r:CircleRoute)=>void;replace:(r:CircleRoute)=>void;back:()=>void;popTo:(n:CircleRoute['name'])=>void};
 
-function Screen({route,nav,mood,homeTab='messages',setHomeTab=()=>{}}:{route:CircleRoute;nav:Nav;mood?:string;homeTab?:HomeTab;setHomeTab?:(t:HomeTab)=>void}){
+function Screen({route,nav,mood,homeTab='messages',setHomeTab=()=>{},historyDay,setHistoryDay=()=>{}}:{route:CircleRoute;nav:Nav;mood?:string;homeTab?:HomeTab;setHomeTab?:(t:HomeTab)=>void;historyDay?:string;setHistoryDay?:(k?:string)=>void}){
  switch(route.name){
-  case 'home':case 'today':return <Home nav={nav} tab={homeTab} onTab={setHomeTab}/>;
+  case 'home':case 'today':return <Home nav={nav} tab={homeTab} onTab={setHomeTab} day={historyDay} onDay={setHistoryDay}/>;
   case 'chat':return null;
   case 'invite':return <Invite groupId={route.groupId} nav={nav}/>;
   case 'enterCode':return <EnterCode nav={nav}/>;
@@ -204,7 +206,7 @@ function HomeTabs({tab,onTab,unread}:{tab:HomeTab;onTab:(t:HomeTab)=>void;unread
  </View>;
 }
 
-function Home({nav,tab='messages',onTab=()=>{}}:{nav:Nav;tab?:HomeTab;onTab?:(t:HomeTab)=>void}){
+function Home({nav,tab='messages',onTab=()=>{},day,onDay=()=>{}}:{nav:Nav;tab?:HomeTab;onTab?:(t:HomeTab)=>void;day?:string;onDay?:(k?:string)=>void}){
  const store=useCircle();
  const {isPlus,showPaywall}=usePlus();
  useEffect(()=>{void store.ensurePush()},[]);
@@ -212,7 +214,7 @@ function Home({nav,tab='messages',onTab=()=>{}}:{nav:Nav;tab?:HomeTab;onTab?:(t:
  const unread=conversationsFor(store).reduce((n,c)=>n+c.unread,0);
  return <>
   <HomeTabs tab={tab} onTab={onTab} unread={unread}/>
-  {tab==='messages'?<MessagesInbox onOpen={id=>nav.push({name:'chat',id})} onInvite={()=>nav.push({name:'invite'})} onSend={()=>nav.push({name:'send'})}/>:<>
+  {tab==='messages'?<MessagesInbox day={day} onDay={onDay} onOpen={(id,d)=>nav.push({name:'chat',id,day:d})} onInvite={()=>nav.push({name:'invite'})} onSend={()=>nav.push({name:'send'})}/>:<>
   <CCard style={{gap:14}}>
    <View style={{flexDirection:'row',gap:9}}>
     <Stat icon="people-outline" value={store.friends.length} label={store.friends.length===1?'Friend':'Friends'} onPress={()=>nav.push({name:'friends'})}/>

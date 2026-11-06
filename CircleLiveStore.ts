@@ -17,7 +17,7 @@ const initialsOf=(name:string)=>(name.trim()[0]||'?').toUpperCase();
 const asMood=(m:string)=>(CIRCLE_MOODS.includes(m as CircleMood)?m:'Calm') as CircleMood;
 const isNetworkError=(e:any)=>/network|fetch|timed? ?out|offline/i.test(String(e?.message||e));
 const deviceTimezone=()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'}catch{return 'UTC'}};
-const startOfToday=()=>{const d=new Date();d.setHours(0,0,0,0);return d.toISOString();};
+const startOfYesterday=()=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),d.getDate()-1).toISOString();};
 
 const emptyState=():State=>({moodsSeenAt:'',seenMoodIds:[],seenSignalIds:[],familyNames:{},friends:[],groups:[],requests:[],myMoods:[],friendMoods:[],signals:[],invite:{code:'',expiresAt:new Date().toISOString()},prefs:{...EMPTY_PREFS},revokedFriendIds:[],blockedNames:[],sentSignals:[],offline:false,widgetHideMood:true,inbox:[]});
 const WIDGET_HIDE_MOOD_KEY='circle.widgetHideMood';
@@ -59,7 +59,7 @@ export function useLiveCircleState():CircleStore{
     supabase.from('circle_shared_moods').select('id,owner_id,mood,shared_at,expires_at').neq('owner_id',uid).order('shared_at',{ascending:false}).limit(30),
     supabase.from('circle_reactions').select('shared_mood_id,emoji,style,updated_at').eq('reactor_id',uid),
     supabase.from('circle_signals').select('id,sender_id,signal,sent_at,seen_at').eq('recipient_id',uid).order('sent_at',{ascending:false}).limit(50),
-    supabase.from('circle_signals').select('recipient_id,signal,sent_at').eq('sender_id',uid).gte('sent_at',startOfToday()),
+    supabase.from('circle_signals').select('recipient_id,signal,sent_at').eq('sender_id',uid).gte('sent_at',startOfYesterday()),
     supabase.from('circle_notification_prefs').select('*').eq('user_id',uid).maybeSingle(),
     supabase.rpc('circle_reaction_inbox',{p_unread_only:false,p_limit:50}),
     supabase.rpc('circle_family_names'),
