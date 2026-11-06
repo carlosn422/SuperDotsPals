@@ -25,9 +25,8 @@ export function SignalPicker({initial=[],onSent,onInvite}:{initial?:string[];onS
  const limited=to.filter(atHourlyLimit);
  const ready=to.filter(id=>!atHourlyLimit(id));
  const first=(id:string)=>store.friends.find(f=>f.id===id)?.name.split(' ')[0]||'a friend';
- const limitNote=!ready.length?(limited.length>1?'You’ve sent these friends 3 signals this hour. Try again a little later.':'You’ve sent '+first(limited[0])+' 3 signals this hour. Try again a little later.')
-  :limited.length>1?'Some friends already got 3 signals from you this hour. Everyone else will still get yours.'
-  :first(limited[0]??'')+' already got 3 signals from you this hour, so they’ll be skipped.';
+ const limitNote=ready.length?'You’ve selected some friends we can’t send to right now (3 signals per hour). We’ll send it to everyone else.'
+  :'We can’t send to the friends you selected right now (3 signals per hour). Try again a little later.';
  const send=()=>{if(!sig||!ready.length)return;Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(()=>{});store.sendSignal(ready,sig);onSent(sig,ready,limited)};
  const seg=(k:'friends'|'groups',label:string,icon:any)=>{const on=tab===k;return <TouchableOpacity key={k} onPress={()=>setTab(k)} accessibilityRole="tab" accessibilityState={{selected:on}}
   style={{flex:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,paddingVertical:9,borderRadius:20,backgroundColor:on?CT.primary:'transparent'}}>
@@ -64,7 +63,7 @@ export function SignalPicker({initial=[],onSent,onInvite}:{initial?:string[];onS
 
 // Bottom sheet. After sending, the signal floats up in a bubble (like it lands on their watch), then the sheet closes.
 function SentBubble({signal,skipped,onDone}:{signal:SignalId;skipped:string[];onDone:()=>void}){
- const store=useCircle();const reduce=useReduceMotion();const v=useRef(new Animated.Value(0)).current;const s=signalById(signal);
+ const reduce=useReduceMotion();const v=useRef(new Animated.Value(0)).current;const s=signalById(signal);
  useEffect(()=>{
   const anim=reduce?Animated.sequence([Animated.timing(v,{toValue:1,duration:200,useNativeDriver:true}),Animated.delay(skipped.length?1700:900)])
    :Animated.sequence([Animated.spring(v,{toValue:1,friction:5,tension:90,useNativeDriver:true}),Animated.delay(skipped.length?1300:550),Animated.timing(v,{toValue:2,duration:550,easing:Easing.in(Easing.quad),useNativeDriver:true})]);
@@ -80,7 +79,7 @@ function SentBubble({signal,skipped,onDone}:{signal:SignalId;skipped:string[];on
     <Text style={{fontSize:17,fontWeight:'900',color:CT.ink}}>{s.label}</Text>
    </View>
    <Text style={{fontSize:13,fontWeight:'800',color:CT.primary}}>Sent</Text>
-   {skipped.length?<Text style={{fontSize:13,fontWeight:'700',color:'#6B4A00',textAlign:'center',maxWidth:260}}>{skipped.length>1?'Some friends were skipped':'Skipped '+(store.friends.find(f=>f.id===skipped[0])?.name.split(' ')[0]||'a friend')}</Text>:null}
+   {skipped.length?<Text style={{fontSize:13,fontWeight:'700',color:'#6B4A00',textAlign:'center',maxWidth:260}}>Some friends were skipped</Text>:null}
   </Animated.View>
  </View>;
 }
