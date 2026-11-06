@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
-import {ActivityIndicator,Animated,AppState,ScrollView,Text,TouchableOpacity,View} from 'react-native';
+import {ActivityIndicator,Alert,Animated,AppState,ScrollView,Text,TouchableOpacity,View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {CircleMood,Friend,FriendSharedMood,MOOD_REACTIONS,MOOD_TINTS,REACTION_LABELS,ReceivedSignal,SignalId,signalById} from './LittleSignalsData';
@@ -170,10 +170,10 @@ function Pop({children,trigger}:{children:React.ReactNode;trigger:string}){
 const bubble={borderRadius:22,paddingHorizontal:12,paddingVertical:10,maxWidth:'80%' as const};
 const meta={fontSize:11,color:CT.muted,fontWeight:'600' as const};
 
-type ThreadProps={id:string;focus?:string;onBack:()=>void;onInfo:()=>void;onSend:()=>void;onOpenMyMood:(moodId:string)=>void;fill?:boolean;padding?:number};
+type ThreadProps={id:string;focus?:string;onBack:()=>void;onInfo:()=>void;onSend:()=>void;fill?:boolean;padding?:number};
 
 // Full conversation: header, thread (newest at the bottom) and the reaction bar. With `fill` it owns its scrolling.
-export function ConversationScreen({id,focus,onBack,onInfo,onSend,onOpenMyMood,fill,padding=20}:ThreadProps){
+export function ConversationScreen({id,focus,onBack,onInfo,onSend,fill,padding=20}:ThreadProps){
  const store=useCircle();useTick(60000);
  const items=threadItems(store,id);
  const {name}=personName(store,id);const first=name.split(' ')[0]||name;
@@ -241,9 +241,10 @@ export function ConversationScreen({id,focus,onBack,onInfo,onSend,onOpenMyMood,f
          <Ionicons name={pending[m.id]?'time-outline':'checkmark'} size={13} color={pending[m.id]?CT.muted:CT.primary}/>
         </View></Pop></View>:null}
       </View>;})()
-     :it.kind==='myMood'?(()=>{const t=MOOD_TINTS[it.mood];const exists=store.myMoods.some(m=>m.id===it.moodId);
+     :it.kind==='myMood'?(()=>{const t=MOOD_TINTS[it.mood];const mine=store.myMoods.find(m=>m.id===it.moodId&&m.active);
+      const stop=()=>{if(!mine)return;Haptics.selectionAsync().catch(()=>{});Alert.alert('Stop sharing this '+it.mood+' mood?','Friends will no longer see it or be able to react.',[{text:'Cancel',style:'cancel'},{text:'Stop sharing',style:'destructive',onPress:()=>store.stopSharing(mine.id)}])};
       return <View style={{alignItems:'flex-end'}}>
-       <TouchableOpacity disabled={!exists} onPress={()=>onOpenMyMood(it.moodId)} accessibilityRole="button" accessibilityLabel={first+' reacted '+(REACTION_LABELS[it.emoji]||it.emoji)+' to your '+it.mood+' mood, '+clock(it.at)}
+       <TouchableOpacity activeOpacity={1} onLongPress={mine?stop:undefined} delayLongPress={350} accessibilityRole={mine?'button':undefined} accessibilityHint={mine?'Long press to stop sharing this mood':undefined} accessibilityActions={mine?[{name:'longpress',label:'Stop sharing'}]:undefined} onAccessibilityAction={stop} accessibilityLabel={first+' reacted '+(REACTION_LABELS[it.emoji]||it.emoji)+' to your '+it.mood+' mood, '+clock(it.at)}
         style={[bubble,{backgroundColor:'#fff',borderBottomRightRadius:6,flexDirection:'row',alignItems:'center',gap:12,borderWidth:lit?2:1,borderColor:lit?CT.primary:CT.line}]}>
         <View><View style={{width:46,height:46,borderRadius:23,backgroundColor:t.tint,alignItems:'center',justifyContent:'center'}}><MoodPalThumb mood={it.mood} size={38}/></View>
          <View style={{position:'absolute',right:-9,bottom:-7,backgroundColor:'#fff',borderRadius:14,paddingHorizontal:3,borderWidth:1,borderColor:CT.line}}><Text style={{fontSize:16}}>{it.emoji}</Text></View></View>

@@ -34,7 +34,7 @@ export default function CircleNavigator({initial=[{name:'home'}],exitLabel='Sett
  const back=()=>{if(stack.length<=1)onExit();else setStack(s=>s.slice(0,-1));};
  const nav={push,replace,back,popTo:(name:CircleRoute['name'])=>setStack(s=>{const i=s.map(x=>x.name).lastIndexOf(name);return i>=0?s.slice(0,i+1):[{name:'home'}]})};
  if(route.name==='chat'){
-  const props={id:route.id,focus:route.focus,onBack:back,onInfo:()=>push({name:'friend',id:route.id}),onSend:()=>push({name:'send',friendId:route.id}),onOpenMyMood:(id:string)=>push({name:'room',id})};
+  const props={id:route.id,focus:route.focus,onBack:back,onInfo:()=>push({name:'friend',id:route.id}),onSend:()=>push({name:'send',friendId:route.id})};
   return contentStyle?<ConversationScreen key={route.id} {...props} fill/>:<ConversationScreen key={route.id} {...props}/>;
  }
  const isHome=(route.name==='home'||route.name==='today')&&stack.length===1;
@@ -77,7 +77,7 @@ function Screen({route,nav,mood,homeTab='messages',setHomeTab=()=>{}}:{route:Cir
   case 'signalSent':return <SignalSent signal={route.signal} friendIds={route.friendIds} nav={nav}/>;
   case 'signalReceived':return <OpenConversation refId={route.signalId} nav={nav} missing={<EmptyState title="Signal not found" detail="It may have been from someone no longer in your circle."/>}/>;
   case 'friendMood':return <OpenConversation refId={route.id} nav={nav} missing={<Screen route={{name:'revoked'}} nav={nav}/>}/>;
-  case 'room':return <ReactionRoom id={route.id} nav={nav}/>;
+  case 'room':return <OpenConversation refId={route.id} nav={nav} missing={<OpenInbox nav={nav}/>}/>;
   case 'notifications':return <NotificationSettings/>;
   case 'widgets':return <WidgetPreviews/>;
   case 'circleSettings':return <CircleSettings nav={nav}/>;
@@ -545,7 +545,7 @@ function ChooseAudience({mood,nav}:{mood:CircleMood;nav:Nav}){
  const active=store.myMoods.find(m=>m.active&&m.mood===mood&&Date.now()-new Date(m.sharedAt).getTime()<6e4);
  if(active)return <>
   <CCard style={{alignItems:'center',gap:8,paddingVertical:22}}><SignalBurst mood={mood} emoji="💚" size={120}/><Text style={{fontSize:20,fontWeight:'900',color:CT.ink}}>Shared with {uniqueAudience(store,active.groupIds,mood).length} friends</Text><Text style={[cs.muted,{textAlign:'center'}]}>Your {mood} MoodPal is visible to them for 24 hours. You can stop sharing anytime.</Text></CCard>
-  <PrimaryButton label="View Reactions" icon="chatbubbles-outline" onPress={()=>nav.replace({name:'room',id:active.id})}/>
+  <PrimaryButton label="Open Messages" icon="chatbubbles-outline" onPress={()=>nav.replace({name:'today'})}/>
   <SoftButton danger label="Stop Sharing" icon="eye-off-outline" onPress={()=>{store.stopSharing(active.id);nav.back()}}/>
  </>;
  return <>
@@ -618,34 +618,7 @@ function SignalSent({signal,friendIds,nav}:{signal:SignalId;friendIds:string[];n
  </>;
 }
 
-function ReactionRoom({id,nav}:{id:string;nav:Nav}){
- const store=useCircle();const m=store.myMoods.find(x=>x.id===id);
- if(!m)return <Screen route={{name:'revoked'}} nav={nav}/>;
- const groups=store.groups.filter(g=>m.groupIds.includes(g.id));
- const t=MOOD_TINTS[m.mood];const date=new Date(m.sharedAt);
- const reactions=[...m.reactions].sort((a,b)=>b.at.localeCompare(a.at));
- return <>
-  <View style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:t.tint,borderRadius:22,padding:14}}>
-   <MoodPalThumb mood={m.mood} size={64}/>
-   <View style={{flex:1,gap:2}}>
-    <Text style={{fontSize:13,fontWeight:'700',color:CT.ink}}>You shared</Text>
-    <Text style={{fontSize:22,fontWeight:'900',color:t.color}}>{m.mood}</Text>
-    <Text style={cs.rowSub}>{date.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})} · {date.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})} · {groups.map(g=>g.name).join(', ')||'removed groups'}</Text>
-    <Text style={[cs.rowSub,{fontWeight:'800',color:m.active?CT.primary:CT.muted}]}>{m.active?'Visible · '+timeLeft(m.expiresAt):'Expired · no longer visible to friends'}</Text>
-   </View>
-  </View>
-  {!reactions.length?<Text style={[cs.muted,{textAlign:'center',lineHeight:18}]}>{m.active?'No reactions yet. Friends who can see this mood can react with an emoji.':'Nobody reacted before this mood expired.'}</Text>:
-  <CCard style={{paddingVertical:2,paddingHorizontal:12}}>{reactions.map((r,i)=>{const f=store.friends.find(x=>x.id===r.friendId)||familyFriend(store,r.friendId);
-   return <TouchableOpacity key={r.friendId} disabled={!f} onPress={()=>nav.push({name:'chat',id:r.friendId,focus:'r'+m.id})} accessibilityRole="button" accessibilityLabel={(f?.name||'Former friend')+' reacted '+(REACTION_LABELS[r.emoji]||r.emoji)+', '+timeAgo(r.at)}
-    style={{flexDirection:'row',alignItems:'center',gap:12,paddingVertical:11,borderBottomWidth:i===reactions.length-1?0:1,borderBottomColor:CT.line}}>
-    <Avatar initials={f?.initials||'?'} color={f?.color||'#C9D2CE'} size={38}/>
-    <View style={{flex:1}}><Text style={cs.rowTitle}>{f?.name.split(' · ')[0]||'Former friend'}</Text><Text style={cs.rowSub}>{REACTION_LABELS[r.emoji]||'Reacted'} · {timeAgo(r.at)}</Text></View>
-    <Text style={{fontSize:26}}>{r.emoji}</Text>
-    {f?<Ionicons name="chevron-forward" size={16} color={CT.muted}/>:null}
-   </TouchableOpacity>})}</CCard>}
-  {m.active?<SoftButton danger label="Stop Sharing" icon="eye-off-outline" onPress={()=>Alert.alert('Stop sharing?','Friends will no longer see this mood or be able to react.',[{text:'Cancel',style:'cancel'},{text:'Stop sharing',style:'destructive',onPress:()=>store.stopSharing(m.id)}])}/>:null}
- </>;
-}
+function OpenInbox({nav}:{nav:Nav}){useEffect(()=>{nav.replace({name:'today'})},[]);return null;}
 
 // Opens the conversation (and item) a Today card or notification points to, if it's still visible.
 function OpenConversation({refId,nav,missing}:{refId:string;nav:Nav;missing:React.ReactNode}){
@@ -662,7 +635,6 @@ function OpenFromNotification({id,nav}:{id:string;nav:Nav}){
   if(!ready)return;
   const target=conversationRef(store,id);
   if(target)nav.replace({name:'chat',id:target.friendId,focus:target.focus});
-  else if(store.myMoods.some(m=>m.id===id))nav.replace({name:'room',id});
   else nav.replace({name:'today'});
  },[ready]);
  return <View style={{paddingVertical:48,alignItems:'center'}}><ActivityIndicator color={CT.ink}/></View>;
