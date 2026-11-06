@@ -7,6 +7,7 @@ import {CodePreview,activeFriendMoods,circleNewCount,familyFriend,friendName,isM
 import {usePlus} from './PlusStore';
 import {Avatar,CCard,CHeading,CRow,CT,Chip,EmptyState,MoodPalThumb,OfflineBanner,PrimaryButton,SampleDataNote,SignalBurst,SoftButton,ToggleRow,cs} from './CircleComponents';
 import {ConversationScreen,MessagesInbox,conversationRef,conversationsFor} from './CircleConversations';
+import CircleSignalSheet,{SignalPicker} from './CircleSignalSheet';
 
 export type CircleRoute=
  |{name:'home'}|{name:'invite';groupId?:string}|{name:'enterCode'}|{name:'requests';groupId?:string;groupName?:string}|{name:'assignGroups';requestId:string;groupId?:string;groupName?:string}
@@ -210,8 +211,11 @@ function Home({nav,tab='messages',onTab=()=>{}}:{nav:Nav;tab?:HomeTab;onTab?:(t:
  useEffect(()=>{void store.ensurePush()},[]);
  const pending=store.requests.filter(r=>r.status==='pending'&&r.direction==='incoming').length;
  const unread=conversationsFor(store).reduce((n,c)=>n+c.unread,0);
+ const [signal,setSignal]=useState(false);
  return <>
   <HomeTabs tab={tab} onTab={onTab} unread={unread}/>
+  {store.friends.length?<TouchableOpacity onPress={()=>setSignal(true)} accessibilityRole="button" style={{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,backgroundColor:CT.primarySoft,borderRadius:22,paddingVertical:12}}><Ionicons name="heart" size={18} color={CT.primary}/><Text style={{color:CT.primary,fontWeight:'900',fontSize:15}}>Send a Little Signal</Text></TouchableOpacity>:null}
+  <CircleSignalSheet visible={signal} onClose={()=>setSignal(false)} onInvite={()=>nav.push({name:'invite'})}/>
   {tab==='messages'?<MessagesInbox onOpen={id=>nav.push({name:'chat',id})} onInvite={()=>nav.push({name:'invite'})} onSend={()=>nav.push({name:'send'})}/>:<>
   <CCard style={{gap:14}}>
    <View style={{flexDirection:'row',gap:9}}>
@@ -451,7 +455,7 @@ function FriendDetail({id,nav}:{id:string;nav:Nav}){
  return <>
   <CCard style={{alignItems:'center',gap:6,paddingVertical:20}}><Avatar initials={f.initials} color={f.color} size={70}/><Text style={{fontSize:21,fontWeight:'900',color:CT.ink}}>{f.name}</Text>{f.nickname&&f.realName&&f.realName!==f.nickname?<Text style={cs.muted}>{f.realName}</Text>:null}<Text style={cs.muted}>In your circle since {f.since}</Text>
    <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Rename '+f.name} onPress={rename} style={{flexDirection:'row',alignItems:'center',gap:5,paddingVertical:6,paddingHorizontal:12}}><Ionicons name="pencil" size={14} color={CT.primary}/><Text style={{fontSize:14,fontWeight:'800',color:CT.primary}}>{f.nickname?'Edit name':'Rename'}</Text></TouchableOpacity>
-   <View style={{alignSelf:'stretch',marginTop:8}}><SoftButton label={'Send '+f.name+' a Little Signal'} icon="heart-outline" onPress={()=>nav.push({name:'send',friendId:f.id})}/></View></CCard>
+</CCard>
   <CHeading title="Groups" detail="Private to you — friends never see your group names."/>
   <GroupPicker selected={groupIds} onToggle={g=>store.setFriendGroups(id,toggle(groupIds,g))}/>
   <CCard style={{paddingVertical:4}}>
@@ -574,37 +578,7 @@ function FriendPick({selected,onToggle}:{selected:string[];onToggle:(id:string)=
 }
 
 function SendSignal({friendId,nav}:{friendId?:string;nav:Nav}){
- const store=useCircle();const [to,setTo]=useState<string[]>(friendId?[friendId]:[]);const [sig,setSig]=useState<SignalId|null>(null);
- const sentToday=store.sentSignals.filter(s=>isToday(s.at)).reduce((n,s)=>n+s.friendIds.length,0);
- // Server allows 3 signals per friend per hour; check first so Signal Sent never shows for a dropped signal.
- const hourAgo=Date.now()-3600e3;
- const atHourlyLimit=(id:string)=>store.sentSignals.filter(s=>Date.parse(s.at)>hourAgo&&s.friendIds.includes(id)).length>=3;
- if(!store.friends.length)return <EmptyState title="Add a friend first" detail="Little Signals can only be sent to approved friends." action="Invite Friends" onAction={()=>nav.push({name:'invite'})}/>;
- const only=friendId?store.friends.find(f=>f.id===friendId):undefined;
- // Replying to one friend: no picker, one tap on a signal sends it.
- if(only){
-  const hourly=atHourlyLimit(only.id);
-  const limited=sentToday>=20||hourly;
-  return <>
-   <CCard style={{flexDirection:'row',alignItems:'center',gap:12}}>
-    <Avatar initials={only.initials} color={only.color} size={46}/>
-    <View style={{flex:1,gap:2}}><Text style={cs.rowTitle}>To {only.name}</Text><Text style={cs.rowSub}>Tap a signal to send it.</Text></View>
-   </CCard>
-   <CHeading title="Signal"/>
-   <View style={{flexDirection:'row',flexWrap:'wrap',gap:9}}>{LITTLE_SIGNALS.map(s=><TouchableOpacity key={s.id} disabled={limited} onPress={()=>{store.sendSignal([only.id],s.id);nav.replace({name:'signalSent',signal:s.id,friendIds:[only.id]})}} accessibilityRole="button" accessibilityLabel={'Send '+only.name+' '+s.label} style={{width:'48%',flexGrow:1,flexDirection:'row',alignItems:'center',gap:9,padding:12,borderRadius:16,borderWidth:1.5,borderColor:CT.border,backgroundColor:'#fff',opacity:limited?0.5:1}}><Text style={{fontSize:24}}>{s.emoji}</Text><Text style={{flex:1,fontWeight:'800',fontSize:13,color:CT.ink}}>{s.label}</Text></TouchableOpacity>)}</View>
-   {limited?<Text style={[cs.muted,{textAlign:'center'}]}>{hourly?'You’ve sent '+only.name+' 3 signals this hour. Try again a little later.':'You’ve sent a lot of signals today. Try again tomorrow.'}</Text>:null}
-  </>;
- }
- return <>
-  <Text style={[cs.muted,{marginTop:-6}]}>A quick, wordless way to show you care. No mood share needed.</Text>
-  <CHeading title="To"/>
-  <CCard><FriendPick selected={to} onToggle={id=>setTo(s=>toggle(s,id))}/></CCard>
-  <CHeading title="Signal"/>
-  <View style={{flexDirection:'row',flexWrap:'wrap',gap:9}}>{LITTLE_SIGNALS.map(s=>{const on=sig===s.id;return <TouchableOpacity key={s.id} onPress={()=>setSig(s.id)} accessibilityRole="radio" accessibilityState={{selected:on}} style={{width:'48%',flexGrow:1,flexDirection:'row',alignItems:'center',gap:9,padding:12,borderRadius:16,borderWidth:1.5,borderColor:on?CT.primary:CT.border,backgroundColor:on?CT.primarySoft:'#fff'}}><Text style={{fontSize:24}}>{s.emoji}</Text><Text style={{flex:1,fontWeight:'800',fontSize:13,color:CT.ink}}>{s.label}</Text></TouchableOpacity>})}</View>
-  {sentToday>=20?<Text style={[cs.muted,{textAlign:'center'}]}>You’ve sent a lot of signals today. Try again tomorrow.</Text>:null}
-  {to.some(atHourlyLimit)?<Text style={[cs.muted,{textAlign:'center'}]}>You’ve sent {to.filter(atHourlyLimit).map(id=>friendName(store,id)).join(', ')} 3 signals this hour. Try again a little later.</Text>:null}
-  <PrimaryButton label={to.length>1?'Send to '+to.length+' friends':'Send Signal'} icon="heart" disabled={!to.length||!sig||sentToday>=20||to.some(atHourlyLimit)} onPress={()=>{if(!sig)return;store.sendSignal(to,sig);nav.replace({name:'signalSent',signal:sig,friendIds:to})}}/>
- </>;
+ return <SignalPicker initial={friendId?[friendId]:[]} onInvite={()=>nav.push({name:'invite'})} onSent={(signal,friendIds)=>nav.replace({name:'signalSent',signal,friendIds})}/>;
 }
 
 function SignalSent({signal,friendIds,nav}:{signal:SignalId;friendIds:string[];nav:Nav}){
