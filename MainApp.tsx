@@ -26,7 +26,7 @@ import CircleNavigator,{CircleRoute} from './MyCircleScreens';
 import {LittleSignalsTodayCard} from './CircleComponents';
 import WatchThemesScreen from './WatchThemesScreen';
 import {PlusPaywallSheet,PlusSettingsScreen} from './PlusPaywall';
-import {AccountRequired,CreateAccountScreen,DeleteAccountScreen,useAppleLink,useIsGuest} from './Account';
+import {AccountRequired,AccountSummary,CreateAccountScreen,DeleteAccountScreen,useAppleLink,useIsGuest} from './Account';
 import {useWatchAutoLink} from './WatchAutoLink';
 import {CIRCLE_MOODS} from './LittleSignalsData';
 import {useStress,ChartScrubContext} from './StressDashboard';
@@ -248,6 +248,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
    {settingsPage==='main'?<>
     <WellnessSettingsIntro companion={shownMood} accent={colors.accent}/>
     <Text style={s.mainTitle}>Settings</Text>
+    <AccountSummary accent={colors.accent} onPlus={()=>setSettingsPage('plus')}/>
     {isGuest?<SettingsItem title="Create your account" subtitle="Save your MoodPals and use My Circle" status="You're using MoodPals as a guest" icon="person-circle-outline" accent={colors.accent} onPress={()=>setSettingsPage('account')}/>:null}
     <SettingsItem title="MoodPals Plus" subtitle="Free and Plus plans" status="Advanced trends, circles and reflections" icon="sparkles-outline" accent={colors.accent} onPress={()=>setSettingsPage('plus')}/>
 
