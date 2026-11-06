@@ -15,12 +15,13 @@ export const MOOD_TINTS:Record<CircleMood,{color:string;tint:string}>={
  Tired:{color:'#7D7A9C',tint:'#EEEDF5'},
 };
 
+// Must stay a subset of public.circle_reaction_allowed (the server rejects anything else via RLS).
 export const MOOD_REACTIONS:Record<CircleMood,string[]>={
  Joyful:['🎉','🙌','✨','❤️'],
- Calm:['🌿','☀️','💚','❤️'],
+ Calm:['🌿','☀️','💚','✨'],
  Sad:['🫂','🫶','💙','❤️'],
  Angry:['🫂','🫶','🌿','💪'],
- Anxious:['🌿','🫶','🫂','☀️'],
+ Anxious:['🌿','🫶','🤗','☀️'],
  Tired:['🌙','☕','🫂','💜'],
 };
 
@@ -28,7 +29,7 @@ export const MOOD_REACTIONS:Record<CircleMood,string[]>={
 export const REACTION_LABELS:Record<string,string>={
  '🎉':'So happy for you','🙌':'Love this','✨':'Keep shining','❤️':'Thinking of you','💜':'Thinking of you',
  '🌿':'Take a breath','☀️':'Sending sunshine','💚':'Glad you’re feeling good','🫂':'Sending a hug',
- '🫶':'Here for you','💙':'You’re not alone','💪':'You’ve got this','🌙':'Rest well','☕':'Coffee’s on me',
+ '🫶':'Here for you','🤗':'Sending a hug','💙':'You’re not alone','💪':'You’ve got this','🌙':'Rest well','☕':'Coffee’s on me',
 };
 
 export const LITTLE_SIGNALS=[

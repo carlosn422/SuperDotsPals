@@ -232,11 +232,11 @@ export function ConversationScreen({id,focus,onBack,onInfo,onSend,onOpenMyMood,f
        </View>
        {m.myReaction?<View style={{alignSelf:'flex-end'}}><Pop trigger={m.myReaction}>
         <View accessible accessibilityLabel={'You reacted '+(REACTION_LABELS[m.myReaction]||m.myReaction)+' to '+first+'’s '+m.mood+' mood'+(pending[m.id]?', sending':'')}
-         style={[bubble,{backgroundColor:CT.primarySoft,borderBottomRightRadius:6,gap:2}]}>
+         style={{flexDirection:'row',alignItems:'center',gap:6,backgroundColor:CT.primarySoft,borderRadius:18,borderBottomRightRadius:6,paddingHorizontal:11,paddingVertical:6}}>
+         <Text style={{fontSize:17}}>{m.myReaction}</Text>
          <Text style={{fontSize:13,fontWeight:'800',color:CT.ink}}>You reacted</Text>
-         <View style={{flexDirection:'row',alignItems:'center',gap:6}}><Text style={{fontSize:20}}>{m.myReaction}</Text><Text style={{fontSize:13,fontWeight:'700',color:CT.ink}}>to {first}’s {m.mood} mood</Text></View>
-         <View style={{flexDirection:'row',alignItems:'center',justifyContent:'flex-end',gap:4}}><Text style={meta}>{m.myReactionAt?clock(m.myReactionAt):''}</Text>
-          <Ionicons name={pending[m.id]?'time-outline':'checkmark'} size={13} color={pending[m.id]?CT.muted:CT.primary}/></View>
+         <Text style={meta}>{m.myReactionAt?clock(m.myReactionAt):''}</Text>
+         <Ionicons name={pending[m.id]?'time-outline':'checkmark'} size={13} color={pending[m.id]?CT.muted:CT.primary}/>
         </View></Pop></View>:null}
       </View>;})()
      :it.kind==='myMood'?(()=>{const t=MOOD_TINTS[it.mood];const exists=store.myMoods.some(m=>m.id===it.moodId);

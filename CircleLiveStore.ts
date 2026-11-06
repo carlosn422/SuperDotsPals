@@ -211,7 +211,7 @@ export function useLiveCircleState():CircleStore{
    }catch(e:any){
     set(prev?.myReaction,prev?.myReactionAt);
     if(isNetworkError(e))up(()=>({offline:true}));
-    Alert.alert('Couldn’t send your reaction',isNetworkError(e)?'You’re offline. Try again when you’re connected.':(e?.message||'Please try again.'));
+    Alert.alert('Couldn’t send your reaction',isNetworkError(e)?'You’re offline. Try again when you’re connected.':/row-level security/i.test(String(e?.message))?'This mood can’t receive that reaction. It may have expired or stopped being shared.':(e?.message||'Please try again.'));
     return false;
    }finally{void refresh()}
   },
