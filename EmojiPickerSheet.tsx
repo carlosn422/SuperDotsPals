@@ -1,15 +1,38 @@
-import React,{useEffect,useMemo,useState} from 'react';
-import {FlatList,Modal,Pressable,Text,TextInput,TouchableOpacity,View,useWindowDimensions} from 'react-native';
+import React,{useEffect,useMemo,useRef,useState} from 'react';
+import {Animated,Easing,FlatList,Modal,Pressable,ScrollView,Text,TextInput,TextStyle,TouchableOpacity,View,useWindowDimensions} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {EMOJI_GROUPS,Emoji,EmojiItem,EmojiStyle,emojiItem} from './EmojiCatalog';
 import {usePlus} from './PlusStore';
 import {PlusPaywallSheet} from './PlusPaywall';
-import {CT} from './CircleComponents';
+import {CT,useReduceMotion} from './CircleComponents';
 
 const RECENT_KEY='circle.recentEmoji';
 const ICONS:Record<string,keyof typeof Ionicons.glyphMap>={recent:'time-outline',smileys:'happy-outline',animals:'paw-outline',food:'fast-food-outline',activity:'football-outline',travel:'car-outline',objects:'bulb-outline',symbols:'shapes-outline',flags:'flag-outline'};
 const COLS=8;
+
+// One line that slowly scrolls to its end and back when it's too long to fit; wraps instead with Reduce Motion on.
+function Marquee({text,style}:{text:string;style:TextStyle}){
+ const reduce=useReduceMotion();
+ const [box,setBox]=useState(0);
+ const [width,setWidth]=useState(0);
+ const x=useRef(new Animated.Value(0)).current;
+ const over=Math.ceil(width-box);
+ useEffect(()=>{
+  x.setValue(0);
+  if(reduce||!box||over<=0)return;
+  const move=(toValue:number)=>Animated.timing(x,{toValue,duration:over*30,easing:Easing.linear,useNativeDriver:true});
+  const loop=Animated.loop(Animated.sequence([Animated.delay(1200),move(-over),Animated.delay(1500),move(0)]));
+  loop.start();
+  return()=>loop.stop();
+ },[over,box,reduce,text]);
+ if(reduce)return <Text numberOfLines={2} style={[style,{flex:1}]}>{text}</Text>;
+ return <View style={{flex:1}} onLayout={e=>setBox(e.nativeEvent.layout.width)} accessible accessibilityLabel={text}>
+  <ScrollView horizontal scrollEnabled={false} showsHorizontalScrollIndicator={false}>
+   <Animated.Text onLayout={e=>setWidth(e.nativeEvent.layout.width)} numberOfLines={1} style={[style,{transform:[{translateX:x}]}]}>{text}</Animated.Text>
+  </ScrollView>
+ </View>;
+}
 
 // Plus emoji sheet: every emoji in Standard (Apple) or 3D (Fluent) art. Free accounts see it greyed out; a tap opens the paywall.
 export default function EmojiPickerSheet({visible,title,onClose,onPick}:{visible:boolean;title:string;onClose:()=>void;onPick:(e:string,style:EmojiStyle)=>void}){
@@ -42,7 +65,7 @@ export default function EmojiPickerSheet({visible,title,onClose,onPick}:{visible
   <View style={{height:Math.round(height*.66),backgroundColor:'#fff',borderTopLeftRadius:26,borderTopRightRadius:26,paddingTop:8}}>
    <View style={{alignSelf:'center',width:38,height:5,borderRadius:3,backgroundColor:'#DDE5E0',marginBottom:10}}/>
    <View style={{flexDirection:'row',alignItems:'center',paddingHorizontal:16,gap:10}}>
-    <Text numberOfLines={1} style={{flex:1,fontSize:15,fontWeight:'900',color:CT.ink}}>{title}</Text>
+    <Marquee text={title} style={{fontSize:15,fontWeight:'900',color:CT.ink}}/>
     <View style={{flexDirection:'row',backgroundColor:'#F0F4F2',borderRadius:14,padding:3}}>
      {(['standard','3d'] as EmojiStyle[]).map(s=><TouchableOpacity key={s} onPress={()=>setStyle(s)} accessibilityRole="button" accessibilityState={{selected:style===s}}
       style={{paddingHorizontal:12,paddingVertical:6,borderRadius:11,backgroundColor:style===s?'#fff':'transparent'}}>
