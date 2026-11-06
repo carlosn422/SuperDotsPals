@@ -72,8 +72,7 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
  );
  const {isPlus}=usePlus();
  return <View style={[s.page,{gap:17}]}>
-  {isPlus?null:<View style={{flexDirection:'row',justifyContent:'flex-end'}}><UpgradePill/></View>}
-  <StressHero mood={companion} onCheckin={onCheckin} onHealthMood={onHealthMood}/>
+  <StressHero mood={companion} onCheckin={onCheckin} onHealthMood={onHealthMood} corner={isPlus?undefined:<UpgradePill compact/>}/>
   {dayRow}
   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Breathing for Calm. Start a one-minute breathing exercise" onPress={onBreathing} style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#FFFAF2',borderRadius:22,paddingVertical:12,paddingHorizontal:14,borderWidth:1,borderColor:'#EAF3EC'}}>
    <SuperdotMascot id="calm" size={54} animate={false}/>
