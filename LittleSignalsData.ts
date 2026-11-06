@@ -40,6 +40,12 @@ export const LITTLE_SIGNALS=[
  {id:'sunshine',emoji:'☀️',label:'Sending sunshine',notify:(n:string)=>n+' sent you some sunshine ☀️'},
  {id:'gotthis',emoji:'💪',label:"You've got this",notify:(n:string)=>n+' says you’ve got this 💪'},
  {id:'cheer',emoji:'🎉',label:'Cheering you on',notify:(n:string)=>n+' is cheering you on 🎉'},
+ {id:'pray',emoji:'🙏',label:'Praying for you',notify:(n:string)=>n+' is praying for you 🙏'},
+ {id:'proud',emoji:'🌟',label:'Proud of you',notify:(n:string)=>n+' is proud of you 🌟'},
+ {id:'missyou',emoji:'💞',label:'Missing you',notify:(n:string)=>n+' misses you 💞'},
+ {id:'madeday',emoji:'😊',label:'You made my day',notify:(n:string)=>n+' says you made their day 😊'},
+ {id:'calm',emoji:'🌿',label:'Sending calm',notify:(n:string)=>n+' sent you some calm 🌿'},
+ {id:'highfive',emoji:'🙌',label:'High five',notify:(n:string)=>n+' sent you a high five 🙌'},
 ] as const;
 export type SignalId=typeof LITTLE_SIGNALS[number]['id'];
 export const signalById=(id:SignalId)=>LITTLE_SIGNALS.find(x=>x.id===id)!;
