@@ -2,7 +2,7 @@ import React,{useEffect,useState} from 'react';
 import {View,Text,TextInput,TouchableOpacity,ActivityIndicator,Alert,Switch} from 'react-native';
 import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
-import {ShareWithCircleCard} from './CircleComponents';
+import CheckinComplete from './CheckinComplete';
 
 const moods=['Joyful','Calm','Sad','Angry','Anxious','Tired'] as const;
 const fallback:Record<string,string[]>={
@@ -98,22 +98,7 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJo
    </View>
    <TouchableOpacity onPress={()=>void save(true)} disabled={busy} style={{alignItems:'center',paddingVertical:6}}><Text style={{fontSize:12,color:'#766A95'}}>Skip remaining questions & save</Text></TouchableOpacity>
   </View>:null}
-  {step===3?<View style={{gap:13,alignItems:'stretch',paddingTop:11}}>
-   <View style={{alignItems:'center',gap:7}}><Text style={{fontSize:35,color:color}}>✓</Text><SuperdotMascot id={mood} size={107}/><Text style={{fontSize:22,fontWeight:'900',color:'#251C45'}}>Check-in complete!</Text><Text style={{color:'#827892',textAlign:'center',fontSize:12,lineHeight:18}}>Your mood has been saved privately.</Text></View>
-   <View style={{backgroundColor:'#F2EFFB',borderRadius:13,padding:12,flexDirection:'row',alignItems:'center',gap:9}}><SuperdotMascot id={mood} size={54}/><View style={{flex:1}}><Text style={{fontSize:11,color:'#817892'}}>Your mood today</Text><Text style={{fontSize:15,fontWeight:'900',color:'#30264D'}}>{mood}</Text><Text style={{fontSize:11,color:'#817892'}}>{new Date().toLocaleString()}</Text></View></View>
-   {onShareWithCircle?<ShareWithCircleCard mood={mood} onShare={()=>onShareWithCircle(mood)} onKeepPrivate={()=>{}}/>:null}
-   <Text style={{fontSize:15,fontWeight:'900',color:'#30264D'}}>What's next?</Text>
-   {[
-    {icon:'📜',title:'Find a Bible verse for me',sub:'Find encouragement matched to your check-in',go:()=>onFindVerse(mood,savedAnswers)},
-    {icon:'💬',title:'Talk to your MoodPal',sub:'Explore this feeling through AI text chat',go:()=>onExploreAI(mood)},
-    {icon:'📖',title:'Write in your journal',sub:'Reflect on your thoughts',go:onJournal},
-    {icon:'💡',title:'View insights',sub:'See your patterns over time',go:onInsights},
-   ].map(item=><TouchableOpacity key={item.title} accessibilityRole="button" onPress={item.go} style={{borderWidth:1,borderColor:'#ECE9F4',borderRadius:14,padding:11,flexDirection:'row',alignItems:'center',gap:11}}>
-    <View style={{backgroundColor:'#F1ECFF',width:40,height:40,borderRadius:12,justifyContent:'center',alignItems:'center'}}><Text style={{fontSize:22}}>{item.icon}</Text></View>
-    <View style={{flex:1,gap:3}}><Text style={{fontWeight:'800',color:'#30264D',fontSize:13}}>{item.title}</Text><Text style={{color:'#89809B',fontSize:11}}>{item.sub}</Text></View>
-   </TouchableOpacity>)}
-   {primary('Back to Home',onDone)}
-  </View>:null}
+  {step===3?<CheckinComplete mood={mood} onDone={onDone} onNeedsAccount={onShareWithCircle}/>:null}
   {busy?<ActivityIndicator color={color}/>:null}
  </View>;
 
