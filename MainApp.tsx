@@ -30,12 +30,14 @@ import {AccountRequired,CreateAccountScreen,DeleteAccountScreen,useAppleLink,use
 import {useWatchAutoLink} from './WatchAutoLink';
 import {CIRCLE_MOODS} from './LittleSignalsData';
 import {useStress,ChartScrubContext} from './StressDashboard';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {displayMood,manualMoodActive,MANUAL_MOOD_HOLD_MS} from './StressEngine';
 import Svg, { Circle, Line, Path, Rect, Defs, LinearGradient, Stop, Polygon } from 'react-native-svg';
 
 type Tab = 'Today' | 'Circle' | 'Watches' | 'Actions' | 'Trends' | 'Health' | 'Settings';
 type Period = 'Day' | 'Week' | 'Month' | 'Year';
 const C = { ink:APP_THEME.ink, muted:APP_THEME.muted, green:APP_THEME.primary, deep:APP_THEME.primary, surface:APP_THEME.surface, bg:APP_THEME.background, mint:APP_THEME.primarySoft, peach:'#FFF0DE', orange:'#F4A570', lilac:APP_THEME.primarySoft, purple:APP_THEME.primary, line:APP_THEME.border, red:'#EC7D8C' };
+const HEALTH_MOOD_KEY='mood.healthRefreshAt';
 const tabs: {name:Tab}[] = [{name:'Today'},{name:'Actions'},{name:'Circle'},{name:'Watches'}];
 type MorePage='Settings'|'Health'|'Trends';
 const NAV_ITEMS=tabs.length+1;
@@ -85,14 +87,20 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  const [moodClock,setMoodClock]=useState(()=>Date.now());
  const {points:stressPoints}=useStress();
  const saveMood=(next:string)=>{setMood(next);setMoodAt(new Date().toISOString());setMoodClock(Date.now())};
+ // Tapping the Apple Health refresh on Today ends the 1-hour hold on a hand-picked mood, so the MoodPal follows the latest readings.
+ // Stored on this iPhone; any mood logged afterwards holds again as usual.
+ const [healthMoodAt,setHealthMoodAt]=useState<string|null>(null);
+ useEffect(()=>{AsyncStorage.getItem(HEALTH_MOOD_KEY).then(v=>{if(v)setHealthMoodAt(v)}).catch(()=>{})},[]);
+ const applyHealthMood=()=>{const at=new Date().toISOString();setHealthMoodAt(at);setMoodClock(Date.now());AsyncStorage.setItem(HEALTH_MOOD_KEY,at).catch(()=>{})};
+ const heldMoodAt=moodAt&&healthMoodAt&&healthMoodAt>moodAt?null:moodAt;
  // Re-evaluate when the one-hour manual hold ends and whenever the app comes back to the foreground.
  useEffect(()=>{
   const sub=AppState.addEventListener('change',st=>{if(st==='active')setMoodClock(Date.now())});
   let timer:ReturnType<typeof setTimeout>|undefined;
-  if(manualMoodActive(moodAt))timer=setTimeout(()=>setMoodClock(Date.now()),new Date(moodAt!).getTime()+MANUAL_MOOD_HOLD_MS-Date.now()+500);
+  if(manualMoodActive(heldMoodAt))timer=setTimeout(()=>setMoodClock(Date.now()),new Date(heldMoodAt!).getTime()+MANUAL_MOOD_HOLD_MS-Date.now()+500);
   return()=>{sub.remove();if(timer)clearTimeout(timer)};
- },[moodAt]);
- const shownMood=displayMood(mood,moodAt,stressPoints,moodClock);
+ },[heldMoodAt]);
+ const shownMood=displayMood(mood,heldMoodAt,stressPoints,moodClock);
  useEffect(()=>{let active=true;(async()=>{
   const {data:{user}}=await supabase.auth.getUser();if(!user)return;
   const {data,error}=await supabase.from('wellness_journal').select('mood,occurred_at').eq('user_id',user.id).not('mood','is',null).order('occurred_at',{ascending:false}).limit(1).maybeSingle();
@@ -211,7 +219,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   <View style={s.top}></View>
   <View style={{flex:1}}>
   <ScrollView ref={pager} horizontal pagingEnabled scrollEnabled={!chartScrubbing} bounces={false} showsHorizontalScrollIndicator={false} scrollEventThrottle={16} onMomentumScrollEnd={onPageSettled} directionalLockEnabled style={{flex:1}} keyboardShouldPersistTaps="handled">
-  <View key="Today" style={{width:pageWidth,flex:1}}><ChartScrubContext.Provider value={setChartScrubbing}><ScrollView scrollEnabled={!chartScrubbing} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><FamilySwitcher disabled={isGuest} focused={tab==='Today'&&!moreScreen} onAdd={()=>go('Watches')}><WellnessToday onInvite={()=>{if(isGuest){go('Settings');setSettingsPage('account')}else setCircleSheet([{name:'invite'}])}} onPlans={()=>{go('Settings');setSettingsPage('plus')}} dayRow={isGuest?null:<MiniMoodCalendar/>} socialCard={<LittleSignalsTodayCard onOpenSignals={()=>setCircleSheet([{name:'today'}])} onOpenMood={id=>setCircleSheet([{name:'friendMood',id}])} onOpenSignal={id=>setCircleSheet([{name:'signalReceived',signalId:id}])} onSend={()=>setCircleSheet([{name:'send'}])}/>} companion={shownMood} accent={colors.accent} water={water} caffeine={coffee} mood={mood} onCheckin={()=>{go('Actions');openAction('checkin')}} onBreathing={()=>{go('Actions');openAction('breathing')}} onChat={()=>{go('Actions');openAction('chat')}} onActions={()=>{go('Actions');setActionView(null);setActionDetail('water')}} onCaffeine={()=>{go('Actions');setActionView(null);setActionDetail('caffeine')}} onJournal={()=>{go('Actions');openAction('history')}} onAddWater={()=>void quickAddHabit('water')} onAddCaffeine={()=>void quickAddHabit('caffeine')} addingWater={quickAdding.water} addingCaffeine={quickAdding.caffeine}/></FamilySwitcher></ScrollView></ChartScrubContext.Provider></View>
+  <View key="Today" style={{width:pageWidth,flex:1}}><ChartScrubContext.Provider value={setChartScrubbing}><ScrollView scrollEnabled={!chartScrubbing} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><FamilySwitcher disabled={isGuest} focused={tab==='Today'&&!moreScreen} onAdd={()=>go('Watches')}><WellnessToday onHealthMood={applyHealthMood} onInvite={()=>{if(isGuest){go('Settings');setSettingsPage('account')}else setCircleSheet([{name:'invite'}])}} onPlans={()=>{go('Settings');setSettingsPage('plus')}} dayRow={isGuest?null:<MiniMoodCalendar/>} socialCard={<LittleSignalsTodayCard onOpenSignals={()=>setCircleSheet([{name:'today'}])} onOpenMood={id=>setCircleSheet([{name:'friendMood',id}])} onOpenSignal={id=>setCircleSheet([{name:'signalReceived',signalId:id}])} onSend={()=>setCircleSheet([{name:'send'}])}/>} companion={shownMood} accent={colors.accent} water={water} caffeine={coffee} mood={mood} onCheckin={()=>{go('Actions');openAction('checkin')}} onBreathing={()=>{go('Actions');openAction('breathing')}} onChat={()=>{go('Actions');openAction('chat')}} onActions={()=>{go('Actions');setActionView(null);setActionDetail('water')}} onCaffeine={()=>{go('Actions');setActionView(null);setActionDetail('caffeine')}} onJournal={()=>{go('Actions');openAction('history')}} onAddWater={()=>void quickAddHabit('water')} onAddCaffeine={()=>void quickAddHabit('caffeine')} addingWater={quickAdding.water} addingCaffeine={quickAdding.caffeine}/></FamilySwitcher></ScrollView></ChartScrubContext.Provider></View>
   <View key="Actions" style={{width:pageWidth,flex:1}}><ScrollView ref={actionScroll} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
   {actionDetail||actionView?<TouchableOpacity onPress={()=>{setActionView(null);setActionDetail(null);actionScroll.current?.scrollTo({y:0,animated:true});}} style={{flexDirection:'row',alignItems:'center',gap:8,paddingVertical:9}}><Ionicons name="arrow-back" size={20} color={colors.accent}/><Text style={{color:colors.accent,fontWeight:'800'}}>All actions</Text></TouchableOpacity>:null}
   {actionDetail?<HabitDetails habit={actionDetail} onBack={()=>{setActionDetail(null);actionScroll.current?.scrollTo({y:0,animated:true})}} onSaved={(habit,n)=>{if(habit==='water')setWater(n);else setCoffee(n)}}/>:

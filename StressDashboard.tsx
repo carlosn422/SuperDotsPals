@@ -24,13 +24,13 @@ export function useStress(){
 function useWidth(initial=300){const [w,setW]=useState(initial);return {width:w,onLayout:(e:any)=>setW(Math.max(160,e.nativeEvent.layout.width))}}
 const fmtTime=(iso:string)=>new Date(iso).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
 
-export function StressHero({name,mood,onCheckin}:{name?:string;mood:string;onCheckin:()=>void}){
+export function StressHero({name,mood,onCheckin,onHealthMood}:{name?:string;mood:string;onCheckin:()=>void;onHealthMood?:()=>void}){
  const {today,baseline,loading,readings,reload}=useStress();
  const [syncing,setSyncing]=useState(false);
  const available=healthKitAvailable();
  async function sync(silent=false){
   setSyncing(true);
-  try{await syncNativeHealth();await AsyncStorage.setItem(SYNC_FLAG,'1');await reload();void enableHealthBackgroundUpdates()}
+  try{await syncNativeHealth();await AsyncStorage.setItem(SYNC_FLAG,'1');await reload();void enableHealthBackgroundUpdates();if(!silent)onHealthMood?.()}
   catch(e:any){if(!silent)Alert.alert('Health sync unavailable','Could not connect to Apple Health. Please make sure you have granted permissions in the Health app.')}
   finally{setSyncing(false)}
  }
@@ -52,7 +52,7 @@ export function StressHero({name,mood,onCheckin}:{name?:string;mood:string;onChe
   <Text style={st.heroUpdated}>{today?`Score ${today.score}/100 · Updated ${fmtTime(today.updated)} · Not a medical measurement`:' '}</Text>
   <View style={{flexDirection:'row',gap:10,alignSelf:'stretch'}}>
    <TouchableOpacity accessibilityRole="button" onPress={onCheckin} style={[st.heroButton,{backgroundColor:SW.ink,flex:1}]}><Text style={st.heroButtonText}>Log how you feel</Text></TouchableOpacity>
-   {available?<TouchableOpacity accessibilityRole="button" accessibilityLabel="Sync Apple Health" disabled={syncing} onPress={()=>void sync()} style={[st.heroButton,{backgroundColor:'#fff',paddingHorizontal:16}]}>{syncing?<ActivityIndicator color={SW.ink}/>:<Ionicons name="sync" size={20} color={SW.ink}/>}</TouchableOpacity>:null}
+   {available?<TouchableOpacity accessibilityRole="button" accessibilityLabel="Update my MoodPal from Apple Health" disabled={syncing} onPress={()=>void sync()} style={[st.heroButton,{backgroundColor:'#fff',paddingHorizontal:16}]}>{syncing?<ActivityIndicator color={SW.ink}/>:<Ionicons name="sync" size={20} color={SW.ink}/>}</TouchableOpacity>:null}
   </View>
  </View>;
 }

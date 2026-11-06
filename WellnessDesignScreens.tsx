@@ -60,7 +60,7 @@ export function MeetYourMoods({onCheckin}:{onCheckin:()=>void}){
    </TouchableOpacity>
  </View>;
 }
-export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,onChat,onBreathing,onActions,onCaffeine,onJournal,onAddWater,onAddCaffeine,addingWater,addingCaffeine,socialCard,dayRow,onInvite,onPlans}:{onInvite:()=>void;onPlans:()=>void;socialCard?:React.ReactNode;dayRow?:React.ReactNode;companion:string;accent:string;water:number;caffeine:number;mood:string;onCheckin:()=>void;onChat:()=>void;onBreathing:()=>void;onActions:()=>void;onCaffeine:()=>void;onJournal:()=>void;onAddWater:()=>void;onAddCaffeine:()=>void;addingWater:boolean;addingCaffeine:boolean}){
+export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,onHealthMood,onChat,onBreathing,onActions,onCaffeine,onJournal,onAddWater,onAddCaffeine,addingWater,addingCaffeine,socialCard,dayRow,onInvite,onPlans}:{onInvite:()=>void;onPlans:()=>void;socialCard?:React.ReactNode;dayRow?:React.ReactNode;companion:string;accent:string;water:number;caffeine:number;mood:string;onCheckin:()=>void;onChat:()=>void;onBreathing:()=>void;onActions:()=>void;onCaffeine:()=>void;onJournal:()=>void;onAddWater:()=>void;onAddCaffeine:()=>void;addingWater:boolean;addingCaffeine:boolean;onHealthMood?:()=>void}){
  const today=new Date();
  const date=today.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
  const row=(icon:any,label:string,detail:string,onPress:()=>void,quickAdd?:()=>void,adding=false)=>(
@@ -73,7 +73,7 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
  const {isPlus}=usePlus();
  return <View style={[s.page,{gap:17}]}>
   {isPlus?null:<View style={{flexDirection:'row',justifyContent:'flex-end'}}><UpgradePill/></View>}
-  <StressHero mood={companion} onCheckin={onCheckin}/>
+  <StressHero mood={companion} onCheckin={onCheckin} onHealthMood={onHealthMood}/>
   {dayRow}
   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Breathing for Calm. Start a one-minute breathing exercise" onPress={onBreathing} style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#FFFAF2',borderRadius:22,paddingVertical:12,paddingHorizontal:14,borderWidth:1,borderColor:'#EAF3EC'}}>
    <SuperdotMascot id="calm" size={54} animate={false}/>
