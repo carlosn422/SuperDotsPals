@@ -25,7 +25,10 @@ export function SignalPicker({initial=[],onSent,onInvite}:{initial?:string[];onS
  const limited=to.filter(atHourlyLimit);
  const ready=to.filter(id=>!atHourlyLimit(id));
  const first=(id:string)=>store.friends.find(f=>f.id===id)?.name.split(' ')[0]||'a friend';
- const send=()=>{if(!sig||!ready.length)return;Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(()=>{});store.sendSignal(ready,sig);onSent(sig,ready,limited.map(first))};
+ const limitNote=!ready.length?(limited.length>1?'You’ve sent these friends 3 signals this hour. Try again a little later.':'You’ve sent '+first(limited[0])+' 3 signals this hour. Try again a little later.')
+  :limited.length>1?'Some friends already got 3 signals from you this hour. Everyone else will still get yours.'
+  :first(limited[0]??'')+' already got 3 signals from you this hour, so they’ll be skipped.';
+ const send=()=>{if(!sig||!ready.length)return;Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(()=>{});store.sendSignal(ready,sig);onSent(sig,ready,limited)};
  const seg=(k:'friends'|'groups',label:string,icon:any)=>{const on=tab===k;return <TouchableOpacity key={k} onPress={()=>setTab(k)} accessibilityRole="tab" accessibilityState={{selected:on}}
   style={{flex:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,paddingVertical:9,borderRadius:20,backgroundColor:on?CT.primary:'transparent'}}>
   <Ionicons name={icon} size={17} color={on?'#fff':CT.ink}/><Text style={{fontSize:14,fontWeight:'800',color:on?'#fff':CT.ink}}>{label}</Text></TouchableOpacity>};
@@ -54,14 +57,14 @@ export function SignalPicker({initial=[],onSent,onInvite}:{initial?:string[];onS
    style={{width:'48%',flexGrow:1,flexDirection:'row',alignItems:'center',gap:9,padding:12,borderRadius:16,borderWidth:1.5,borderColor:on?CT.primary:CT.border,backgroundColor:on?CT.primarySoft:'#fff'}}>
    <Text style={{fontSize:24}}>{s.emoji}</Text><Text style={{flex:1,fontWeight:'800',fontSize:13,color:CT.ink}}>{s.label}</Text></TouchableOpacity>})}</View>
   {sentToday>=20?<Text style={[cs.muted,{textAlign:'center'}]}>You’ve sent a lot of signals today. Try again tomorrow.</Text>:null}
-  {limited.length?<View accessibilityLiveRegion="polite" style={{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:'#FFF6E5',borderRadius:14,padding:12,borderWidth:1,borderColor:'#F3D9A4'}}><Ionicons name="time-outline" size={20} color="#9A6A00"/><Text style={{flex:1,fontSize:13,fontWeight:'700',color:'#6B4A00'}}>{limited.map(first).join(', ')} already got 3 signals from you this hour{ready.length?', so they’ll be skipped.':'. Try again a little later.'}</Text></View>:null}
+  {limited.length?<View accessibilityLiveRegion="polite" style={{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:'#FFF6E5',borderRadius:14,padding:12,borderWidth:1,borderColor:'#F3D9A4'}}><Ionicons name="time-outline" size={20} color="#9A6A00"/><Text style={{flex:1,fontSize:13,fontWeight:'700',color:'#6B4A00'}}>{limitNote}</Text></View>:null}
   <PrimaryButton label={!to.length?'Choose who to send to':!ready.length?'Try again later':ready.length>1?'Send to '+ready.length+' friends':'Send to '+first(ready[0])} icon="heart" disabled={!ready.length||!sig||sentToday>=20} onPress={send}/>
  </View>;
 }
 
 // Bottom sheet. After sending, the signal floats up in a bubble (like it lands on their watch), then the sheet closes.
 function SentBubble({signal,skipped,onDone}:{signal:SignalId;skipped:string[];onDone:()=>void}){
- const reduce=useReduceMotion();const v=useRef(new Animated.Value(0)).current;const s=signalById(signal);
+ const store=useCircle();const reduce=useReduceMotion();const v=useRef(new Animated.Value(0)).current;const s=signalById(signal);
  useEffect(()=>{
   const anim=reduce?Animated.sequence([Animated.timing(v,{toValue:1,duration:200,useNativeDriver:true}),Animated.delay(skipped.length?1700:900)])
    :Animated.sequence([Animated.spring(v,{toValue:1,friction:5,tension:90,useNativeDriver:true}),Animated.delay(skipped.length?1300:550),Animated.timing(v,{toValue:2,duration:550,easing:Easing.in(Easing.quad),useNativeDriver:true})]);
@@ -71,13 +74,13 @@ function SentBubble({signal,skipped,onDone}:{signal:SignalId;skipped:string[];on
  const y=v.interpolate({inputRange:[0,1,2],outputRange:[reduce?0:80,0,reduce?0:-260]});
  const op=v.interpolate({inputRange:[0,.3,1,1.7,2],outputRange:[0,1,1,1,reduce?1:0]});
  return <View pointerEvents="none" style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center',backgroundColor:'rgba(244,250,246,.82)'}]}>
-  <Animated.View accessible accessibilityLiveRegion="polite" accessibilityLabel={s.label+' sent'+(skipped.length?'. Skipped '+skipped.join(', '):'')} style={{opacity:op,transform:[{translateY:y},{scale}],alignItems:'center',gap:8}}>
+  <Animated.View accessible accessibilityLiveRegion="polite" accessibilityLabel={s.label+' sent'+(skipped.length?'. Some friends were skipped':'')} style={{opacity:op,transform:[{translateY:y},{scale}],alignItems:'center',gap:8}}>
    <View style={{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:'#fff',borderRadius:28,borderBottomLeftRadius:8,paddingHorizontal:18,paddingVertical:14,shadowColor:'#1D2B33',shadowOpacity:.15,shadowRadius:16,shadowOffset:{width:0,height:6}}}>
     <Text style={{fontSize:44}}>{s.emoji}</Text>
     <Text style={{fontSize:17,fontWeight:'900',color:CT.ink}}>{s.label}</Text>
    </View>
    <Text style={{fontSize:13,fontWeight:'800',color:CT.primary}}>Sent</Text>
-   {skipped.length?<Text style={{fontSize:13,fontWeight:'700',color:'#6B4A00',textAlign:'center',maxWidth:260}}>Skipped {skipped.join(', ')} (3 this hour)</Text>:null}
+   {skipped.length?<Text style={{fontSize:13,fontWeight:'700',color:'#6B4A00',textAlign:'center',maxWidth:260}}>{skipped.length>1?'Some friends were skipped':'Skipped '+(store.friends.find(f=>f.id===skipped[0])?.name.split(' ')[0]||'a friend')}</Text>:null}
   </Animated.View>
  </View>;
 }
