@@ -1,3 +1,4 @@
+import {Ionicons} from '@expo/vector-icons';
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {AppState,View,Text,TouchableOpacity,TextInput,ActivityIndicator,Modal,StyleSheet,ScrollView,Animated,Easing,PanResponder,Pressable,useWindowDimensions} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -93,15 +94,16 @@ export function ManageFamilyProfile({profile,onClose,onDeleted}:{profile:FamilyP
  }
  return <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={busy?undefined:onClose}>
   <ScrollView ref={scroll} style={{backgroundColor:'#F4FAF6'}} contentContainerStyle={{padding:20,gap:12}} automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled">
-   <TouchableOpacity disabled={busy} onPress={onClose} accessibilityRole="button"><Text style={{color:'#1D2B33',fontWeight:'800',fontSize:16}}>‹ Watches</Text></TouchableOpacity>
+   <TouchableOpacity disabled={busy} onPress={onClose} accessibilityRole="button" style={{flexDirection:'row',alignItems:'center',gap:2}}><Ionicons name="chevron-back" size={22} color="#1D2B33"/><Text style={{color:'#1D2B33',fontWeight:'800',fontSize:16}}>Watches</Text></TouchableOpacity>
    <View style={{alignItems:'center',gap:6}}><WatchImage color={color} name={shortProfileName(name)} width={130}/><Text style={styles.title}>{name}</Text></View>
-   <View style={styles.card}>
-    <Text style={styles.sub}>Mood-only family profile. No heart rate, HRV, sleep, activity or other Health data is collected.</Text>
-    <Text style={styles.sub}>Latest mood: {profile.mood?profile.mood+' · '+new Date(profile.moodAt||'').toLocaleString():'none yet'}</Text>
-    <Text style={styles.sub}>Watch: {profile.connected?'linked':'not linked'}{profile.lastSeenAt?' · last seen '+new Date(profile.lastSeenAt).toLocaleString():''}</Text>
+   <View style={{backgroundColor:'#fff',borderRadius:22,padding:16,gap:8}}>
+    <Text style={{color:'#6E7D86',fontSize:13}}>Profile  <Text style={{color:'#1D2B33',fontWeight:'700'}}>Family watch · mood only</Text></Text>
+    <Text style={{color:'#6E7D86',fontSize:13}}>Status  <Text style={{color:'#1D2B33',fontWeight:'700'}}>{profile.connected?'Linked':'Not linked'}{profile.lastSeenAt?' · last active '+new Date(profile.lastSeenAt).toLocaleDateString():''}</Text></Text>
+    <Text style={{color:'#6E7D86',fontSize:13}}>Latest mood  <Text style={{color:'#1D2B33',fontWeight:'700'}}>{profile.mood?profile.mood+' · '+new Date(profile.moodAt||'').toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}):'None yet'}</Text></Text>
+    <Text style={{color:'#6E7D86',fontSize:12,lineHeight:17}}>No heart rate, HRV, sleep, activity or other Health data is collected.</Text>
    </View>
    <WatchShareGroup kind="family" id={profile.id}/>
-   {!renaming?<TouchableOpacity accessibilityRole="button" style={styles.button} disabled={busy} onPress={()=>{setDraft(shortProfileName(name));setNameError('');setRenaming(true)}}><Text style={styles.buttonText}>Rename Watch</Text></TouchableOpacity>:
+   {!renaming?<TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>{setDraft(shortProfileName(name));setNameError('');setRenaming(true)}} style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#fff',borderRadius:18,paddingVertical:14,paddingHorizontal:16}}><Ionicons name="pencil-outline" size={20} color="#34B37E"/><Text style={{flex:1,fontWeight:'800',color:'#1D2B33'}}>Name</Text><Text style={{color:'#6E7D86'}}>{shortProfileName(name)}</Text><Ionicons name="chevron-forward" size={17} color="#6E7D86"/></TouchableOpacity>:
    <View style={styles.card} onLayout={e=>{renameY.current=e.nativeEvent.layout.y}}>
     <Text style={[styles.sub,{fontWeight:'700'}]}>Name shown in your profile switcher and to your Circle</Text>
     <TextInput value={draft} onChangeText={setDraft} maxLength={40} autoFocus autoCapitalize="words" returnKeyType="done" onSubmitEditing={()=>void saveName()} onFocus={()=>setTimeout(()=>scroll.current?.scrollTo({y:Math.max(0,renameY.current-16),animated:true}),300)} editable={!savingName} placeholder="Tristan" style={styles.input} accessibilityLabel="Watch name"/>
@@ -111,9 +113,9 @@ export function ManageFamilyProfile({profile,onClose,onDeleted}:{profile:FamilyP
     </TouchableOpacity>
     <TouchableOpacity disabled={savingName} onPress={()=>{setRenaming(false);setNameError('')}}><Text style={{color:purple,fontWeight:'800',textAlign:'center'}}>Cancel</Text></TouchableOpacity>
    </View>}
-   {profile.connected?<TouchableOpacity accessibilityRole="button" style={styles.button} onPress={()=>setRecoloring(true)}><Text style={styles.buttonText}>{color?'Change Watch Color':'Choose Watch Color'}</Text></TouchableOpacity>:null}
+   {profile.connected?<TouchableOpacity accessibilityRole="button" onPress={()=>setRecoloring(true)} style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#fff',borderRadius:18,paddingVertical:14,paddingHorizontal:16}}><Ionicons name="color-palette-outline" size={20} color="#34B37E"/><Text style={{flex:1,fontWeight:'800',color:'#1D2B33'}}>Watch color</Text><Text style={{color:'#6E7D86'}}>{color?colorName(color):'Choose'}</Text><Ionicons name="chevron-forward" size={17} color="#6E7D86"/></TouchableOpacity>:null}
    <WatchColorSheet visible={recoloring} name={shortProfileName(name)} initial={color} onSave={saveColor} onClose={()=>setRecoloring(false)}/>
-   {!confirming?<TouchableOpacity style={[styles.button,{backgroundColor:red}]} onPress={()=>setConfirming(true)}><Text style={styles.buttonText}>Remove Family Watch</Text></TouchableOpacity>:
+   {!confirming?<TouchableOpacity accessibilityRole="button" onPress={()=>setConfirming(true)} style={{alignItems:'center',paddingVertical:14}}><Text style={{color:red,fontWeight:'800'}}>Remove Family Watch</Text></TouchableOpacity>:
    <View style={[styles.card,{borderColor:'#F1C7D0'}]}>
     <Text style={{fontWeight:'900',color:red}}>Permanently remove {name}?</Text>
     <Text style={styles.sub}>The watch is signed out first. Then this MoodPals data is permanently deleted:</Text>
