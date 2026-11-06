@@ -9,11 +9,12 @@ const PLUS='#7B5CE6',PLUS_SOFT='#F1ECFF';
 
 export function PlusBadge(){return <View style={s.badge}><Text style={s.badgeText}>PLUS</Text></View>;}
 
-export function UpgradePill(){
+// compact: smaller version that sits in the corner of the Today mascot card.
+export function UpgradePill({compact=false}:{compact?:boolean}={}){
  const {isPlus,showPaywall}=usePlus();
  if(isPlus)return null;
- return <TouchableOpacity accessibilityRole="button" accessibilityLabel="Upgrade to MoodPals Plus" onPress={()=>showPaywall('general')} style={s.pill}>
-  <Ionicons name="sparkles" size={15} color={PLUS}/><Text style={s.pillText}>Upgrade</Text>
+ return <TouchableOpacity accessibilityRole="button" accessibilityLabel="Upgrade to MoodPals Plus" onPress={()=>showPaywall('general')} hitSlop={6} style={[s.pill,compact&&{paddingHorizontal:10,minHeight:30,gap:5}]}>
+  <Ionicons name="sparkles" size={compact?13:15} color={PLUS}/><Text style={[s.pillText,compact&&{fontSize:13}]}>Upgrade</Text>
  </TouchableOpacity>;
 }
 

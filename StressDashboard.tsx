@@ -24,7 +24,7 @@ export function useStress(){
 function useWidth(initial=300){const [w,setW]=useState(initial);return {width:w,onLayout:(e:any)=>setW(Math.max(160,e.nativeEvent.layout.width))}}
 const fmtTime=(iso:string)=>new Date(iso).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
 
-export function StressHero({name,mood,onCheckin,onHealthMood}:{name?:string;mood:string;onCheckin:()=>void;onHealthMood?:()=>void}){
+export function StressHero({name,mood,onCheckin,onHealthMood,corner}:{name?:string;mood:string;onCheckin:()=>void;onHealthMood?:()=>void;corner?:React.ReactNode}){
  const {today,baseline,loading,readings,reload}=useStress();
  const [syncing,setSyncing]=useState(false);
  const available=healthKitAvailable();
@@ -41,6 +41,7 @@ export function StressHero({name,mood,onCheckin,onHealthMood}:{name?:string;mood
  const detail=level?level.summary:!readings.length?'Connect Apple Health so your MoodPal can read HRV and heart rate from your iPhone and Apple Watch.':!baseline.ready?`Building your personal baseline: ${baseline.samples}/${MIN_BASELINE_SAMPLES} HRV readings across ${baseline.days}/${MIN_BASELINE_DAYS} days.`:'No HRV reading in the last 24 hours. Wear your Apple Watch to get a fresh score.';
  const position=today?100-today.score:50;
  return <View style={[st.hero,{backgroundColor:tint}]}>
+  {corner?<View style={{position:'absolute',top:12,right:12,zIndex:2}}>{corner}</View>:null}
   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Log how you feel" activeOpacity={0.8} onPress={onCheckin} style={{alignSelf:'center'}}><SuperdotMascot id={mood||level?.mascot||'calm'} size={168}/></TouchableOpacity>
   <Text style={st.heroGreeting}>{name?`Hi ${name}, here's your daily score`:"Here's your daily stress score"}</Text>
   <Text style={[st.heroLevel,{color:level?.color||SW.ink}]} accessibilityLabel={today?`Stress ${title}, score ${today.score} of 100`:title}>{title}</Text>
