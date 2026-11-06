@@ -59,6 +59,8 @@ if [[ ! -d ios || ! -f ios/Podfile ]]; then
 fi
 (
   cd ios
+  # ios/ is gitignored, so Podfile.lock is machine-local; drop it so bumped Expo modules don't conflict with stale local podspecs.
+  rm -rf Pods Podfile.lock
   pod install --repo-update
 )
 
