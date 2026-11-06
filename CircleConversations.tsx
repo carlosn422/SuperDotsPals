@@ -272,7 +272,6 @@ export function ConversationScreen({id,focus,onBack,onInfo,onSend,fill,padding=2
   {target?<>
    <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
     <Text numberOfLines={1} style={{flex:1,fontSize:13,fontWeight:'800',color:CT.ink}}>React to {first}’s <Text style={{color:MOOD_TINTS[target.mood.mood].color}}>{target.mood.mood}</Text> mood{active.length>1?' · '+clock(target.mood.sharedAt):''}</Text>
-    {isFriend?<TouchableOpacity onPress={onSend} accessibilityRole="button" accessibilityLabel={'Send '+first+' a Little Signal'} hitSlop={8}><Ionicons name="heart-outline" size={22} color={CT.primary}/></TouchableOpacity>:null}
    </View>
    <View style={{flexDirection:'row',justifyContent:'space-between'}}>
     {MOOD_REACTIONS[target.mood.mood].map(e=>{const on=target.mood.myReaction===e;return <TouchableOpacity key={e} disabled={!!pending[target.mood.id]} onPress={()=>void react(target.mood,e)} accessibilityRole="button"
