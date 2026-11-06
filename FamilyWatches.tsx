@@ -1,4 +1,3 @@
-import {Ionicons} from '@expo/vector-icons';
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {AppState,View,Text,TouchableOpacity,TextInput,ActivityIndicator,Modal,StyleSheet,ScrollView,Animated,Easing,PanResponder,Pressable,useWindowDimensions} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
