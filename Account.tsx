@@ -22,6 +22,54 @@ export function useIsGuest(){
  return guest;
 }
 
+// "Signed in as" card at the top of Settings: name, email, how they sign in, and their plan.
+export function AccountSummary({accent,onPlus}:{accent:string;onPlus:()=>void}){
+ const {isPlus}=usePlus();
+ const [info,setInfo]=useState<{name:string;email:string;apple:boolean}|null>(null);
+ useEffect(()=>{
+  let alive=true;
+  const load=async()=>{
+   const {data:{user}}=await supabase.auth.getUser();
+   if(!user||user.is_anonymous){if(alive)setInfo(null);return;}
+   const {data}=await supabase.from('profiles').select('display_name').eq('id',user.id).maybeSingle();
+   const meta=user.user_metadata||{};
+   if(alive)setInfo({name:data?.display_name||meta.full_name||meta.name||'',email:user.email||'',apple:hasApple(user.identities)});
+  };
+  void load().catch(()=>{});
+  const {data:{subscription}}=supabase.auth.onAuthStateChange(()=>{void load().catch(()=>{})});
+  return()=>{alive=false;subscription.unsubscribe()};
+ },[]);
+ if(!info)return null;
+ const title=info.name||info.email||'Your account';
+ return <View accessible accessibilityLabel={'Signed in as '+title+(info.name&&info.email?', '+info.email:'')+', '+(isPlus?'Plus':'Free')+' plan'} style={a.card}>
+  <View style={[a.avatar,{backgroundColor:accent+'22'}]}><Text style={[a.initial,{color:accent}]}>{(title.trim()[0]||'?').toUpperCase()}</Text></View>
+  <View style={{flex:1,gap:2}}>
+   <Text style={a.label}>Signed in as</Text>
+   <Text numberOfLines={1} style={a.name}>{title}</Text>
+   {info.name&&info.email?<Text numberOfLines={1} style={a.email}>{info.email}</Text>:null}
+   <View style={{flexDirection:'row',alignItems:'center',gap:5,marginTop:2}}>
+    <Ionicons name={info.apple?'logo-apple':'mail-outline'} size={12} color={T.muted}/>
+    <Text style={a.method}>{info.apple?'Sign in with Apple':'Email and password'}</Text>
+   </View>
+  </View>
+  <TouchableOpacity onPress={onPlus} accessibilityRole="button" accessibilityLabel={(isPlus?'Plus':'Free')+' plan. View plans'} hitSlop={8} style={[a.plan,isPlus?{backgroundColor:'#F1ECFF'}:{backgroundColor:'#F0F2F1'}]}>
+   {isPlus?<Ionicons name="sparkles" size={12} color="#7B5CE6"/>:null}
+   <Text style={[a.planText,{color:isPlus?'#7B5CE6':T.muted}]}>{isPlus?'Plus':'Free'}</Text>
+  </TouchableOpacity>
+ </View>;
+}
+const a=StyleSheet.create({
+ card:{backgroundColor:'#fff',borderRadius:23,padding:16,flexDirection:'row',alignItems:'center',gap:13},
+ avatar:{width:46,height:46,borderRadius:23,alignItems:'center',justifyContent:'center'},
+ initial:{fontSize:20,fontWeight:'900'},
+ label:{fontSize:11,fontWeight:'700',color:T.muted},
+ name:{fontSize:16,fontWeight:'900',color:T.ink},
+ email:{fontSize:13,color:T.muted},
+ method:{fontSize:11,color:T.muted,fontWeight:'600'},
+ plan:{flexDirection:'row',alignItems:'center',gap:4,borderRadius:14,paddingHorizontal:11,paddingVertical:6},
+ planText:{fontSize:13,fontWeight:'900'},
+});
+
 const DELETED_ITEMS=['Your MoodPals profile','Your linked family profiles and their family watches','Your mood history','Your stored health and wellness data','Your Circle memberships and group assignments','Your emoji reactions and notifications','Your linked Apple Watch connections','Your account preferences and other personal information'];
 
 export function DeleteAccountScreen({accent,onBack}:{accent:string;onBack:()=>void}){
