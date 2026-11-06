@@ -66,6 +66,7 @@ export default function FamilyWatches({reloadKey,onAdd}:{reloadKey:number;onAdd?
  </View>;
 }
 
+import WatchShareGroup from './WatchShareGroup';
 export function ManageFamilyProfile({profile,onClose,onDeleted}:{profile:FamilyProfile;onClose:()=>void;onDeleted:()=>void|Promise<void>}){
  const [confirming,setConfirming]=useState(false),[typed,setTyped]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [color,setColor]=useState(isWatchColor(profile.watchColor)?profile.watchColor:null),[recoloring,setRecoloring]=useState(false);
@@ -91,16 +92,15 @@ export function ManageFamilyProfile({profile,onClose,onDeleted}:{profile:FamilyP
   finally{setBusy(false)}
  }
  return <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={busy?undefined:onClose}>
-  <ScrollView ref={scroll} contentContainerStyle={{padding:22,gap:14}} automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled">
-   <TouchableOpacity disabled={busy} onPress={onClose}><Text style={{color:purple,fontWeight:'800'}}>‹ Back</Text></TouchableOpacity>
+  <ScrollView ref={scroll} style={{backgroundColor:'#F4FAF6'}} contentContainerStyle={{padding:20,gap:12}} automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled">
+   <TouchableOpacity disabled={busy} onPress={onClose} accessibilityRole="button"><Text style={{color:'#1D2B33',fontWeight:'800',fontSize:16}}>‹ Watches</Text></TouchableOpacity>
    <View style={{alignItems:'center',gap:6}}><WatchImage color={color} name={shortProfileName(name)} width={130}/><Text style={styles.title}>{name}</Text></View>
    <View style={styles.card}>
-    <Text style={styles.sub}>Profile: {shortProfileName(name)} (mood-only family watch)</Text>
-    <Text style={styles.sub}>Watch color: {color?colorName(color):'not chosen yet'}</Text>
     <Text style={styles.sub}>Mood-only family profile. No heart rate, HRV, sleep, activity or other Health data is collected.</Text>
     <Text style={styles.sub}>Latest mood: {profile.mood?profile.mood+' · '+new Date(profile.moodAt||'').toLocaleString():'none yet'}</Text>
     <Text style={styles.sub}>Watch: {profile.connected?'linked':'not linked'}{profile.lastSeenAt?' · last seen '+new Date(profile.lastSeenAt).toLocaleString():''}</Text>
    </View>
+   <WatchShareGroup kind="family" id={profile.id}/>
    {!renaming?<TouchableOpacity accessibilityRole="button" style={styles.button} disabled={busy} onPress={()=>{setDraft(shortProfileName(name));setNameError('');setRenaming(true)}}><Text style={styles.buttonText}>Rename Watch</Text></TouchableOpacity>:
    <View style={styles.card} onLayout={e=>{renameY.current=e.nativeEvent.layout.y}}>
     <Text style={[styles.sub,{fontWeight:'700'}]}>Name shown in your profile switcher and to your Circle</Text>
@@ -113,7 +113,7 @@ export function ManageFamilyProfile({profile,onClose,onDeleted}:{profile:FamilyP
    </View>}
    {profile.connected?<TouchableOpacity accessibilityRole="button" style={styles.button} onPress={()=>setRecoloring(true)}><Text style={styles.buttonText}>{color?'Change Watch Color':'Choose Watch Color'}</Text></TouchableOpacity>:null}
    <WatchColorSheet visible={recoloring} name={shortProfileName(name)} initial={color} onSave={saveColor} onClose={()=>setRecoloring(false)}/>
-   {!confirming?<TouchableOpacity style={[styles.button,{backgroundColor:red}]} onPress={()=>setConfirming(true)}><Text style={styles.buttonText}>Remove Linked Profile</Text></TouchableOpacity>:
+   {!confirming?<TouchableOpacity style={[styles.button,{backgroundColor:red}]} onPress={()=>setConfirming(true)}><Text style={styles.buttonText}>Remove Family Watch</Text></TouchableOpacity>:
    <View style={[styles.card,{borderColor:'#F1C7D0'}]}>
     <Text style={{fontWeight:'900',color:red}}>Permanently remove {name}?</Text>
     <Text style={styles.sub}>The watch is signed out first. Then this MoodPals data is permanently deleted:</Text>

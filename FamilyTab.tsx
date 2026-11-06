@@ -26,9 +26,9 @@ function FamilyCard({profile,groups,onManage}:{profile:FamilyProfile;groups:Grou
  useEffect(()=>{void load();const t=setInterval(()=>{void load()},30000);return()=>clearInterval(t)},[load,profile.moodAt]);
  const toggle=async(id:string,on:boolean)=>{
   setBusy(id);setError('');
-  const {error:e}=on?await supabase.from('family_profile_groups').insert({profile_user_id:profile.id,group_id:id})
+  const {error:e}=on?await supabase.rpc('family_set_share_group',{p_profile:profile.id,p_group:id})
    :await supabase.from('family_profile_groups').delete().eq('profile_user_id',profile.id).eq('group_id',id);
-  if(e)setError('Unable to update sharing.');else setShared(s=>on?[...s,id]:s.filter(x=>x!==id));
+  if(e)setError(/Plus/.test(e.message)?'MoodPals Plus is required to choose another group.':'Unable to update sharing.');else setShared(s=>on?[id]:s.filter(x=>x!==id));
   setBusy(null);
  };
  const latest=moods[0];

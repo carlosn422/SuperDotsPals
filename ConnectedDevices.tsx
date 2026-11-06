@@ -7,6 +7,8 @@ import {usePlus} from './PlusStore';
 import {getPendingWatchPairing,onWatchPairingRequest,requestWatchPairing} from './modules/watch-link';
 import {WatchSetupCard,useWatchSetup} from './WatchSetupStatus';
 import {SettingsItem} from './SettingsComponents';
+import WatchShareGroup from './WatchShareGroup';
+import {Ionicons} from '@expo/vector-icons';
 import {COLOR_NOTE,SectionHeader,WatchColor,WatchColorGrid,WatchColorSheet,WatchImage,WatchRow,colorName,isWatchColor} from './WatchArt';
 
 type Device={id:string;name:string;platform:string;linked_at:string;last_seen_at:string|null;revoked_at:string|null;watch_color:string|null};
@@ -139,16 +141,16 @@ export default function ConnectedDevices({focused=true,onOpenThemes,onCreateAcco
   </Modal>
 
   <Modal visible={!!details} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setDetails(null)}>
-   {details?<ScrollView contentContainerStyle={{padding:22,gap:14}}>
-    <TouchableOpacity onPress={()=>setDetails(null)}><Text style={{color:purple,fontWeight:'800'}}>‹ Back</Text></TouchableOpacity>
+   {details?<ScrollView style={{backgroundColor:'#F4FAF6'}} contentContainerStyle={{padding:20,gap:12}}>
+    <TouchableOpacity onPress={()=>setDetails(null)} accessibilityRole="button" style={{flexDirection:'row',alignItems:'center',gap:2}}><Ionicons name="chevron-back" size={22} color="#1D2B33"/><Text style={{color:'#1D2B33',fontWeight:'800',fontSize:16}}>Watches</Text></TouchableOpacity>
     <View style={{alignItems:'center',gap:6}}><WatchImage color={isWatchColor(details.watch_color)?details.watch_color:null} name={shortProfileName(deviceName(details))} width={130}/><Text style={styles.title}>{deviceName(details)}</Text></View>
-    <View style={styles.card}>
-     <Text style={styles.sub}>Profile: your account</Text>
-     <Text style={styles.sub}>Status: {deviceStatus(details)}</Text>
-     <Text style={styles.sub}>Watch color: {isWatchColor(details.watch_color)?colorName(details.watch_color):'not chosen yet'}</Text>
+    <View style={{backgroundColor:'#fff',borderRadius:22,padding:16,gap:8}}>
+     <Text style={{color:'#6E7D86',fontSize:13}}>Profile  <Text style={{color:'#1D2B33',fontWeight:'700'}}>Your account</Text></Text>
+     <Text style={{color:'#6E7D86',fontSize:13}}>Status  <Text style={{color:'#1D2B33',fontWeight:'700'}}>{deviceStatus(details)}</Text></Text>
     </View>
-    <TouchableOpacity accessibilityRole="button" style={styles.button} onPress={()=>setRecoloring(true)}><Text style={styles.buttonText}>{isWatchColor(details.watch_color)?'Change Watch Color':'Choose Watch Color'}</Text></TouchableOpacity>
-    <TouchableOpacity accessibilityRole="button" style={[styles.button,{backgroundColor:red}]} onPress={()=>void remove(details)}><Text style={styles.buttonText}>Remove Device</Text></TouchableOpacity>
+    <WatchShareGroup kind="watch" id={details.id}/>
+    <TouchableOpacity accessibilityRole="button" onPress={()=>setRecoloring(true)} style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#fff',borderRadius:18,paddingVertical:14,paddingHorizontal:16}}><Ionicons name="color-palette-outline" size={20} color="#34B37E"/><Text style={{flex:1,fontWeight:'800',color:'#1D2B33'}}>Watch color</Text><Text style={{color:'#6E7D86'}}>{isWatchColor(details.watch_color)?colorName(details.watch_color):'Choose'}</Text><Ionicons name="chevron-forward" size={17} color="#6E7D86"/></TouchableOpacity>
+    <TouchableOpacity accessibilityRole="button" onPress={()=>void remove(details)} style={{alignItems:'center',paddingVertical:14}}><Text style={{color:red,fontWeight:'800'}}>Remove Watch</Text></TouchableOpacity>
     <WatchColorSheet visible={recoloring} name={shortProfileName(deviceName(details))} initial={isWatchColor(details.watch_color)?details.watch_color:null} onSave={c=>saveColor(details,c)} onClose={()=>setRecoloring(false)}/>
    </ScrollView>:null}
   </Modal>
