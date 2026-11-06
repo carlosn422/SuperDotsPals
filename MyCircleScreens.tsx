@@ -15,7 +15,7 @@ export type CircleRoute=
  |{name:'signalReceived';signalId:string}|{name:'friendMood';id:string}|{name:'room';id:string}|{name:'today'}
  |{name:'notifications'}|{name:'widgets'}|{name:'circleSettings'}|{name:'revoked'}|{name:'fromNotification';ref:string}|{name:'chat';id:string;focus?:string};
 
-const TITLES:Record<CircleRoute['name'],string>={chat:'Messages',circleSettings:'Circle Settings',fromNotification:'Circle',home:'Circle',invite:'Invite Friends',enterCode:'Enter Invite Code',requests:'Friend Requests',assignGroups:'Add to Groups',friends:'Friends',friend:'Friend',groups:'Manage Groups',group:'Group',permissions:'Mood Sharing',share:'Choose Audience',send:'Send a Little Signal',signalSent:'Signal Sent',signalReceived:'Little Signal',friendMood:'Shared Mood',room:'Reactions',today:'Messages',notifications:'Circle Notifications',widgets:'Widgets',revoked:'Not Available'};
+const TITLES:Record<CircleRoute['name'],string>={chat:'Messages',circleSettings:'Circle Settings',fromNotification:'Circle',home:'Circle',invite:'Invite Friends',enterCode:'Enter Invite Code',requests:'Friend Requests',assignGroups:'Add to Groups',friends:'Friends',friend:'Friend',groups:'Manage Groups',group:'Group',permissions:'Mood Sharing',share:'Choose Audience',send:'Send a Little Signal',signalSent:'Signal Sent',signalReceived:'Little Signal',friendMood:'Shared Mood',room:'Your Mood',today:'Messages',notifications:'Circle Notifications',widgets:'Widgets',revoked:'Not Available'};
 type GroupDraft={group:CircleGroup;knownFriendIds:string[]};
 const GROUP_ICONS=['heart','home','leaf','star','people','sunny','musical-notes','paw'] as const;
 const GROUP_COLORS=['#E76B8A','#488CD9','#3BA986','#E3A426','#7139E9','#D9704B'];
@@ -622,21 +622,27 @@ function ReactionRoom({id,nav}:{id:string;nav:Nav}){
  const store=useCircle();const m=store.myMoods.find(x=>x.id===id);
  if(!m)return <Screen route={{name:'revoked'}} nav={nav}/>;
  const groups=store.groups.filter(g=>m.groupIds.includes(g.id));
- const date=new Date(m.sharedAt);
+ const t=MOOD_TINTS[m.mood];const date=new Date(m.sharedAt);
+ const reactions=[...m.reactions].sort((a,b)=>b.at.localeCompare(a.at));
  return <>
-  <CCard style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:MOOD_TINTS[m.mood].tint}}>
-   <MoodPalThumb mood={m.mood} size={78} animate/>
-   <View style={{flex:1,gap:4}}><Text style={{fontSize:22,fontWeight:'900',color:CT.ink}}>{m.mood}</Text>
-    <Text style={cs.rowSub}>{date.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})} · {date.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}</Text>
-    <Text style={cs.rowSub}>Shared with {groups.map(g=>g.name).join(', ')||'removed groups'}</Text>
-    <Text style={[cs.rowSub,{fontWeight:'800',color:m.active?CT.primary:CT.muted}]}>{m.active?'Visible · '+timeLeft(m.expiresAt):'Expired — no longer visible to friends'}</Text></View>
-  </CCard>
-  {!m.reactions.length?<EmptyState mood={m.mood} title="No reactions yet" detail={m.active?'Friends who can see this mood can react with an emoji. You’ll see them here.':'Nobody reacted before this mood expired.'}/>:
-  <View style={{gap:10}}>{m.reactions.map(r=>{const f=store.friends.find(x=>x.id===r.friendId);return <View key={r.friendId} style={{flexDirection:'row',alignItems:'flex-end',gap:8}}>
-   <Avatar initials={f?.initials||'?'} color={f?.color||'#C9D2CE'} size={34}/>
-   <View style={{backgroundColor:'#fff',borderRadius:20,borderBottomLeftRadius:6,paddingHorizontal:14,paddingVertical:10,shadowColor:'#4A268A',shadowOpacity:.05,shadowRadius:8,shadowOffset:{width:0,height:2}}}>
-    <Text style={{fontSize:12,fontWeight:'800',color:CT.muted}}>{f?.name||'Former friend'}</Text><Text style={{fontSize:30}}>{r.emoji}</Text></View>
-   <Text style={[cs.rowSub,{marginBottom:4}]}>{timeAgo(r.at)}</Text></View>})}</View>}
+  <View style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:t.tint,borderRadius:22,padding:14}}>
+   <MoodPalThumb mood={m.mood} size={64}/>
+   <View style={{flex:1,gap:2}}>
+    <Text style={{fontSize:13,fontWeight:'700',color:CT.ink}}>You shared</Text>
+    <Text style={{fontSize:22,fontWeight:'900',color:t.color}}>{m.mood}</Text>
+    <Text style={cs.rowSub}>{date.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})} · {date.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})} · {groups.map(g=>g.name).join(', ')||'removed groups'}</Text>
+    <Text style={[cs.rowSub,{fontWeight:'800',color:m.active?CT.primary:CT.muted}]}>{m.active?'Visible · '+timeLeft(m.expiresAt):'Expired · no longer visible to friends'}</Text>
+   </View>
+  </View>
+  {!reactions.length?<Text style={[cs.muted,{textAlign:'center',lineHeight:18}]}>{m.active?'No reactions yet. Friends who can see this mood can react with an emoji.':'Nobody reacted before this mood expired.'}</Text>:
+  <CCard style={{paddingVertical:2,paddingHorizontal:12}}>{reactions.map((r,i)=>{const f=store.friends.find(x=>x.id===r.friendId)||familyFriend(store,r.friendId);
+   return <TouchableOpacity key={r.friendId} disabled={!f} onPress={()=>nav.push({name:'chat',id:r.friendId,focus:'r'+m.id})} accessibilityRole="button" accessibilityLabel={(f?.name||'Former friend')+' reacted '+(REACTION_LABELS[r.emoji]||r.emoji)+', '+timeAgo(r.at)}
+    style={{flexDirection:'row',alignItems:'center',gap:12,paddingVertical:11,borderBottomWidth:i===reactions.length-1?0:1,borderBottomColor:CT.line}}>
+    <Avatar initials={f?.initials||'?'} color={f?.color||'#C9D2CE'} size={38}/>
+    <View style={{flex:1}}><Text style={cs.rowTitle}>{f?.name.split(' · ')[0]||'Former friend'}</Text><Text style={cs.rowSub}>{REACTION_LABELS[r.emoji]||'Reacted'} · {timeAgo(r.at)}</Text></View>
+    <Text style={{fontSize:26}}>{r.emoji}</Text>
+    {f?<Ionicons name="chevron-forward" size={16} color={CT.muted}/>:null}
+   </TouchableOpacity>})}</CCard>}
   {m.active?<SoftButton danger label="Stop Sharing" icon="eye-off-outline" onPress={()=>Alert.alert('Stop sharing?','Friends will no longer see this mood or be able to react.',[{text:'Cancel',style:'cancel'},{text:'Stop sharing',style:'destructive',onPress:()=>store.stopSharing(m.id)}])}/>:null}
  </>;
 }

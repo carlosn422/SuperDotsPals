@@ -81,6 +81,8 @@ export function conversationRef(store:CircleStore,ref:string):{friendId:string;f
  const sig=store.signals.find(s=>s.id===ref);if(sig)return {friendId:sig.friendId,focus:'s'+sig.id};
  const reactions=store.inbox.filter(n=>n.moodId===ref||n.id===ref).sort((a,b)=>Number(a.read)-Number(b.read)||b.at.localeCompare(a.at));
  if(reactions[0])return {friendId:reactions[0].friendId,focus:'r'+reactions[0].moodId};
+ const mine=store.myMoods.find(m=>m.id===ref);const last=mine?.reactions.slice().sort((a,b)=>b.at.localeCompare(a.at))[0];
+ if(mine&&last)return {friendId:last.friendId,focus:'r'+mine.id};
  return null;
 }
 
