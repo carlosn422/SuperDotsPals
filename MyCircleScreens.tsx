@@ -22,12 +22,13 @@ const GROUP_COLORS=['#E76B8A','#488CD9','#3BA986','#E3A426','#7139E9','#D9704B']
 
 type HomeTab='messages'|'people';
 // With `contentStyle` the navigator owns its scrolling (Circle tab and sheet), so a conversation can keep its header and reaction bar on screen.
-export default function CircleNavigator({initial=[{name:'home'}],exitLabel='Settings',onExit,mood,onRouteChange,contentStyle}:{initial?:CircleRoute[];exitLabel?:string;onExit:()=>void;mood?:string;onRouteChange?:()=>void;contentStyle?:any}){
+export default function CircleNavigator({initial=[{name:'home'}],exitLabel='Settings',onExit,mood,onRouteChange,contentStyle,resetKey=0}:{initial?:CircleRoute[];exitLabel?:string;onExit:()=>void;mood?:string;onRouteChange?:()=>void;contentStyle?:any;resetKey?:number}){
  const [stack,setStack]=useState<CircleRoute[]>(initial);
  const [homeTab,setHomeTab]=useState<HomeTab>('messages');
  const store=useCircle();const {refresh}=store;
  useEffect(()=>{onRouteChange?.();void refresh()},[stack.length,stack[stack.length-1]?.name]);
  useEffect(()=>{setStack(initial)},[JSON.stringify(initial)]);
+ useEffect(()=>{if(resetKey)setStack([{name:'home'}])},[resetKey]);
  const route=stack[stack.length-1];
  const push=(r:CircleRoute)=>setStack(s=>[...s,r]);
  const replace=(r:CircleRoute)=>setStack(s=>[...s.slice(0,-1),r]);
@@ -55,7 +56,7 @@ export default function CircleNavigator({initial=[{name:'home'}],exitLabel='Sett
   <OfflineBanner/>
   <Screen route={route} nav={nav} mood={mood} homeTab={homeTab} setHomeTab={setHomeTab}/>
  </View>;
- return contentStyle?<ScrollView key={stack.length+route.name} style={{flex:1}} contentContainerStyle={contentStyle} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">{body}</ScrollView>:body;
+ return contentStyle?<ScrollView key={stack.length+route.name+resetKey} style={{flex:1}} contentContainerStyle={contentStyle} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">{body}</ScrollView>:body;
 }
 type Nav={push:(r:CircleRoute)=>void;replace:(r:CircleRoute)=>void;back:()=>void;popTo:(n:CircleRoute['name'])=>void};
 
