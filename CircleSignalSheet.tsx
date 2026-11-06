@@ -1,10 +1,10 @@
-import React,{useEffect,useState} from 'react';
-import {Modal,ScrollView,Text,TouchableOpacity,View} from 'react-native';
+import React,{useEffect,useRef,useState} from 'react';
+import {Animated,Easing,Modal,ScrollView,StyleSheet,Text,TouchableOpacity,View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {LITTLE_SIGNALS,SignalId,isToday,signalById} from './LittleSignalsData';
 import {useCircle} from './CircleStore';
-import {CT,EmptyState,PrimaryButton,cs} from './CircleComponents';
+import {CT,EmptyState,PrimaryButton,cs,useReduceMotion} from './CircleComponents';
 import {PersonAvatar} from './CircleConversations';
 
 // Little Signal picker: choose friends (circles) or whole groups, then a signal. Used as a sheet and as the 'send' page.
@@ -55,18 +55,42 @@ export function SignalPicker({initial=[],onSent,onInvite}:{initial?:string[];onS
  </View>;
 }
 
-// Bottom sheet with a short "Sent" confirmation before it closes.
+// Bottom sheet. After sending, the signal floats up in a bubble (like it lands on their watch), then the sheet closes.
+function SentBubble({signal,onDone}:{signal:SignalId;onDone:()=>void}){
+ const reduce=useReduceMotion();const v=useRef(new Animated.Value(0)).current;const s=signalById(signal);
+ useEffect(()=>{
+  const anim=reduce?Animated.sequence([Animated.timing(v,{toValue:1,duration:200,useNativeDriver:true}),Animated.delay(900)])
+   :Animated.sequence([Animated.spring(v,{toValue:1,friction:5,tension:90,useNativeDriver:true}),Animated.delay(550),Animated.timing(v,{toValue:2,duration:550,easing:Easing.in(Easing.quad),useNativeDriver:true})]);
+  anim.start(()=>onDone());return()=>anim.stop();
+ },[]);
+ const scale=v.interpolate({inputRange:[0,1,2],outputRange:[reduce?1:.4,1,.9]});
+ const y=v.interpolate({inputRange:[0,1,2],outputRange:[reduce?0:80,0,reduce?0:-260]});
+ const op=v.interpolate({inputRange:[0,.3,1,1.7,2],outputRange:[0,1,1,1,reduce?1:0]});
+ return <View pointerEvents="none" style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center',backgroundColor:'rgba(244,250,246,.82)'}]}>
+  <Animated.View accessible accessibilityLiveRegion="polite" accessibilityLabel={s.label+' sent'} style={{opacity:op,transform:[{translateY:y},{scale}],alignItems:'center',gap:8}}>
+   <View style={{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:'#fff',borderRadius:28,borderBottomLeftRadius:8,paddingHorizontal:18,paddingVertical:14,shadowColor:'#1D2B33',shadowOpacity:.15,shadowRadius:16,shadowOffset:{width:0,height:6}}}>
+    <Text style={{fontSize:44}}>{s.emoji}</Text>
+    <Text style={{fontSize:17,fontWeight:'900',color:CT.ink}}>{s.label}</Text>
+   </View>
+   <Text style={{fontSize:13,fontWeight:'800',color:CT.primary}}>Sent</Text>
+  </Animated.View>
+ </View>;
+}
+
 export default function CircleSignalSheet({visible,initial,onClose,onInvite}:{visible:boolean;initial?:string[];onClose:()=>void;onInvite?:()=>void}){
  const [sent,setSent]=useState<SignalId|null>(null);
- useEffect(()=>{if(!sent)return;const t=setTimeout(()=>{setSent(null);onClose()},1300);return()=>clearTimeout(t)},[sent]);
+ const [round,setRound]=useState(0);
+ useEffect(()=>{if(visible){setSent(null);setRound(r=>r+1)}},[visible]);
  return <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
   <View style={{flex:1,backgroundColor:'#F4FAF6'}}>
    <View style={{flexDirection:'row',alignItems:'center',paddingHorizontal:18,paddingTop:16,paddingBottom:8}}>
     <Text accessibilityRole="header" style={{flex:1,fontSize:22,fontWeight:'900',color:CT.ink}}>Send a Little Signal</Text>
     <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={10}><Ionicons name="close" size={26} color={CT.ink}/></TouchableOpacity>
    </View>
-   {sent?<View style={{flex:1,alignItems:'center',justifyContent:'center',gap:10}}><Text style={{fontSize:64}}>{signalById(sent).emoji}</Text><Text style={{fontSize:20,fontWeight:'900',color:CT.ink}}>Signal sent</Text></View>
-   :visible?<ScrollView contentContainerStyle={{padding:18,paddingTop:6,paddingBottom:40}} keyboardShouldPersistTaps="handled"><SignalPicker key={(initial||[]).join(',')} initial={initial} onSent={s=>setSent(s)} onInvite={onInvite?()=>{onClose();onInvite()}:undefined}/></ScrollView>:null}
+   <ScrollView style={{flex:1}} contentContainerStyle={{padding:18,paddingTop:6,paddingBottom:40}} keyboardShouldPersistTaps="handled" scrollEnabled={!sent}>
+    <SignalPicker key={round+'|'+(initial||[]).join(',')} initial={initial} onSent={x=>setSent(x)} onInvite={onInvite?()=>{onClose();onInvite()}:undefined}/>
+   </ScrollView>
+   {sent?<SentBubble signal={sent} onDone={onClose}/>:null}
   </View>
  </Modal>;
 }
