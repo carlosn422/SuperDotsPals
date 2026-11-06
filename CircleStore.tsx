@@ -4,8 +4,8 @@ import {CIRCLE_PROTOTYPE,MOCK_CODE_LOOKUP,CIRCLE_MOODS,CircleGroup,CircleMood,DE
 
 // Local, in-memory sample data for reviewing My Circle without a backend (CIRCLE_PROTOTYPE=true).
 // The real feature uses useLiveCircleState (Supabase).
-export type State={moodsSeenAt:string;seenMoodIds:string[];friends:Friend[];groups:CircleGroup[];requests:FriendRequest[];myMoods:MySharedMood[];friendMoods:FriendSharedMood[];signals:ReceivedSignal[];invite:{code:string;expiresAt:string};prefs:NotificationPrefs;revokedFriendIds:string[];blockedNames:string[];sentSignals:{friendIds:string[];signal:SignalId;at:string}[];offline:boolean;widgetHideMood:boolean;inbox:ReactionNotice[];familyNames:Record<string,{name:string;owner:string}>};
-const initial=():State=>({moodsSeenAt:'',seenMoodIds:[],familyNames:{},friends:MOCK_FRIENDS.map(f=>({...f})),groups:MOCK_GROUPS.map(g=>({...g,memberIds:[...g.memberIds],moods:[...g.moods]})),requests:MOCK_REQUESTS.map(r=>({...r})),myMoods:MOCK_MY_MOODS.map(m=>({...m,reactions:[...m.reactions]})),friendMoods:MOCK_FRIEND_MOODS.map(m=>({...m})),signals:MOCK_SIGNALS.map(s=>({...s})),invite:{...MOCK_INVITE},prefs:{...DEFAULT_PREFS},revokedFriendIds:[],blockedNames:[],sentSignals:[],offline:false,widgetHideMood:true,
+export type State={moodsSeenAt:string;seenMoodIds:string[];seenSignalIds:string[];friends:Friend[];groups:CircleGroup[];requests:FriendRequest[];myMoods:MySharedMood[];friendMoods:FriendSharedMood[];signals:ReceivedSignal[];invite:{code:string;expiresAt:string};prefs:NotificationPrefs;revokedFriendIds:string[];blockedNames:string[];sentSignals:{friendIds:string[];signal:SignalId;at:string}[];offline:boolean;widgetHideMood:boolean;inbox:ReactionNotice[];familyNames:Record<string,{name:string;owner:string}>};
+const initial=():State=>({moodsSeenAt:'',seenMoodIds:[],seenSignalIds:[],familyNames:{},friends:MOCK_FRIENDS.map(f=>({...f})),groups:MOCK_GROUPS.map(g=>({...g,memberIds:[...g.memberIds],moods:[...g.moods]})),requests:MOCK_REQUESTS.map(r=>({...r})),myMoods:MOCK_MY_MOODS.map(m=>({...m,reactions:[...m.reactions]})),friendMoods:MOCK_FRIEND_MOODS.map(m=>({...m})),signals:MOCK_SIGNALS.map(s=>({...s})),invite:{...MOCK_INVITE},prefs:{...DEFAULT_PREFS},revokedFriendIds:[],blockedNames:[],sentSignals:[],offline:false,widgetHideMood:true,
  inbox:MOCK_MY_MOODS.flatMap(m=>m.reactions.map((r,i)=>({id:m.id+'-'+r.friendId,moodId:m.id,mood:m.mood,friendId:r.friendId,name:MOCK_FRIENDS.find(f=>f.id===r.friendId)?.name||'A friend',emoji:r.emoji,at:r.at,read:i>0}))).sort((a,b)=>b.at.localeCompare(a.at))});
 const empty=():State=>({...initial(),friends:[],groups:[],requests:[],myMoods:[],friendMoods:[],signals:[],inbox:[]});
 
@@ -33,11 +33,12 @@ function useMockCircleState(){
   toggleGroupMood:(id:string,mood:CircleMood)=>up(s=>({groups:s.groups.map(g=>g.id!==id?g:{...g,moods:g.moods.includes(mood)?g.moods.filter(m=>m!==mood):CIRCLE_MOODS.filter(m=>m===mood||g.moods.includes(m))})})),
   shareMood:(mood:CircleMood,groupIds:string[])=>{const id='m'+Date.now();up(s=>({myMoods:[{id,mood,sharedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+864e5).toISOString(),groupIds,reactions:[],active:true},...s.myMoods]}));return id;},
   stopSharing:(id:string)=>up(s=>({myMoods:s.myMoods.map(m=>m.id===id?{...m,active:false,expiresAt:new Date().toISOString()}:m)})),
-  react:(friendMoodId:string,emoji?:string)=>up(s=>({friendMoods:s.friendMoods.map(m=>m.id===friendMoodId?{...m,myReaction:emoji}:m)})),
+  react:async(friendMoodId:string,emoji?:string):Promise<boolean>=>{up(s=>({friendMoods:s.friendMoods.map(m=>m.id===friendMoodId?{...m,myReaction:emoji,myReactionAt:emoji?new Date().toISOString():undefined}:m)}));return true;},
   sendSignal:(friendIds:string[],signal:SignalId)=>up(s=>({sentSignals:[{friendIds,signal,at:new Date().toISOString()},...s.sentSignals]})),
   markSignalsSeen:()=>up(s=>({signals:s.signals.map(x=>({...x,seen:true}))})),
+  markSignalSeen:(id:string|string[])=>{const ids=Array.isArray(id)?id:[id];up(s=>({signals:s.signals.map(x=>ids.includes(x.id)?{...x,seen:true}:x)}))},
   markMoodsSeen:()=>up(()=>({moodsSeenAt:new Date().toISOString()})),
-  markMoodSeen:(id:string)=>up(s=>s.seenMoodIds.includes(id)?{}:{seenMoodIds:[...s.seenMoodIds,id]}),
+  markMoodSeen:(id:string|string[])=>up(s=>({seenMoodIds:Array.from(new Set([...s.seenMoodIds,...(Array.isArray(id)?id:[id])]))})),
   markReactionRead:(id:string)=>up(s=>({inbox:s.inbox.map(n=>n.id===id?{...n,read:true}:n)})),
   simulateIncomingSignal:(friendId:string,signal:SignalId)=>up(s=>({signals:[{id:'s'+Date.now(),friendId,signal,at:new Date().toISOString(),seen:false},...s.signals]})),
   setPref:(k:keyof NotificationPrefs,v:boolean)=>up(s=>({prefs:{...s.prefs,[k]:v}})),

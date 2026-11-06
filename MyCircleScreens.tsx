@@ -5,22 +5,26 @@ import * as Clipboard from 'expo-clipboard';
 import {CIRCLE_MOODS,CircleGroup,CircleMood,Friend,FriendRequest,FriendSharedMood,LITTLE_SIGNALS,MOOD_REACTIONS,MOOD_TINTS,REACTION_LABELS,SignalId,isToday,signalById,timeAgo,timeLeft} from './LittleSignalsData';
 import {CodePreview,activeFriendMoods,circleNewCount,familyFriend,friendName,isMoodNew,uniqueAudience,useCircle} from './CircleStore';
 import {usePlus} from './PlusStore';
-import {Avatar,CCard,CHeading,CRow,CT,Chip,EmptyState,MoodPalThumb,MoodTag,OfflineBanner,PrimaryButton,SampleDataNote,SignalBurst,SoftButton,ToggleRow,cs} from './CircleComponents';
+import {Avatar,CCard,CHeading,CRow,CT,Chip,EmptyState,MoodPalThumb,OfflineBanner,PrimaryButton,SampleDataNote,SignalBurst,SoftButton,ToggleRow,cs} from './CircleComponents';
+import {ConversationScreen,MessagesInbox,conversationRef,conversationsFor} from './CircleConversations';
 
 export type CircleRoute=
  |{name:'home'}|{name:'invite';groupId?:string}|{name:'enterCode'}|{name:'requests';groupId?:string;groupName?:string}|{name:'assignGroups';requestId:string;groupId?:string;groupName?:string}
  |{name:'friends'}|{name:'friend';id:string}|{name:'groups'}|{name:'group';id?:string;draft?:GroupDraft}|{name:'permissions'}
  |{name:'share';mood:CircleMood}|{name:'send';friendId?:string}|{name:'signalSent';signal:SignalId;friendIds:string[]}
  |{name:'signalReceived';signalId:string}|{name:'friendMood';id:string}|{name:'room';id:string}|{name:'today'}
- |{name:'notifications'}|{name:'widgets'}|{name:'circleSettings'}|{name:'revoked'}|{name:'fromNotification';ref:string};
+ |{name:'notifications'}|{name:'widgets'}|{name:'circleSettings'}|{name:'revoked'}|{name:'fromNotification';ref:string}|{name:'chat';id:string;focus?:string};
 
-const TITLES:Record<CircleRoute['name'],string>={circleSettings:'Circle Settings',fromNotification:'My Circle',home:'My Circle',invite:'Invite Friends',enterCode:'Enter Invite Code',requests:'Friend Requests',assignGroups:'Add to Groups',friends:'Friends',friend:'Friend',groups:'Manage Groups',group:'Group',permissions:'Mood Sharing',share:'Choose Audience',send:'Send a Little Signal',signalSent:'Signal Sent',signalReceived:'Little Signal',friendMood:'Shared Mood',room:'Reactions',today:"Today's Signals",notifications:'Circle Notifications',widgets:'Widgets',revoked:'Not Available'};
+const TITLES:Record<CircleRoute['name'],string>={chat:'Messages',circleSettings:'Circle Settings',fromNotification:'Circle',home:'Circle',invite:'Invite Friends',enterCode:'Enter Invite Code',requests:'Friend Requests',assignGroups:'Add to Groups',friends:'Friends',friend:'Friend',groups:'Manage Groups',group:'Group',permissions:'Mood Sharing',share:'Choose Audience',send:'Send a Little Signal',signalSent:'Signal Sent',signalReceived:'Little Signal',friendMood:'Shared Mood',room:'Reactions',today:'Messages',notifications:'Circle Notifications',widgets:'Widgets',revoked:'Not Available'};
 type GroupDraft={group:CircleGroup;knownFriendIds:string[]};
 const GROUP_ICONS=['heart','home','leaf','star','people','sunny','musical-notes','paw'] as const;
 const GROUP_COLORS=['#E76B8A','#488CD9','#3BA986','#E3A426','#7139E9','#D9704B'];
 
-export default function CircleNavigator({initial=[{name:'home'}],exitLabel='Settings',onExit,mood,onRouteChange}:{initial?:CircleRoute[];exitLabel?:string;onExit:()=>void;mood?:string;onRouteChange?:()=>void}){
+type HomeTab='messages'|'people';
+// With `contentStyle` the navigator owns its scrolling (Circle tab and sheet), so a conversation can keep its header and reaction bar on screen.
+export default function CircleNavigator({initial=[{name:'home'}],exitLabel='Settings',onExit,mood,onRouteChange,contentStyle}:{initial?:CircleRoute[];exitLabel?:string;onExit:()=>void;mood?:string;onRouteChange?:()=>void;contentStyle?:any}){
  const [stack,setStack]=useState<CircleRoute[]>(initial);
+ const [homeTab,setHomeTab]=useState<HomeTab>('messages');
  const store=useCircle();const {refresh}=store;
  useEffect(()=>{onRouteChange?.();void refresh()},[stack.length,stack[stack.length-1]?.name]);
  useEffect(()=>{setStack(initial)},[JSON.stringify(initial)]);
@@ -28,34 +32,37 @@ export default function CircleNavigator({initial=[{name:'home'}],exitLabel='Sett
  const push=(r:CircleRoute)=>setStack(s=>[...s,r]);
  const replace=(r:CircleRoute)=>setStack(s=>[...s.slice(0,-1),r]);
  const back=()=>{if(stack.length<=1)onExit();else setStack(s=>s.slice(0,-1));};
- const prev=stack.length>1?TITLES[stack[stack.length-2].name]:exitLabel;
  const nav={push,replace,back,popTo:(name:CircleRoute['name'])=>setStack(s=>{const i=s.map(x=>x.name).lastIndexOf(name);return i>=0?s.slice(0,i+1):[{name:'home'}]})};
- return <View style={{gap:14}}>
-  {route.name==='home'&&stack.length===1?<View style={{gap:2}}>
-   <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
-    <Text style={[cs.title,{flex:1,textAlign:'left'}]} accessibilityRole="header">My Circle</Text>
-    <HeaderButton icon="notifications-outline" label="Today's Signals" dot={circleNewCount(store)>0} onPress={()=>push({name:'today'})}/>
-    <HeaderButton icon="settings-outline" label="Circle Settings" onPress={()=>push({name:'circleSettings'})}/>
-   </View>
-   <Text style={[cs.muted,{fontSize:14}]}>Stay close to the people you care about.</Text>
+ if(route.name==='chat'){
+  const props={id:route.id,focus:route.focus,onBack:back,onInfo:()=>push({name:'friend',id:route.id}),onSend:()=>push({name:'send',friendId:route.id}),onOpenMyMood:(id:string)=>push({name:'room',id})};
+  return contentStyle?<ConversationScreen key={route.id} {...props} fill/>:<ConversationScreen key={route.id} {...props}/>;
+ }
+ const isHome=(route.name==='home'||route.name==='today')&&stack.length===1;
+ const pendingRequests=store.requests.filter(r=>r.direction==='incoming'&&r.status==='pending').length;
+ const body=<View style={{gap:14}}>
+  {isHome?<View style={{flexDirection:'row',alignItems:'center',gap:8}}>
+   <View style={{flex:1}}><Text style={[cs.title,{textAlign:'left'}]} accessibilityRole="header">Circle</Text><Text style={[cs.muted,{fontSize:14}]}>Stay connected through moods.</Text></View>
+   <HeaderButton icon="notifications-outline" label={pendingRequests?pendingRequests+' friend requests':'Requests and invites'} dot={pendingRequests>0} onPress={()=>push({name:'requests'})}/>
   </View>:
   <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center', position: 'relative'}}>
     {stack.length > 1 && (
-        <TouchableOpacity onPress={back} style={{position: 'absolute', left: 0, padding: 4}}>
+        <TouchableOpacity onPress={back} accessibilityRole="button" accessibilityLabel="Back" style={{position: 'absolute', left: 0, padding: 4}}>
             <Ionicons name="chevron-back" size={22} color={CT.ink}/>
         </TouchableOpacity>
     )}
     <Text style={cs.title}>{TITLES[route.name]}</Text>
-</View>}
+  </View>}
   <OfflineBanner/>
-  <Screen route={route} nav={nav} mood={mood}/>
+  <Screen route={route} nav={nav} mood={mood} homeTab={homeTab} setHomeTab={setHomeTab}/>
  </View>;
+ return contentStyle?<ScrollView key={stack.length+route.name} style={{flex:1}} contentContainerStyle={contentStyle} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">{body}</ScrollView>:body;
 }
 type Nav={push:(r:CircleRoute)=>void;replace:(r:CircleRoute)=>void;back:()=>void;popTo:(n:CircleRoute['name'])=>void};
 
-function Screen({route,nav,mood}:{route:CircleRoute;nav:Nav;mood?:string}){
+function Screen({route,nav,mood,homeTab='messages',setHomeTab=()=>{}}:{route:CircleRoute;nav:Nav;mood?:string;homeTab?:HomeTab;setHomeTab?:(t:HomeTab)=>void}){
  switch(route.name){
-  case 'home':return <Home nav={nav}/>;
+  case 'home':case 'today':return <Home nav={nav} tab={homeTab} onTab={setHomeTab}/>;
+  case 'chat':return null;
   case 'invite':return <Invite groupId={route.groupId} nav={nav}/>;
   case 'enterCode':return <EnterCode nav={nav}/>;
   case 'requests':return <Requests groupId={route.groupId} groupName={route.groupName} nav={nav}/>;
@@ -68,10 +75,9 @@ function Screen({route,nav,mood}:{route:CircleRoute;nav:Nav;mood?:string}){
   case 'share':return <ChooseAudience mood={route.mood} nav={nav}/>;
   case 'send':return <SendSignal friendId={route.friendId} nav={nav}/>;
   case 'signalSent':return <SignalSent signal={route.signal} friendIds={route.friendIds} nav={nav}/>;
-  case 'signalReceived':return <SignalReceived id={route.signalId} nav={nav} mood={mood}/>;
-  case 'friendMood':return <FriendMood id={route.id} nav={nav}/>;
+  case 'signalReceived':return <OpenConversation refId={route.signalId} nav={nav} missing={<EmptyState title="Signal not found" detail="It may have been from someone no longer in your circle."/>}/>;
+  case 'friendMood':return <OpenConversation refId={route.id} nav={nav} missing={<Screen route={{name:'revoked'}} nav={nav}/>}/>;
   case 'room':return <ReactionRoom id={route.id} nav={nav}/>;
-  case 'today':return <TodaySignals nav={nav}/>;
   case 'notifications':return <NotificationSettings/>;
   case 'widgets':return <WidgetPreviews/>;
   case 'circleSettings':return <CircleSettings nav={nav}/>;
@@ -140,14 +146,14 @@ function YourPeople({nav}:{nav:Nav}){
    <Chip label="All Friends" selected={false} onPress={()=>setAllOpen(true)}/>
   </View>
   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:6,paddingRight:4}} style={{marginHorizontal:-4}}>
-   {people.map(p=><PersonCircle key={p.f.id} p={p} onLongPress={()=>options(p.f)} onPress={()=>nav.push(p.mood?{name:'friendMood',id:p.mood.id}:{name:'friend',id:p.f.id})}/>)}
+   {people.map(p=><PersonCircle key={p.f.id} p={p} onLongPress={()=>options(p.f)} onPress={()=>nav.push({name:'chat',id:p.f.id})}/>)}
    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add Friend" onPress={()=>nav.push({name:'invite'})} style={{width:96,alignItems:'center',gap:4}}>
     <View style={{width:84,height:84,borderRadius:42,borderWidth:1.5,borderStyle:'dashed',borderColor:CT.primary,alignItems:'center',justifyContent:'center',backgroundColor:CT.primarySoft}}><Ionicons name="person-add-outline" size={28} color={CT.primary}/></View>
     <Text style={{fontSize:14,fontWeight:'900',color:CT.primary}}>Add Friend</Text>
    </TouchableOpacity>
   </ScrollView>
   {store.friends.length>1&&!store.friends.some(f=>f.pinnedAt)?<Text style={[cs.rowSub,{textAlign:'center'}]}>Tip: long-press someone to pin them to the front.</Text>:null}
-  <AllFriendsSheet visible={allOpen} people={all} onClose={()=>setAllOpen(false)} onOpen={p=>{setAllOpen(false);nav.push(p.mood?{name:'friendMood',id:p.mood.id}:{name:'friend',id:p.f.id})}} onAdd={()=>{setAllOpen(false);nav.push({name:'invite'})}}/>
+  <AllFriendsSheet visible={allOpen} people={all} onClose={()=>setAllOpen(false)} onOpen={p=>{setAllOpen(false);nav.push({name:'chat',id:p.f.id})}} onAdd={()=>{setAllOpen(false);nav.push({name:'invite'})}}/>
  </CCard>;
 }
 
@@ -186,35 +192,26 @@ function AllFriendsSheet({visible,people,onClose,onOpen,onAdd}:{visible:boolean;
  </Modal>;
 }
 
-function RecentActivity({nav}:{nav:Nav}){
- const store=useCircle();
- type Item={id:string;at:string;unread:boolean;title:string;leading:React.ReactNode;onPress:()=>void;right?:React.ReactNode};
- const items:Item[]=[
-  ...activeFriendMoods(store).map(m=>({id:'m'+m.id,at:m.sharedAt,unread:isMoodNew(store,m),title:friendName(store,m.friendId)+' is feeling '+m.mood,leading:<MoodPalThumb mood={m.mood} size={44}/>,onPress:()=>nav.push({name:'friendMood',id:m.id}),
-   right:<TouchableOpacity accessibilityRole="button" accessibilityLabel={m.myReaction?'You reacted '+m.myReaction:'React to '+friendName(store,m.friendId)} onPress={()=>nav.push({name:'friendMood',id:m.id})} style={{width:44,height:44,borderRadius:14,backgroundColor:CT.primarySoft,alignItems:'center',justifyContent:'center'}}>{m.myReaction?<Text style={{fontSize:22}}>{m.myReaction}</Text>:<Ionicons name="heart-outline" size={22} color={CT.primary}/>}</TouchableOpacity>})),
-  ...store.signals.map(x=>({id:'s'+x.id,at:x.at,unread:!x.seen,title:signalById(x.signal).notify(friendName(store,x.friendId)),leading:<View style={cs.signalEmoji}><Text style={{fontSize:22}}>{signalById(x.signal).emoji}</Text></View>,onPress:()=>nav.push({name:'signalReceived',signalId:x.id})})),
-  ...store.inbox.map(n=>({id:'r'+n.id,at:n.at,unread:!n.read,title:n.name+' reacted '+n.emoji+' to your '+n.mood.toLowerCase()+' mood',leading:<MoodPalThumb mood={n.mood} size={44}/>,onPress:()=>{store.markReactionRead(n.id);if(store.myMoods.some(m=>m.id===n.moodId))nav.push({name:'room',id:n.moodId})}})),
- ].sort((a,b)=>b.at.localeCompare(a.at)).slice(0,2);
- return <CCard style={{gap:8}}>
-  <View style={{flexDirection:'row',alignItems:'center'}}>
-   <Text style={[cs.rowTitle,{fontSize:19,flex:1}]} accessibilityRole="header">Recent Activity</Text>
-   <TouchableOpacity accessibilityRole="button" onPress={()=>nav.push({name:'today'})} style={{flexDirection:'row',alignItems:'center',paddingVertical:6}}><Text style={{color:CT.primary,fontWeight:'800',fontSize:14}}>See All</Text><Ionicons name="chevron-forward" size={16} color={CT.primary}/></TouchableOpacity>
-  </View>
-  {items.length?items.map(it=><TouchableOpacity key={it.id} accessibilityRole="button" accessibilityLabel={it.title+', '+whenLabel(it.at)+(it.unread?', new':'')} onPress={it.onPress}
-   style={{flexDirection:'row',alignItems:'center',gap:10,padding:10,borderRadius:16,backgroundColor:it.unread?CT.primarySoft:CT.background}}>
-   {it.leading}
-   <View style={{flex:1}}><Text style={cs.rowTitle}>{it.title}</Text><Text style={cs.rowSub}>{it.unread?'New · ':''}{whenLabel(it.at)}</Text></View>
-   {it.right}
-  </TouchableOpacity>):<Text style={cs.rowSub}>When friends share a mood or send a Little Signal, it shows up here.</Text>}
- </CCard>;
+function HomeTabs({tab,onTab,unread}:{tab:HomeTab;onTab:(t:HomeTab)=>void;unread:number}){
+ const item=(k:HomeTab,label:string,icon:any,badge?:number)=>{const on=tab===k;return <TouchableOpacity key={k} onPress={()=>onTab(k)} accessibilityRole="tab" accessibilityState={{selected:on}} accessibilityLabel={label+(badge?', '+badge+' unread':'')}
+  style={{flex:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,paddingVertical:11,borderRadius:22,backgroundColor:on?CT.primary:'transparent'}}>
+  <Ionicons name={icon} size={19} color={on?'#fff':CT.ink}/><Text style={{fontSize:15,fontWeight:'800',color:on?'#fff':CT.ink}}>{label}</Text>
+  {badge?<View style={{position:'absolute',top:-4,right:18,minWidth:20,height:20,borderRadius:10,paddingHorizontal:5,backgroundColor:CT.danger,borderWidth:1.5,borderColor:'#fff',alignItems:'center',justifyContent:'center'}}><Text style={{color:'#fff',fontSize:11,fontWeight:'900'}}>{badge>99?'99+':badge}</Text></View>:null}
+ </TouchableOpacity>};
+ return <View accessibilityRole="tablist" style={{flexDirection:'row',backgroundColor:'#fff',borderRadius:26,padding:4,gap:4,borderWidth:1,borderColor:CT.line}}>
+  {item('messages','Messages',tab==='messages'?'chatbubble':'chatbubble-outline',unread)}{item('people','People',tab==='people'?'people':'people-outline')}
+ </View>;
 }
 
-function Home({nav}:{nav:Nav}){
+function Home({nav,tab='messages',onTab=()=>{}}:{nav:Nav;tab?:HomeTab;onTab?:(t:HomeTab)=>void}){
  const store=useCircle();
  const {isPlus,showPaywall}=usePlus();
  useEffect(()=>{void store.ensurePush()},[]);
  const pending=store.requests.filter(r=>r.status==='pending'&&r.direction==='incoming').length;
+ const unread=conversationsFor(store).reduce((n,c)=>n+c.unread,0);
  return <>
+  <HomeTabs tab={tab} onTab={onTab} unread={unread}/>
+  {tab==='messages'?<MessagesInbox onOpen={id=>nav.push({name:'chat',id})} onInvite={()=>nav.push({name:'invite'})} onSend={()=>nav.push({name:'send'})}/>:<>
   <CCard style={{gap:14}}>
    <View style={{flexDirection:'row',gap:9}}>
     <Stat icon="people-outline" value={store.friends.length} label={store.friends.length===1?'Friend':'Friends'} onPress={()=>nav.push({name:'friends'})}/>
@@ -226,7 +223,6 @@ function Home({nav}:{nav:Nav}){
   {pending?<RequestsCard pending={pending} onPress={()=>nav.push({name:'requests'})}/>:null}
   {!store.friends.length?<EmptyState mood="Joyful" title="Your circle is empty" detail="Invite close friends or family with your personal code. Nobody can find you by searching — only people you share your code with." action="Invite Friends" onAction={()=>nav.push({name:'invite'})}/>:<>
    <YourPeople nav={nav}/>
-   <RecentActivity nav={nav}/>
   </>}
   <CCard style={{gap:8}}>
    <Text style={[cs.rowTitle,{fontSize:19}]} accessibilityRole="header">Groups</Text>
@@ -234,6 +230,8 @@ function Home({nav}:{nav:Nav}){
     :<Text style={cs.rowSub}>Groups like Family or Close Friends let you choose who sees which moods.</Text>}
    <SoftButton label="Create a Group" icon="add" onPress={()=>!isPlus?showPaywall('circles'):nav.push({name:'group'})}/>
   </CCard>
+  <CCard style={{paddingVertical:4}}><CRow icon="settings-outline" title="Circle Settings" subtitle="Mood sharing, notifications and widgets" onPress={()=>nav.push({name:'circleSettings'})} last/></CCard>
+  </>}
   {store.live?null:<PrototypeControls nav={nav}/>}
  </>;
 }
@@ -255,7 +253,7 @@ function PrototypeControls({nav}:{nav:Nav}){
   <SampleDataNote/>
   <Text style={[cs.muted,{textAlign:'center',marginBottom:4}]}>Review tools for the prototype — not part of the final feature.</Text>
   <ToggleRow title="Simulate offline" value={store.offline} onChange={store.setOffline}/>
-  <CRow icon="gift-outline" title="Simulate receiving a signal" subtitle="Jamie sends a hug" onPress={()=>{store.simulateIncomingSignal(store.friends[0]?.id||'jamie','hug');nav.push({name:'signalReceived',signalId:'latest'})}}/>
+  <CRow icon="gift-outline" title="Simulate receiving a signal" subtitle="Jamie sends a hug" onPress={()=>{const id=store.friends[0]?.id||'jamie';store.simulateIncomingSignal(id,'hug');nav.push({name:'chat',id})}}/>
   <CRow icon="eye-off-outline" title="Open a revoked or expired mood link" onPress={()=>nav.push({name:'revoked'})}/>
   <CRow icon="trash-outline" title="Show empty states" onPress={store.showEmpty}/>
   <CRow icon="refresh-outline" title="Reset sample data" onPress={store.reset} last/>
@@ -456,7 +454,7 @@ function FriendDetail({id,nav}:{id:string;nav:Nav}){
   <CHeading title="Groups" detail="Private to you — friends never see your group names."/>
   <GroupPicker selected={groupIds} onToggle={g=>store.setFriendGroups(id,toggle(groupIds,g))}/>
   <CCard style={{paddingVertical:4}}>
-   <ToggleRow title="Mute signals" subtitle={'No notifications from '+f.name+'. Signals still appear in Today’s Signals.'} value={f.muted} onChange={v=>store.updateFriend(id,{muted:v})}/>
+   <ToggleRow title="Mute signals" subtitle={'No notifications from '+f.name+'. Their signals still appear in your conversation.'} value={f.muted} onChange={v=>store.updateFriend(id,{muted:v})}/>
    <ToggleRow title="Hide my mood updates" subtitle={f.name+' won’t see moods you share, whatever their groups.'} value={f.hideMyMoods} onChange={v=>store.updateFriend(id,{hideMyMoods:v})} last/>
   </CCard>
   <SoftButton danger label={'Remove '+f.name} icon="person-remove-outline" onPress={()=>Alert.alert('Remove '+f.name+'?','They’ll immediately lose access to every mood you’ve shared, and you to theirs. They won’t be notified.',[{text:'Cancel',style:'cancel'},{text:'Remove',style:'destructive',onPress:()=>{store.removeFriend(id);nav.back()}}])}/>
@@ -620,51 +618,6 @@ function SignalSent({signal,friendIds,nav}:{signal:SignalId;friendIds:string[];n
  </>;
 }
 
-function SignalReceived({id,nav,mood}:{id:string;nav:Nav;mood?:string}){
- const store=useCircle();const sig=id==='latest'?store.signals[0]:store.signals.find(s=>s.id===id);
- useEffect(()=>{store.markSignalsSeen()},[]);
- if(!sig)return <EmptyState title="Signal not found" detail="It may have been from someone no longer in your circle."/>;
- const s=signalById(sig.signal);const name=friendName(store,sig.friendId);
- const m=(CIRCLE_MOODS.find(x=>x.toLowerCase()===(mood||'').toLowerCase())||'Calm') as CircleMood;
- return <>
-  <CCard style={{alignItems:'center',gap:6,paddingVertical:20}}>
-   <SignalBurst mood={m} emoji={s.emoji} size={140}/>
-   <Text style={{fontSize:21,fontWeight:'900',color:CT.ink,textAlign:'center'}}>{s.notify(name)}</Text>
-   <Text style={cs.muted}>{timeAgo(sig.at)}</Text>
-  </CCard>
-  <PrimaryButton label={'Send '+name+' one back'} icon="heart-outline" onPress={()=>nav.replace({name:'send',friendId:sig.friendId})}/>
-  <SoftButton label="See Today’s Signals" onPress={()=>nav.replace({name:'today'})}/>
- </>;
-}
-
-function ReactionPicker({mood,value,onPick}:{mood:CircleMood;value?:string;onPick:(e:string)=>void}){
- return <View style={{flexDirection:'row',flexWrap:'wrap',gap:9}}>{MOOD_REACTIONS[mood].map(e=>{const on=value===e;const label=REACTION_LABELS[e]||e;return <TouchableOpacity key={e} onPress={()=>onPick(e)} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{selected:on}} style={{width:'48%',flexGrow:1,flexDirection:'row',alignItems:'center',gap:9,padding:12,borderRadius:16,borderWidth:1.5,borderColor:on?CT.primary:CT.border,backgroundColor:on?CT.primarySoft:'#fff'}}><Text style={{fontSize:24}}>{e}</Text><Text style={{flex:1,fontWeight:'800',fontSize:13,color:CT.ink}}>{label}</Text>{on?<Ionicons name="checkmark-circle" size={20} color={CT.primary}/>:null}</TouchableOpacity>})}</View>
-}
-
-function FriendMood({id,nav}:{id:string;nav:Nav}){
- const store=useCircle();const fm=store.friendMoods.find(m=>m.id===id);
- useEffect(()=>{if(fm)store.markMoodSeen(fm.id)},[fm?.id]);
- const [undoFor,setUndoFor]=useState<string|undefined>();
- useEffect(()=>{if(!undoFor)return;const t=setTimeout(()=>setUndoFor(undefined),5000);return()=>clearTimeout(t)},[undoFor]);
- const f=fm&&(store.friends.find(x=>x.id===fm.friendId)||familyFriend(store,fm.friendId));
- if(!fm||!f||new Date(fm.expiresAt).getTime()<Date.now())return <Screen route={{name:'revoked'}} nav={nav}/>;
- const first=f.name.split(' ')[0]||f.name;
- return <>
-  <CCard style={{alignItems:'center',gap:8,paddingVertical:20,backgroundColor:MOOD_TINTS[fm.mood].tint}}>
-   <View style={{flexDirection:'row',alignItems:'center',gap:8}}><Avatar initials={f.initials} color={f.color} size={30}/><Text style={cs.rowTitle}>{f.name}</Text><Text style={cs.rowSub}>· {timeAgo(fm.sharedAt)}</Text></View>
-   <MoodPalThumb mood={fm.mood} size={130} animate/>
-   <Text style={{fontSize:16,color:CT.ink}}>{f.name} is feeling <Text style={{fontWeight:'900',color:MOOD_TINTS[fm.mood].color}}>{fm.mood.toLowerCase()}</Text></Text>
-   <Text style={cs.rowSub}>Visible for {timeLeft(fm.expiresAt)}</Text>
-  </CCard>
-  <CHeading title={'Send '+first+' a response'}/>
-  <ReactionPicker mood={fm.mood} value={fm.myReaction} onPick={e=>{if(e===fm.myReaction)return;store.react(fm.id,e);setUndoFor(e)}}/>
-  {fm.myReaction?<View style={{flexDirection:'row',justifyContent:'center',alignItems:'center',gap:6}}>
-   <Ionicons name="checkmark" size={16} color={CT.primary}/><Text style={cs.muted}>Sent to {first}</Text>
-   {undoFor===fm.myReaction?<TouchableOpacity accessibilityRole="button" accessibilityLabel="Undo response" hitSlop={10} onPress={()=>{store.react(fm.id,undefined);setUndoFor(undefined)}}><Text style={{color:CT.primary,fontWeight:'800'}}>Undo</Text></TouchableOpacity>:null}
-  </View>:null}
- </>;
-}
-
 function ReactionRoom({id,nav}:{id:string;nav:Nav}){
  const store=useCircle();const m=store.myMoods.find(x=>x.id===id);
  if(!m)return <Screen route={{name:'revoked'}} nav={nav}/>;
@@ -688,60 +641,25 @@ function ReactionRoom({id,nav}:{id:string;nav:Nav}){
  </>;
 }
 
-// Reactions to my shared moods: name, emoji and the original mood only. Unread ones are marked one at a time when opened.
+// Opens the conversation (and item) a Today card or notification points to, if it's still visible.
+function OpenConversation({refId,nav,missing}:{refId:string;nav:Nav;missing:React.ReactNode}){
+ const store=useCircle();const target=conversationRef(store,refId);
+ useEffect(()=>{if(target)nav.replace({name:'chat',id:target.friendId,focus:target.focus})},[!!target]);
+ return target?null:<>{missing}</>;
+}
+
 // A push only carries the row id; refresh first so a signal or reaction that arrived while the app was closed is found.
 function OpenFromNotification({id,nav}:{id:string;nav:Nav}){
  const store=useCircle();const [ready,setReady]=useState(false);
  useEffect(()=>{let on=true;void Promise.resolve(store.refresh()).catch(()=>{}).finally(()=>{if(on)setReady(true)});return()=>{on=false}},[id]);
  useEffect(()=>{
   if(!ready)return;
-  if(store.signals.some(s=>s.id===id))nav.replace({name:'signalReceived',signalId:id});
-  else if(store.myMoods.some(m=>m.id===id)){store.inbox.filter(n=>n.moodId===id&&!n.read).forEach(n=>store.markReactionRead(n.id));nav.replace({name:'room',id});}
-  else if(store.friendMoods.some(m=>m.id===id))nav.replace({name:'friendMood',id});
+  const target=conversationRef(store,id);
+  if(target)nav.replace({name:'chat',id:target.friendId,focus:target.focus});
+  else if(store.myMoods.some(m=>m.id===id))nav.replace({name:'room',id});
   else nav.replace({name:'today'});
  },[ready]);
  return <View style={{paddingVertical:48,alignItems:'center'}}><ActivityIndicator color={CT.ink}/></View>;
-}
-
-function ReactionNotices({nav}:{nav:Nav}){
- const store=useCircle();const [all,setAll]=useState(false);
- const unread=store.inbox.filter(n=>!n.read).length;
- if(!store.inbox.length)return null;
- const shown=all?store.inbox:store.inbox.slice(0,6);
- return <>
-  <CHeading title={unread?'Notifications · '+unread+' unread':'Notifications'} action={store.inbox.length>6?(all?'Show less':'Show all'):undefined} onAction={()=>setAll(v=>!v)}/>
-  <CCard style={{paddingVertical:4}}>{shown.map((n,i)=><TouchableOpacity key={n.id} accessibilityRole="button" accessibilityLabel={n.name+' '+n.emoji+', '+n.mood+(n.read?'':', unread')}
-   onPress={()=>{store.markReactionRead(n.id);if(store.myMoods.some(m=>m.id===n.moodId))nav.push({name:'room',id:n.moodId});}}
-   style={{flexDirection:'row',alignItems:'center',gap:10,paddingVertical:10,borderBottomWidth:i===shown.length-1?0:1,borderBottomColor:'#EEF2F0'}}>
-   <View style={{width:8,height:8,borderRadius:4,backgroundColor:n.read?'transparent':'#3B82F6'}}/>
-   <View style={{flex:1}}><Text style={cs.rowTitle}>{n.name}</Text><Text style={cs.rowSub}>{timeAgo(n.at)}</Text></View>
-   <Text style={{fontSize:26}}>{n.emoji}</Text>
-   <MoodPalThumb mood={n.mood} size={40}/>
-  </TouchableOpacity>)}</CCard>
- </>;
-}
-
-function TodaySignals({nav}:{nav:Nav}){
- const store=useCircle();
- useEffect(()=>{store.markMoodsSeen();if(store.signals.some(s=>!s.seen))store.markSignalsSeen()},[]);const [tab,setTab]=useState<'today'|'earlier'>('today');const [open,setOpen]=useState<Record<string,boolean>>({});
- const mine=store.myMoods.filter(m=>tab==='today'?isToday(m.sharedAt):!isToday(m.sharedAt));
- const signals=store.signals.filter(s=>tab==='today'?isToday(s.at):!isToday(s.at));
- const friendMoods=tab==='today'?store.friendMoods.filter(m=>new Date(m.expiresAt).getTime()>Date.now()):[];
- const nothing=!mine.length&&!signals.length&&!friendMoods.length;
- return <>
-  <Segmented value={tab} options={[['today','Today'],['earlier','Earlier']]} onChange={v=>setTab(v as any)}/>
-  {nothing?<EmptyState title={tab==='today'?'A quiet day so far':'Nothing earlier'} detail="Signals and reactions from your circle will show up here." action="Send a Little Signal" onAction={()=>nav.push({name:'send'})}/>:null}
-  {mine.map(m=>{const isOpen=open[m.id]??tab==='today';return <CCard key={m.id} style={{gap:8}}>
-   <TouchableOpacity onPress={()=>setOpen(o=>({...o,[m.id]:!isOpen}))} accessibilityRole="button" accessibilityState={{expanded:isOpen}} style={{flexDirection:'row',alignItems:'center',gap:10}}>
-    <MoodPalThumb mood={m.mood} size={42}/><View style={{flex:1}}><Text style={cs.rowTitle}>{tab==='today'?'Today':new Date(m.sharedAt).toLocaleDateString(undefined,{weekday:'short'})} — {m.mood}</Text><Text style={cs.rowSub}>{m.reactions.length?m.reactions.map(r=>r.emoji).join(' ')+' · '+m.reactions.length+' reactions':'No reactions'}{m.active?'':' · expired'}</Text></View>
-    <Ionicons name={isOpen?'chevron-up':'chevron-down'} size={18} color={CT.primary}/></TouchableOpacity>
-   {isOpen?<>{m.reactions.map(r=><View key={r.friendId} style={{flexDirection:'row',alignItems:'center',gap:10,paddingLeft:52}}><Text style={{flex:1,color:CT.ink,fontWeight:'700'}}>{friendName(store,r.friendId)}</Text><Text style={{fontSize:20}}>{r.emoji}</Text><Text style={cs.rowSub}>{timeAgo(r.at)}</Text></View>)}
-    <TouchableOpacity onPress={()=>nav.push({name:'room',id:m.id})} style={{paddingLeft:52}}><Text style={{color:CT.primary,fontWeight:'800',fontSize:12}}>Open reactions →</Text></TouchableOpacity></>:null}
-  </CCard>})}
-  {signals.length?<><CHeading title="Little Signals"/><CCard style={{paddingVertical:4}}>{signals.map((s,i)=><CRow key={s.id} last={i===signals.length-1} leading={<View style={cs.signalEmoji}><Text style={{fontSize:22}}>{signalById(s.signal).emoji}</Text></View>} title={signalById(s.signal).notify(friendName(store,s.friendId))} subtitle={timeAgo(s.at)} onPress={()=>nav.push({name:'signalReceived',signalId:s.id})}/>)}</CCard></>:null}
-  {friendMoods.length?<><CHeading title="Shared with you" detail="Visible for 24 hours after they share"/><CCard style={{paddingVertical:4}}>{friendMoods.map((m,i)=><CRow key={m.id} last={i===friendMoods.length-1} leading={<MoodPalThumb mood={m.mood} size={40}/>} title={friendName(store,m.friendId)+' · '+m.mood} subtitle={(m.myReaction?'You reacted '+m.myReaction+' · ':'Tap to react · ')+timeAgo(m.sharedAt)} onPress={()=>nav.push({name:'friendMood',id:m.id})}/>)}</CCard></>:null}
-  <ReactionNotices nav={nav}/>
- </>;
 }
 
 function NotificationSettings(){

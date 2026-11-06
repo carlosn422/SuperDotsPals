@@ -4,7 +4,7 @@ import {Ionicons} from '@expo/vector-icons';
 import SuperdotMascot from './SuperdotMascot';
 import {APP_THEME} from './MoodMascot';
 import {CircleMood,MOOD_TINTS,signalById,timeAgo} from './LittleSignalsData';
-import {activeFriendMoods,friendName,useCircle} from './CircleStore';
+import {activeFriendMoods,friendName,isMoodNew,useCircle} from './CircleStore';
 
 export const CT={...APP_THEME,line:'#EEF3F0',danger:'#D65B79'};
 
@@ -90,7 +90,7 @@ export function LittleSignalsTodayCard({onOpenSignals,onOpenMood,onOpenSignal,on
  const items=[
   ...store.signals.filter(s=>Date.now()-new Date(s.at).getTime()<864e5).map(s=>({key:'s'+s.id,at:s.at,isNew:!s.seen,open:()=>onOpenSignal(s.id),
    leading:<View style={cs.signalEmoji}><Text style={{fontSize:22}}>{signalById(s.signal).emoji}</Text></View>,title:signalById(s.signal).notify(friendName(store,s.friendId))})),
-  ...activeFriendMoods(store).map(m=>({key:'m'+m.id,at:m.sharedAt,isNew:!store.moodsSeenAt||m.sharedAt>store.moodsSeenAt,open:()=>onOpenMood(m.id),
+  ...activeFriendMoods(store).map(m=>({key:'m'+m.id,at:m.sharedAt,isNew:isMoodNew(store,m),open:()=>onOpenMood(m.id),
    leading:<MoodPalThumb mood={m.mood} size={44}/>,title:friendName(store,m.friendId)+' is feeling '+m.mood+(m.myReaction?' · you sent '+m.myReaction:'')})),
  ].sort((x,y)=>y.at.localeCompare(x.at));
  const unseen=items.filter(i=>i.isNew).length;
@@ -99,7 +99,7 @@ export function LittleSignalsTodayCard({onOpenSignals,onOpenMood,onOpenSignal,on
  return <View style={[cs.card,{gap:12}]}>
   <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
    <View style={{flexDirection:'row',alignItems:'center',gap:8}}><Text accessibilityRole="header" style={{fontWeight:'900',fontSize:17,color:CT.ink}}>Your Circle</Text>{unseen?<View style={cs.badge} accessibilityLabel={unseen+' new'}><Text style={{color:'#fff',fontSize:11,fontWeight:'900'}}>{unseen} new</Text></View>:null}</View>
-   <TouchableOpacity onPress={onOpenSignals} accessibilityRole="button" accessibilityLabel="See all of today's signals" style={{minHeight:44,justifyContent:'center'}}><Text style={{color:CT.primary,fontWeight:'800',fontSize:12}}>See all</Text></TouchableOpacity>
+   <TouchableOpacity onPress={onOpenSignals} accessibilityRole="button" accessibilityLabel="Open Circle messages" style={{minHeight:44,justifyContent:'center'}}><Text style={{color:CT.primary,fontWeight:'800',fontSize:12}}>See all</Text></TouchableOpacity>
   </View>
   {shown.length?shown.map(i=><TouchableOpacity key={i.key} onPress={i.open} accessibilityRole="button" accessibilityLabel={i.title+', '+timeAgo(i.at)+(i.isNew?', new':'')} style={{flexDirection:'row',alignItems:'center',gap:12}}>
     {i.leading}

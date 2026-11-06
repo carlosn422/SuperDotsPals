@@ -18,10 +18,12 @@ const isNetworkError=(e:any)=>/network|fetch|timed? ?out|offline/i.test(String(e
 const deviceTimezone=()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'}catch{return 'UTC'}};
 const startOfToday=()=>{const d=new Date();d.setHours(0,0,0,0);return d.toISOString();};
 
-const emptyState=():State=>({moodsSeenAt:'',seenMoodIds:[],familyNames:{},friends:[],groups:[],requests:[],myMoods:[],friendMoods:[],signals:[],invite:{code:'',expiresAt:new Date().toISOString()},prefs:{...EMPTY_PREFS},revokedFriendIds:[],blockedNames:[],sentSignals:[],offline:false,widgetHideMood:true,inbox:[]});
+const emptyState=():State=>({moodsSeenAt:'',seenMoodIds:[],seenSignalIds:[],familyNames:{},friends:[],groups:[],requests:[],myMoods:[],friendMoods:[],signals:[],invite:{code:'',expiresAt:new Date().toISOString()},prefs:{...EMPTY_PREFS},revokedFriendIds:[],blockedNames:[],sentSignals:[],offline:false,widgetHideMood:true,inbox:[]});
 const WIDGET_HIDE_MOOD_KEY='circle.widgetHideMood';
 const MOODS_SEEN_KEY='circle.moodsSeenAt';
 const MOOD_IDS_SEEN_KEY='circle.seenMoodIds';
+// Signals seen in their conversation; the server only marks all signals seen at once, so that call waits until none are left.
+const SIGNAL_IDS_SEEN_KEY='circle.seenSignalIds';
 // Read acknowledgements that couldn't reach the server yet; retried on every refresh.
 const PENDING_READS_KEY='circle.pendingReactionReads';
 const loadPendingReads=async():Promise<string[]>=>{try{return JSON.parse((await AsyncStorage.getItem(PENDING_READS_KEY))||'[]')}catch{return []}};
@@ -54,7 +56,7 @@ export function useLiveCircleState():CircleStore{
     supabase.from('circle_groups').select('id,name,icon,color,allowed_moods,is_default,created_at,circle_group_members(member_id)').order('is_default',{ascending:false}).order('created_at'),
     supabase.from('circle_shared_moods').select('id,mood,group_ids,shared_at,expires_at,stopped_at,circle_reactions(reactor_id,emoji,updated_at)').eq('owner_id',uid).order('shared_at',{ascending:false}).limit(30),
     supabase.from('circle_shared_moods').select('id,owner_id,mood,shared_at,expires_at').neq('owner_id',uid).order('shared_at',{ascending:false}).limit(30),
-    supabase.from('circle_reactions').select('shared_mood_id,emoji').eq('reactor_id',uid),
+    supabase.from('circle_reactions').select('shared_mood_id,emoji,updated_at').eq('reactor_id',uid),
     supabase.from('circle_signals').select('id,sender_id,signal,sent_at,seen_at').eq('recipient_id',uid).order('sent_at',{ascending:false}).limit(50),
     supabase.from('circle_signals').select('recipient_id,signal,sent_at').eq('sender_id',uid).gte('sent_at',startOfToday()),
     supabase.from('circle_notification_prefs').select('*').eq('user_id',uid).maybeSingle(),
@@ -64,7 +66,7 @@ export function useLiveCircleState():CircleStore{
    const failed=[invite,friends,requests,groups,mine,shared,myReactions,signals,sent,prefs,inbox,family].find(r=>r.error);
    if(failed?.error)throw failed.error;
    const now=Date.now();
-   const reactionByMood=new Map<string,string>(((myReactions.data||[]) as any[]).map(r=>[r.shared_mood_id,r.emoji]));
+   const reactionByMood=new Map<string,{emoji:string;at:string}>(((myReactions.data||[]) as any[]).map(r=>[r.shared_mood_id,{emoji:r.emoji,at:r.updated_at}]));
    const inv=((invite.data||[]) as any[])[0];
    const p:any=prefs.data;
    const friendList=((friends.data||[]) as any[]).map((f):Friend=>({id:f.friend_id,name:f.display_name,initials:initialsOf(f.display_name),color:f.avatar_color,
@@ -79,8 +81,8 @@ export function useLiveCircleState():CircleStore{
     myMoods:((mine.data||[]) as any[]).map(m=>({id:m.id,mood:asMood(m.mood),sharedAt:m.shared_at,expiresAt:m.stopped_at||m.expires_at,groupIds:m.group_ids||[],
      active:!m.stopped_at&&new Date(m.expires_at).getTime()>now,
      reactions:(m.circle_reactions||[]).map((r:any)=>({friendId:r.reactor_id,emoji:r.emoji,at:r.updated_at})).sort((a:any,b:any)=>a.at.localeCompare(b.at))})),
-    friendMoods:((shared.data||[]) as any[]).map(m=>({id:m.id,friendId:m.owner_id,mood:asMood(m.mood),sharedAt:m.shared_at,expiresAt:m.expires_at,myReaction:reactionByMood.get(m.id)})),
-    signals:((signals.data||[]) as any[]).map(x=>({id:x.id,friendId:x.sender_id,signal:x.signal as SignalId,at:x.sent_at,seen:!!x.seen_at})),
+    friendMoods:((shared.data||[]) as any[]).map(m=>({id:m.id,friendId:m.owner_id,mood:asMood(m.mood),sharedAt:m.shared_at,expiresAt:m.expires_at,myReaction:reactionByMood.get(m.id)?.emoji,myReactionAt:reactionByMood.get(m.id)?.at})),
+    signals:((signals.data||[]) as any[]).map(x=>({id:x.id,friendId:x.sender_id,signal:x.signal as SignalId,at:x.sent_at,seen:!!x.seen_at||s.seenSignalIds.includes(x.id)})),
     sentSignals:((sent.data||[]) as any[]).map(x=>({friendIds:[x.recipient_id],signal:x.signal as SignalId,at:x.sent_at})),
     inbox:((inbox.data||[]) as any[]).map(n=>({id:n.id,moodId:n.shared_mood_id,mood:asMood(n.mood),friendId:n.reactor_id,name:nickById.get(n.reactor_id)||n.reactor_name,emoji:n.emoji,at:n.reacted_at,read:!!n.read_at||pendingReads.includes(n.id)})),
     familyNames:Object.fromEntries(((family.data||[]) as any[]).map(n=>[n.profile_id,{name:n.display_name,owner:n.owner_name}])),
@@ -95,6 +97,7 @@ export function useLiveCircleState():CircleStore{
  },[]);
 
  useEffect(()=>{AsyncStorage.getItem(MOOD_IDS_SEEN_KEY).then(v=>{if(v)up(s=>({seenMoodIds:Array.from(new Set([...s.seenMoodIds,...JSON.parse(v)]))}))}).catch(()=>{})},[]);
+ useEffect(()=>{AsyncStorage.getItem(SIGNAL_IDS_SEEN_KEY).then(v=>{if(v){const ids:string[]=JSON.parse(v);up(s=>({seenSignalIds:Array.from(new Set([...s.seenSignalIds,...ids])),signals:s.signals.map(x=>ids.includes(x.id)?{...x,seen:true}:x)}))}}).catch(()=>{})},[]);
  useEffect(()=>{AsyncStorage.getItem(MOODS_SEEN_KEY).then(v=>{if(v)up(s=>({moodsSeenAt:v>s.moodsSeenAt?v:s.moodsSeenAt}))}).catch(()=>{})},[]);
  useEffect(()=>{AsyncStorage.getItem(WIDGET_HIDE_MOOD_KEY).then(v=>{if(v!==null)up(()=>({widgetHideMood:v==='1'}))}).catch(()=>{})},[]);
 
@@ -194,11 +197,23 @@ export function useLiveCircleState():CircleStore{
    return temp;
   },
   stopSharing:(id:string)=>{up(s=>({myMoods:s.myMoods.map(m=>m.id===id?{...m,active:false,expiresAt:new Date().toISOString()}:m)}));void run('Couldn’t stop sharing',()=>supabase.rpc('circle_stop_share',{p_mood:id}))},
-  react:(friendMoodId:string,emoji?:string)=>{
-   up(s=>({friendMoods:s.friendMoods.map(m=>m.id===friendMoodId?{...m,myReaction:emoji}:m)}));
-   void run('Couldn’t save your reaction',async()=>{const uid=await userId();
-    return emoji?supabase.from('circle_reactions').upsert({shared_mood_id:friendMoodId,reactor_id:uid,emoji,updated_at:new Date().toISOString()},{onConflict:'shared_mood_id,reactor_id'})
-     :supabase.from('circle_reactions').delete().eq('shared_mood_id',friendMoodId).eq('reactor_id',uid);});
+  // Optimistic; returns false (and restores the previous reaction) when the server rejects it or we're offline.
+  react:async(friendMoodId:string,emoji?:string):Promise<boolean>=>{
+   const prev=stRef.current.friendMoods.find(m=>m.id===friendMoodId);
+   const set=(e?:string,at?:string)=>up(s=>({friendMoods:s.friendMoods.map(m=>m.id===friendMoodId?{...m,myReaction:e,myReactionAt:at}:m)}));
+   set(emoji,emoji?new Date().toISOString():undefined);
+   try{
+    const uid=await userId();
+    const {error}=emoji?await supabase.from('circle_reactions').upsert({shared_mood_id:friendMoodId,reactor_id:uid,emoji,updated_at:new Date().toISOString()},{onConflict:'shared_mood_id,reactor_id'})
+     :await supabase.from('circle_reactions').delete().eq('shared_mood_id',friendMoodId).eq('reactor_id',uid);
+    if(error)throw error;
+    return true;
+   }catch(e:any){
+    set(prev?.myReaction,prev?.myReactionAt);
+    if(isNetworkError(e))up(()=>({offline:true}));
+    Alert.alert('Couldn’t send your reaction',isNetworkError(e)?'You’re offline. Try again when you’re connected.':(e?.message||'Please try again.'));
+    return false;
+   }finally{void refresh()}
   },
   sendSignal:(friendIds:string[],signal:SignalId)=>{
    up(s=>({sentSignals:[{friendIds,signal,at:new Date().toISOString()},...s.sentSignals]}));
@@ -212,9 +227,21 @@ export function useLiveCircleState():CircleStore{
    up(s=>({inbox:s.inbox.map(x=>x.id===id?{...x,read:true}:x)}));
    supabase.rpc('circle_mark_reactions_read',{p_ids:[id]}).then(r=>{if(r.error)void loadPendingReads().then(ids=>savePendingReads([...ids,id]))},()=>{void loadPendingReads().then(ids=>savePendingReads([...ids,id]))});
   },
-  markMoodSeen:(id:string)=>{if(stRef.current.seenMoodIds.includes(id))return;const ids=[...stRef.current.seenMoodIds,id].slice(-200);up(()=>({seenMoodIds:ids}));AsyncStorage.setItem(MOOD_IDS_SEEN_KEY,JSON.stringify(ids)).catch(()=>{})},
+  markMoodSeen:(id:string|string[])=>{
+   const add=(Array.isArray(id)?id:[id]).filter(x=>!stRef.current.seenMoodIds.includes(x));if(!add.length)return;
+   const ids=[...stRef.current.seenMoodIds,...add].slice(-200);stRef.current={...stRef.current,seenMoodIds:ids};
+   up(()=>({seenMoodIds:ids}));AsyncStorage.setItem(MOOD_IDS_SEEN_KEY,JSON.stringify(ids)).catch(()=>{});
+  },
   markMoodsSeen:()=>{const at=new Date().toISOString();up(()=>({moodsSeenAt:at}));AsyncStorage.setItem(MOODS_SEEN_KEY,at).catch(()=>{})},
   markSignalsSeen:()=>{up(s=>({signals:s.signals.map(x=>({...x,seen:true}))}));supabase.rpc('circle_mark_signals_seen').then(()=>{})},
+  markSignalSeen:(id:string|string[])=>{
+   const cur=stRef.current;const add=(Array.isArray(id)?id:[id]).filter(x=>cur.signals.some(y=>y.id===x&&!y.seen));if(!add.length)return;
+   const ids=[...cur.seenSignalIds,...add].slice(-200);
+   const signals=cur.signals.map(x=>add.includes(x.id)?{...x,seen:true}:x);stRef.current={...cur,seenSignalIds:ids,signals};
+   up(s=>({seenSignalIds:ids,signals:s.signals.map(x=>add.includes(x.id)?{...x,seen:true}:x)}));
+   AsyncStorage.setItem(SIGNAL_IDS_SEEN_KEY,JSON.stringify(ids)).catch(()=>{});
+   if(!signals.some(x=>!x.seen))supabase.rpc('circle_mark_signals_seen').then(()=>{});
+  },
   setPref:(k:keyof NotificationPrefs,v:boolean)=>{up(s=>({prefs:{...s.prefs,[k]:v}}));
    void run('Couldn’t save notification settings',async()=>supabase.from('circle_notification_prefs').upsert({user_id:await userId(),[PREF_COLUMNS[k]]:v,timezone:deviceTimezone()},{onConflict:'user_id'}))},
   setWidgetHideMood:(v:boolean)=>{up(()=>({widgetHideMood:v}));AsyncStorage.setItem(WIDGET_HIDE_MOOD_KEY,v?'1':'0').catch(()=>{})},
