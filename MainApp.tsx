@@ -190,7 +190,6 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   else if(t==='Circle')setCircleReset(n=>n+1);
   else if(t==='Watches'){setWatchesPage('main');setWatchesReset(n=>n+1);watchesScroll.current?.scrollTo({y:0,animated:true});}
  };
- const closeMorePage=()=>{setMoreScreen(null);Animated.timing(activePosition,{toValue:Math.max(0,tabs.findIndex(x=>x.name===tab)),duration:250,useNativeDriver:true}).start();};
  const pickMore=(key:string)=>{if(key==='plus'||key==='help'||key==='privacy'){go('Settings');setSettingsPage(key);}else go(key as MorePage);};
  const onPageSettled=(event:NativeSyntheticEvent<NativeScrollEvent>)=>{
   const index=Math.max(0,Math.min(tabs.length-1,Math.round(event.nativeEvent.contentOffset.x/pageWidth)));
@@ -244,7 +243,6 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   <View key="Watches" style={{width:pageWidth,flex:1}}><ScrollView ref={watchesScroll} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>{watchesPage==='themes'?<WatchThemesScreen backLabel="Watches" onBack={()=>setWatchesPage('main')}/>:<ConnectedDevices key={watchesReset} focused={tab==='Watches'&&!moreScreen} onOpenThemes={()=>setWatchesPage('themes')} onCreateAccount={()=>{go('Settings');setSettingsPage('account')}}/>}</ScrollView></View>
   </ScrollView>
   <View pointerEvents={moreScreen?'auto':'none'} style={[StyleSheet.absoluteFill,{backgroundColor:C.bg,display:moreScreen?'flex':'none'}]}>
-  <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Back to '+tab} onPress={closeMorePage} style={{flexDirection:'row',alignItems:'center',alignSelf:'flex-start',gap:2,paddingHorizontal:14,minHeight:44}}><Ionicons name="chevron-back" size={20} color={C.deep}/><Text style={{color:C.deep,fontWeight:'800',fontSize:14}}>{tab}</Text></TouchableOpacity>
   <View key="Settings" style={{flex:1,display:moreScreen==='Settings'?'flex':'none'}}><ScrollView ref={settingsScroll} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
    {settingsPage==='main'?<>
     <WellnessSettingsIntro companion={shownMood} accent={colors.accent}/>
