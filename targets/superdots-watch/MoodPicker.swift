@@ -108,14 +108,16 @@ struct MoodPicker: View {
                 }
                 .frame(width: geo.size.width, height: geo.size.height)
             } else {
-                // Reclaim the space previously occupied by the full-width Set Mood button.
-                // Size the orbit to the smallest watch display, without clipping its outer moods.
-                let ringHeight = max(90, geo.size.height - 19)
+                // Keep confirmation controls at the lower corners, like native watchOS Maps.
+                // Use the top area for the animated center mascot and five outer options.
+                let footerHeight: CGFloat = 42
+                let ringHeight = max(90, geo.size.height - footerHeight)
                 let side = min(geo.size.width, ringHeight)
-                let outer = max(38, min(62, side * 0.37))
-                let middle = max(53, min(90, side * 0.43))
+                let outer = max(36, min(62, side * 0.37))
+                let middle = max(54, min(90, side * 0.44))
                 let radius = (side - outer) / 2
-                VStack(spacing: 1) {
+
+                VStack(spacing: 0) {
                     ZStack {
                         Circle()
                             .fill(option.color.opacity(0.32))
@@ -125,32 +127,7 @@ struct MoodPicker: View {
                         ForEach(Self.options.indices, id: \.self) { i in
                             mascot(i, outer: outer, middle: middle, radius: radius)
                         }
-                        // Separate confirmation target: tapping the center character only previews it.
-                        // The checkmark overlaps its upper-right edge without taking an extra row.
-                        Button(action: setMood) {
-                            Group {
-                                if saving {
-                                    ProgressView().tint(.white)
-                                } else {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundStyle(.white)
-                                }
-                            }
-                            .frame(width: 23, height: 23)
-                            .background(Circle().fill(Color.green))
-                            .overlay(Circle().stroke(Color.white.opacity(0.9), lineWidth: 1.25))
-                            .frame(width: 36, height: 36)
-                            .contentShape(Circle())
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(saving)
-                        .accessibilityLabel(failed ? "Retry saving \(option.label)" : "Save \(option.label) mood")
-                        .accessibilityHint("Saves the selected mood")
-                        .offset(x: middle * 0.53, y: -middle * 0.53)
-                        .zIndex(3)
-
-                        Text(failed ? "Couldn't save — tap ✓ to retry" : option.label)
+                        Text(failed ? "Couldn't save — try again" : option.label)
                             .font(.system(size: failed ? 10 : 14, weight: .semibold))
                             .foregroundStyle(failed ? .orange : .primary)
                             .lineLimit(1)
@@ -159,11 +136,38 @@ struct MoodPicker: View {
                             .accessibilityHidden(true)
                     }
                     .frame(width: geo.size.width, height: ringHeight)
-                    Text(saving ? "Saving…" : "Tap ✓ to set mood")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .frame(height: 16)
-                        .accessibilityHidden(true)
+
+                    HStack {
+                        Button { dismiss() } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 34, height: 34)
+                                .background(Circle().fill(Color.white.opacity(0.2)))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(saving)
+                        .accessibilityLabel("Cancel mood selection")
+                        Spacer(minLength: 0)
+                        Button(action: setMood) {
+                            Group {
+                                if saving {
+                                    ProgressView().tint(.white)
+                                } else {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 16, weight: .bold))
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                            .frame(width: 34, height: 34)
+                            .background(Circle().fill(Color.green))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(saving)
+                        .accessibilityLabel(failed ? "Retry saving \(option.label)" : "Save \(option.label) mood")
+                    }
+                    .padding(.horizontal, 8)
+                    .frame(height: footerHeight)
                 }
                 .frame(width: geo.size.width, height: geo.size.height)
             }
