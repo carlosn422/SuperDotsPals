@@ -20,8 +20,15 @@ struct MoodPicker: View {
         Option(label: "Tired", mood: "Tired", color: Color(red: 0.62, green: 0.66, blue: 0.80)),
     ]
 
-    /// Outer positions in degrees (0 = right, 90 = down); the bottom stays clear for the center label.
-    private static let ringAngles: [Double] = [-90, -30, 30, 150, 210]
+    /// Normalized positions across the entire usable watch canvas, not a tiny fixed ring.
+    /// These five slots remain stable when the selected mascot swaps to the center.
+    private static let ringPositions: [CGPoint] = [
+        CGPoint(x: 0.50, y: 0.11), // top
+        CGPoint(x: 0.84, y: 0.33), // upper right
+        CGPoint(x: 0.84, y: 0.79), // lower right
+        CGPoint(x: 0.16, y: 0.79), // lower left
+        CGPoint(x: 0.16, y: 0.33), // upper left
+    ]
 
     /// The option for a saved mood; moods without a picker option start on Calm.
     static func index(for mood: String) -> Int {
@@ -110,35 +117,45 @@ struct MoodPicker: View {
                 }
                 .frame(width: geo.size.width, height: geo.size.height)
             } else {
-                // Present in-place rather than as a watchOS sheet, so the system does
-                // not add a second Cancel control or shrink the available content area.
-                // Fixed-size orbit slots prevent the old overlapping mascot problem.
+                // Put the characters across the full watch canvas instead of squeezing
+                // them into a circle sized by the short vertical dimension.
+                // Keep their entire PNGs visible: don't zoom/crop off arms or bodies.
                 let footerHeight: CGFloat = 36
-                let ringHeight = max(90, geo.size.height - footerHeight)
-                let side = min(geo.size.width - 4, ringHeight - 6)
-                let outer = side * 0.29
-                let middle = side * 0.41
-                let radius = (side - outer) / 2
+                let canvasHeight = max(90, geo.size.height - footerHeight)
+                let outer = min(72, geo.size.width * 0.40)
+                let middle = min(96, geo.size.width * 0.50)
+                let centerY = canvasHeight * 0.49
 
                 VStack(spacing: 0) {
-                    ZStack {
+                    ZStack(alignment: .topLeading) {
                         Circle()
-                            .fill(option.color.opacity(0.32))
-                            .frame(width: middle * 1.12, height: middle * 1.12)
-                            .blur(radius: middle * 0.18)
+                            .fill(option.color.opacity(0.30))
+                            .frame(width: middle * 0.93, height: middle * 0.93)
+                            .blur(radius: middle * 0.14)
+                            .position(x: geo.size.width / 2, y: centerY)
                             .accessibilityHidden(true)
+
                         ForEach(Self.options.indices, id: \.self) { i in
-                            mascot(i, outer: outer, middle: middle, radius: radius)
+                            mascot(
+                                i,
+                                outer: outer,
+                                middle: middle,
+                                width: geo.size.width,
+                                height: canvasHeight
+                            )
                         }
+
                         Text(failed ? "Couldn't save — try again" : option.label)
                             .font(.system(size: failed ? 10 : 14, weight: .semibold))
                             .foregroundStyle(failed ? .orange : .primary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
-                            .offset(y: ringHeight / 2 - 12)
+                            .frame(maxWidth: geo.size.width * 0.5)
+                            .position(x: geo.size.width / 2,
+                                      y: min(canvasHeight - 10, centerY + middle / 2 + 8))
                             .accessibilityHidden(true)
                     }
-                    .frame(width: geo.size.width, height: ringHeight)
+                    .frame(width: geo.size.width, height: canvasHeight)
 
                     HStack {
                         Button {
@@ -199,27 +216,31 @@ struct MoodPicker: View {
 
     /// One MoodPal, in the center or at its outer position. Only the center one plays its animation.
     @ViewBuilder
-    private func mascot(_ i: Int, outer: CGFloat, middle: CGFloat, radius: CGFloat) -> some View {
+    private func mascot(
+        _ i: Int, outer: CGFloat, middle: CGFloat, width: CGFloat, height: CGFloat
+    ) -> some View {
         let isCenter = i == center
-        let angle = (ring.firstIndex(of: i).map { Self.ringAngles[$0] } ?? 0) * .pi / 180
+        let position = ring.firstIndex(of: i).map { Self.ringPositions[$0] }
+            ?? CGPoint(x: 0.5, y: 0.49)
         let size = isCenter ? middle : outer
+
         Button { preview(i) } label: {
             ZStack {
                 Circle()
                     .fill(Color.white.opacity(isCenter ? 0 : 0.12))
-                    .frame(width: size, height: size)
-                // Crop each mascot's transparent source padding within its own bubble.
-                // This makes the *visible characters* bigger without overlap.
+                    .frame(width: size * 0.72, height: size * 0.72)
+
+                // Show each ORIGINAL mascot in full. The previous 2x zoom plus
+                // Circle clipping cropped off the characters' bodies and arms.
                 AnimatedMoodMascot(mood: Self.options[i].mood, size: size, isActive: isCenter)
-                    .scaleEffect(isCenter ? 1.75 : 2.0)
                     .frame(width: size, height: size)
-                    .clipShape(Circle())
             }
             .frame(width: size, height: size)
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .offset(x: isCenter ? 0 : cos(angle) * radius, y: isCenter ? 0 : sin(angle) * radius)
+        .position(x: isCenter ? width / 2 : width * position.x,
+                  y: isCenter ? height * 0.49 : height * position.y)
         .zIndex(isCenter ? 1 : 0)
         .accessibilityLabel(isCenter ? "\(Self.options[i].label), selected" : Self.options[i].label)
         .accessibilityHint(isCenter ? "Use the bottom-right checkmark to save this mood." : "Previews this mood. Use the bottom-right checkmark to save.")
