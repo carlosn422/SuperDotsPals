@@ -32,8 +32,9 @@ struct MoodPicker: View {
     let accent: Color
     /// Saves the mood; returns false when it could not be saved.
     let commit: (String) async -> Bool
+    /// Leaves the selector without saving, or after a successful save.
+    let onClose: () -> Void
 
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Option shown in the center.
     @State private var center: Int
@@ -45,13 +46,14 @@ struct MoodPicker: View {
     @State private var failed = false
     @FocusState private var crownFocused: Bool
 
-    init(current: String, accent: Color, commit: @escaping (String) async -> Bool) {
+    init(current: String, accent: Color, commit: @escaping (String) async -> Bool, onClose: @escaping () -> Void) {
         let start = Self.index(for: current)
         _center = State(initialValue: start)
         _ring = State(initialValue: Self.options.indices.filter { $0 != start })
         _crown = State(initialValue: Double(start))
         self.accent = accent
         self.commit = commit
+        self.onClose = onClose
     }
 
     private var option: Option { Self.options[center] }
@@ -83,7 +85,7 @@ struct MoodPicker: View {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) { saved = true }
                 }
                 try? await Task.sleep(for: .seconds(1.2))
-                dismiss()
+                onClose()
             } else {
                 failed = true
                 WKInterfaceDevice.current().play(.failure)
@@ -108,15 +110,14 @@ struct MoodPicker: View {
                 }
                 .frame(width: geo.size.width, height: geo.size.height)
             } else {
-                // The original oversized animation frames overlapped because the ring radius
-                // was smaller than the sum of the center and outer mascot radii.
-                // Reserve the footer, then fit a non-overlapping orbit inside the available square:
-                // middle = 44% and outer = 28% => middle + 2*outer == side.
-                let footerHeight: CGFloat = 40
+                // Present in-place rather than as a watchOS sheet, so the system does
+                // not add a second Cancel control or shrink the available content area.
+                // Fixed-size orbit slots prevent the old overlapping mascot problem.
+                let footerHeight: CGFloat = 36
                 let ringHeight = max(90, geo.size.height - footerHeight)
-                let side = min(geo.size.width, ringHeight)
-                let outer = side * 0.28
-                let middle = side * 0.44
+                let side = min(geo.size.width - 4, ringHeight - 6)
+                let outer = side * 0.29
+                let middle = side * 0.41
                 let radius = (side - outer) / 2
 
                 VStack(spacing: 0) {
@@ -134,41 +135,50 @@ struct MoodPicker: View {
                             .foregroundStyle(failed ? .orange : .primary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
-                            .offset(y: middle / 2 + 10)
+                            .offset(y: ringHeight / 2 - 12)
                             .accessibilityHidden(true)
                     }
                     .frame(width: geo.size.width, height: ringHeight)
 
                     HStack {
-                        Button { dismiss() } label: {
+                        Button {
+                            guard !saving else { return }
+                            onClose()
+                        } label: {
                             Image(systemName: "xmark")
-                                .font(.system(size: 15, weight: .bold))
+                                .font(.system(size: 12, weight: .bold))
                                 .foregroundStyle(.white)
-                                .frame(width: 34, height: 34)
-                                .background(Circle().fill(Color.white.opacity(0.2)))
+                                .frame(width: 26, height: 26)
+                                .background(Circle().fill(Color.white.opacity(0.20)))
+                                .frame(width: 36, height: 36)
+                                .contentShape(Circle())
                         }
                         .buttonStyle(.plain)
                         .disabled(saving)
                         .accessibilityLabel("Cancel mood selection")
+
                         Spacer(minLength: 0)
+
                         Button(action: setMood) {
                             Group {
                                 if saving {
                                     ProgressView().tint(.white)
                                 } else {
                                     Image(systemName: "checkmark")
-                                        .font(.system(size: 16, weight: .bold))
+                                        .font(.system(size: 13, weight: .bold))
                                         .foregroundStyle(.white)
                                 }
                             }
-                            .frame(width: 34, height: 34)
+                            .frame(width: 26, height: 26)
                             .background(Circle().fill(Color.green))
+                            .frame(width: 36, height: 36)
+                            .contentShape(Circle())
                         }
                         .buttonStyle(.plain)
                         .disabled(saving)
                         .accessibilityLabel(failed ? "Retry saving \(option.label)" : "Save \(option.label) mood")
                     }
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, 5)
                     .frame(height: footerHeight)
                 }
                 .frame(width: geo.size.width, height: geo.size.height)
@@ -185,17 +195,6 @@ struct MoodPicker: View {
             preview(Int(value.rounded()), haptic: false)
         }
         .onAppear { crownFocused = true }
-        // watchOS supplies an automatic upper-left X for sheets. Replace it with an
-        // invisible, non-interactive toolbar item so only our bottom-left Cancel remains.
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("") {}
-                    .opacity(0)
-                    .disabled(true)
-                    .allowsHitTesting(false)
-            }
-        }
-        .interactiveDismissDisabled(saving)
     }
 
     /// One MoodPal, in the center or at its outer position. Only the center one plays its animation.
@@ -209,10 +208,10 @@ struct MoodPicker: View {
                 Circle()
                     .fill(Color.white.opacity(isCenter ? 0 : 0.12))
                     .frame(width: size, height: size)
-                // Fill the tappable bubble, but clip *after* scaling so no mascot
-                // can render outside its own orbit slot or overlap the center.
+                // Crop each mascot's transparent source padding within its own bubble.
+                // This makes the *visible characters* bigger without overlap.
                 AnimatedMoodMascot(mood: Self.options[i].mood, size: size, isActive: isCenter)
-                    .scaleEffect(isCenter ? 1.12 : 1.30)
+                    .scaleEffect(isCenter ? 1.75 : 2.0)
                     .frame(width: size, height: size)
                     .clipShape(Circle())
             }
