@@ -113,8 +113,8 @@ struct MoodPicker: View {
                 let footerHeight: CGFloat = 42
                 let ringHeight = max(90, geo.size.height - footerHeight)
                 let side = min(geo.size.width, ringHeight)
-                let outer = max(36, min(62, side * 0.37))
-                let middle = max(54, min(90, side * 0.44))
+                let outer = max(42, min(70, side * 0.43))
+                let middle = max(58, min(94, side * 0.46))
                 let radius = (side - outer) / 2
 
                 VStack(spacing: 0) {
@@ -193,15 +193,14 @@ struct MoodPicker: View {
         let angle = (ring.firstIndex(of: i).map { Self.ringAngles[$0] } ?? 0) * .pi / 180
         let size = isCenter ? middle : outer
         Button { preview(i) } label: {
-            AnimatedMoodMascot(mood: Self.options[i].mood, size: size * (isCenter ? 1.13 : 1.32), isActive: isCenter)
+            AnimatedMoodMascot(mood: Self.options[i].mood, size: size * (isCenter ? 1.10 : 1.18), isActive: isCenter)
                 .frame(width: size, height: size)
                 .background(Circle().fill(Color.white.opacity(isCenter ? 0 : 0.12)))
-                .clipShape(Circle())
         }
         .buttonStyle(.plain)
         .offset(x: isCenter ? 0 : cos(angle) * radius, y: isCenter ? 0 : sin(angle) * radius)
         .zIndex(isCenter ? 1 : 0)
         .accessibilityLabel(isCenter ? "\(Self.options[i].label), selected" : Self.options[i].label)
-        .accessibilityHint(isCenter ? "Use the green checkmark to save this mood." : "Previews this mood. Use the green checkmark to save.")
+        .accessibilityHint(isCenter ? "Use the bottom-right checkmark to save this mood." : "Previews this mood. Use the bottom-right checkmark to save.")
     }
 }
