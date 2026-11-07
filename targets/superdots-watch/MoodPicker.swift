@@ -2,7 +2,7 @@ import SwiftUI
 import WatchKit
 
 /// Circular mood picker: the previewed MoodPal is large and animated in the center, the other moods sit around it.
-/// Tapping an outer MoodPal (or turning the Digital Crown) swaps it with the center one; the floating checkmark saves.
+/// Tapping an outer MoodPal (or turning the Digital Crown) swaps it with the center one; the bottom-right checkmark saves.
 struct MoodPicker: View {
     struct Option: Equatable {
         let label: String
@@ -108,13 +108,15 @@ struct MoodPicker: View {
                 }
                 .frame(width: geo.size.width, height: geo.size.height)
             } else {
-                // Keep confirmation controls at the lower corners, like native watchOS Maps.
-                // Use the top area for the animated center mascot and five outer options.
-                let footerHeight: CGFloat = 42
+                // The original oversized animation frames overlapped because the ring radius
+                // was smaller than the sum of the center and outer mascot radii.
+                // Reserve the footer, then fit a non-overlapping orbit inside the available square:
+                // middle = 44% and outer = 28% => middle + 2*outer == side.
+                let footerHeight: CGFloat = 40
                 let ringHeight = max(90, geo.size.height - footerHeight)
                 let side = min(geo.size.width, ringHeight)
-                let outer = max(42, min(70, side * 0.43))
-                let middle = max(58, min(94, side * 0.46))
+                let outer = side * 0.28
+                let middle = side * 0.44
                 let radius = (side - outer) / 2
 
                 VStack(spacing: 0) {
@@ -183,6 +185,16 @@ struct MoodPicker: View {
             preview(Int(value.rounded()), haptic: false)
         }
         .onAppear { crownFocused = true }
+        // watchOS supplies an automatic upper-left X for sheets. Replace it with an
+        // invisible, non-interactive toolbar item so only our bottom-left Cancel remains.
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("") {}
+                    .opacity(0)
+                    .disabled(true)
+                    .allowsHitTesting(false)
+            }
+        }
         .interactiveDismissDisabled(saving)
     }
 
@@ -193,9 +205,19 @@ struct MoodPicker: View {
         let angle = (ring.firstIndex(of: i).map { Self.ringAngles[$0] } ?? 0) * .pi / 180
         let size = isCenter ? middle : outer
         Button { preview(i) } label: {
-            AnimatedMoodMascot(mood: Self.options[i].mood, size: size * (isCenter ? 1.24 : 1.58), isActive: isCenter)
-                .frame(width: size, height: size)
-                .background(Circle().fill(Color.white.opacity(isCenter ? 0 : 0.12)))
+            ZStack {
+                Circle()
+                    .fill(Color.white.opacity(isCenter ? 0 : 0.12))
+                    .frame(width: size, height: size)
+                // Fill the tappable bubble, but clip *after* scaling so no mascot
+                // can render outside its own orbit slot or overlap the center.
+                AnimatedMoodMascot(mood: Self.options[i].mood, size: size, isActive: isCenter)
+                    .scaleEffect(isCenter ? 1.12 : 1.30)
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+            }
+            .frame(width: size, height: size)
+            .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .offset(x: isCenter ? 0 : cos(angle) * radius, y: isCenter ? 0 : sin(angle) * radius)
