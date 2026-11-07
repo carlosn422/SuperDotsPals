@@ -144,11 +144,11 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   });
   return()=>{active=false;appState.remove();if(channel)void supabase.removeChannel(channel)};
  },[]);
- // Forward each saved mood to the Apple Watch so its complication updates without opening the watch app.
+ // Forward each saved mood, and the Apple Health refresh, to the Apple Watch so it updates without opening the watch app.
  useEffect(()=>{
   if(!mood||!moodAt)return;
-  void supabase.auth.getSession().then(({data:{session}})=>{if(session?.user.id)sendMoodToWatch(mood,moodAt,session.user.id)});
- },[mood,moodAt]);
+  void supabase.auth.getSession().then(({data:{session}})=>{if(session?.user.id)sendMoodToWatch(mood,moodAt,session.user.id,healthMoodAt)});
+ },[mood,moodAt,healthMoodAt]);
  useEffect(()=>{const open=(url:string|null)=>{const m=url?.match(/^wellnest:\/\/circle\/?(\w*)/);if(m)setCircleSheet([{name:m[1]==='send'?'send':'today'}])};Linking.getInitialURL().then(open).catch(()=>{});const sub=Linking.addEventListener('url',e=>open(e.url));return()=>sub.remove()},[]);
  // Opens the screen a notification points at, whether the tap launched the app or arrived while it was running.
  const openNotification=(r:Notifications.NotificationResponse)=>{

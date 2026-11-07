@@ -7,7 +7,7 @@ type WatchLinkModule={
  getPendingPairing():WatchPairing|null;
  getWatchStatus():WatchStatus;
  requestPairing():boolean;
- sendMood(mood:string,at:number,user:string):boolean;
+ sendMood(mood:string,at:number,user:string,healthAt?:number):boolean;
  addListener(event:'onPairingRequest',listener:(pairing:WatchPairing)=>void):{remove():void};
  addListener(event:'onWatchStatus',listener:(status:WatchStatus)=>void):{remove():void};
 };
@@ -25,8 +25,10 @@ export function onWatchStatusChange(listener:(status:WatchStatus)=>void){
 }
 export const requestWatchPairing=():boolean=>native?.requestPairing()??false;
 // Latest saved mood (wellness_journal row) for the watch complication; the watch ignores older ones.
-export function sendMoodToWatch(mood:string,occurredAt:string,userId:string):boolean{
+// healthAt: when the Apple Health refresh on Today ended the hold on that mood, so the watch follows Health too.
+export function sendMoodToWatch(mood:string,occurredAt:string,userId:string,healthAt?:string|null):boolean{
  const at=Math.floor(new Date(occurredAt).getTime()/1000);
  if(!native||!mood||!userId||!Number.isFinite(at)||at<=0)return false;
- return native.sendMood(mood,at,userId);
+ const health=healthAt?Math.floor(new Date(healthAt).getTime()/1000):0;
+ return native.sendMood(mood,at,userId,Number.isFinite(health)&&health>0?health:0);
 }

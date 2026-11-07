@@ -28,6 +28,8 @@ final class WatchStore: ObservableObject {
     @Published var companion: Dot = .bloop
     @Published private(set) var currentMood: String = WatchMoodStore.loadMood()
     @Published private(set) var currentMoodAt: Date = WatchMoodStore.loadDate()
+    /// Set when the iPhone's Apple Health refresh ends the hold on the picked mood.
+    @Published private(set) var healthAt: Date? = SharedMoodStore.healthAt
 
     /// What the MoodPal shows: the picked mood for an hour, then the latest stress reading.
     func displayMood(at now: Date = Date()) -> String { WatchMoodStore.display(manual: currentMood, setAt: currentMoodAt, stress: stress, now: now) }
@@ -44,6 +46,8 @@ final class WatchStore: ObservableObject {
         let mood = WatchMoodStore.loadMood(), at = WatchMoodStore.loadDate()
         if mood != currentMood { currentMood = mood }
         if at != currentMoodAt { currentMoodAt = at }
+        let health = SharedMoodStore.healthAt
+        if health != healthAt { healthAt = health }
     }
     @Published var latestHRV: Double? = nil
     @Published var latestRestingHeartRate: Double? = nil
