@@ -112,8 +112,8 @@ struct MoodPicker: View {
                 // Size the orbit to the smallest watch display, without clipping its outer moods.
                 let ringHeight = max(90, geo.size.height - 19)
                 let side = min(geo.size.width, ringHeight)
-                let outer = max(27, min(44, side * 0.255))
-                let middle = max(56, min(104, side * 0.51))
+                let outer = max(34, min(58, side * 0.33))
+                let middle = max(54, min(96, side * 0.44))
                 let radius = (side - outer) / 2
                 VStack(spacing: 1) {
                     ZStack {
@@ -133,20 +133,21 @@ struct MoodPicker: View {
                                     ProgressView().tint(.white)
                                 } else {
                                     Image(systemName: "checkmark")
-                                        .font(.system(size: 16, weight: .bold))
+                                        .font(.system(size: 11, weight: .bold))
                                         .foregroundStyle(.white)
                                 }
                             }
-                            .frame(width: 38, height: 38)
+                            .frame(width: 23, height: 23)
                             .background(Circle().fill(Color.green))
-                            .overlay(Circle().stroke(Color.white.opacity(0.9), lineWidth: 2))
+                            .overlay(Circle().stroke(Color.white.opacity(0.9), lineWidth: 1.25))
+                            .frame(width: 36, height: 36)
                             .contentShape(Circle())
                         }
                         .buttonStyle(.plain)
                         .disabled(saving)
                         .accessibilityLabel(failed ? "Retry saving \(option.label)" : "Save \(option.label) mood")
                         .accessibilityHint("Saves the selected mood")
-                        .offset(x: middle * 0.37, y: -middle * 0.37)
+                        .offset(x: middle * 0.34, y: -middle * 0.38)
                         .zIndex(3)
 
                         Text(failed ? "Couldn't save — tap ✓ to retry" : option.label)
@@ -188,7 +189,7 @@ struct MoodPicker: View {
         let angle = (ring.firstIndex(of: i).map { Self.ringAngles[$0] } ?? 0) * .pi / 180
         let size = isCenter ? middle : outer
         Button { preview(i) } label: {
-            AnimatedMoodMascot(mood: Self.options[i].mood, size: isCenter ? size : size * 0.91, isActive: isCenter)
+            AnimatedMoodMascot(mood: Self.options[i].mood, size: size, isActive: isCenter)
                 .frame(width: size, height: size)
                 .background(Circle().fill(Color.white.opacity(isCenter ? 0 : 0.12)))
                 .clipShape(Circle())
