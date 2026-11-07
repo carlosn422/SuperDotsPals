@@ -262,3 +262,5 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 .kid-note small{display:block;font-size:11px;font-weight:700;color:var(--muted)}.kid-note b{font:700 16px Fredoka,sans-serif;color:var(--ink)}
 .kid-note.n1{right:-64px;top:9%}.kid-note.n2{left:-64px;top:52%}
 @media(max-width:860px){.feature.rev .kids-media{order:-1}.kids-media{width:270px}.kid-note.n1{right:-36px}.kid-note.n2{left:-36px}}
+.watch-photo{width:420px;max-width:100%;height:auto;border-radius:28px;box-shadow:0 22px 40px rgba(43,30,69,.28)}
+@media(max-width:860px){.watch-photo{width:340px}}
