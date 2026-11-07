@@ -112,8 +112,8 @@ struct MoodPicker: View {
                 // Size the orbit to the smallest watch display, without clipping its outer moods.
                 let ringHeight = max(90, geo.size.height - 19)
                 let side = min(geo.size.width, ringHeight)
-                let outer = max(34, min(58, side * 0.33))
-                let middle = max(54, min(96, side * 0.44))
+                let outer = max(38, min(62, side * 0.37))
+                let middle = max(53, min(90, side * 0.43))
                 let radius = (side - outer) / 2
                 VStack(spacing: 1) {
                     ZStack {
@@ -147,7 +147,7 @@ struct MoodPicker: View {
                         .disabled(saving)
                         .accessibilityLabel(failed ? "Retry saving \(option.label)" : "Save \(option.label) mood")
                         .accessibilityHint("Saves the selected mood")
-                        .offset(x: middle * 0.34, y: -middle * 0.38)
+                        .offset(x: middle * 0.53, y: -middle * 0.53)
                         .zIndex(3)
 
                         Text(failed ? "Couldn't save — tap ✓ to retry" : option.label)
@@ -189,7 +189,7 @@ struct MoodPicker: View {
         let angle = (ring.firstIndex(of: i).map { Self.ringAngles[$0] } ?? 0) * .pi / 180
         let size = isCenter ? middle : outer
         Button { preview(i) } label: {
-            AnimatedMoodMascot(mood: Self.options[i].mood, size: size, isActive: isCenter)
+            AnimatedMoodMascot(mood: Self.options[i].mood, size: size * (isCenter ? 1.13 : 1.32), isActive: isCenter)
                 .frame(width: size, height: size)
                 .background(Circle().fill(Color.white.opacity(isCenter ? 0 : 0.12)))
                 .clipShape(Circle())
