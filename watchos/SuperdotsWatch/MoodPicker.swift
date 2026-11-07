@@ -1,24 +1,29 @@
 import SwiftUI
 import WatchKit
 
-/// Mood picker: a large preview of the highlighted MoodPal over five small circular MoodPals.
-/// Tap, swipe or turn the Digital Crown to browse; only Set Mood saves (browsing never changes the mood).
+/// Circular mood picker: the previewed MoodPal is large and animated in the center, the other moods sit around it.
+/// Tapping an outer MoodPal (or turning the Digital Crown) swaps it with the center one; the floating checkmark saves.
 struct MoodPicker: View {
     struct Option: Equatable {
         let label: String
         /// Name stored in wellness_journal and shared with the Circle (same as the iPhone app).
         let mood: String
+        let color: Color
     }
 
     static let options: [Option] = [
-        Option(label: "Calm", mood: "Calm"),
-        Option(label: "Joy", mood: "Joyful"),
-        Option(label: "Sad", mood: "Sad"),
-        Option(label: "Angry", mood: "Angry"),
-        Option(label: "Tired", mood: "Tired"),
+        Option(label: "Calm", mood: "Calm", color: Color(red: 0.30, green: 0.78, blue: 0.55)),
+        Option(label: "Joy", mood: "Joyful", color: Color(red: 1.00, green: 0.80, blue: 0.25)),
+        Option(label: "Anxious", mood: "Anxious", color: Color(red: 0.66, green: 0.48, blue: 0.96)),
+        Option(label: "Sad", mood: "Sad", color: Color(red: 0.36, green: 0.60, blue: 0.98)),
+        Option(label: "Angry", mood: "Angry", color: Color(red: 0.96, green: 0.36, blue: 0.32)),
+        Option(label: "Tired", mood: "Tired", color: Color(red: 0.62, green: 0.66, blue: 0.80)),
     ]
 
-    /// The highlighted option for a saved mood; older moods without a picker option (e.g. Anxious) start on Calm.
+    /// Outer positions in degrees (0 = right, 90 = down); the bottom stays clear for the center label.
+    private static let ringAngles: [Double] = [-90, -30, 30, 150, 210]
+
+    /// The option for a saved mood; moods without a picker option start on Calm.
     static func index(for mood: String) -> Int {
         let emotion = MoodArt.emotion(mood)
         return options.firstIndex { MoodArt.emotion($0.mood) == emotion } ?? 0
@@ -29,7 +34,11 @@ struct MoodPicker: View {
     let commit: (String) async -> Bool
 
     @Environment(\.dismiss) private var dismiss
-    @State private var index: Int
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Option shown in the center.
+    @State private var center: Int
+    /// Option at each outer position (same order as `ringAngles`).
+    @State private var ring: [Int]
     @State private var crown: Double
     @State private var saving = false
     @State private var saved = false
@@ -38,18 +47,23 @@ struct MoodPicker: View {
 
     init(current: String, accent: Color, commit: @escaping (String) async -> Bool) {
         let start = Self.index(for: current)
-        _index = State(initialValue: start)
+        _center = State(initialValue: start)
+        _ring = State(initialValue: Self.options.indices.filter { $0 != start })
         _crown = State(initialValue: Double(start))
         self.accent = accent
         self.commit = commit
     }
 
-    private var option: Option { Self.options[index] }
+    private var option: Option { Self.options[center] }
 
-    private func select(_ next: Int, haptic: Bool = true) {
-        let next = min(max(next, 0), Self.options.count - 1)
-        guard next != index, !saving, !saved else { return }
-        withAnimation(.easeInOut(duration: 0.18)) { index = next }
+    /// Moves `next` to the center and the previous center mood into the position `next` left.
+    private func preview(_ next: Int, haptic: Bool = true) {
+        guard next != center, !saving, !saved, let slot = ring.firstIndex(of: next) else { return }
+        let swap = {
+            ring[slot] = center
+            center = next
+        }
+        if reduceMotion { swap() } else { withAnimation(.spring(response: 0.34, dampingFraction: 0.8)) { swap() } }
         failed = false
         if Double(next) != crown { crown = Double(next) }
         if haptic { WKInterfaceDevice.current().play(.click) }
@@ -65,7 +79,9 @@ struct MoodPicker: View {
             saving = false
             if ok {
                 WKInterfaceDevice.current().play(.success)
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) { saved = true }
+                if reduceMotion { saved = true } else {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) { saved = true }
+                }
                 try? await Task.sleep(for: .seconds(1.2))
                 dismiss()
             } else {
@@ -77,11 +93,10 @@ struct MoodPicker: View {
 
     var body: some View {
         GeometryReader { geo in
-            let preview = max(44, min(100, geo.size.height - 98))
-            VStack(spacing: 4) {
-                if saved {
+            if saved {
+                VStack(spacing: 4) {
                     Spacer(minLength: 0)
-                    AnimatedMoodMascot(mood: option.mood, size: max(preview, min(100, geo.size.height - 56)), isActive: true)
+                    AnimatedMoodMascot(mood: option.mood, size: max(44, min(100, geo.size.height - 56)), isActive: true)
                         .overlay(alignment: .bottomTrailing) {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 22, weight: .bold))
@@ -90,60 +105,67 @@ struct MoodPicker: View {
                         .transition(.scale.combined(with: .opacity))
                     Text("Mood set to \(option.label)").font(.system(size: 13, weight: .semibold))
                     Spacer(minLength: 0)
-                } else {
-                    AnimatedMoodMascot(mood: option.mood, size: preview, isActive: true)
-                        .id(index)
-                        .transition(.opacity)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: preview)
-                        .contentShape(Rectangle())
-                        .highPriorityGesture(
-                            DragGesture(minimumDistance: 15)
-                                .onEnded { value in
-                                    let dx = value.translation.width
-                                    guard abs(dx) > abs(value.translation.height), abs(dx) > 25 else { return }
-                                    select(index + (dx < 0 ? 1 : -1))
-                                }
-                        )
-                        .accessibilityLabel("\(option.label) MoodPal preview")
-                    Text(failed ? "Couldn't save. Try again." : option.label)
-                        .font(.system(size: failed ? 11 : 14, weight: .semibold))
-                        .foregroundStyle(failed ? .orange : .primary)
-                        .lineLimit(1)
-                        .frame(height: 18)
-                    HStack(spacing: 2) {
-                        ForEach(Self.options.indices, id: \.self) { i in
-                            let selected = i == index
-                            Button { select(i) } label: {
-                                AnimatedMoodMascot(mood: Self.options[i].mood, size: 22, isActive: false)
-                                    .frame(width: 28, height: 28)
-                                    .background(Circle().fill(selected ? accent.opacity(0.35) : Color.white.opacity(0.12)))
-                                    .overlay(Circle().stroke(selected ? accent : .clear, lineWidth: 2))
-                                    .clipShape(Circle())
-                                    .scaleEffect(selected ? 1.15 : 0.92)
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(Self.options[i].label + (selected ? ", selected" : ""))
-                        }
-                    }
-                    .frame(height: 34)
-                    .padding(.horizontal, 6)
-                    Button(action: setMood) {
-                        Group {
-                            if saving { ProgressView().tint(.white) } else { Text("Set Mood") }
-                        }
-                        .font(.system(size: 14, weight: .bold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 32)
-                        .background(Capsule().fill(accent))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(saving)
-                    .accessibilityLabel("Set mood to \(option.label)")
                 }
+                .frame(width: geo.size.width, height: geo.size.height)
+            } else {
+                // Reclaim the space previously occupied by the full-width Set Mood button.
+                // Size the orbit to the smallest watch display, without clipping its outer moods.
+                let ringHeight = max(90, geo.size.height - 19)
+                let side = min(geo.size.width, ringHeight)
+                let outer = max(27, min(44, side * 0.255))
+                let middle = max(56, min(104, side * 0.51))
+                let radius = (side - outer) / 2
+                VStack(spacing: 1) {
+                    ZStack {
+                        Circle()
+                            .fill(option.color.opacity(0.32))
+                            .frame(width: middle * 1.12, height: middle * 1.12)
+                            .blur(radius: middle * 0.18)
+                            .accessibilityHidden(true)
+                        ForEach(Self.options.indices, id: \.self) { i in
+                            mascot(i, outer: outer, middle: middle, radius: radius)
+                        }
+                        // Separate confirmation target: tapping the center character only previews it.
+                        // The checkmark overlaps its upper-right edge without taking an extra row.
+                        Button(action: setMood) {
+                            Group {
+                                if saving {
+                                    ProgressView().tint(.white)
+                                } else {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 16, weight: .bold))
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                            .frame(width: 38, height: 38)
+                            .background(Circle().fill(Color.green))
+                            .overlay(Circle().stroke(Color.white.opacity(0.9), lineWidth: 2))
+                            .contentShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(saving)
+                        .accessibilityLabel(failed ? "Retry saving \(option.label)" : "Save \(option.label) mood")
+                        .accessibilityHint("Saves the selected mood")
+                        .offset(x: middle * 0.37, y: -middle * 0.37)
+                        .zIndex(3)
+
+                        Text(failed ? "Couldn't save — tap ✓ to retry" : option.label)
+                            .font(.system(size: failed ? 10 : 14, weight: .semibold))
+                            .foregroundStyle(failed ? .orange : .primary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .offset(y: middle / 2 + 10)
+                            .accessibilityHidden(true)
+                    }
+                    .frame(width: geo.size.width, height: ringHeight)
+                    Text(saving ? "Saving…" : "Tap ✓ to set mood")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .frame(height: 16)
+                        .accessibilityHidden(true)
+                }
+                .frame(width: geo.size.width, height: geo.size.height)
             }
-            .frame(width: geo.size.width, height: geo.size.height)
         }
         .padding(.horizontal, 4)
         .focusable(!saved)
@@ -153,9 +175,28 @@ struct MoodPicker: View {
                               sensitivity: .low, isContinuous: false, isHapticFeedbackEnabled: true)
         .onChange(of: crown) { _, value in
             // The crown's detents already play a haptic.
-            select(Int(value.rounded()), haptic: false)
+            preview(Int(value.rounded()), haptic: false)
         }
         .onAppear { crownFocused = true }
         .interactiveDismissDisabled(saving)
+    }
+
+    /// One MoodPal, in the center or at its outer position. Only the center one plays its animation.
+    @ViewBuilder
+    private func mascot(_ i: Int, outer: CGFloat, middle: CGFloat, radius: CGFloat) -> some View {
+        let isCenter = i == center
+        let angle = (ring.firstIndex(of: i).map { Self.ringAngles[$0] } ?? 0) * .pi / 180
+        let size = isCenter ? middle : outer
+        Button { preview(i) } label: {
+            AnimatedMoodMascot(mood: Self.options[i].mood, size: isCenter ? size : size * 0.91, isActive: isCenter)
+                .frame(width: size, height: size)
+                .background(Circle().fill(Color.white.opacity(isCenter ? 0 : 0.12)))
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .offset(x: isCenter ? 0 : cos(angle) * radius, y: isCenter ? 0 : sin(angle) * radius)
+        .zIndex(isCenter ? 1 : 0)
+        .accessibilityLabel(isCenter ? "\(Self.options[i].label), selected" : Self.options[i].label)
+        .accessibilityHint(isCenter ? "Use the green checkmark to save this mood." : "Previews this mood. Use the green checkmark to save.")
     }
 }
