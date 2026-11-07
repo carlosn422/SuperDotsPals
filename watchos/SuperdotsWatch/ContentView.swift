@@ -42,7 +42,12 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if !simulatorDemo && (!sync.connected || sync.needsReconnect || sync.pairingActive) {
+            if choosingMood {
+                MoodPicker(current: store.displayMood(), accent: purple, commit: commitMood) {
+                    choosingMood = false
+                }
+                .background(Color.black.ignoresSafeArea())
+            } else if !simulatorDemo && (!sync.connected || sync.needsReconnect || sync.pairingActive) {
                 WatchSyncView(sync: sync)
             } else if !simulatorDemo && !sync.moodLoaded {
                 VStack(spacing: 10) {
@@ -126,9 +131,6 @@ struct ContentView: View {
         }
         .sheet(isPresented: $measuring) {
             NavigationStack { MeasureNowView() }
-        }
-        .sheet(isPresented: $choosingMood) {
-            MoodPicker(current: store.displayMood(), accent: purple, commit: commitMood)
         }
         .sheet(isPresented: $choosingTheme) {
             NavigationStack { WatchThemePicker() }.environmentObject(store)
