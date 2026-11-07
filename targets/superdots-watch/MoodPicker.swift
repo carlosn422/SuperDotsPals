@@ -2,7 +2,7 @@ import SwiftUI
 import WatchKit
 
 /// Circular mood picker: the previewed MoodPal is large and animated in the center, the other moods sit around it.
-/// Tapping an outer MoodPal (or turning the Digital Crown) swaps it with the center one; only Set Mood saves.
+/// Tapping an outer MoodPal (or turning the Digital Crown) swaps it with the center one; the floating checkmark saves.
 struct MoodPicker: View {
     struct Option: Equatable {
         let label: String
@@ -108,41 +108,61 @@ struct MoodPicker: View {
                 }
                 .frame(width: geo.size.width, height: geo.size.height)
             } else {
-                let ringHeight = max(80, geo.size.height - 38)
+                // Reclaim the space previously occupied by the full-width Set Mood button.
+                // Size the orbit to the smallest watch display, without clipping its outer moods.
+                let ringHeight = max(90, geo.size.height - 19)
                 let side = min(geo.size.width, ringHeight)
-                let outer = max(22, min(36, side * 0.22))
-                let middle = max(44, min(84, side * 0.44))
+                let outer = max(27, min(44, side * 0.255))
+                let middle = max(56, min(104, side * 0.51))
                 let radius = (side - outer) / 2
-                VStack(spacing: 6) {
+                VStack(spacing: 1) {
                     ZStack {
                         Circle()
-                            .fill(option.color.opacity(0.4))
-                            .frame(width: middle * 1.1, height: middle * 1.1)
+                            .fill(option.color.opacity(0.32))
+                            .frame(width: middle * 1.12, height: middle * 1.12)
                             .blur(radius: middle * 0.18)
                             .accessibilityHidden(true)
                         ForEach(Self.options.indices, id: \.self) { i in
                             mascot(i, outer: outer, middle: middle, radius: radius)
                         }
-                        Text(failed ? "Couldn't save" : option.label)
-                            .font(.system(size: failed ? 11 : 13, weight: .semibold))
+                        // Separate confirmation target: tapping the center character only previews it.
+                        // The checkmark overlaps its upper-right edge without taking an extra row.
+                        Button(action: setMood) {
+                            Group {
+                                if saving {
+                                    ProgressView().tint(.white)
+                                } else {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 16, weight: .bold))
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                            .frame(width: 38, height: 38)
+                            .background(Circle().fill(Color.green))
+                            .overlay(Circle().stroke(Color.white.opacity(0.9), lineWidth: 2))
+                            .contentShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(saving)
+                        .accessibilityLabel(failed ? "Retry saving \(option.label)" : "Save \(option.label) mood")
+                        .accessibilityHint("Saves the selected mood")
+                        .offset(x: middle * 0.37, y: -middle * 0.37)
+                        .zIndex(3)
+
+                        Text(failed ? "Couldn't save — tap ✓ to retry" : option.label)
+                            .font(.system(size: failed ? 10 : 14, weight: .semibold))
                             .foregroundStyle(failed ? .orange : .primary)
                             .lineLimit(1)
-                            .offset(y: middle / 2 + 9)
+                            .minimumScaleFactor(0.8)
+                            .offset(y: middle / 2 + 10)
                             .accessibilityHidden(true)
                     }
                     .frame(width: geo.size.width, height: ringHeight)
-                    Button(action: setMood) {
-                        Group {
-                            if saving { ProgressView().tint(.white) } else { Text(failed ? "Try Again" : "Set Mood") }
-                        }
-                        .font(.system(size: 14, weight: .bold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 32)
-                        .background(Capsule().fill(accent))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(saving)
-                    .accessibilityLabel(failed ? "Couldn't save. Try setting mood to \(option.label) again" : "Set mood to \(option.label)")
+                    Text(saving ? "Saving…" : "Tap ✓ to set mood")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .frame(height: 16)
+                        .accessibilityHidden(true)
                 }
                 .frame(width: geo.size.width, height: geo.size.height)
             }
@@ -168,7 +188,7 @@ struct MoodPicker: View {
         let angle = (ring.firstIndex(of: i).map { Self.ringAngles[$0] } ?? 0) * .pi / 180
         let size = isCenter ? middle : outer
         Button { preview(i) } label: {
-            AnimatedMoodMascot(mood: Self.options[i].mood, size: isCenter ? size : size * 0.8, isActive: isCenter)
+            AnimatedMoodMascot(mood: Self.options[i].mood, size: isCenter ? size : size * 0.91, isActive: isCenter)
                 .frame(width: size, height: size)
                 .background(Circle().fill(Color.white.opacity(isCenter ? 0 : 0.12)))
                 .clipShape(Circle())
@@ -177,6 +197,6 @@ struct MoodPicker: View {
         .offset(x: isCenter ? 0 : cos(angle) * radius, y: isCenter ? 0 : sin(angle) * radius)
         .zIndex(isCenter ? 1 : 0)
         .accessibilityLabel(isCenter ? "\(Self.options[i].label), selected" : Self.options[i].label)
-        .accessibilityHint(isCenter ? "" : "Previews this mood. Set Mood saves it.")
+        .accessibilityHint(isCenter ? "Use the green checkmark to save this mood." : "Previews this mood. Use the green checkmark to save.")
     }
 }
