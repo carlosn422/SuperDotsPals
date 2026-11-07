@@ -193,7 +193,7 @@ struct MoodPicker: View {
         let angle = (ring.firstIndex(of: i).map { Self.ringAngles[$0] } ?? 0) * .pi / 180
         let size = isCenter ? middle : outer
         Button { preview(i) } label: {
-            AnimatedMoodMascot(mood: Self.options[i].mood, size: size * (isCenter ? 1.10 : 1.18), isActive: isCenter)
+            AnimatedMoodMascot(mood: Self.options[i].mood, size: size * (isCenter ? 1.24 : 1.58), isActive: isCenter)
                 .frame(width: size, height: size)
                 .background(Circle().fill(Color.white.opacity(isCenter ? 0 : 0.12)))
         }
