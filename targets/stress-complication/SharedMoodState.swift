@@ -30,7 +30,21 @@ enum SharedMoodStore {
     private static let key = "sharedMoodState"
     private static let legacyMood = "currentMood"
     private static let legacyDate = "currentMoodUpdated"
+    private static let healthKey = "healthMoodAt"
     private static var defaults: UserDefaults? { UserDefaults(suiteName: appGroup) }
+
+    /// Last time the MoodPal was set to follow Apple Health (the iPhone's refresh on Today). Ends the hold on moods picked before it.
+    static var healthAt: Date? { (defaults?.object(forKey: healthKey) as? Double).map { Date(timeIntervalSince1970: $0) } }
+
+    /// Stores a newer follow-Apple-Health time and reloads the mood complications. Returns false when stale.
+    @discardableResult
+    static func followHealth(at date: Date) -> Bool {
+        guard let d = defaults else { return false }
+        if let current = healthAt, date <= current { return false }
+        d.set(date.timeIntervalSince1970, forKey: healthKey)
+        reloadWidgets()
+        return true
+    }
 
     static func load() -> SharedMoodState? {
         guard let d = defaults else { return nil }
@@ -68,7 +82,7 @@ enum SharedMoodStore {
     }
 
     static func clear() {
-        for k in [key, legacyMood, legacyDate] { defaults?.removeObject(forKey: k) }
+        for k in [key, legacyMood, legacyDate, healthKey] { defaults?.removeObject(forKey: k) }
         reloadWidgets()
     }
 
@@ -76,7 +90,10 @@ enum SharedMoodStore {
         for kind in moodWidgetKinds { WidgetCenter.shared.reloadTimelines(ofKind: kind) }
     }
 
-    static func isManual(_ setAt: Date, now: Date = Date()) -> Bool { now.timeIntervalSince(setAt) < manualHold }
+    static func isManual(_ setAt: Date, now: Date = Date()) -> Bool {
+        if let healthAt, healthAt >= setAt { return false }
+        return now.timeIntervalSince(setAt) < manualHold
+    }
 
     /// The MoodPal to show: the picked mood for an hour, then the stress-based mood if a reading from the last day exists.
     static func display(manual: String, setAt: Date, stressScore: Int?, stressAt: Date?, now: Date = Date()) -> String {

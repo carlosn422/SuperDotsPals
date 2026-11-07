@@ -25,8 +25,11 @@ public class WatchLinkModule: Module {
     }
 
     /// Sends the account's latest saved mood to the watch so its complication can refresh without opening the app.
-    Function("sendMood") { (mood: String, at: Double, user: String) -> Bool in
-      WatchLinkSession.shared.sendMood(["mood": mood, "at": at, "user": user])
+    /// `healthAt` (seconds, 0 for none) is when the Apple Health refresh on Today ended the hold on that mood.
+    Function("sendMood") { (mood: String, at: Double, user: String, healthAt: Double?) -> Bool in
+      var payload: [String: Any] = ["mood": mood, "at": at, "user": user]
+      if let healthAt, healthAt > 0 { payload["healthAt"] = healthAt }
+      return WatchLinkSession.shared.sendMood(payload)
     }
 
     /// Asks the MoodPals watch app to start linking; it answers with its pairing request.

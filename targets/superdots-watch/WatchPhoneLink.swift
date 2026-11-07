@@ -93,7 +93,8 @@ final class WatchPhoneLink: NSObject, WCSessionDelegate {
         tasks.forEach { $0.setTaskCompletedWithSnapshot(false) }
     }
 
-    /// `["moodSync": ["mood": String, "at": seconds since 1970, "user": account id]]`, newest wins.
+    /// `["moodSync": ["mood": String, "at": seconds since 1970, "user": account id, "healthAt": seconds (optional)]]`, newest wins.
+    /// `healthAt` is when the iPhone's Apple Health refresh ended the hold on the picked mood.
     private func handleMood(_ payload: [String: Any]) {
         guard let sync = payload["moodSync"] as? [String: Any] else { return }
         guard let mood = sync["mood"] as? String, (1...40).contains(mood.count),
@@ -108,6 +109,11 @@ final class WatchPhoneLink: NSObject, WCSessionDelegate {
             guard WatchThemeSync.shared.isSignedIn(as: user) else {
                 NSLog("[WatchSync] Mood from iPhone ignored: different or no account on this watch")
                 return
+            }
+            if let healthAt = (sync["healthAt"] as? NSNumber)?.doubleValue, healthAt > 0,
+               healthAt <= Date().timeIntervalSince1970 + 300,
+               WatchMoodStore.followHealth(at: Date(timeIntervalSince1970: healthAt)) {
+                NSLog("[WatchSync] iPhone set the MoodPal to follow Apple Health")
             }
             if WatchMoodStore.save(mood, at: Date(timeIntervalSince1970: at), if: .newer) != nil {
                 NSLog("[WatchSync] Mood from iPhone applied: %@", mood)

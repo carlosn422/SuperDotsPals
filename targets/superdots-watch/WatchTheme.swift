@@ -93,6 +93,12 @@ enum WatchMoodStore {
         NotificationCenter.default.post(name: .moodPalsMoodChanged, object: nil)
         return state
     }
+    @discardableResult
+    static func followHealth(at date: Date) -> Bool {
+        guard SharedMoodStore.followHealth(at: date) else { return false }
+        NotificationCenter.default.post(name: .moodPalsMoodChanged, object: nil)
+        return true
+    }
     static func clear() {
         SharedMoodStore.clear()
         NotificationCenter.default.post(name: .moodPalsMoodChanged, object: nil)
