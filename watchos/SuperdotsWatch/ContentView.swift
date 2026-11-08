@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var measuring = false
     @Environment(\.scenePhase) private var scenePhase
     @State private var choosingMood = false
+    @State private var shareAttempt: (mood: String, event: String)?
     @State private var choosingTheme = false
     @ObservedObject private var circle = WatchCircleStore.shared
     @State private var showingCircle = false
@@ -23,6 +24,9 @@ struct ContentView: View {
 
     /// Set Mood: backend first, then local + complication state, then the Circle share (one event id per commit).
     private func commitMood(_ mood: String) async -> Bool {
+        // Try Again after a failed or timed-out save reuses the same event id, so it can't share twice.
+        if shareAttempt?.mood != mood { shareAttempt = (mood, UUID().uuidString) }
+        let event = shareAttempt!.event
         if sync.connected {
             do { try await sync.submitMood(mood, store: store) }
             catch {
@@ -35,7 +39,8 @@ struct ContentView: View {
             return false
         }
         // Only a mood picked here notifies the Circle; sync and restore never do.
-        circle.recordMoodChange(mood)
+        circle.recordMoodChange(mood, event: event)
+        shareAttempt = nil
         Task { await circle.flushMoodShares() }
         return true
     }

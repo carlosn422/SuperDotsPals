@@ -276,8 +276,8 @@ final class WatchCircleStore: ObservableObject {
     }
 
     /// A mood picked on the watch. Only the latest unsent change is kept; its event id makes retries idempotent.
-    func recordMoodChange(_ mood: String) {
-        pendingShares = [PendingShare(event: UUID().uuidString, mood: mood, at: Date())]
+    func recordMoodChange(_ mood: String, event: String = UUID().uuidString) {
+        pendingShares = [PendingShare(event: event, mood: mood, at: Date())]
     }
 
     /// Shares queued watch moods with every Circle group that allows them (same recipients as the iPhone).

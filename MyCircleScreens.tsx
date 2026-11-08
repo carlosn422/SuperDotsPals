@@ -2,6 +2,7 @@ import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {ActionSheetIOS,ActivityIndicator,Alert,Modal,ScrollView,Share,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import * as Crypto from 'expo-crypto';
 import {CIRCLE_MOODS,CircleGroup,CircleMood,Friend,FriendRequest,FriendSharedMood,LITTLE_SIGNALS,MOOD_REACTIONS,MOOD_TINTS,REACTION_LABELS,SignalId,isToday,signalById,timeAgo,timeLeft} from './LittleSignalsData';
 import {CodePreview,activeFriendMoods,circleNewCount,familyFriend,friendName,isMoodNew,uniqueAudience,useCircle} from './CircleStore';
 import {usePlus} from './PlusStore';
@@ -547,6 +548,7 @@ function ChooseAudience({mood,nav}:{mood:CircleMood;nav:Nav}){
  const allowed=store.groups.filter(g=>g.moods.includes(mood));const blocked=store.groups.filter(g=>!g.moods.includes(mood));
  const [sel,setSel]=useState<string[]>(allowed.map(g=>g.id).slice(0,1));
  const audience=uniqueAudience(store,sel,mood);
+ const eventId=useRef(Crypto.randomUUID()).current;
  const active=store.myMoods.find(m=>m.active&&m.mood===mood&&Date.now()-new Date(m.sharedAt).getTime()<6e4);
  if(active)return <>
   <CCard style={{alignItems:'center',gap:8,paddingVertical:22}}><SignalBurst mood={mood} emoji="💚" size={120}/><Text style={{fontSize:20,fontWeight:'900',color:CT.ink}}>Shared with {uniqueAudience(store,active.groupIds,mood).length} friends</Text><Text style={[cs.muted,{textAlign:'center'}]}>Your {mood} MoodPal is visible to them for 24 hours. You can stop sharing anytime.</Text></CCard>
@@ -565,7 +567,7 @@ function ChooseAudience({mood,nav}:{mood:CircleMood;nav:Nav}){
    <Text style={cs.rowSub}>{audience.map(id=>friendName(store,id)).join(', ')||'Choose at least one group'}{sel.length>1?' · counted once even if they’re in several groups':''}</Text>
    <View style={{flexDirection:'row',alignItems:'center',gap:8,marginTop:4}}><Ionicons name="time-outline" size={18} color={CT.muted}/><Text style={cs.rowSub}>Disappears after 24 hours</Text></View>
   </CCard>
-  <PrimaryButton label="Share Mood" icon="paper-plane-outline" disabled={!audience.length} onPress={()=>{store.shareMood(mood,sel)}}/>
+  <PrimaryButton label="Share Mood" icon="paper-plane-outline" disabled={!audience.length} onPress={()=>{store.shareMood(mood,sel,eventId)}}/>
   <SoftButton label="Keep Private" onPress={nav.back}/>
  </>;
 }

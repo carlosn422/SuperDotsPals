@@ -1,3 +1,4 @@
+import * as Crypto from 'expo-crypto';
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Alert,AppState} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -192,7 +193,8 @@ export function useLiveCircleState():CircleStore{
    up(s=>({groups:s.groups.map(x=>x.id===id?{...x,moods}:x)}));
    void run('Couldn’t update mood sharing',()=>supabase.from('circle_groups').update({allowed_moods:moods}).eq('id',id));
   },
-  shareMood:(mood:CircleMood,groupIds:string[])=>{
+  // eventId is created once per Share tap; the server returns the original share for a repeat or a retry.
+  shareMood:(mood:CircleMood,groupIds:string[],eventId?:string)=>{
    const at=Date.now();
    const key=mood+'|'+[...groupIds].sort().join(',');
    const last=lastMoodShare.current;
@@ -200,7 +202,7 @@ export function useLiveCircleState():CircleStore{
    const temp='pending-'+at;
    lastMoodShare.current={key,at,tempId:temp};
    up(s=>({myMoods:[{id:temp,mood,sharedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+864e5).toISOString(),groupIds,reactions:[],active:true},...s.myMoods]}));
-   void run('Couldn’t share your mood',()=>supabase.rpc('circle_share_mood',{p_mood:mood,p_group_ids:groupIds}));
+   void run('Couldn’t share your mood',()=>supabase.rpc('circle_share_mood',{p_mood:mood,p_group_ids:groupIds,p_event_id:eventId||Crypto.randomUUID()}));
    return temp;
   },
   stopSharing:(id:string)=>{up(s=>({myMoods:s.myMoods.map(m=>m.id===id?{...m,active:false,expiresAt:new Date().toISOString()}:m)}));void run('Couldn’t stop sharing',()=>supabase.rpc('circle_stop_share',{p_mood:id}))},
