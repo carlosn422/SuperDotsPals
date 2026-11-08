@@ -4,7 +4,7 @@ private let violet=Color(red:0.47,green:0.38,blue:0.91)
 private let moodNames=["Joyful","Calm","Sad","Angry","Anxious","Tired"]
 private func displayMood(_ value:String) -> String {
  let mood=value.trimmingCharacters(in:.whitespacesAndNewlines)
- return mood.lowercased()=="disgust" || mood.lowercased()=="disgusted" ? "Calm" : mood
+ return mood.lowercased()=="disgust" || mood.lowercased()=="disgusted" ? "Calm" : MoodLabel.display(mood)
 }
 
 struct WatchCheckIn:View {
@@ -33,7 +33,7 @@ struct WatchCheckIn:View {
        Button {mood=m;Task {await loadQuestions()}} label:{
         VStack(spacing:2) {
          AnimatedMoodMascot(mood:m,size:48)
-         Text(m).font(.caption2)
+         Text(MoodLabel.display(m)).font(.caption2)
         }.padding(4).frame(maxWidth:.infinity)
        }.buttonStyle(.plain).background(mood==m ? violet.opacity(0.4):Color.white.opacity(0.1),in:RoundedRectangle(cornerRadius:10))
       }

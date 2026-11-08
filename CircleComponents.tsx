@@ -3,7 +3,7 @@ import {AccessibilityInfo,Animated,Easing,StyleSheet,Switch,Text,TouchableOpacit
 import {Ionicons} from '@expo/vector-icons';
 import SuperdotMascot from './SuperdotMascot';
 import {APP_THEME} from './MoodMascot';
-import {CircleMood,MOOD_TINTS,signalById,timeAgo} from './LittleSignalsData';
+import {CircleMood,MOOD_TINTS,signalById,timeAgo,moodLabel} from './LittleSignalsData';
 import {activeFriendMoods,friendName,isMoodNew,useCircle} from './CircleStore';
 
 export const CT={...APP_THEME,line:'#EEF3F0',danger:'#D65B79'};
@@ -22,7 +22,7 @@ export function Avatar({initials,color,size=40}:{initials:string;color:string;si
 export function MoodPalThumb({mood,size=44,animate=false}:{mood:CircleMood;size?:number;animate?:boolean}){
  return <SuperdotMascot id={mood} size={size} preview animate={animate}/>;
 }
-export function MoodTag({mood}:{mood:CircleMood}){const t=MOOD_TINTS[mood];return <View style={{backgroundColor:t.tint,paddingHorizontal:9,paddingVertical:4,borderRadius:10,alignSelf:'flex-start'}}><Text style={{color:t.color,fontWeight:'800',fontSize:11}}>{mood}</Text></View>;}
+export function MoodTag({mood}:{mood:CircleMood}){const t=MOOD_TINTS[mood];return <View style={{backgroundColor:t.tint,paddingHorizontal:9,paddingVertical:4,borderRadius:10,alignSelf:'flex-start'}}><Text style={{color:t.color,fontWeight:'800',fontSize:11}}>{moodLabel(mood)}</Text></View>;}
 export function CCard({children,style}:{children:React.ReactNode;style?:any}){return <View style={[cs.card,style]}>{children}</View>;}
 export function CHeading({title,detail,action,onAction}:{title:string;detail?:string;action?:string;onAction?:()=>void}){
  return <View style={{flexDirection:'row',alignItems:'flex-end',justifyContent:'space-between',marginTop:4}}>
@@ -91,7 +91,7 @@ export function LittleSignalsTodayCard({onOpenSignals,onOpenMood,onOpenSignal,on
   ...store.signals.filter(s=>Date.now()-new Date(s.at).getTime()<864e5).map(s=>({key:'s'+s.id,at:s.at,isNew:!s.seen,open:()=>onOpenSignal(s.id),
    leading:<View style={cs.signalEmoji}><Text style={{fontSize:22}}>{signalById(s.signal).emoji}</Text></View>,title:signalById(s.signal).notify(friendName(store,s.friendId))})),
   ...activeFriendMoods(store).map(m=>({key:'m'+m.id,at:m.sharedAt,isNew:isMoodNew(store,m),open:()=>onOpenMood(m.id),
-   leading:<MoodPalThumb mood={m.mood} size={44}/>,title:friendName(store,m.friendId)+' is feeling '+m.mood+(m.myReaction?' · you sent '+m.myReaction:'')})),
+   leading:<MoodPalThumb mood={m.mood} size={44}/>,title:friendName(store,m.friendId)+' is feeling '+moodLabel(m.mood)+(m.myReaction?' · you sent '+m.myReaction:'')})),
  ].sort((x,y)=>y.at.localeCompare(x.at));
  const unseen=items.filter(i=>i.isNew).length;
  const reactions=store.myMoods.filter(m=>m.active).reduce((n,m)=>n+m.reactions.length,0);

@@ -1,4 +1,5 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
+import {moodLabel} from './LittleSignalsData';
 import {AppState,View,Text,TouchableOpacity,TextInput,ActivityIndicator,Modal,StyleSheet,ScrollView,Animated,Easing,PanResponder,Pressable,useWindowDimensions} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -98,7 +99,7 @@ export function ManageFamilyProfile({profile,onClose,onDeleted}:{profile:FamilyP
    <View style={{backgroundColor:'#fff',borderRadius:22,padding:16,gap:8}}>
     <Text style={{color:'#6E7D86',fontSize:13}}>Profile  <Text style={{color:'#1D2B33',fontWeight:'700'}}>Family watch · mood only</Text></Text>
     <Text style={{color:'#6E7D86',fontSize:13}}>Status  <Text style={{color:'#1D2B33',fontWeight:'700'}}>{profile.connected?'Linked':'Not linked'}{profile.lastSeenAt?' · last active '+new Date(profile.lastSeenAt).toLocaleDateString():''}</Text></Text>
-    <Text style={{color:'#6E7D86',fontSize:13}}>Latest mood  <Text style={{color:'#1D2B33',fontWeight:'700'}}>{profile.mood?profile.mood+' · '+new Date(profile.moodAt||'').toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}):'None yet'}</Text></Text>
+    <Text style={{color:'#6E7D86',fontSize:13}}>Latest mood  <Text style={{color:'#1D2B33',fontWeight:'700'}}>{profile.mood?moodLabel(profile.mood)+' · '+new Date(profile.moodAt||'').toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}):'None yet'}</Text></Text>
     <Text style={{color:'#6E7D86',fontSize:12,lineHeight:17}}>No heart rate, HRV, sleep, activity or other Health data is collected.</Text>
    </View>
    <WatchShareGroup kind="family" id={profile.id}/>

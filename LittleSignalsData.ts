@@ -4,6 +4,8 @@ import type {EmojiStyle} from './EmojiCatalog';
 // Set to true to review the screens with local sample data instead of the live backend.
 export const CIRCLE_PROTOTYPE=false;
 
+// "Angry" stays the stored mood id (older apps and the server use it); it is shown as "Stressed".
+export const moodLabel=(m?:string|null)=>!m?'':m.toLowerCase()==='angry'?'Stressed':m;
 export const CIRCLE_MOODS=['Joyful','Calm','Sad','Angry','Anxious','Tired'] as const;
 export type CircleMood=typeof CIRCLE_MOODS[number];
 

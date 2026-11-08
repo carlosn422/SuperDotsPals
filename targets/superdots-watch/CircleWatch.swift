@@ -16,7 +16,7 @@ struct WatchReaction: Identifiable, Hashable {
     var isSignal: Bool { kind == "signal" }
     /// Pending-read key; signals are prefixed so they're marked read with their own RPC.
     var readKey: String { isSignal ? "s:" + id : id }
-    var subtitle: String { label ?? mood ?? (isSignal ? "Little Signal" : "Response") }
+    var subtitle: String { label ?? mood.map(MoodLabel.display) ?? (isSignal ? "Little Signal" : "Response") }
 }
 
 /// "+N more" bubble shown instead of animating every reaction in a large batch.
@@ -523,7 +523,7 @@ struct WatchReactionDetail: View {
                 if let mood = reaction.mood {
                     AnimatedMoodMascot(mood: mood, size: 70)
                         .frame(width: 70, height: 70)
-                    Text("Your \(mood.lowercased()) mood").font(.caption2).foregroundStyle(.secondary)
+                    Text("Your \(MoodLabel.display(mood).lowercased()) mood").font(.caption2).foregroundStyle(.secondary)
                 } else {
                     Text("Little Signal").font(.caption2).foregroundStyle(.secondary)
                 }

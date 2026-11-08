@@ -1,4 +1,5 @@
 import {Platform} from 'react-native';
+import {moodLabel} from './LittleSignalsData';
 import {computeStressPoints,dailyStress,energyScore,sameDay,STRESS_LEVELS,ScoredReading} from './StressEngine';
 
 export const APP_GROUP='group.com.superdotspals.wellnest';
@@ -38,7 +39,7 @@ export function publishCircleSnapshot(data:{signals:CircleWidgetSignal[];unseen:
    signals:data.signals.slice(0,3).map(s=>({...s,at:Math.round(new Date(s.at).getTime()/1000)})),
    unseen:data.unseen,todayCount:data.todayCount,friendCount:data.friendCount,
    hideMood:data.hideMood,showNames:data.showNames,
-   mood:data.hideMood?'':data.mood,mascot:data.hideMood?'':(MASCOT_ASSET[data.mood]||''),
+   mood:data.hideMood?'':moodLabel(data.mood),mascot:data.hideMood?'':(MASCOT_ASSET[data.mood]||''),
   });
   ExtensionStorage.reloadWidget();
  }catch(e){console.warn('Circle widget snapshot skipped',e)}

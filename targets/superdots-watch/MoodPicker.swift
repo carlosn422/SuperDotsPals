@@ -16,7 +16,7 @@ struct MoodPicker: View {
         Option(label: "Joy", mood: "Joyful", color: Color(red: 1.00, green: 0.80, blue: 0.25)),
         Option(label: "Anxious", mood: "Anxious", color: Color(red: 0.66, green: 0.48, blue: 0.96)),
         Option(label: "Sad", mood: "Sad", color: Color(red: 0.36, green: 0.60, blue: 0.98)),
-        Option(label: "Angry", mood: "Angry", color: Color(red: 0.96, green: 0.36, blue: 0.32)),
+        Option(label: "Stressed", mood: "Angry", color: Color(red: 0.96, green: 0.36, blue: 0.32)),
         Option(label: "Tired", mood: "Tired", color: Color(red: 0.62, green: 0.66, blue: 0.80)),
     ]
 

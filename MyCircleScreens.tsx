@@ -3,7 +3,7 @@ import {ActionSheetIOS,ActivityIndicator,Alert,Modal,ScrollView,Share,Text,TextI
 import {Ionicons} from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Crypto from 'expo-crypto';
-import {CIRCLE_MOODS,CircleGroup,CircleMood,Friend,FriendRequest,FriendSharedMood,LITTLE_SIGNALS,MOOD_REACTIONS,MOOD_TINTS,REACTION_LABELS,SignalId,isToday,signalById,timeAgo,timeLeft} from './LittleSignalsData';
+import {CIRCLE_MOODS,CircleGroup,CircleMood,Friend,FriendRequest,FriendSharedMood,LITTLE_SIGNALS,MOOD_REACTIONS,MOOD_TINTS,REACTION_LABELS,SignalId,isToday,signalById,timeAgo,timeLeft,moodLabel} from './LittleSignalsData';
 import {CodePreview,activeFriendMoods,circleNewCount,familyFriend,friendName,isMoodNew,uniqueAudience,useCircle} from './CircleStore';
 import {usePlus} from './PlusStore';
 import {Avatar,CCard,CHeading,CRow,CT,Chip,EmptyState,MoodPalThumb,OfflineBanner,PrimaryButton,SampleDataNote,SignalBurst,SoftButton,ToggleRow,cs} from './CircleComponents';
@@ -118,14 +118,14 @@ function whenLabel(iso:string){const d=new Date(iso);const t=d.toLocaleTimeStrin
 
 function PersonCircle({p,onPress,onLongPress}:{p:Person;onPress:()=>void;onLongPress:()=>void}){
  const t=p.mood?MOOD_TINTS[p.mood.mood]:undefined;
- const label=p.f.name+(p.mood?', '+p.mood.mood+', '+timeAgo(p.mood.sharedAt)+(p.isNew?', new':''):', no mood shared')+(p.f.pinnedAt?', pinned':'');
+ const label=p.f.name+(p.mood?', '+moodLabel(p.mood.mood)+', '+timeAgo(p.mood.sharedAt)+(p.isNew?', new':''):', no mood shared')+(p.f.pinnedAt?', pinned':'');
  return <TouchableOpacity accessibilityRole="button" accessibilityLabel={label} accessibilityHint="Long press for pin options" onPress={onPress} onLongPress={onLongPress} delayLongPress={350} style={{width:96,alignItems:'center',gap:4}}>
   <View style={{width:84,height:84,borderRadius:42,borderWidth:p.isNew?3:1.5,borderColor:p.isNew&&t?t.color:'#DCE5E0',backgroundColor:t?t.tint:CT.background,alignItems:'center',justifyContent:'center'}}>
    {p.mood?<MoodPalThumb mood={p.mood.mood} size={58}/>:<Avatar initials={p.f.initials} color={p.f.color} size={54}/>}
    {p.f.pinnedAt?<View style={{position:'absolute',top:-3,right:-3,width:24,height:24,borderRadius:12,backgroundColor:'#fff',borderWidth:1,borderColor:'#DCE5E0',alignItems:'center',justifyContent:'center'}}><Ionicons name="pin" size={13} color={CT.primary}/></View>:null}
   </View>
   <Text numberOfLines={1} style={{fontSize:14,fontWeight:'900',color:CT.ink,maxWidth:94}}>{p.f.name}</Text>
-  {p.mood&&t?<><View style={{backgroundColor:t.tint,paddingHorizontal:9,paddingVertical:3,borderRadius:10}}><Text style={{color:t.color,fontWeight:'800',fontSize:11}}>{p.mood.mood}</Text></View>
+  {p.mood&&t?<><View style={{backgroundColor:t.tint,paddingHorizontal:9,paddingVertical:3,borderRadius:10}}><Text style={{color:t.color,fontWeight:'800',fontSize:11}}>{moodLabel(p.mood.mood)}</Text></View>
    <Text style={[cs.rowSub,p.isNew?{color:t.color,fontWeight:'800'}:null]}>{p.isNew?'New · ':''}{timeAgo(p.mood.sharedAt)}</Text></>
    :<Text style={cs.rowSub}>No mood yet</Text>}
  </TouchableOpacity>;
@@ -183,7 +183,7 @@ function AllFriendsSheet({visible,people,onClose,onOpen,onAdd}:{visible:boolean;
      <Text style={{fontSize:13,fontWeight:'900',color:CT.muted,marginLeft:4}}>{sec.letter}</Text>
      <CCard style={{paddingVertical:4}}>
       {sec.items.map((p,i)=><CRow key={p.f.id} last={i===sec.items.length-1} onPress={()=>onOpen(p)} title={p.f.name}
-       subtitle={p.mood?p.mood.mood+' · '+timeAgo(p.mood.sharedAt):'No mood yet'}
+       subtitle={p.mood?moodLabel(p.mood.mood)+' · '+timeAgo(p.mood.sharedAt):'No mood yet'}
        leading={p.mood?<MoodPalThumb mood={p.mood.mood} size={40}/>:<Avatar initials={p.f.initials} color={p.f.color} size={40}/>}
        right={p.f.pinnedAt?<View style={{flexDirection:'row',alignItems:'center',gap:6}}><Ionicons name="pin" size={15} color={CT.primary}/><Ionicons name="chevron-forward" size={18} color={CT.primary}/></View>:undefined}/>)}
      </CCard>
@@ -527,7 +527,7 @@ function GroupEdit({id,draft,nav}:{id?:string;draft?:GroupDraft;nav:Nav}){
 function MoodPermissionRow({moods,onToggle}:{moods:CircleMood[];onToggle:(m:CircleMood)=>void}){
  return <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{CIRCLE_MOODS.map(m=>{const on=moods.includes(m);const t=MOOD_TINTS[m];return <TouchableOpacity key={m} onPress={()=>onToggle(m)} accessibilityRole="checkbox" accessibilityState={{checked:on}} accessibilityLabel={m}
   style={{width:'31%',flexGrow:1,alignItems:'center',paddingVertical:8,borderRadius:16,borderWidth:1.5,borderColor:on?t.color:CT.border,backgroundColor:on?t.tint:'#fff',opacity:on?1:.55}}>
-  <MoodPalThumb mood={m} size={46}/><Text style={{fontSize:12,fontWeight:'800',color:on?t.color:CT.muted}}>{m}</Text>
+  <MoodPalThumb mood={m} size={46}/><Text style={{fontSize:12,fontWeight:'800',color:on?t.color:CT.muted}}>{moodLabel(m)}</Text>
   <Ionicons name={on?'checkmark-circle':'ellipse-outline'} size={16} color={on?t.color:'#C9D2CE'} style={{position:'absolute',top:6,right:6}}/></TouchableOpacity>})}</View>;
 }
 
@@ -556,12 +556,12 @@ function ChooseAudience({mood,nav}:{mood:CircleMood;nav:Nav}){
   <SoftButton danger label="Stop Sharing" icon="eye-off-outline" onPress={()=>{store.stopSharing(active.id);nav.back()}}/>
  </>;
  return <>
-  <CCard style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:MOOD_TINTS[mood].tint}}><MoodPalThumb mood={mood} size={70} animate/><View style={{flex:1,gap:4}}><Text style={cs.muted}>You’re sharing</Text><Text style={{fontSize:22,fontWeight:'900',color:CT.ink}}>{mood}</Text><Text style={cs.rowSub}>Only your MoodPal and the time. Notes, answers, Health data and stress score stay private.</Text></View></CCard>
+  <CCard style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:MOOD_TINTS[mood].tint}}><MoodPalThumb mood={mood} size={70} animate/><View style={{flex:1,gap:4}}><Text style={cs.muted}>You’re sharing</Text><Text style={{fontSize:22,fontWeight:'900',color:CT.ink}}>{moodLabel(mood)}</Text><Text style={cs.rowSub}>Only your MoodPal and the time. Notes, answers, Health data and stress score stay private.</Text></View></CCard>
   <CHeading title="Who can see it?"/>
   {allowed.length?<View style={{gap:8}}>{allowed.map(g=>{const on=sel.includes(g.id);return <TouchableOpacity key={g.id} onPress={()=>setSel(s=>toggle(s,g.id))} accessibilityRole="checkbox" accessibilityState={{checked:on}} style={{flexDirection:'row',alignItems:'center',gap:12,padding:12,borderRadius:16,borderWidth:1.5,borderColor:on?g.color:CT.border,backgroundColor:'#fff'}}>
    <View style={[cs.rowIcon,{backgroundColor:g.color+'22'}]}><Ionicons name={g.icon as any} size={19} color={g.color}/></View><View style={{flex:1}}><Text style={cs.rowTitle}>{g.name}</Text><Text style={cs.rowSub}>{g.memberIds.length} members</Text></View><Ionicons name={on?'checkmark-circle':'ellipse-outline'} size={24} color={on?g.color:'#C9D2CE'}/></TouchableOpacity>})}</View>:
-   <EmptyState mood={mood} title={'No group can see '+mood} detail="Turn this mood on for a group in Mood Sharing Settings." action="Mood Sharing Settings" onAction={()=>nav.push({name:'permissions'})}/>}
-  {blocked.length?<Text style={cs.muted}>Not offered: {blocked.map(g=>g.name).join(', ')} (you don’t share {mood} with {blocked.length>1?'them':'this group'}).</Text>:null}
+   <EmptyState mood={mood} title={'No group can see '+moodLabel(mood)} detail="Turn this mood on for a group in Mood Sharing Settings." action="Mood Sharing Settings" onAction={()=>nav.push({name:'permissions'})}/>}
+  {blocked.length?<Text style={cs.muted}>Not offered: {blocked.map(g=>g.name).join(', ')} (you don’t share {moodLabel(mood)} with {blocked.length>1?'them':'this group'}).</Text>:null}
   <CCard style={{gap:6}}>
    <View style={{flexDirection:'row',alignItems:'center',gap:8}}><Ionicons name="people-outline" size={18} color={CT.primary}/><Text style={cs.rowTitle}>{audience.length} {audience.length===1?'friend':'friends'} will see this</Text></View>
    <Text style={cs.rowSub}>{audience.map(id=>friendName(store,id)).join(', ')||'Choose at least one group'}{sel.length>1?' · counted once even if they’re in several groups':''}</Text>

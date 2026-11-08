@@ -2,7 +2,7 @@ import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {ActivityIndicator,Alert,Animated,AppState,PanResponder,ScrollView,Text,TouchableOpacity,View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import {CircleMood,Friend,FriendSharedMood,MOOD_REACTIONS,MOOD_TINTS,REACTION_LABELS,ReceivedSignal,SignalId,signalById} from './LittleSignalsData';
+import {CircleMood,Friend,FriendSharedMood,MOOD_REACTIONS,MOOD_TINTS,REACTION_LABELS,ReceivedSignal,SignalId,signalById,moodLabel} from './LittleSignalsData';
 import {CircleStore,canSignal,familyFriend,isMoodNew,useCircle} from './CircleStore';
 import {Avatar,CT,EmptyState,MoodPalThumb,OfflineBanner,cs,useReduceMotion} from './CircleComponents';
 import {Emoji,EmojiStyle} from './EmojiCatalog';
@@ -56,8 +56,8 @@ export function latestMood(store:CircleStore,id:string){return store.friendMoods
 
 function previewOf(it:ThreadItem,first:string):{text:string;color?:string;at:string}{
  switch(it.kind){
-  case 'theirMood':return it.mood.myReactionAt&&it.mood.myReaction?{text:'You reacted '+it.mood.myReaction+' to '+it.mood.mood,at:it.mood.myReactionAt}:{text:'Feeling '+it.mood.mood,color:MOOD_TINTS[it.mood.mood].color,at:it.at};
-  case 'myMood':return {text:'Reacted '+it.emoji+' to your '+it.mood+' mood',at:it.at};
+  case 'theirMood':return it.mood.myReactionAt&&it.mood.myReaction?{text:'You reacted '+it.mood.myReaction+' to '+moodLabel(it.mood.mood),at:it.mood.myReactionAt}:{text:'Feeling '+moodLabel(it.mood.mood),color:MOOD_TINTS[it.mood.mood].color,at:it.at};
+  case 'myMood':return {text:'Reacted '+it.emoji+' to your '+moodLabel(it.mood)+' mood',at:it.at};
   case 'signal':{const s=signalById(it.signal.signal);return {text:s.emoji+' '+s.label,at:it.at};}
   case 'sentSignal':{const s=signalById(it.signal);return {text:'You sent '+s.emoji+' '+s.label,at:it.at};}
  }
@@ -162,7 +162,7 @@ function ConversationHeader({id,onBack,onInfo}:{id:string;onBack:()=>void;onInfo
   <PersonAvatar store={store} id={id} size={42}/>
   <View style={{flex:1}}>
    <Text accessibilityRole="header" numberOfLines={1} style={{fontSize:18,fontWeight:'900',color:CT.ink}}>{name}</Text>
-   <Text numberOfLines={1} style={{fontSize:12,color:CT.muted,fontWeight:'600'}}>{detail||(known?(m?'Feeling '+m.mood:'In your circle'):'No longer in your circle')}</Text>
+   <Text numberOfLines={1} style={{fontSize:12,color:CT.muted,fontWeight:'600'}}>{detail||(known?(m?'Feeling '+moodLabel(m.mood):'In your circle'):'No longer in your circle')}</Text>
   </View>
   {store.friends.some(f=>f.id===id)?<TouchableOpacity onPress={onInfo} accessibilityRole="button" accessibilityLabel={'About '+name} hitSlop={10} style={{width:44,height:44,alignItems:'center',justifyContent:'center'}}><Ionicons name="information-circle-outline" size={27} color={CT.ink}/></TouchableOpacity>:null}
  </View>;
@@ -269,17 +269,17 @@ export function ConversationScreen({id,focus,onBack,onInfo,onSend,fill,padding=2
        <View style={{flexDirection:'row',alignItems:'flex-end',gap:8}}>
         <View style={{width:32,height:32,borderRadius:16,backgroundColor:t.tint,alignItems:'center',justifyContent:'center'}}><MoodPalThumb mood={m.mood} size={26}/></View>
         <TouchableOpacity activeOpacity={.85} onPress={()=>{Haptics.selectionAsync().catch(()=>{});setPicked(it.key)}} accessibilityRole="button"
-         accessibilityLabel={first+' is feeling '+m.mood+', '+clock(m.sharedAt)+(m.myReaction?', you reacted '+m.myReaction:'')} accessibilityState={{selected}} accessibilityHint="Choose this mood in the reaction bar"
+         accessibilityLabel={first+' is feeling '+moodLabel(m.mood)+', '+clock(m.sharedAt)+(m.myReaction?', you reacted '+m.myReaction:'')} accessibilityState={{selected}} accessibilityHint="Choose this mood in the reaction bar"
          style={[bubble,{backgroundColor:t.tint,borderBottomLeftRadius:6,flexDirection:'row',alignItems:'center',gap:10,borderWidth:2,borderColor:selected&&active.length>1||lit?t.color:'transparent'}]}>
          <View style={{gap:1,paddingHorizontal:4,flexShrink:1}}>
           <Text style={{fontSize:13,fontWeight:'700',color:CT.ink}}>{first} is feeling</Text>
-          <Text style={{fontSize:19,fontWeight:'900',color:t.color}}>{m.mood}</Text>
+          <Text style={{fontSize:19,fontWeight:'900',color:t.color}}>{moodLabel(m.mood)}</Text>
           <Text style={[meta,{marginTop:2}]}>{clock(m.sharedAt)}</Text>
          </View>
         </TouchableOpacity>
        </View>
        {drafts[m.id]?<UndoPill draft={drafts[m.id]} onUndo={()=>undo(m.id)}/>:m.myReaction?<View style={{alignSelf:'flex-end'}}><Pop trigger={m.myReaction}>
-        <View accessible accessibilityLabel={'You reacted '+(REACTION_LABELS[m.myReaction]||m.myReaction)+' to '+first+'’s '+m.mood+' mood'+(pending[m.id]?', sending':'')}
+        <View accessible accessibilityLabel={'You reacted '+(REACTION_LABELS[m.myReaction]||m.myReaction)+' to '+first+'’s '+moodLabel(m.mood)+' mood'+(pending[m.id]?', sending':'')}
          style={{flexDirection:'row',alignItems:'center',gap:6,backgroundColor:CT.primarySoft,borderRadius:18,borderBottomRightRadius:6,paddingHorizontal:11,paddingVertical:6}}>
          <Emoji e={m.myReaction} style={m.myReactionStyle} size={17}/>
          <Text style={{fontSize:13,fontWeight:'800',color:CT.ink}}>You reacted</Text>
@@ -288,7 +288,7 @@ export function ConversationScreen({id,focus,onBack,onInfo,onSend,fill,padding=2
         </View></Pop></View>:null}
       </View>;})()
      :it.kind==='myMood'?(()=>{const t=MOOD_TINTS[it.mood];const mine=store.myMoods.find(m=>m.id===it.moodId&&m.active);
-      const stop=()=>{if(!mine)return;Haptics.selectionAsync().catch(()=>{});Alert.alert('Stop sharing this '+it.mood+' mood?','Friends will no longer see it or be able to react.',[{text:'Cancel',style:'cancel'},{text:'Stop sharing',style:'destructive',onPress:()=>store.stopSharing(mine.id)}])};
+      const stop=()=>{if(!mine)return;Haptics.selectionAsync().catch(()=>{});Alert.alert('Stop sharing this '+moodLabel(it.mood)+' mood?','Friends will no longer see it or be able to react.',[{text:'Cancel',style:'cancel'},{text:'Stop sharing',style:'destructive',onPress:()=>store.stopSharing(mine.id)}])};
       return <View style={{alignItems:'flex-end'}}>
        <TouchableOpacity activeOpacity={1} onLongPress={mine?stop:undefined} delayLongPress={350} accessibilityRole={mine?'button':undefined} accessibilityHint={mine?'Long press to stop sharing this mood':undefined} accessibilityActions={mine?[{name:'longpress',label:'Stop sharing'}]:undefined} onAccessibilityAction={stop} accessibilityLabel={first+' reacted '+(REACTION_LABELS[it.emoji]||it.emoji)+' to your '+it.mood+' mood, '+clock(it.at)}
         style={[bubble,{backgroundColor:'#fff',borderBottomRightRadius:6,flexDirection:'row',alignItems:'center',gap:12,borderWidth:lit?2:1,borderColor:lit?CT.primary:CT.line}]}>
@@ -320,20 +320,20 @@ export function ConversationScreen({id,focus,onBack,onInfo,onSend,fill,padding=2
    return <>
    {done?null:<View style={{alignSelf:'center',width:34,height:4,borderRadius:2,backgroundColor:'#E3EAE6',marginTop:-4}}/>}
    <View style={{flexDirection:'row',alignItems:'center',gap:6}}>
-    {done?<><Text numberOfLines={1} style={{flexShrink:1,fontSize:13,fontWeight:'800',color:CT.ink}}>You reacted to {first}’s <Text style={{color:tint}}>{m.mood}</Text> mood</Text><Emoji e={m.myReaction!} style={m.myReactionStyle} size={16}/></>
-     :<Text numberOfLines={1} style={{flex:1,fontSize:13,fontWeight:'800',color:CT.ink}}>React to {first}’s <Text style={{color:tint}}>{m.mood}</Text> mood{active.length>1?' · '+clock(m.sharedAt):''}</Text>}
+    {done?<><Text numberOfLines={1} style={{flexShrink:1,fontSize:13,fontWeight:'800',color:CT.ink}}>You reacted to {first}’s <Text style={{color:tint}}>{moodLabel(m.mood)}</Text> mood</Text><Emoji e={m.myReaction!} style={m.myReactionStyle} size={16}/></>
+     :<Text numberOfLines={1} style={{flex:1,fontSize:13,fontWeight:'800',color:CT.ink}}>React to {first}’s <Text style={{color:tint}}>{moodLabel(m.mood)}</Text> mood{active.length>1?' · '+clock(m.sharedAt):''}</Text>}
    </View>
    {done?<Text style={[cs.rowSub,{fontSize:12}]}>Sent reactions can’t be changed.{active.length>1?' Tap another mood above to react to it.':''}</Text>
    :<View style={{flexDirection:'row',justifyContent:'space-between'}}>
     {MOOD_REACTIONS[m.mood].map(e=>{const on=d?.e===e&&d.style==='standard';return <TouchableOpacity key={e} disabled={!!pending[m.id]} onPress={()=>react(m,e)} accessibilityRole="button"
-     accessibilityLabel={'React '+(REACTION_LABELS[e]||e)+' to '+first+'’s '+m.mood+' mood'} accessibilityState={{selected:on}}
+     accessibilityLabel={'React '+(REACTION_LABELS[e]||e)+' to '+first+'’s '+moodLabel(m.mood)+' mood'} accessibilityState={{selected:on}}
      style={[btn,{backgroundColor:on?CT.primarySoft:'#F5F8F6',borderWidth:on?2:0,borderColor:CT.primary}]}><Text style={{fontSize:27}}>{e}</Text></TouchableOpacity>})}
     <TouchableOpacity disabled={!!pending[m.id]} onPress={()=>setSheet(true)} accessibilityRole="button" accessibilityLabel={isPlus?'More emoji':'More emoji, Plus'} style={[btn,{backgroundColor:'#F5F8F6'}]}>
      <Ionicons name="add" size={28} color={CT.primary}/>
      {!isPlus?<View style={{position:'absolute',top:4,right:6,backgroundColor:CT.primary,borderRadius:8,width:16,height:16,alignItems:'center',justifyContent:'center'}}><Ionicons name="lock-closed" size={9} color="#fff"/></View>:null}
     </TouchableOpacity>
    </View>}
-   <EmojiPickerSheet visible={sheet} title={'React to '+first+'’s '+m.mood+' mood'} onClose={()=>setSheet(false)} onPick={(e,st)=>{setSheet(false);react(m,e,st)}}/>
+   <EmojiPickerSheet visible={sheet} title={'React to '+first+'’s '+moodLabel(m.mood)+' mood'} onClose={()=>setSheet(false)} onPick={(e,st)=>{setSheet(false);react(m,e,st)}}/>
   </>})()
 :<View style={{flexDirection:'row',alignItems:'center',gap:10}}>
    <Text style={[cs.rowSub,{flex:1,fontSize:12}]}>You can react when {first} shares a mood.</Text>
