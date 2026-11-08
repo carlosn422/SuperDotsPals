@@ -1,7 +1,7 @@
 import React,{useMemo,useState} from 'react';
 import {View,Text,TouchableOpacity,StyleSheet} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import {CIRCLE_MOODS,CircleMood,MOOD_TINTS} from './LittleSignalsData';
+import {CIRCLE_MOODS,CircleMood,MOOD_TINTS,moodLabel} from './LittleSignalsData';
 import {MoodPalThumb} from './CircleComponents';
 
 export type TimelineMood={mood:string;occurred_at:string};
@@ -90,10 +90,10 @@ export default function FamilyTimeline({name,moods,reactions,onDay,openKey,onOpe
       <View style={[st.dot,{backgroundColor:MOOD_TINTS[e.mood].color}]}/>
       {i<dayEvents.length-1?<View style={[st.line,{backgroundColor:MOOD_TINTS[e.mood].color}]}/>:null}
      </View>
-     <TouchableOpacity accessibilityRole="button" accessibilityLabel={e.mood+' at '+time(e.at)+', '+e.reactions.length+' reactions'} onPress={()=>onOpenKey(e.key)} style={[st.card,{flex:1,marginBottom:8}]}>
+     <TouchableOpacity accessibilityRole="button" accessibilityLabel={moodLabel(e.mood)+' at '+time(e.at)+', '+e.reactions.length+' reactions'} onPress={()=>onOpenKey(e.key)} style={[st.card,{flex:1,marginBottom:8}]}>
       <View style={{flexDirection:'row',alignItems:'center',gap:10}}>
        <View style={{backgroundColor:MOOD_TINTS[e.mood].tint,borderRadius:30}}><MoodPalThumb mood={e.mood} size={52}/></View>
-       <View style={{flex:1}}><Text style={{fontWeight:'800',fontSize:16,color:ink}}>{e.mood}</Text><Text style={st.sub}>{time(e.at)}</Text></View>
+       <View style={{flex:1}}><Text style={{fontWeight:'800',fontSize:16,color:ink}}>{moodLabel(e.mood)}</Text><Text style={st.sub}>{time(e.at)}</Text></View>
        <Ionicons name="chevron-forward" size={18} color={muted}/>
       </View>
       <ReactionSummary reactions={e.reactions}/>

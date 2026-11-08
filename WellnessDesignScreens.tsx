@@ -41,7 +41,7 @@ export function StatCard({title,value,detail,icon,tint,onPress}:{title:string;va
 const moodGuides=[
  {mood:'Joy',id:'joy',detail:'Happy and energized'},
  {mood:'Sad',id:'sadness',detail:'Feeling a little low'},
- {mood:'Angry',id:'anger',detail:'Frustrated or upset'},
+ {mood:'Stressed',id:'anger',detail:'Frustrated or upset'},
  {mood:'Anxious',id:'fear',detail:'Worried or stressed'},
  {mood:'Calm',id:'disgust',detail:'Calm and balanced'},
 ] as const;

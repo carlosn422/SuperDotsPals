@@ -109,7 +109,7 @@ enum MoodArt {
     static func emotion(_ mood: String) -> String {
         let value = mood.lowercased()
         if ["happy","good","great","joy","excited","proud"].contains(where: value.contains) { return "joy" }
-        if ["anger","angry","frustrated","mad","irritated"].contains(where: value.contains) { return "anger" }
+        if ["anger","angry","stressed","frustrated","mad","irritated"].contains(where: value.contains) { return "anger" }
         if ["fear","anxious","stress","worried","nervous","overwhelmed"].contains(where: value.contains) { return "fear" }
         if ["tired","sleepy","exhausted","fatigued"].contains(where: value.contains) { return "tired" }
         if ["sad","down","depressed","lonely"].contains(where: value.contains) { return "sadness" }
@@ -126,4 +126,9 @@ enum MoodArt {
     static func stressMood(_ score: Int) -> String {
         score < 35 ? "Calm" : score < 60 ? "Joyful" : score < 80 ? "Anxious" : "Angry"
     }
+}
+
+/// "Angry" stays the stored mood id (older apps and the server use it); it is shown as "Stressed".
+enum MoodLabel {
+    static func display(_ mood: String) -> String { mood.lowercased() == "angry" ? "Stressed" : mood }
 }

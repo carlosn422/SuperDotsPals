@@ -1,4 +1,5 @@
 import React,{useEffect,useState} from 'react';
+import {moodLabel} from './LittleSignalsData';
 import {View,Text,TouchableOpacity,ActivityIndicator,Alert,Switch,ScrollView,Linking} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {supabase} from './supabase';
@@ -45,12 +46,12 @@ export default function SpiritualReading({initialCheckin}:{initialCheckin?:{mood
  </View>:null}
  {step==='mood'?<View style={{backgroundColor:'white',padding:16,borderRadius:22,gap:14}}>
   <Text style={{color:ink,fontSize:20,fontWeight:'900'}}>How are you feeling?</Text>
-  <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{moods.map(m=><TouchableOpacity key={m} onPress={()=>setMood(m)} style={{width:'48%',backgroundColor:mood===m?'#F0EAFF':'#FAF9FC',borderColor:mood===m?purple:'#EBE7F1',borderWidth:1,borderRadius:15,alignItems:'center',padding:10,gap:4}}><SuperdotMascot id={m} size={64}/><Text style={{fontWeight:'800',color:ink}}>{m}</Text></TouchableOpacity>)}</View>
+  <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{moods.map(m=><TouchableOpacity key={m} onPress={()=>setMood(m)} style={{width:'48%',backgroundColor:mood===m?'#F0EAFF':'#FAF9FC',borderColor:mood===m?purple:'#EBE7F1',borderWidth:1,borderRadius:15,alignItems:'center',padding:10,gap:4}}><SuperdotMascot id={m} size={64}/><Text style={{fontWeight:'800',color:ink}}>{moodLabel(m)}</Text></TouchableOpacity>)}</View>
   {mood?btn('Continue →',()=>void generateQuestions()):null}
   {btn('Back',()=>setStep('start'),false)}
  </View>:null}
  {step==='questions'?<View style={{backgroundColor:'white',padding:17,borderRadius:22,gap:13}}>
-  <View style={{flexDirection:'row',alignItems:'center',gap:12}}><SuperdotMascot id={mood} size={58}/><View style={{flex:1}}><Text style={{color:ink,fontWeight:'800'}}>{mood}</Text><Text style={{color:muted,fontSize:11}}>Question {index+1} of {questions.length}</Text></View></View>
+  <View style={{flexDirection:'row',alignItems:'center',gap:12}}><SuperdotMascot id={mood} size={58}/><View style={{flex:1}}><Text style={{color:ink,fontWeight:'800'}}>{moodLabel(mood)}</Text><Text style={{color:muted,fontSize:11}}>Question {index+1} of {questions.length}</Text></View></View>
   <Text style={{fontSize:19,fontWeight:'900',color:ink}}>{questions[index]}</Text>
   {['Yes','A little','No','Not sure','Prefer not to say'].map(x=>radio(x,answers[questions[index]]===x,()=>setAnswers(a=>({...a,[questions[index]]:x}))))}
   <View style={{flexDirection:'row',gap:8}}><View style={{flex:1}}>{btn('Back',()=>index?setIndex(i=>i-1):setStep('mood'),false)}</View><View style={{flex:2}}>{btn(index===questions.length-1?'Find my verse →':'Next →',()=>index===questions.length-1?void recommend():setIndex(i=>i+1))}</View></View>

@@ -1,4 +1,5 @@
 import React,{useCallback,useEffect,useState} from 'react';
+import {moodLabel} from './LittleSignalsData';
 import {View,Text,TouchableOpacity,ActivityIndicator,Switch,StyleSheet} from 'react-native';
 import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
@@ -36,7 +37,7 @@ function FamilyCard({profile,groups,onManage}:{profile:FamilyProfile;groups:Grou
   <View style={{alignItems:'center',gap:4}}>
    {latest?<SuperdotMascot id={MASCOT_ID[latest.mood.toLowerCase()]||'joy'} size={110}/>:null}
    <Text style={styles.title}>{profile.name}</Text>
-   <Text style={styles.sub}>{latest?latest.mood+' · '+new Date(latest.occurred_at).toLocaleString():loaded?'No mood yet':'Loading…'}</Text>
+   <Text style={styles.sub}>{latest?moodLabel(latest.mood)+' · '+new Date(latest.occurred_at).toLocaleString():loaded?'No mood yet':'Loading…'}</Text>
    {moods.length>1?<Text style={styles.sub}>Earlier: {moods.slice(1).map(m=>m.mood).join(', ')}</Text>:null}
   </View>
   {error?<Text style={[styles.sub,{color:red}]}>{error}</Text>:null}

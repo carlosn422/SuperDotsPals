@@ -61,7 +61,7 @@ struct ComplicationMood {
         let stressAt = d.map { Date(timeIntervalSince1970: $0.double(forKey: "stressUpdated")) }
         let mood = SharedMoodStore.display(manual: state?.mood ?? "Calm", setAt: state?.updatedAt ?? Date(timeIntervalSince1970: 0),
                                            stressScore: stress.score, stressAt: stressAt, now: date)
-        return ComplicationMood(name: mood.capitalized, image: "mood_\(MoodArt.emotion(mood))")
+        return ComplicationMood(name: MoodLabel.display(mood.capitalized), image: "mood_\(MoodArt.emotion(mood))")
     }
 }
 

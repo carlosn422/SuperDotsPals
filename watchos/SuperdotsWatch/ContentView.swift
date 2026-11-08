@@ -85,8 +85,8 @@ struct ContentView: View {
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Current mood \(shownMood). Tap to change.")
-                        Text(shownMood).font(.headline)
+                        .accessibilityLabel("Current mood \(MoodLabel.display(shownMood)). Tap to change.")
+                        Text(MoodLabel.display(shownMood)).font(.headline)
                         Text(store.moodFromHealth(at: context.date) ? "From your heart data" : "Tap to change mood").font(.caption2).foregroundStyle(.secondary)
                         }
                         if !sync.moodOnly {

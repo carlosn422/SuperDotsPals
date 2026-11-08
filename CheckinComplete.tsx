@@ -8,7 +8,7 @@ import SuperdotMascot from './SuperdotMascot';
 import {CT,useReduceMotion} from './CircleComponents';
 import {useCircle} from './CircleStore';
 import {useIsGuest} from './Account';
-import {CircleMood,MOOD_TINTS} from './LittleSignalsData';
+import {CircleMood,MOOD_TINTS,moodLabel} from './LittleSignalsData';
 
 const MOOD_HEART:Record<CircleMood,string>={Joyful:'💜',Calm:'💚',Sad:'💙',Angry:'❤️',Anxious:'💛',Tired:'🌙'};
 type Status='idle'|'sharing'|'shared'|'error'|'nobody';
@@ -53,8 +53,8 @@ export default function CheckinComplete({mood,onDone,onNeedsAccount}:{mood:strin
     </Animated.View>
    </View>
   </View>
-  <View style={{alignItems:'center',gap:4}} accessible accessibilityRole="header" accessibilityLabel={'You’re feeling '+m+'. '+(shared?'Shared with your Circle.':'Your mood has been saved privately.')}>
-   <Text style={{fontSize:25,fontWeight:'900',color:'#251C45',textAlign:'center'}}>You’re feeling {m}! {MOOD_HEART[m]}</Text>
+  <View style={{alignItems:'center',gap:4}} accessible accessibilityRole="header" accessibilityLabel={'You’re feeling '+moodLabel(m)+'. '+(shared?'Shared with your Circle.':'Your mood has been saved privately.')}>
+   <Text style={{fontSize:25,fontWeight:'900',color:'#251C45',textAlign:'center'}}>You’re feeling {moodLabel(m)}! {MOOD_HEART[m]}</Text>
    {shared?<View style={{flexDirection:'row',alignItems:'center',gap:6}}><Ionicons name="checkmark-circle" size={18} color={CT.primary}/><Text style={{fontSize:15,fontWeight:'800',color:CT.primary}}>Shared with your Circle!</Text></View>
     :<Text style={{fontSize:14,color:'#827892',textAlign:'center'}}>Your mood has been saved privately.</Text>}
   </View>

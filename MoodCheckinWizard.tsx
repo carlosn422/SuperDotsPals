@@ -1,4 +1,5 @@
 import React,{useEffect,useState} from 'react';
+import {moodLabel} from './LittleSignalsData';
 import {View,Text,TextInput,TouchableOpacity,ActivityIndicator,Alert,Switch} from 'react-native';
 import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
@@ -63,10 +64,10 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJo
    <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
     {moods.map(m=><TouchableOpacity key={m} accessibilityRole="radio" accessibilityState={{selected:mood===m}} onPress={()=>setMood(m)} style={{width:'48.7%',alignItems:'center',borderWidth:mood===m?1.5:1,borderColor:mood===m?color:'#EEEAF3',borderRadius:22,backgroundColor:mood===m?'#EEE8FF':'#FBF9FF',paddingVertical:13,gap:7}}>
      <SuperdotMascot id={m} size={96} preview/>
-     <Text style={{fontWeight:'800',fontSize:15,color:'#26165C'}}>{m}</Text>
+     <Text style={{fontWeight:'800',fontSize:15,color:'#26165C'}}>{moodLabel(m)}</Text>
     </TouchableOpacity>)}
    </View>
-   {mood?<View style={{flexDirection:'row',alignItems:'center',padding:9,gap:10,backgroundColor:'#F8F6FC',borderRadius:13}}><SuperdotMascot id={mood} size={44}/><View style={{flex:1}}><Text style={{fontWeight:'800',color:'#332655',fontSize:13}}>{mood}</Text><Text style={{fontSize:11,color:'#817892'}}>Your MoodPal reflects how you feel.</Text></View></View>:null}
+   {mood?<View style={{flexDirection:'row',alignItems:'center',padding:9,gap:10,backgroundColor:'#F8F6FC',borderRadius:13}}><SuperdotMascot id={mood} size={44}/><View style={{flex:1}}><Text style={{fontWeight:'800',color:'#332655',fontSize:13}}>{moodLabel(mood)}</Text><Text style={{fontSize:11,color:'#817892'}}>Your MoodPal reflects how you feel.</Text></View></View>:null}
    {primary('Continue →',()=>changeStep(1),!mood)}
   </View>:null}
   {step===1?<View style={{gap:13,alignItems:'stretch'}}>
@@ -79,7 +80,7 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJo
    {secondary('Back to moods',()=>changeStep(0))}
   </View>:null}
   {step===2?<View style={{gap:12}}>
-   <View style={{flexDirection:'row',alignItems:'center',gap:10}}><SuperdotMascot id={mood} size={56}/><View style={{flex:1}}><Text style={{fontWeight:'800',fontSize:14,color:'#281F49'}}>{mood}</Text><Text style={{fontSize:11,color:'#8980A0'}}>Let's explore this feeling</Text></View><Text style={{fontSize:11,color:'#817892'}}>{questionIndex+1} of {shownQuestions.length}</Text></View>
+   <View style={{flexDirection:'row',alignItems:'center',gap:10}}><SuperdotMascot id={mood} size={56}/><View style={{flex:1}}><Text style={{fontWeight:'800',fontSize:14,color:'#281F49'}}>{moodLabel(mood)}</Text><Text style={{fontSize:11,color:'#8980A0'}}>Let's explore this feeling</Text></View><Text style={{fontSize:11,color:'#817892'}}>{questionIndex+1} of {shownQuestions.length}</Text></View>
    <View style={{height:4,backgroundColor:'#EDEAF4',borderRadius:3,overflow:'hidden'}}><View style={{width:`${(questionIndex+1)/Math.max(shownQuestions.length,1)*100}%` as `${number}%`,height:4,backgroundColor:color,borderRadius:3}}/></View>
    <View style={{position:'relative',gap:12}}>
    <Text style={{fontSize:17,fontWeight:'900',color:'#251C45',lineHeight:24}}>{currentQuestion}</Text>

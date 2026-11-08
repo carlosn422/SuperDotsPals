@@ -14,7 +14,7 @@ struct MoodPicker: View {
         Option(label: "Calm", mood: "Calm"),
         Option(label: "Joy", mood: "Joyful"),
         Option(label: "Sad", mood: "Sad"),
-        Option(label: "Angry", mood: "Angry"),
+        Option(label: "Stressed", mood: "Angry"),
         Option(label: "Tired", mood: "Tired"),
     ]
 
