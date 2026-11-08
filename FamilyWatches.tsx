@@ -234,7 +234,7 @@ const sel=StyleSheet.create({
  add:{minHeight:48,borderRadius:16,backgroundColor:'#EEE9FB',alignItems:'center',justifyContent:'center',marginTop:4},
 });
 
-const styles=StyleSheet.create({title:{fontWeight:'900',fontSize:20,color:'#251C45'},sub:{fontSize:12,lineHeight:19,color:'#807694'},button:{backgroundColor:purple,borderRadius:14,padding:14,alignItems:'center'},buttonText:{color:'white',fontWeight:'900'},card:{backgroundColor:'white',borderRadius:16,padding:15,gap:8,borderWidth:1,borderColor:'#EDE9F3'},chip:{borderWidth:1,borderColor:'#E2DCEC',borderRadius:18,paddingHorizontal:14,paddingVertical:8,backgroundColor:'white'},input:{borderWidth:1,borderColor:'#E2DCEC',borderRadius:12,padding:12,fontWeight:'800',letterSpacing:2,color:'#271C49'}});
+const styles=StyleSheet.create({familyAction:{flex:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,backgroundColor:'#F1EEFB',borderRadius:16,paddingVertical:12},familyActionText:{fontWeight:'800',fontSize:14,color:purple},title:{fontWeight:'900',fontSize:20,color:'#251C45'},sub:{fontSize:12,lineHeight:19,color:'#807694'},button:{backgroundColor:purple,borderRadius:14,padding:14,alignItems:'center'},buttonText:{color:'white',fontWeight:'900'},card:{backgroundColor:'white',borderRadius:16,padding:15,gap:8,borderWidth:1,borderColor:'#EDE9F3'},chip:{borderWidth:1,borderColor:'#E2DCEC',borderRadius:18,paddingHorizontal:14,paddingVertical:8,backgroundColor:'white'},input:{borderWidth:1,borderColor:'#E2DCEC',borderRadius:12,padding:12,fontWeight:'800',letterSpacing:2,color:'#271C49'}});
 
 export const MASCOT_ID:Record<string,string>={joyful:'joy',calm:'disgust',disgust:'disgust',sad:'sadness',angry:'anger',anxious:'fear',tired:'tired'};
 type MoodRow={mood:string;occurred_at:string};
@@ -244,12 +244,11 @@ type ReactionRow={id:string;mood:string;shared_at:string;reactor_name:string;emo
 const SELECTED_KEY='moodpals.familySelectedProfile';
 export function shortProfileName(name:string){return name.replace(/[’']s\s+Apple\s+Watch$/i,'').replace(/\s*Apple\s+Watch$/i,'').trim()||name}
 
-export function FamilySwitcher({children,disabled=false,onAdd,focused=true}:{children:React.ReactNode;disabled?:boolean;onAdd?:()=>void;focused?:boolean}){
+export function FamilySwitcher({children,disabled=false,onAdd,focused=true,onChat,onSignal}:{children:React.ReactNode;disabled?:boolean;onAdd?:()=>void;focused?:boolean;onChat?:(id:string)=>void;onSignal?:(id:string)=>void}){
  const {profiles,slots,load,loaded}=useFamilyProfiles(!disabled);
  const {isPlus,showPaywall}=usePlus();
  const [selected,setSelectedState]=useState<string|null>(null),[moods,setMoods]=useState<MoodRow[]>([]),[reactions,setReactions]=useState<ReactionRow[]>([]),[tick,setTick]=useState(0),[loading,setLoading]=useState(false),[error,setError]=useState('');
- const [saved,setSaved]=useState<string|null|undefined>(undefined),[lastLinked,setLastLinked]=useState<string|null>(null),[listOpen,setListOpen]=useState(false),[openKey,setOpenKey]=useState<string|null>(null);
- useEffect(()=>setOpenKey(null),[selected]);
+ const [saved,setSaved]=useState<string|null|undefined>(undefined),[lastLinked,setLastLinked]=useState<string|null>(null),[listOpen,setListOpen]=useState(false);
  const profile=profiles.find(p=>p.id===selected)||null;
  const setSelected=(id:string|null)=>{setSelectedState(id);if(id)setLastLinked(id);void (id?AsyncStorage.setItem(SELECTED_KEY,id):AsyncStorage.removeItem(SELECTED_KEY))};
  useEffect(()=>{void AsyncStorage.getItem(SELECTED_KEY).then(v=>setSaved(v))},[]);
@@ -285,8 +284,11 @@ export function FamilySwitcher({children,disabled=false,onAdd,focused=true}:{chi
    </View>
    {loading?<ActivityIndicator color={purple}/>:null}
    {error?<Text style={[styles.sub,{color:red}]}>{error}</Text>:null}
-   {openKey?<TouchableOpacity accessibilityRole="button" accessibilityLabel="Back" onPress={()=>setOpenKey(null)} style={{flexDirection:'row',alignItems:'center',gap:3,alignSelf:'flex-start'}}><Ionicons name="chevron-back" size={22} color="#251C45"/><Text style={{fontWeight:'800',color:'#251C45'}}>Back</Text></TouchableOpacity>:null}
-   {!loading||moods.length?<FamilyTimeline key={profile.id} name={shortProfileName(profile.name)} moods={moods} reactions={reactions} retentionDays={RETENTION_DAYS} openKey={openKey} onOpenKey={setOpenKey}/>:null}
+   {onSignal||onChat?<View style={{flexDirection:'row',gap:10}}>
+    {onSignal?<TouchableOpacity accessibilityRole="button" onPress={()=>onSignal(profile.id)} style={styles.familyAction}><Ionicons name="heart-outline" size={18} color={purple}/><Text style={styles.familyActionText}>Little Signal</Text></TouchableOpacity>:null}
+    {onChat?<TouchableOpacity accessibilityRole="button" onPress={()=>onChat(profile.id)} style={styles.familyAction}><Ionicons name="chatbubble-ellipses-outline" size={18} color={purple}/><Text style={styles.familyActionText}>Open Chat</Text></TouchableOpacity>:null}
+   </View>:null}
+   {!loading||moods.length?<FamilyTimeline key={profile.id} name={shortProfileName(profile.name)} moods={moods} reactions={reactions} retentionDays={RETENTION_DAYS} openKey={null} onOpenKey={()=>onChat?.(profile.id)}/>:null}
   </View>}
  </View>;
 }

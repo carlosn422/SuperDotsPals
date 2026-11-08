@@ -85,7 +85,7 @@ export function useLiveCircleState():CircleStore{
     signals:((signals.data||[]) as any[]).map(x=>({id:x.id,friendId:x.sender_id,signal:x.signal as SignalId,at:x.sent_at,seen:!!x.seen_at||s.seenSignalIds.includes(x.id)})),
     sentSignals:((sent.data||[]) as any[]).map(x=>({friendIds:[x.recipient_id],signal:x.signal as SignalId,at:x.sent_at})),
     inbox:((inbox.data||[]) as any[]).map(n=>({id:n.id,moodId:n.shared_mood_id,mood:asMood(n.mood),friendId:n.reactor_id,name:nickById.get(n.reactor_id)||n.reactor_name,emoji:n.emoji,at:n.reacted_at,read:!!n.read_at||pendingReads.includes(n.id)})),
-    familyNames:Object.fromEntries(((family.data||[]) as any[]).map(n=>[n.profile_id,{name:n.display_name,owner:n.owner_name}])),
+    familyNames:Object.fromEntries(((family.data||[]) as any[]).map(n=>[n.profile_id,{name:n.display_name,owner:n.owner_name,mine:!!n.is_mine}])),
     prefs:p?{invites:p.invites,approvals:p.approvals,signals:p.signals,reactions:p.reactions,moods:p.moods??true,showNamesInPreview:p.show_names_in_preview,showMoodOnLockScreen:p.show_mood_on_lock_screen}:s.prefs,
    }));
    const tz=deviceTimezone();

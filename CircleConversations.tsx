@@ -3,7 +3,7 @@ import {ActivityIndicator,Alert,Animated,AppState,PanResponder,ScrollView,Text,T
 import {Ionicons} from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {CircleMood,Friend,FriendSharedMood,MOOD_REACTIONS,MOOD_TINTS,REACTION_LABELS,ReceivedSignal,SignalId,signalById} from './LittleSignalsData';
-import {CircleStore,familyFriend,isMoodNew,useCircle} from './CircleStore';
+import {CircleStore,canSignal,familyFriend,isMoodNew,useCircle} from './CircleStore';
 import {Avatar,CT,EmptyState,MoodPalThumb,OfflineBanner,cs,useReduceMotion} from './CircleComponents';
 import {Emoji,EmojiStyle} from './EmojiCatalog';
 import EmojiPickerSheet from './EmojiPickerSheet';
@@ -310,7 +310,7 @@ export function ConversationScreen({id,focus,onBack,onInfo,onSend,fill,padding=2
    })}
   </View>;
 
- const isFriend=store.friends.some(f=>f.id===id);
+ const isFriend=canSignal(store,id);
  const bar=<View {...(target&&!(target.mood.myReaction&&!drafts[target.mood.id])?swipe.panHandlers:{})} style={{backgroundColor:'#fff',borderRadius:24,padding:12,gap:10,borderWidth:1,borderColor:CT.line}}>
   {target?(()=>{const m=target.mood;const d=drafts[m.id];const done=!!m.myReaction&&!d;const tint=MOOD_TINTS[m.mood].color;
    const btn={width:56,height:52,borderRadius:26,alignItems:'center' as const,justifyContent:'center' as const};
