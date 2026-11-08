@@ -14,7 +14,8 @@
       "infoPlist": {
         "NSHealthShareUsageDescription": "Allow MoodPals to read heart rate variability, heart rate, resting heart rate, sleep, activity, daylight, mindful minutes and noise levels to estimate your stress and energy.",
         "ITSAppUsesNonExemptEncryption": false,
-        "NSHealthUpdateUsageDescription": "MoodPals reads your health data for wellness insights and does not write to Apple Health."
+        "NSHealthUpdateUsageDescription": "MoodPals reads your health data for wellness insights and does not write to Apple Health.",
+        "NSLocationWhenInUseUsageDescription": "MoodPals shows your family watch's last location on a map. The iPhone app does not use your own location."
       },
       "entitlements": {
         "com.apple.security.application-groups": [
