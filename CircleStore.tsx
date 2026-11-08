@@ -5,7 +5,7 @@ import type {EmojiStyle} from './EmojiCatalog';
 
 // Local, in-memory sample data for reviewing My Circle without a backend (CIRCLE_PROTOTYPE=true).
 // The real feature uses useLiveCircleState (Supabase).
-export type State={moodsSeenAt:string;seenMoodIds:string[];seenSignalIds:string[];friends:Friend[];groups:CircleGroup[];requests:FriendRequest[];myMoods:MySharedMood[];friendMoods:FriendSharedMood[];signals:ReceivedSignal[];invite:{code:string;expiresAt:string};prefs:NotificationPrefs;revokedFriendIds:string[];blockedNames:string[];sentSignals:{friendIds:string[];signal:SignalId;at:string}[];offline:boolean;widgetHideMood:boolean;inbox:ReactionNotice[];familyNames:Record<string,{name:string;owner:string}>};
+export type State={moodsSeenAt:string;seenMoodIds:string[];seenSignalIds:string[];friends:Friend[];groups:CircleGroup[];requests:FriendRequest[];myMoods:MySharedMood[];friendMoods:FriendSharedMood[];signals:ReceivedSignal[];invite:{code:string;expiresAt:string};prefs:NotificationPrefs;revokedFriendIds:string[];blockedNames:string[];sentSignals:{friendIds:string[];signal:SignalId;at:string}[];offline:boolean;widgetHideMood:boolean;inbox:ReactionNotice[];familyNames:Record<string,{name:string;owner:string;mine?:boolean}>};
 const initial=():State=>({moodsSeenAt:'',seenMoodIds:[],seenSignalIds:[],familyNames:{},friends:MOCK_FRIENDS.map(f=>({...f})),groups:MOCK_GROUPS.map(g=>({...g,memberIds:[...g.memberIds],moods:[...g.moods]})),requests:MOCK_REQUESTS.map(r=>({...r})),myMoods:MOCK_MY_MOODS.map(m=>({...m,reactions:[...m.reactions]})),friendMoods:MOCK_FRIEND_MOODS.map(m=>({...m})),signals:MOCK_SIGNALS.map(s=>({...s})),invite:{...MOCK_INVITE},prefs:{...DEFAULT_PREFS},revokedFriendIds:[],blockedNames:[],sentSignals:[],offline:false,widgetHideMood:true,
  inbox:MOCK_MY_MOODS.flatMap(m=>m.reactions.map((r,i)=>({id:m.id+'-'+r.friendId,moodId:m.id,mood:m.mood,friendId:r.friendId,name:MOCK_FRIENDS.find(f=>f.id===r.friendId)?.name||'A friend',emoji:r.emoji,at:r.at,read:i>0}))).sort((a,b)=>b.at.localeCompare(a.at))});
 const empty=():State=>({...initial(),friends:[],groups:[],requests:[],myMoods:[],friendMoods:[],signals:[],inbox:[]});
@@ -65,6 +65,8 @@ export function circleNewCount(store:CircleStore){
   +activeFriendMoods(store).filter(m=>isMoodNew(store,m)).length;
 }
 export function isMoodNew(store:CircleStore,m:{id:string;sharedAt:string}){return !store.seenMoodIds.includes(m.id)&&(!store.moodsSeenAt||m.sharedAt>store.moodsSeenAt);}
+// Approved friends, plus family watches I own (they can get Little Signals from me too).
+export function canSignal(store:CircleStore,id:string){return store.friends.some(f=>f.id===id)||!!store.familyNames?.[id]?.mine;}
 export function friendName(store:CircleStore,id:string){return store.friends.find(f=>f.id===id)?.name||familyFriend(store,id)?.name||'Former friend';}
 export function uniqueAudience(store:CircleStore,groupIds:string[],mood?:CircleMood){
  const ids=new Set<string>();

@@ -3,9 +3,9 @@ import {Animated,Easing,Modal,ScrollView,StyleSheet,Text,TouchableOpacity,View} 
 import {Ionicons} from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {LITTLE_SIGNALS,SignalId,isToday,signalById} from './LittleSignalsData';
-import {useCircle} from './CircleStore';
+import {familyFriend,useCircle} from './CircleStore';
 import {CT,EmptyState,PrimaryButton,cs,useReduceMotion} from './CircleComponents';
-import {PersonAvatar} from './CircleConversations';
+import {PersonAvatar,personName} from './CircleConversations';
 
 // Little Signal picker: choose friends (circles) or whole groups, then a signal. Used as a sheet and as the 'send' page.
 export function SignalPicker({initial=[],onSent,onInvite}:{initial?:string[];onSent:(signal:SignalId,friendIds:string[],skipped:string[])=>void;onInvite?:()=>void}){
@@ -14,17 +14,19 @@ export function SignalPicker({initial=[],onSent,onInvite}:{initial?:string[];onS
  const [people,setPeople]=useState<string[]>(initial);
  const [groups,setGroups]=useState<string[]>([]);
  const [sig,setSig]=useState<SignalId|null>(null);
- const friendIds=new Set(store.friends.map(f=>f.id));
+ // Friends, plus family watches I own.
+ const recipients=[...store.friends,...Object.keys(store.familyNames||{}).filter(id=>store.familyNames[id].mine&&!store.friends.some(f=>f.id===id)).map(id=>familyFriend(store,id)!)];
+ const friendIds=new Set(recipients.map(f=>f.id));
  const to=Array.from(new Set([...people,...store.groups.filter(g=>groups.includes(g.id)).flatMap(g=>g.memberIds)])).filter(id=>friendIds.has(id));
  const sentToday=store.sentSignals.filter(s=>isToday(s.at)).reduce((n,s)=>n+s.friendIds.length,0);
  const hourAgo=Date.now()-3600e3;
  const atHourlyLimit=(id:string)=>store.sentSignals.filter(s=>Date.parse(s.at)>hourAgo&&s.friendIds.includes(id)).length>=3;
  const toggle=(list:string[],id:string)=>list.includes(id)?list.filter(x=>x!==id):[...list,id];
- if(!store.friends.length)return <EmptyState title="Add a friend first" detail="Little Signals can only be sent to approved friends." action={onInvite?'Invite Friends':undefined} onAction={onInvite}/>;
+ if(!recipients.length)return <EmptyState title="Add a friend first" detail="Little Signals can only be sent to approved friends." action={onInvite?'Invite Friends':undefined} onAction={onInvite}/>;
  // Friends at the hourly limit are skipped (the server skips them too); everyone else still gets the signal.
  const limited=to.filter(atHourlyLimit);
  const ready=to.filter(id=>!atHourlyLimit(id));
- const first=(id:string)=>store.friends.find(f=>f.id===id)?.name.split(' ')[0]||'a friend';
+ const first=(id:string)=>personName(store,id).name.split(' ')[0]||'a friend';
  const limitNote=ready.length?'You’ve selected some friends we can’t send to right now (3 signals per hour). We’ll send it to everyone else.'
   :'We can’t send to the friends you selected right now (3 signals per hour). Try again a little later.';
  const send=()=>{if(!sig||!ready.length)return;Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(()=>{});store.sendSignal(ready,sig);onSent(sig,ready,limited)};
@@ -36,11 +38,11 @@ export function SignalPicker({initial=[],onSent,onInvite}:{initial?:string[];onS
    {seg('friends','Friends','person-outline')}{seg('groups','Groups','people-outline')}
   </View>
   {tab==='friends'?<View style={{flexDirection:'row',flexWrap:'wrap',gap:14,paddingHorizontal:2}}>
-   {store.friends.map(f=>{const on=people.includes(f.id);return <TouchableOpacity key={f.id} onPress={()=>{Haptics.selectionAsync().catch(()=>{});setPeople(p=>toggle(p,f.id))}} accessibilityRole="checkbox" accessibilityState={{checked:on}} accessibilityLabel={f.name}
+   {recipients.map(f=>{const on=people.includes(f.id);return <TouchableOpacity key={f.id} onPress={()=>{Haptics.selectionAsync().catch(()=>{});setPeople(p=>toggle(p,f.id))}} accessibilityRole="checkbox" accessibilityState={{checked:on}} accessibilityLabel={f.name}
     style={{width:72,alignItems:'center',gap:5}}>
     <View style={{borderRadius:34,borderWidth:3,borderColor:on?CT.primary:'transparent',padding:2}}><PersonAvatar store={store} id={f.id} size={56}/></View>
     {on?<View style={{position:'absolute',top:0,right:6,width:22,height:22,borderRadius:11,backgroundColor:CT.primary,borderWidth:2,borderColor:'#fff',alignItems:'center',justifyContent:'center'}}><Ionicons name="checkmark" size={13} color="#fff"/></View>:null}
-    <Text numberOfLines={1} style={{fontSize:12,fontWeight:on?'900':'700',color:CT.ink,maxWidth:72}}>{f.name.split(' ')[0]}</Text>
+    <Text numberOfLines={1} style={{fontSize:12,fontWeight:on?'900':'700',color:CT.ink,maxWidth:72}}>{personName(store,f.id).name.split(' ')[0]}</Text>
     {atHourlyLimit(f.id)?<Text style={{fontSize:10,fontWeight:'700',color:CT.muted,marginTop:-3}}>Sent 3 this hour</Text>:null}
    </TouchableOpacity>})}
   </View>:<View style={[cs.card,{paddingVertical:2,paddingHorizontal:12}]}>
