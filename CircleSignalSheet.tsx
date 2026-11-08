@@ -8,7 +8,8 @@ import {CT,EmptyState,PrimaryButton,cs,useReduceMotion} from './CircleComponents
 import {PersonAvatar,personName} from './CircleConversations';
 
 // Little Signal picker: choose friends (circles) or whole groups, then a signal. Used as a sheet and as the 'send' page.
-export function SignalPicker({initial=[],onSent,onInvite}:{initial?:string[];onSent:(signal:SignalId,friendIds:string[],skipped:string[])=>void;onInvite?:()=>void}){
+// `locked` hides the Friends/Groups picker when the recipient is already chosen (a family watch).
+export function SignalPicker({initial=[],locked,onSent,onInvite}:{initial?:string[];locked?:boolean;onSent:(signal:SignalId,friendIds:string[],skipped:string[])=>void;onInvite?:()=>void}){
  const store=useCircle();
  const [tab,setTab]=useState<'friends'|'groups'>('friends');
  const [people,setPeople]=useState<string[]>(initial);
@@ -34,7 +35,7 @@ export function SignalPicker({initial=[],onSent,onInvite}:{initial?:string[];onS
   style={{flex:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,paddingVertical:9,borderRadius:20,backgroundColor:on?CT.primary:'transparent'}}>
   <Ionicons name={icon} size={17} color={on?'#fff':CT.ink}/><Text style={{fontSize:14,fontWeight:'800',color:on?'#fff':CT.ink}}>{label}</Text></TouchableOpacity>};
  return <View style={{gap:14}}>
-  <View accessibilityRole="tablist" style={{flexDirection:'row',backgroundColor:'#fff',borderRadius:24,padding:4,gap:4,borderWidth:1,borderColor:CT.line}}>
+  {locked?null:<><View accessibilityRole="tablist" style={{flexDirection:'row',backgroundColor:'#fff',borderRadius:24,padding:4,gap:4,borderWidth:1,borderColor:CT.line}}>
    {seg('friends','Friends','person-outline')}{seg('groups','Groups','people-outline')}
   </View>
   {tab==='friends'?<View style={{flexDirection:'row',flexWrap:'wrap',gap:14,paddingHorizontal:2}}>
@@ -52,7 +53,7 @@ export function SignalPicker({initial=[],onSent,onInvite}:{initial?:string[];onS
     <View style={{flex:1}}><Text style={cs.rowTitle}>{g.name}</Text><Text style={cs.rowSub}>{n===1?'1 friend':n+' friends'}</Text></View>
     <Ionicons name={on?'checkmark-circle':'ellipse-outline'} size={24} color={on?CT.primary:CT.muted}/>
    </TouchableOpacity>})}
-  </View>}
+  </View>}</>}
   <Text style={{fontSize:16,fontWeight:'900',color:CT.ink,marginTop:2}}>Signal</Text>
   <View style={{flexDirection:'row',flexWrap:'wrap',gap:9}}>{LITTLE_SIGNALS.map(s=>{const on=sig===s.id;return <TouchableOpacity key={s.id} onPress={()=>setSig(s.id)} accessibilityRole="radio" accessibilityState={{selected:on}}
    style={{width:'48%',flexGrow:1,flexDirection:'row',alignItems:'center',gap:9,padding:12,borderRadius:16,borderWidth:1.5,borderColor:on?CT.primary:CT.border,backgroundColor:on?CT.primarySoft:'#fff'}}>
@@ -64,7 +65,7 @@ export function SignalPicker({initial=[],onSent,onInvite}:{initial?:string[];onS
 }
 
 // Bottom sheet. After sending, the signal floats up in a bubble (like it lands on their watch), then the sheet closes.
-function SentBubble({signal,skipped,onDone}:{signal:SignalId;skipped:string[];onDone:()=>void}){
+export function SentBubble({signal,skipped,onDone}:{signal:SignalId;skipped:string[];onDone:()=>void}){
  const reduce=useReduceMotion();const v=useRef(new Animated.Value(0)).current;const s=signalById(signal);
  useEffect(()=>{
   const anim=reduce?Animated.sequence([Animated.timing(v,{toValue:1,duration:200,useNativeDriver:true}),Animated.delay(skipped.length?1700:900)])
