@@ -8,6 +8,7 @@ import {Avatar,CT,EmptyState,MoodPalThumb,OfflineBanner,cs,useReduceMotion} from
 import {Emoji,EmojiStyle} from './EmojiCatalog';
 import EmojiPickerSheet from './EmojiPickerSheet';
 import {usePlus} from './PlusStore';
+import {shortProfileName} from './FamilyWatches';
 
 // Circle conversations: one thread per person, built only from existing Circle data
 // (moods they shared with me, my reactions, their reactions to my moods, Little Signals). No text messages.
@@ -25,6 +26,9 @@ const isActive=(m:{expiresAt:string})=>new Date(m.expiresAt).getTime()>now();
 
 export function personFor(store:CircleStore,id:string):Friend|undefined{return store.friends.find(f=>f.id===id)||familyFriend(store,id);}
 // Display name without the family suffix, plus a secondary line ("Carlos's family") for family watches.
+// "Mia's Apple Watch" -> "Mia", "Jordan Lee" -> "Jordan".
+export const firstName=(name:string)=>shortProfileName(name).split(' ')[0]||name;
+
 export function personName(store:CircleStore,id:string){
  const fam=store.familyNames?.[id];if(fam&&!store.friends.some(f=>f.id===id))return {name:fam.name,detail:fam.owner+"'s family"};
  return {name:store.friends.find(f=>f.id===id)?.name||store.inbox.find(n=>n.friendId===id)?.name||'Former friend',detail:undefined as string|undefined};
@@ -198,7 +202,7 @@ type ThreadProps={id:string;focus?:string;onBack:()=>void;onInfo:()=>void;onSend
 export function ConversationScreen({id,focus,onBack,onInfo,onSend,fill,padding=20}:ThreadProps){
  const store=useCircle();useTick(60000);
  const items=threadItems(store,id);
- const {name}=personName(store,id);const first=name.split(' ')[0]||name;
+ const {name}=personName(store,id);const first=firstName(name);
  const [limit,setLimit]=useState(()=>{const i=focus?items.findIndex(x=>x.key===focus):-1;return Math.max(40,i>=0?items.length-i:0)});
  const active=items.filter((x):x is Extract<ThreadItem,{kind:'theirMood'}>=>x.kind==='theirMood');
  const [picked,setPicked]=useState<string|undefined>(()=>focus&&active.some(x=>x.key===focus)?focus:undefined);

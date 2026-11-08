@@ -5,7 +5,7 @@ import * as Haptics from 'expo-haptics';
 import {LITTLE_SIGNALS,SignalId,isToday,signalById} from './LittleSignalsData';
 import {familyFriend,useCircle} from './CircleStore';
 import {CT,EmptyState,PrimaryButton,cs,useReduceMotion} from './CircleComponents';
-import {PersonAvatar,personName} from './CircleConversations';
+import {PersonAvatar,firstName,personName} from './CircleConversations';
 
 // Little Signal picker: choose friends (circles) or whole groups, then a signal. Used as a sheet and as the 'send' page.
 // `locked` hides the Friends/Groups picker when the recipient is already chosen (a family watch).
@@ -27,7 +27,7 @@ export function SignalPicker({initial=[],locked,onSent,onInvite}:{initial?:strin
  // Friends at the hourly limit are skipped (the server skips them too); everyone else still gets the signal.
  const limited=to.filter(atHourlyLimit);
  const ready=to.filter(id=>!atHourlyLimit(id));
- const first=(id:string)=>personName(store,id).name.split(' ')[0]||'a friend';
+ const first=(id:string)=>firstName(personName(store,id).name)||'a friend';
  const limitNote=ready.length?'You’ve selected some friends we can’t send to right now (3 signals per hour). We’ll send it to everyone else.'
   :'We can’t send to the friends you selected right now (3 signals per hour). Try again a little later.';
  const send=()=>{if(!sig||!ready.length)return;Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(()=>{});store.sendSignal(ready,sig);onSent(sig,ready,limited)};
@@ -43,7 +43,7 @@ export function SignalPicker({initial=[],locked,onSent,onInvite}:{initial?:strin
     style={{width:72,alignItems:'center',gap:5}}>
     <View style={{borderRadius:34,borderWidth:3,borderColor:on?CT.primary:'transparent',padding:2}}><PersonAvatar store={store} id={f.id} size={56}/></View>
     {on?<View style={{position:'absolute',top:0,right:6,width:22,height:22,borderRadius:11,backgroundColor:CT.primary,borderWidth:2,borderColor:'#fff',alignItems:'center',justifyContent:'center'}}><Ionicons name="checkmark" size={13} color="#fff"/></View>:null}
-    <Text numberOfLines={1} style={{fontSize:12,fontWeight:on?'900':'700',color:CT.ink,maxWidth:72}}>{personName(store,f.id).name.split(' ')[0]}</Text>
+    <Text numberOfLines={1} style={{fontSize:12,fontWeight:on?'900':'700',color:CT.ink,maxWidth:72}}>{firstName(personName(store,f.id).name)}</Text>
     {atHourlyLimit(f.id)?<Text style={{fontSize:10,fontWeight:'700',color:CT.muted,marginTop:-3}}>Sent 3 this hour</Text>:null}
    </TouchableOpacity>})}
   </View>:<View style={[cs.card,{paddingVertical:2,paddingHorizontal:12}]}>
