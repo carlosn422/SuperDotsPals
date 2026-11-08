@@ -177,6 +177,7 @@ struct ContentView: View {
             // The root view stays alive after pairing completes.
             // Keep the latest iPhone check-in in sync while the watch is open.
             await sync.refresh(store: store)
+            if scenePhase == .active { await sync.reportLocation() }
             while !Task.isCancelled && sync.connected {
                 do { try await Task.sleep(for: .seconds(30)) }
                 catch { break }
@@ -185,7 +186,10 @@ struct ContentView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active && sync.connected && !sync.pairingActive {
-                Task { await sync.refresh(store: store) }
+                Task {
+                    await sync.refresh(store: store)
+                    await sync.reportLocation()
+                }
             }
         }
     }
