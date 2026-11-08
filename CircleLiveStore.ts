@@ -34,6 +34,8 @@ export function useLiveCircleState():CircleStore{
  const [loading,setLoading]=useState(true);
  const stRef=useRef(st);stRef.current=st;
  const me=useRef<string|null>(null);
+ // Protect against accidental double taps while creating the same mood event.
+ const lastMoodShare=useRef<{key:string;at:number;tempId:string}|null>(null);
  const up=(fn:(s:State)=>Partial<State>)=>setSt(s=>({...s,...fn(s)}));
 
  const userId=async()=>{
@@ -191,7 +193,12 @@ export function useLiveCircleState():CircleStore{
    void run('Couldn’t update mood sharing',()=>supabase.from('circle_groups').update({allowed_moods:moods}).eq('id',id));
   },
   shareMood:(mood:CircleMood,groupIds:string[])=>{
-   const temp='pending-'+Date.now();
+   const at=Date.now();
+   const key=mood+'|'+[...groupIds].sort().join(',');
+   const last=lastMoodShare.current;
+   if(last&&last.key===key&&at-last.at<1500)return last.tempId;
+   const temp='pending-'+at;
+   lastMoodShare.current={key,at,tempId:temp};
    up(s=>({myMoods:[{id:temp,mood,sharedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+864e5).toISOString(),groupIds,reactions:[],active:true},...s.myMoods]}));
    void run('Couldn’t share your mood',()=>supabase.rpc('circle_share_mood',{p_mood:mood,p_group_ids:groupIds}));
    return temp;
