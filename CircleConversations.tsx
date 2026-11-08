@@ -41,7 +41,11 @@ export function threadItems(store:CircleStore,id:string):ThreadItem[]{
   items.push({kind:'myMood',key:'r'+m.id,at:r.at,moodId:m.id,mood:m.mood,sharedAt:m.sharedAt,emoji:r.emoji,style:r.style,unread:false})}));
  store.signals.filter(s=>s.friendId===id).forEach(s=>items.push({kind:'signal',key:'s'+s.id,at:s.at,signal:s}));
  store.sentSignals.forEach((s,i)=>{if(s.friendIds.includes(id))items.push({kind:'sentSignal',key:'x'+s.at+i,at:s.at,signal:s.signal})});
- return items.sort((a,b)=>a.at.localeCompare(b.at));
+ // The history fetch and live updates may overlap. Render each persisted event only once.
+ // Distinct event IDs are deliberately kept, even when mood and timestamp match.
+ const unique=new Map<string,ThreadItem>();
+ items.forEach(item=>{if(!unique.has(item.key))unique.set(item.key,item)});
+ return [...unique.values()].sort((a,b)=>a.at.localeCompare(b.at)||a.key.localeCompare(b.key));
 }
 
 function unreadFor(store:CircleStore,id:string){
@@ -292,7 +296,7 @@ export function ConversationScreen({id,focus,onBack,onInfo,onSend,fill,padding=2
         <View><View style={{width:46,height:46,borderRadius:23,backgroundColor:t.tint,alignItems:'center',justifyContent:'center'}}><MoodPalThumb mood={it.mood} size={38}/></View>
          <View style={{position:'absolute',right:-9,bottom:-7,backgroundColor:'#fff',borderRadius:14,paddingHorizontal:3,borderWidth:1,borderColor:CT.line}}><Emoji e={it.emoji} style={it.style} size={16}/></View></View>
         <View style={{gap:2,flexShrink:1,paddingLeft:4}}>
-         <Text style={{fontSize:13,fontWeight:'700',color:CT.ink}}>{first} reacted {it.emoji}</Text>
+         <Text style={{fontSize:13,fontWeight:'700',color:CT.ink}}>{first} reacted</Text>
          <Text style={{fontSize:14,fontWeight:'800',color:CT.ink}}>to your <Text style={{color:t.color}}>{it.mood}</Text> mood</Text>
          <Text style={meta}>{clock(it.at)}</Text>
         </View>
