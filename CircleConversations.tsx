@@ -271,8 +271,7 @@ export function ConversationScreen({id,focus,onBack,onInfo,onSend,fill,padding=2
         <TouchableOpacity activeOpacity={.85} onPress={()=>{Haptics.selectionAsync().catch(()=>{});setPicked(it.key)}} accessibilityRole="button"
          accessibilityLabel={first+' is feeling '+m.mood+', '+clock(m.sharedAt)+(m.myReaction?', you reacted '+m.myReaction:'')} accessibilityState={{selected}} accessibilityHint="Choose this mood in the reaction bar"
          style={[bubble,{backgroundColor:t.tint,borderBottomLeftRadius:6,flexDirection:'row',alignItems:'center',gap:10,borderWidth:2,borderColor:selected&&active.length>1||lit?t.color:'transparent'}]}>
-         <MoodPalThumb mood={m.mood} size={62}/>
-         <View style={{gap:1,paddingRight:4,flexShrink:1}}>
+         <View style={{gap:1,paddingHorizontal:4,flexShrink:1}}>
           <Text style={{fontSize:13,fontWeight:'700',color:CT.ink}}>{first} is feeling</Text>
           <Text style={{fontSize:19,fontWeight:'900',color:t.color}}>{m.mood}</Text>
           <Text style={[meta,{marginTop:2}]}>{clock(m.sharedAt)}</Text>
