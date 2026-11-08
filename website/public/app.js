@@ -16,7 +16,7 @@ const hrvDots = () => {
 const ring = (pct, color, size = 44, label = '') => `<svg width="${size}" height="${size}" viewBox="0 0 44 44"><circle cx="22" cy="22" r="18" fill="none" stroke="${color}" stroke-opacity=".18" stroke-width="6"/><circle cx="22" cy="22" r="18" fill="none" stroke="${color}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${113*pct} 113" transform="rotate(-90 22 22)"/>${label?`<text x="22" y="26" text-anchor="middle" font-size="11" font-weight="800" fill="#1D2B33">${label}</text>`:''}</svg>`;
 const duoFrames = frames => frames.map(([file, t, alt, tap]) =>
   (tap ? `<i class="tap" style="--t:${t - 0.5}s;left:${tap[0]}%;top:${tap[1]}%"></i>` : '') +
-  `<img class="frame" src="/img/duo/${file}.webp?v=1" alt="${alt}" decoding="async" style="--t:${t}s">`).join('');
+  `<img class="frame" src="/img/duo/${file}.webp?v=2" alt="${alt}" decoding="async" style="--t:${t}s">`).join('');
 const SCREENS = {
   today: () => `<div class="ui"><div class="top"><span>Today</span><span class="muted">Tue, Oct 21</span></div>
     <div class="hero"><img src="/img/mascots/disgust.webp" alt=""><div class="muted">Hi Carlos, here's your daily score</div><div class="lvl">Great</div><div class="scale">${scale}<b></b></div><div class="muted">Your body signals look relaxed compared with your usual.</div></div>
@@ -81,7 +81,7 @@ document.querySelectorAll('.phone').forEach(phone => {
   phone.appendChild(screen);
   const slides = (phone.dataset.slides || '').split(',').filter(Boolean);
   if (slides.length) {
-    screen.innerHTML = slides.map((s, i) => `<img class="slide${i ? '' : ' on'}" src="/img/screens/${s}.webp?v=9" alt="MoodPals ${s.replace('-', ' ')} screen">`).join('');
+    screen.innerHTML = slides.map((s, i) => `<img class="slide${i ? '' : ' on'}" src="/img/screens/${s}.webp?v=10" alt="MoodPals ${s.replace('-', ' ')} screen">`).join('');
     let i = 0;
     const imgs = screen.querySelectorAll('.slide');
     setInterval(() => { imgs[i].classList.remove('on'); i = (i + 1) % imgs.length; imgs[i].classList.add('on'); }, 2800);
