@@ -1,6 +1,6 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {moodLabel} from './LittleSignalsData';
-import {AppState,View,Text,TouchableOpacity,TextInput,ActivityIndicator,Modal,StyleSheet,ScrollView,Animated,Easing,PanResponder,Pressable,useWindowDimensions} from 'react-native';
+import {AppState,Linking,View,Text,TouchableOpacity,TextInput,ActivityIndicator,Modal,StyleSheet,ScrollView,Animated,Easing,PanResponder,Pressable,useWindowDimensions} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {usePlus} from './PlusStore';
@@ -316,14 +316,16 @@ function FamilyLocation({profileId,name,tick}:{profileId:string;name:string;tick
  },[profileId,tick]);
  if(loc===undefined)return null;
  const note='Location from '+name+"'s last mood change or when the app was opened.";
+ const openInMaps=()=>{if(loc)void Linking.openURL('https://maps.apple.com/?ll='+loc.latitude+','+loc.longitude+'&q='+encodeURIComponent(name)).catch(()=>{})};
  return <View style={[styles.card,{gap:10}]}>
   {loc&&Maps?<View style={{height:220,borderRadius:16,overflow:'hidden'}}>
    <Maps.AppleMaps.View style={{flex:1}}
     cameraPosition={{coordinates:{latitude:loc.latitude,longitude:loc.longitude},zoom:15}}
-    markers={[{id:profileId,coordinates:{latitude:loc.latitude,longitude:loc.longitude},title:name,tintColor:purple}]}/>
+    markers={[{id:profileId,coordinates:{latitude:loc.latitude,longitude:loc.longitude},title:name,tintColor:purple}]}
+    onMapClick={openInMaps} onMarkerClick={openInMaps}/>
   </View>:null}
   {loc?<Text style={[styles.sub,{fontWeight:'700',color:'#2E2A44'}]}>Last updated {updatedLabel(loc.recorded_at)}</Text>
    :<Text style={[styles.sub,{fontWeight:'700',color:'#2E2A44'}]}>No location yet</Text>}
-  <Text style={styles.sub}>{note}</Text>
+  <Text style={styles.sub}>{note}{loc&&Maps?' Tap the map for the address and directions.':''}</Text>
  </View>;
 }
