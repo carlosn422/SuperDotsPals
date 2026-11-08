@@ -8,12 +8,12 @@ import {CodePreview,activeFriendMoods,circleNewCount,familyFriend,friendName,isM
 import {usePlus} from './PlusStore';
 import {Avatar,CCard,CHeading,CRow,CT,Chip,EmptyState,MoodPalThumb,OfflineBanner,PrimaryButton,SampleDataNote,SignalBurst,SoftButton,ToggleRow,cs} from './CircleComponents';
 import {ConversationScreen,MessagesInbox,conversationRef,conversationsFor} from './CircleConversations';
-import CircleSignalSheet,{SignalPicker} from './CircleSignalSheet';
+import CircleSignalSheet,{SentBubble,SignalPicker} from './CircleSignalSheet';
 
 export type CircleRoute=
  |{name:'home'}|{name:'invite';groupId?:string}|{name:'enterCode'}|{name:'requests';groupId?:string;groupName?:string}|{name:'assignGroups';requestId:string;groupId?:string;groupName?:string}
  |{name:'friends'}|{name:'friend';id:string}|{name:'groups'}|{name:'group';id?:string;draft?:GroupDraft}|{name:'permissions'}
- |{name:'share';mood:CircleMood}|{name:'send';friendId?:string}|{name:'signalSent';signal:SignalId;friendIds:string[]}
+ |{name:'share';mood:CircleMood}|{name:'send';friendId?:string;locked?:boolean}|{name:'signalSent';signal:SignalId;friendIds:string[]}
  |{name:'signalReceived';signalId:string}|{name:'friendMood';id:string}|{name:'room';id:string}|{name:'today'}
  |{name:'notifications'}|{name:'widgets'}|{name:'circleSettings'}|{name:'revoked'}|{name:'fromNotification';ref:string}|{name:'chat';id:string;focus?:string};
 
@@ -76,7 +76,7 @@ function Screen({route,nav,mood,homeTab='messages',setHomeTab=()=>{}}:{route:Cir
   case 'group':return <GroupEdit id={route.id} draft={route.draft} nav={nav}/>;
   case 'permissions':return <Permissions/>;
   case 'share':return <ChooseAudience mood={route.mood} nav={nav}/>;
-  case 'send':return <SendSignal friendId={route.friendId} nav={nav}/>;
+  case 'send':return <SendSignal friendId={route.friendId} locked={route.locked} nav={nav}/>;
   case 'signalSent':return <SignalSent signal={route.signal} friendIds={route.friendIds} nav={nav}/>;
   case 'signalReceived':return <OpenConversation refId={route.signalId} nav={nav} missing={<EmptyState title="Signal not found" detail="It may have been from someone no longer in your circle."/>}/>;
   case 'friendMood':return <OpenConversation refId={route.id} nav={nav} missing={<Screen route={{name:'revoked'}} nav={nav}/>}/>;
@@ -579,8 +579,13 @@ function FriendPick({selected,onToggle}:{selected:string[];onToggle:(id:string)=
   <Text style={{fontSize:12,fontWeight:on?'900':'600',color:on?CT.primary:CT.ink}}>{f.name}</Text></TouchableOpacity>})}</View>;
 }
 
-function SendSignal({friendId,nav}:{friendId?:string;nav:Nav}){
- return <SignalPicker initial={friendId?[friendId]:[]} onInvite={()=>nav.push({name:'invite'})} onSent={(signal,friendIds)=>nav.replace({name:'signalSent',signal,friendIds})}/>;
+// After sending, the signal floats up in place (same as the Little Signal sheet), then goes back.
+function SendSignal({friendId,locked,nav}:{friendId?:string;locked?:boolean;nav:Nav}){
+ const [sent,setSent]=useState<{signal:SignalId;skipped:string[]}|null>(null);
+ return <View>
+  <SignalPicker initial={friendId?[friendId]:[]} locked={locked&&!!friendId} onInvite={()=>nav.push({name:'invite'})} onSent={(signal,_ids,skipped)=>setSent({signal,skipped})}/>
+  {sent?<SentBubble signal={sent.signal} skipped={sent.skipped} onDone={nav.back}/>:null}
+ </View>;
 }
 
 function SignalSent({signal,friendIds,nav}:{signal:SignalId;friendIds:string[];nav:Nav}){

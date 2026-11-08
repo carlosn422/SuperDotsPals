@@ -57,7 +57,8 @@
       "./scripts/with-watch-widget-embed.cjs",
       "./scripts/with-health-privacy.cjs",
       "expo-sharing",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      "expo-maps"
     ],
     "extra": {
       "eas": {

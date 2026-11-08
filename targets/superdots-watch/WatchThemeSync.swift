@@ -238,6 +238,22 @@ final class WatchThemeSync: ObservableObject {
         let savedAt = Self.parseTimestamp(row?["occurred_at"] as? String) ?? Date()
         store.setMood(mood, at: savedAt, if: .always)
         moodLoaded = true
+        Task { await reportLocation(force: true) }
+    }
+
+    private var lastLocationReport: Date?
+
+    /// Family watches share where they are with their owner when the app opens or a mood is set.
+    func reportLocation(force: Bool = false) async {
+        guard moodOnly, connected else { return }
+        if !force, let last = lastLocationReport, Date().timeIntervalSince(last) < 300 { return }
+        lastLocationReport = Date()
+        guard let location = await WatchLocation.shared.current() else { return }
+        do {
+            _ = try await rpc("family_watch_report_location", [
+                "p_lat": location.coordinate.latitude, "p_lon": location.coordinate.longitude,
+                "p_accuracy": location.horizontalAccuracy])
+        } catch { NSLog("[WatchSync] Location upload failed: %@", error.localizedDescription) }
     }
 
     /// Saves a theme picked on the watch so the iPhone shows the same choice.

@@ -5,7 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import {usePlus} from './PlusStore';
 import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
-import FamilyTimeline,{RETENTION_DAYS} from './FamilyTimeline';
+import {requireOptionalNativeModule} from 'expo';
 import {SectionHeader,WatchColorSheet,WatchImage,WatchRow,colorName,isWatchColor} from './WatchArt';
 
 export type FamilyProfile={id:string;name:string;createdAt:string;lastSeenAt:string|null;connected:boolean;mood:string|null;moodAt:string|null;watchColor?:string|null};
@@ -288,7 +288,41 @@ export function FamilySwitcher({children,disabled=false,onAdd,focused=true,onCha
     {onSignal?<TouchableOpacity accessibilityRole="button" onPress={()=>onSignal(profile.id)} style={styles.familyAction}><Ionicons name="heart-outline" size={18} color={purple}/><Text style={styles.familyActionText}>Little Signal</Text></TouchableOpacity>:null}
     {onChat?<TouchableOpacity accessibilityRole="button" onPress={()=>onChat(profile.id)} style={styles.familyAction}><Ionicons name="chatbubble-ellipses-outline" size={18} color={purple}/><Text style={styles.familyActionText}>Open Chat</Text></TouchableOpacity>:null}
    </View>:null}
-   {!loading||moods.length?<FamilyTimeline key={profile.id} name={shortProfileName(profile.name)} moods={moods} reactions={reactions} retentionDays={RETENTION_DAYS} openKey={null} onOpenKey={()=>onChat?.(profile.id)}/>:null}
+   <FamilyLocation profileId={profile.id} name={shortProfileName(profile.name)} tick={tick}/>
   </View>}
+ </View>;
+}
+
+// Native map only exists in builds that include expo-maps; older dev builds skip the map.
+const Maps:typeof import('expo-maps')|null=requireOptionalNativeModule('ExpoMaps')?require('expo-maps'):null;
+type WatchLocation={latitude:number;longitude:number;recorded_at:string};
+function updatedLabel(at:string){
+ const d=new Date(at),now=new Date(),time=d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+ const day=(x:Date)=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();
+ const diff=Math.round((day(now)-day(d))/86400000);
+ if(diff===0)return 'Today '+time;
+ if(diff===1)return 'Yesterday '+time;
+ return d.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'})+', '+time;
+}
+function FamilyLocation({profileId,name,tick}:{profileId:string;name:string;tick:number}){
+ const [loc,setLoc]=useState<WatchLocation|null|undefined>(undefined);
+ useEffect(()=>{
+  let live=true;
+  void supabase.rpc('family_watch_location',{p_profile:profileId}).then(({data,error})=>{
+   if(live)setLoc(error?null:((data as WatchLocation[])||[])[0]||null);
+  });
+  return()=>{live=false};
+ },[profileId,tick]);
+ if(loc===undefined)return null;
+ const note='Location from '+name+"'s last mood change or when the app was opened.";
+ return <View style={[styles.card,{gap:10}]}>
+  {loc&&Maps?<View style={{height:220,borderRadius:16,overflow:'hidden'}}>
+   <Maps.AppleMaps.View style={{flex:1}}
+    cameraPosition={{coordinates:{latitude:loc.latitude,longitude:loc.longitude},zoom:15}}
+    markers={[{id:profileId,coordinates:{latitude:loc.latitude,longitude:loc.longitude},title:name,tintColor:purple}]}/>
+  </View>:null}
+  {loc?<Text style={[styles.sub,{fontWeight:'700',color:'#2E2A44'}]}>Last updated {updatedLabel(loc.recorded_at)}</Text>
+   :<Text style={[styles.sub,{fontWeight:'700',color:'#2E2A44'}]}>No location yet</Text>}
+  <Text style={styles.sub}>{note}</Text>
  </View>;
 }

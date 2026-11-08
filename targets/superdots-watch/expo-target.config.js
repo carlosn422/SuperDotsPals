@@ -6,7 +6,7 @@ module.exports = {
   // Keep the watch app embedded in the existing MoodPals iOS bundle.
   bundleIdentifier: '.watchkitapp',
   deploymentTarget: '10.0',
-  frameworks: ['SwiftUI', 'Security', 'HealthKit', 'WidgetKit', 'WatchConnectivity', 'UserNotifications'],
+  frameworks: ['SwiftUI', 'Security', 'HealthKit', 'WidgetKit', 'WatchConnectivity', 'UserNotifications', 'CoreLocation'],
   // Sets ASSETCATALOG_COMPILER_APPICON_NAME so the watch icon is compiled; without it watch notifications show a blank icon.
   icon: '../../assets/watch-icon.png',
   entitlements: {
@@ -21,5 +21,6 @@ module.exports = {
   infoPlist: {
     CFBundleIconName: 'AppIcon',
     WKRunsIndependentlyOfCompanionApp: true,
+    NSLocationWhenInUseUsageDescription: "MoodPals shares this watch's location with the family member who set it up, only when you open the app or set a mood.",
   },
 };
