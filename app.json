@@ -4,7 +4,7 @@
     "icon": "./assets/branding/app-icon.png",
     "slug": "superdotspals",
     "scheme": "wellnest",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "ios": {
