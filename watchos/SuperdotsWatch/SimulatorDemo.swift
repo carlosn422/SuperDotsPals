@@ -11,8 +11,9 @@ enum SimulatorDemo {
     static func seedHealthIfNeeded() async {
         guard enabled else { return }
         let monitor = HealthStressMonitor.shared
-        let types: Set<HKSampleType> = [monitor.hrvType, monitor.rhrType, monitor.heartRateType]
+        let types: Set<HKSampleType> = [monitor.hrvType, monitor.rhrType, monitor.heartRateType, monitor.sleepType]
         do { try await monitor.store.requestAuthorization(toShare: types, read: monitor.readTypes) } catch { return }
+        if await monitor.sleepNights(since: Date().addingTimeInterval(-8 * 86400)).isEmpty { await seedSleep(monitor) }
         let existing = await monitor.samples(monitor.hrvType, unit: HealthStressMonitor.ms, since: Date().addingTimeInterval(-21 * 86400))
         guard existing.count < StressEngine.minBaselineSamples else { return }
         var samples: [HKQuantitySample] = []
@@ -33,6 +34,25 @@ enum SimulatorDemo {
         add(monitor.hrvType, HealthStressMonitor.ms, 41, now.addingTimeInterval(-600))
         add(monitor.rhrType, HealthStressMonitor.bpm, 63, now.addingTimeInterval(-900))
         do { try await monitor.store.save(samples) } catch { NSLog("[SimulatorDemo] Seed failed: %@", error.localizedDescription) }
+    }
+
+    /// Five nights of staged sleep, 11 pm to about 6:30 am, with a short awake break.
+    private static func seedSleep(_ monitor: HealthStressMonitor) async {
+        let earliest = monitor.store.earliestPermittedSampleDate()
+        let today = Calendar.current.startOfDay(for: Date())
+        var samples: [HKCategorySample] = []
+        for night in 0..<5 {
+            var start = today.addingTimeInterval(-Double(night) * 86400 - 3600)
+            guard start > earliest, start < Date().addingTimeInterval(-10 * 3600) else { continue }
+            let stages: [(HKCategoryValueSleepAnalysis, Double)] = [(.asleepCore, 120), (.asleepDeep, 60), (.asleepREM, 60 + Double(night) * 5), (.awake, 10), (.asleepCore, 200)]
+            for (stage, minutes) in stages {
+                let end = start.addingTimeInterval(minutes * 60)
+                samples.append(HKCategorySample(type: monitor.sleepType, value: stage.rawValue, start: start, end: end))
+                start = end
+            }
+        }
+        guard !samples.isEmpty else { return }
+        do { try await monitor.store.save(samples) } catch { NSLog("[SimulatorDemo] Sleep seed failed: %@", error.localizedDescription) }
     }
 }
 #endif

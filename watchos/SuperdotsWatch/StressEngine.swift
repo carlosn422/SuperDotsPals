@@ -83,6 +83,50 @@ struct HealthPoint {
     var uuid: String = ""
 }
 
+/// One night of sleep, computed exactly like the iPhone's Apple Health sync (HealthDataPanel.tsx) so both write the same rows:
+/// keyed by wake-up day ("2026-11-9"; samples ending after 6 pm count toward the next day), overlapping samples merged.
+struct SleepNight {
+    let key: String
+    let at: Date
+    let rows: [(metric: String, prefix: String, minutes: Double)]
+
+    static func dayKey(_ date: Date) -> String {
+        let c = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return "\(c.year ?? 0)-\(c.month ?? 0)-\(c.day ?? 0)"
+    }
+
+    /// Skips nights that began before `since` (partial) or whose sleep ended less than 2 hours ago (may still be in progress).
+    static func nights(from samples: [HKCategorySample], since: Date, now: Date) -> [SleepNight] {
+        let shift: TimeInterval = 6 * 3600
+        let grouped = Dictionary(grouping: samples) { Calendar.current.startOfDay(for: $0.endDate.addingTimeInterval(shift)) }
+        let asleepValues = Set([HKCategoryValueSleepAnalysis.asleepUnspecified, .asleepCore, .asleepDeep, .asleepREM].map(\.rawValue))
+        return grouped.compactMap { day, list in
+            guard day.addingTimeInterval(-shift) >= since else { return nil }
+            func merged(_ values: Set<Int>) -> (minutes: Double, end: Date?) {
+                let spans = list.filter { values.contains($0.value) && $0.endDate > $0.startDate }
+                    .map { (start: $0.startDate, end: $0.endDate) }.sorted { $0.start < $1.start }
+                var joined: [(start: Date, end: Date)] = []
+                for span in spans {
+                    if let last = joined.last, span.start <= last.end { joined[joined.count - 1].end = max(last.end, span.end) }
+                    else { joined.append(span) }
+                }
+                let minutes = min(1440, joined.reduce(0) { $0 + $1.end.timeIntervalSince($1.start) / 60 })
+                return ((minutes * 100).rounded() / 100, joined.last?.end)
+            }
+            let asleep = merged(asleepValues)
+            guard asleep.minutes > 0, let wake = asleep.end, now.timeIntervalSince(wake) >= 2 * 3600 else { return nil }
+            let key = dayKey(day)
+            return SleepNight(key: key, at: dayKey(wake) == key ? wake : wake.addingTimeInterval(shift), rows: [
+                ("sleep_minutes", "sleep", asleep.minutes),
+                ("sleep_deep_minutes", "sleep-deep", merged([HKCategoryValueSleepAnalysis.asleepDeep.rawValue]).minutes),
+                ("sleep_rem_minutes", "sleep-rem", merged([HKCategoryValueSleepAnalysis.asleepREM.rawValue]).minutes),
+                ("sleep_core_minutes", "sleep-core", merged([HKCategoryValueSleepAnalysis.asleepCore.rawValue, HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue]).minutes),
+                ("sleep_awake_minutes", "sleep-awake", merged([HKCategoryValueSleepAnalysis.awake.rawValue]).minutes),
+            ])
+        }
+    }
+}
+
 /// The newest stress reading, shared with the watch-face complication through the App Group.
 struct StressReading: Equatable {
     enum Source: String { case watch, measure, iphone }
@@ -154,10 +198,13 @@ final class HealthStressMonitor: @unchecked Sendable {
     let hrvType = HKQuantityType(.heartRateVariabilitySDNN)
     let rhrType = HKQuantityType(.restingHeartRate)
     let heartRateType = HKQuantityType(.heartRate)
+    let sleepType = HKCategoryType(.sleepAnalysis)
+    static let sleepCheckedKey = "watch_sleep_checked"
+    private var sleepSyncing = false
     private var observing = false
     private let lock = NSLock()
 
-    var readTypes: Set<HKObjectType> { [hrvType, rhrType, heartRateType] }
+    var readTypes: Set<HKObjectType> { [hrvType, rhrType, heartRateType, sleepType] }
 
     func requestAuthorization() async -> Bool {
         guard !WatchProfile.moodOnly, HKHealthStore.isHealthDataAvailable() else { return false }
@@ -222,11 +269,40 @@ final class HealthStressMonitor: @unchecked Sendable {
     static let ms = HKUnit.secondUnit(with: .milli)
     static let bpm = HKUnit.count().unitDivided(by: .minute())
 
+    /// Watch sleep nights since `since`, grouped and keyed like the iPhone's Apple Health sync.
+    func sleepNights(since: Date) async -> [SleepNight] {
+        let samples: [HKCategorySample] = await withCheckedContinuation { continuation in
+            let predicate = HKQuery.predicateForSamples(withStart: since, end: Date(), options: [])
+            let query = HKSampleQuery(sampleType: sleepType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, results, _ in
+                continuation.resume(returning: results as? [HKCategorySample] ?? [])
+            }
+            store.execute(query)
+        }
+        return SleepNight.nights(from: samples, since: since, now: Date())
+    }
+
+    /// Uploads the last week of watch sleep at most every 30 minutes, to fill nights Apple Health on the iPhone is missing.
+    func syncSleepIfDue() async {
+        guard Date().timeIntervalSince1970 - UserDefaults.standard.double(forKey: Self.sleepCheckedKey) > 30 * 60 else { return }
+        let start = lock.withLock { () -> Bool in
+            if sleepSyncing { return false }
+            sleepSyncing = true
+            return true
+        }
+        guard start else { return }
+        defer { lock.withLock { sleepSyncing = false } }
+        let nights = await sleepNights(since: Date().addingTimeInterval(-8 * 86400))
+        if await WatchThemeSync.shared.uploadSleep(nights) {
+            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: Self.sleepCheckedKey)
+        }
+    }
+
     /// Recomputes the latest score from watch HealthKit data, stores it in the App Group (newest wins)
     /// and optionally uploads it as a `computed` stress_score row.
     @discardableResult
     func recompute(upload: Bool) async -> StressReading? {
         guard !WatchProfile.moodOnly, HKHealthStore.isHealthDataAvailable() else { return nil }
+        if upload { await syncSleepIfDue() }
         let since = Date().addingTimeInterval(-(StressEngine.baselineDays + 2) * 86400)
         let (h, r) = await history(since: since)
         // Watch HealthKit samples from the last 2 days (cached iPhone history has no UUID).
