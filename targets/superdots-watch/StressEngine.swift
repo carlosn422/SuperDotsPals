@@ -250,14 +250,20 @@ final class HealthStressMonitor: @unchecked Sendable {
         guard !WatchProfile.moodOnly, HKHealthStore.isHealthDataAvailable() else { return nil }
         let since = Date().addingTimeInterval(-(StressEngine.baselineDays + 2) * 86400)
         let (h, r) = await history(since: since)
+        // Watch HealthKit samples from the last 2 days (cached iPhone history has no UUID).
+        let recent = Date().addingTimeInterval(-48 * 3600)
+        let raw = h.filter { !$0.uuid.isEmpty && $0.date >= recent }.map { (metric: "hrv", point: $0) }
+            + r.filter { !$0.uuid.isEmpty && $0.date >= recent }.map { (metric: "resting_heart_rate", point: $0) }
         guard let point = StressEngine.latestPoint(hrv: h, rhr: r) else {
             WatchStressStore.calibrating = !h.isEmpty && WatchStressStore.load()?.isFresh != true
+            if upload, !raw.isEmpty { await WatchThemeSync.shared.uploadReadings(raw: raw, stress: nil) }
             return nil
         }
         let reading = StressReading(score: point.score, at: point.at, source: .watch)
-        if WatchStressStore.offer(reading), upload {
+        let isNew = WatchStressStore.offer(reading)
+        if upload, isNew || !raw.isEmpty {
             // Same key as the iPhone ("stress-hrv-<HealthKit UUID>") so both devices upsert one row.
-            await WatchThemeSync.shared.uploadStress(score: point.score, at: point.at, key: "stress-hrv-\(point.sample.uuid)")
+            await WatchThemeSync.shared.uploadReadings(raw: raw, stress: isNew ? (point.score, point.at, "stress-hrv-\(point.sample.uuid)") : nil)
         }
         return reading
     }
