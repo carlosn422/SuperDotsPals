@@ -214,6 +214,7 @@ final class WatchThemeSync: ObservableObject {
         WatchMoodStore.clear()
         for key in ["watch_access","watch_refresh","watch_user","watch_pairing_id"] { storeSecret(nil,for:key) }
         UserDefaults.standard.removeObject(forKey: Self.uploadedReadingsKey)
+        UserDefaults.standard.removeObject(forKey: HealthStressMonitor.sleepCheckedKey)
         accessToken = ""; refreshToken = ""; userId = ""; pairingId = ""; pairingSecret = ""; pairingCode = ""; pairingActive = false; pairingConnecting = false; connected = false; moodLoaded = false; sessionVerified = false; needsReconnect = false; syncWarning = nil
         WatchCircleStore.shared.reset()
         setMoodOnly(false)
@@ -280,7 +281,7 @@ final class WatchThemeSync: ObservableObject {
 
     private static func rememberUploadedReadings(_ keys:[String:Double]) {
         guard !keys.isEmpty else { return }
-        let cutoff = Date().addingTimeInterval(-72 * 3600).timeIntervalSince1970
+        let cutoff = Date().addingTimeInterval(-9 * 86400).timeIntervalSince1970
         let kept = uploadedReadingKeys().merging(keys) { $1 }.filter { $0.value >= cutoff }
         UserDefaults.standard.set(kept, forKey: uploadedReadingsKey)
     }
@@ -306,7 +307,35 @@ final class WatchThemeSync: ObservableObject {
             rows.append(["user_id":userId,"metric":"stress_score","value":stress.score,"source":"computed",
                          "source_record_key":stress.key,"recorded_at":formatter.string(from:stress.at)])
         }
-        guard !rows.isEmpty else { return }
+        await postReadings(rows, fresh: fresh, summary: "stress \(stress.map { "\($0.score)" } ?? "none")")
+    }
+
+    /// Uploads watch sleep nights with the iPhone's keys ("sleep-<day>", "sleep-deep-<day>", ...). Insert-only, so Apple Health on
+    /// the iPhone stays primary: a night the iPhone already saved is kept, and the iPhone's next sync overwrites a watch row.
+    /// Returns false when the upload could not run (not signed in, or the request failed).
+    func uploadSleep(_ nights:[SleepNight]) async -> Bool {
+        guard !moodOnly, connected, !userId.isEmpty, !refreshToken.isEmpty else { return false }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let sent = Self.uploadedReadingKeys()
+        var fresh:[String:Double] = [:]
+        var rows:[[String:Any]] = []
+        for night in nights {
+            for row in night.rows {
+                let key = "\(row.prefix)-\(night.key)"
+                guard sent[key] == nil, !uploadingReadingKeys.contains(key) else { continue }
+                fresh[key] = night.at.timeIntervalSince1970
+                rows.append(["user_id":userId,"metric":row.metric,"value":row.minutes,"source":"healthkit",
+                             "source_record_key":key,"recorded_at":formatter.string(from:night.at)])
+            }
+        }
+        return await postReadings(rows, fresh: fresh, summary: "sleep")
+    }
+
+    /// One insert-only PostgREST POST; rows whose source_record_key already exists are ignored.
+    @discardableResult
+    private func postReadings(_ rows:[[String:Any]], fresh:[String:Double], summary:String) async -> Bool {
+        guard !rows.isEmpty else { return true }
         uploadingReadingKeys.formUnion(fresh.keys)
         defer { uploadingReadingKeys.subtract(fresh.keys) }
         let path = "/rest/v1/wellness_readings?on_conflict=user_id,source,metric,source_record_key"
@@ -319,9 +348,11 @@ final class WatchThemeSync: ObservableObject {
                 _ = try await request(path,method:"POST",body:body,extraHeaders:headers)
             }
             Self.rememberUploadedReadings(fresh)
-            NSLog("[WatchSync] Uploaded %ld readings (stress %@)", rows.count, stress.map { "\($0.score)" } ?? "none")
+            NSLog("[WatchSync] Uploaded %ld readings (%@)", rows.count, summary)
+            return true
         } catch {
             NSLog("[WatchSync] Reading upload failed: %@", error.localizedDescription)
+            return false
         }
     }
 
@@ -471,6 +502,11 @@ final class WatchThemeSync: ObservableObject {
               let refresh = json["refresh_token"] as? String,
               let user = json["user"] as? [String:Any],
               let id = user["id"] as? String else { throw SyncError.badResponse }
+        if id != userId {
+            // Upload memory belongs to the previous account (e.g. re-linked after its session expired).
+            UserDefaults.standard.removeObject(forKey: Self.uploadedReadingsKey)
+            UserDefaults.standard.removeObject(forKey: HealthStressMonitor.sleepCheckedKey)
+        }
         accessToken = access; refreshToken = refresh; userId = id
         storeSecret(access,for:"watch_access")
         storeSecret(refresh,for:"watch_refresh")

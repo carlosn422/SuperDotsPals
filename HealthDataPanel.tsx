@@ -17,6 +17,7 @@ export type Reading={metric:Metric;value:number;recorded_at:string;source:string
 type Upload={user_id:string;metric:Metric;value:number;source:'healthkit'|'computed';source_record_key:string;recorded_at:string};
 const palette={ink:'#1D2B33',purple:'#34B37E',muted:'#6E7D86',mint:'#E4F6EA'};
 function numberValue(v:unknown){const n=Number(v);return Number.isFinite(n)&&n>=0?n:null}
+const SLEEP_NIGHTS=14;
 function dayKey(d:Date){return [d.getFullYear(),d.getMonth()+1,d.getDate()].join('-')}
 function keyForToday(){return dayKey(new Date())}
 const DAYLIGHT='HKQuantityTypeIdentifierTimeInDaylight';
@@ -54,13 +55,15 @@ export async function syncNativeHealth():Promise<number>{
  await h.requestAuthorization({toRead});
  const can=(t:string)=>toRead.includes(t);
  const now=new Date(),recent=new Date(now.getTime()-30*86400000),week=new Date(now.getTime()-7*86400000),day=new Date();day.setHours(0,0,0,0);
+ // Apple Health is the primary source: re-read two weeks of sleep on every sync so missed nights fill in.
+ const sleepFrom=new Date(now.getTime()-SLEEP_NIGHTS*86400000);
  const skip=Promise.resolve([]);
  const results=await Promise.allSettled([
-  h.queryQuantitySamples({type:Q.heartRateVariabilitySDNN,unit:'ms',from:recent,to:now,limit:240,ascending:false}),
-  h.queryQuantitySamples({type:Q.restingHeartRate,unit:'count/min',from:recent,to:now,limit:40,ascending:false}),
+  h.queryQuantitySamples({type:Q.heartRateVariabilitySDNN,unit:'ms',from:recent,to:now,limit:2000,ascending:false}),
+  h.queryQuantitySamples({type:Q.restingHeartRate,unit:'count/min',from:recent,to:now,limit:100,ascending:false}),
   h.queryStatistics({type:Q.stepCount,unit:'count',from:day,to:now,options:h.StatisticsOption.cumulativeSum}),
   h.queryStatisticsCollection({type:Q.stepCount,unit:'count',from:recent,to:now,interval:{day:1},options:h.StatisticsOption.cumulativeSum}),
-  h.queryCategorySamples({type:C.sleepAnalysis,from:week,to:now,limit:2000,ascending:false}),
+  h.queryCategorySamples({type:C.sleepAnalysis,from:sleepFrom,to:now,limit:10000,ascending:false}),
   can(Q.heartRate)?h.queryStatisticsCollection({type:Q.heartRate,unit:'count/min',from:week,to:now,interval:{hour:1},options:h.StatisticsOption.discreteAverage}):skip,
   can(ACTIVITY_SUMMARY)?h.queryActivitySummaries({from:recent,to:now}):skip,
   can(DAYLIGHT)?h.queryStatisticsCollection({type:DAYLIGHT,unit:'min',from:recent,to:now,interval:{day:1},options:h.StatisticsOption.cumulativeSum}):skip,
@@ -88,6 +91,9 @@ export async function syncNativeHealth():Promise<number>{
   const nights=new Map<string,any[]>();
   for(const v of sleeps){const end=new Date(v.endDate).getTime();if(!Number.isFinite(end))continue;const k=dayKey(new Date(end+6*3600000));nights.set(k,[...(nights.get(k)||[]),v]);}
   for(const [key,list] of nights){
+   // The oldest night is partial when the query window starts after its 6 pm boundary.
+   const wakeDay=new Date(new Date(list[0].endDate).getTime()+6*3600000);wakeDay.setHours(0,0,0,0);
+   if(wakeDay.getTime()-6*3600000<sleepFrom.getTime())continue;
    const spansFor=(values:number[])=>{
     const spans=list.filter((v:any)=>values.includes(v.value)).map((v:any)=>[new Date(v.startDate).getTime(),new Date(v.endDate).getTime()]).filter(([a,b]:number[])=>Number.isFinite(a)&&Number.isFinite(b)&&b>a).sort((a:number[],b:number[])=>a[0]-b[0]);
     const merged:number[][]=[];for(const [a,b] of spans){const last=merged[merged.length-1];if(last&&a<=last[1])last[1]=Math.max(last[1],b);else merged.push([a,b]);}
