@@ -7,7 +7,7 @@ import SuperdotMascot from './SuperdotMascot';
 import {supabase} from './supabase';
 import {useSavedHealth,syncNativeHealth,healthKitAvailable,Reading,Metric,HEALTH_SYNCED_FLAG} from './HealthDataPanel';
 import {enableHealthBackgroundUpdates} from './HealthBackground';
-import {computeStressPoints,dailyStress,baselineStatus,levelFor,levelDistribution,median,sameDay,sleepQuality,noiseLabel,formatMinutes,energyScore,energyLabel,STRESS_LEVELS,LEVEL_ORDER,StressPoint,MIN_BASELINE_SAMPLES,MIN_BASELINE_DAYS} from './StressEngine';
+import {stressPointsWithSaved,dailyStress,baselineStatus,levelFor,levelDistribution,median,sameDay,sleepQuality,noiseLabel,formatMinutes,energyScore,energyLabel,STRESS_LEVELS,LEVEL_ORDER,StressPoint,MIN_BASELINE_SAMPLES,MIN_BASELINE_DAYS} from './StressEngine';
 
 export const SW={bg:'#F4FAF6',mint:'#E4F6EA',ink:'#1D2B33',muted:'#6E7D86',green:'#34B37E',line:'#E6EEEA',card:'#FFFFFF',hr:'#9A86F2',pink:'#EE6F86'};
 const SYNC_FLAG=HEALTH_SYNCED_FLAG;
@@ -15,7 +15,7 @@ let autoSynced=false;
 
 export function useStress(){
  const health=useSavedHealth();
- const points=useMemo(()=>computeStressPoints(health.readings),[health.readings]);
+ const points=useMemo(()=>stressPointsWithSaved(health.readings),[health.readings]);
  const today=useMemo(()=>dailyStress(points),[points]);
  const baseline=useMemo(()=>baselineStatus(health.readings),[health.readings]);
  return {...health,points,today,baseline};

@@ -55,7 +55,7 @@ export function scoreFromSignals(hrv:number,hrvBaseline:number,rhr?:number|null,
  return Math.round(clamp(50+40*hrvPart+10*rhrPart,0,100));
 }
 
-export type StressPoint={at:string;score:number;level:StressLevel;hrv:number;sourceKey?:string};
+export type StressPoint={at:string;score:number;level:StressLevel;hrv?:number;sourceKey?:string};
 
 // Score every HRV sample against the 21 days of HRV (and resting HR) that preceded it.
 export function computeStressPoints(readings:ScoredReading[]):StressPoint[]{
@@ -72,6 +72,20 @@ export function computeStressPoints(readings:ScoredReading[]):StressPoint[]{
   points.push({at:r.recorded_at,score,level:levelFor(score),hrv:r.value});
  }
  return points;
+}
+
+// Adds saved scores this iPhone has no HRV sample for (the Apple Watch computes and uploads its own),
+// so the iPhone shows the same latest reading as the watch.
+export function stressPointsWithSaved(readings:ScoredReading[]):StressPoint[]{
+ const points=computeStressPoints(readings);
+ const known=new Set(points.map(p=>new Date(p.at).getTime()));
+ for(const r of readings){
+  if(r.metric!=='stress_score'||r.source!=='computed'||!Number.isFinite(r.value)||!Number.isFinite(time(r))||known.has(time(r)))continue;
+  known.add(time(r));
+  const score=Math.round(clamp(r.value,0,100));
+  points.push({at:r.recorded_at,score,level:levelFor(score)});
+ }
+ return points.sort((a,b)=>new Date(a.at).getTime()-new Date(b.at).getTime());
 }
 
 export function baselineStatus(readings:ScoredReading[]){

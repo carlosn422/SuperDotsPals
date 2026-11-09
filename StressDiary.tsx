@@ -134,7 +134,7 @@ export default function StressDiary({entries,onChanged,onAsk}:{entries:DiaryEntr
         <View style={{flexDirection:'row',gap:8}}><TouchableOpacity onPress={()=>void saveEdit(e.id)} style={[st.small,{backgroundColor:SW.green}]}><Text style={{color:'#fff',fontWeight:'800'}}>Save</Text></TouchableOpacity><TouchableOpacity onPress={()=>setEditing(null)} style={st.small}><Text style={{fontWeight:'800',color:SW.ink}}>Cancel</Text></TouchableOpacity></View>
        </>:auto?<Text style={st.muted}>{e.body}</Text>:<Text style={st.body}>{e.body}</Text>}
        <View style={st.chips}>
-        {p?<View style={[st.tag,{backgroundColor:STRESS_LEVELS[p.level].tint}]}><Text style={[st.tagText,{color}]}>Stress {STRESS_LEVELS[p.level].label} · {p.score} · HRV {Math.round(p.hrv)}ms</Text></View>:null}
+        {p?<View style={[st.tag,{backgroundColor:STRESS_LEVELS[p.level].tint}]}><Text style={[st.tagText,{color}]}>Stress {STRESS_LEVELS[p.level].label} · {p.score} {p.hrv!=null?` · HRV ${Math.round(p.hrv)}ms`:''}</Text></View>:null}
         {(e.stress_factors||[]).map(f=><View key={f} style={st.tag}><Text style={st.tagText}>{f}</Text></View>)}
         {e.energy_level&&e.energy_level!=='neutral'?<View style={st.tag}><Text style={st.tagText}>{e.energy_level==='tired'?'Tired':'Energized'}</Text></View>:null}
        </View>
