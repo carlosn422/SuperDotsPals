@@ -54,14 +54,13 @@ export async function syncNativeHealth():Promise<number>{
  await h.requestAuthorization({toRead});
  const can=(t:string)=>toRead.includes(t);
  const now=new Date(),recent=new Date(now.getTime()-30*86400000),week=new Date(now.getTime()-7*86400000),day=new Date();day.setHours(0,0,0,0);
- const night=new Date(now.getTime()-24*3600000);
  const skip=Promise.resolve([]);
  const results=await Promise.allSettled([
   h.queryQuantitySamples({type:Q.heartRateVariabilitySDNN,unit:'ms',from:recent,to:now,limit:240,ascending:false}),
   h.queryQuantitySamples({type:Q.restingHeartRate,unit:'count/min',from:recent,to:now,limit:40,ascending:false}),
   h.queryStatistics({type:Q.stepCount,unit:'count',from:day,to:now,options:h.StatisticsOption.cumulativeSum}),
   h.queryStatisticsCollection({type:Q.stepCount,unit:'count',from:recent,to:now,interval:{day:1},options:h.StatisticsOption.cumulativeSum}),
-  h.queryCategorySamples({type:C.sleepAnalysis,from:night,to:now,limit:200,ascending:false}),
+  h.queryCategorySamples({type:C.sleepAnalysis,from:week,to:now,limit:2000,ascending:false}),
   can(Q.heartRate)?h.queryStatisticsCollection({type:Q.heartRate,unit:'count/min',from:week,to:now,interval:{hour:1},options:h.StatisticsOption.discreteAverage}):skip,
   can(ACTIVITY_SUMMARY)?h.queryActivitySummaries({from:recent,to:now}):skip,
   can(DAYLIGHT)?h.queryStatisticsCollection({type:DAYLIGHT,unit:'min',from:recent,to:now,interval:{day:1},options:h.StatisticsOption.cumulativeSum}):skip,
@@ -84,24 +83,28 @@ export async function syncNativeHealth():Promise<number>{
  const sleeps=samples(4);
  if(sleeps.length){
   const V=h.SleepAnalysisValue;
-  const spansFor=(values:number[])=>{
-   const spans=sleeps.filter((v:any)=>values.includes(v.value)).map((v:any)=>[new Date(v.startDate).getTime(),new Date(v.endDate).getTime()]).filter(([a,b]:number[])=>Number.isFinite(a)&&Number.isFinite(b)&&b>a).sort((a:number[],b:number[])=>a[0]-b[0]);
-   const merged:number[][]=[];for(const [a,b] of spans){const last=merged[merged.length-1];if(last&&a<=last[1])last[1]=Math.max(last[1],b);else merged.push([a,b]);}
-   return merged;
-  };
   const total=(m:number[][])=>Math.min(1440,m.reduce((t,[a,b])=>t+(b-a)/60000,0));
-  const asleep=spansFor([V.asleepUnspecified,V.asleepCore,V.asleepDeep,V.asleepREM].filter((x:any)=>x!==undefined));
-  const key=keyForToday();
-  if(total(asleep)>0){
-   append('sleep_minutes',total(asleep),'sleep-'+key,now);
-   append('sleep_deep_minutes',total(spansFor([V.asleepDeep])),'sleep-deep-'+key,now);
-   append('sleep_rem_minutes',total(spansFor([V.asleepREM])),'sleep-rem-'+key,now);
-   append('sleep_core_minutes',total(spansFor([V.asleepCore,V.asleepUnspecified])),'sleep-core-'+key,now);
-   append('sleep_awake_minutes',total(spansFor([V.awake])),'sleep-awake-'+key,now);
+  // One row per night, keyed by wake-up day: samples ending before 6 pm count toward that day, later ones toward the next.
+  const nights=new Map<string,any[]>();
+  for(const v of sleeps){const end=new Date(v.endDate).getTime();if(!Number.isFinite(end))continue;const k=dayKey(new Date(end+6*3600000));nights.set(k,[...(nights.get(k)||[]),v]);}
+  for(const [key,list] of nights){
+   const spansFor=(values:number[])=>{
+    const spans=list.filter((v:any)=>values.includes(v.value)).map((v:any)=>[new Date(v.startDate).getTime(),new Date(v.endDate).getTime()]).filter(([a,b]:number[])=>Number.isFinite(a)&&Number.isFinite(b)&&b>a).sort((a:number[],b:number[])=>a[0]-b[0]);
+    const merged:number[][]=[];for(const [a,b] of spans){const last=merged[merged.length-1];if(last&&a<=last[1])last[1]=Math.max(last[1],b);else merged.push([a,b]);}
+    return merged;
+   };
+   const asleep=spansFor([V.asleepUnspecified,V.asleepCore,V.asleepDeep,V.asleepREM].filter((x:any)=>x!==undefined));
+   if(total(asleep)<=0)continue;
+   const wake=new Date(asleep[asleep.length-1][1]);
+   const at=dayKey(wake)===key?wake:new Date(wake.getTime()+6*3600000);
+   append('sleep_minutes',total(asleep),'sleep-'+key,at);
+   append('sleep_deep_minutes',total(spansFor([V.asleepDeep])),'sleep-deep-'+key,at);
+   append('sleep_rem_minutes',total(spansFor([V.asleepREM])),'sleep-rem-'+key,at);
+   append('sleep_core_minutes',total(spansFor([V.asleepCore,V.asleepUnspecified])),'sleep-core-'+key,at);
+   append('sleep_awake_minutes',total(spansFor([V.awake])),'sleep-awake-'+key,at);
    if(can(Q.heartRate)){
-    try{const from=new Date(asleep[0][0]),to=new Date(asleep[asleep.length-1][1]);
-     const hr=await h.queryStatistics({type:Q.heartRate,unit:'count/min',from,to,options:h.StatisticsOption.discreteAverage});
-     if(hr?.average)append('sleep_heart_rate',hr.average,'sleep-hr-'+key,now);
+    try{const hr=await h.queryStatistics({type:Q.heartRate,unit:'count/min',from:new Date(asleep[0][0]),to:wake,options:h.StatisticsOption.discreteAverage});
+     if(hr?.average)append('sleep_heart_rate',hr.average,'sleep-hr-'+key,at);
     }catch{}
    }
   }
