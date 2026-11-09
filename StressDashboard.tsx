@@ -138,7 +138,9 @@ export function HealthActionsGrid({onMindfulness,onSteps}:{onMindfulness:()=>voi
  useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;const start=new Date();start.setHours(0,0,0,0);
   const {data,error}=await supabase.from('habit_entries').select('amount').eq('user_id',user.id).eq('habit','mindfulness').gte('recorded_at',start.toISOString());
   if(!error&&alive)setAppMindful((data||[]).reduce((t,r)=>t+Number(r.amount||0),0))})();return()=>{alive=false}},[readings]);
- const sleep=latestValue(readings,'sleep_minutes'),awake=latestValue(readings,'sleep_awake_minutes')||0,sleepHr=latestValue(readings,'sleep_heart_rate');
+ // Only last night's sleep; older readings would show a stale night as today's.
+ const lastNight=(metric:Metric)=>{const r=readings.find(x=>x.metric===metric);return r&&Date.now()-new Date(r.recorded_at).getTime()<36*3600000?r.value:null};
+ const sleep=lastNight('sleep_minutes'),awake=lastNight('sleep_awake_minutes')||0,sleepHr=lastNight('sleep_heart_rate');
  const move=todayValue(readings,'active_energy_kcal'),exercise=todayValue(readings,'exercise_minutes'),stand=todayValue(readings,'stand_hours');
  const daylight=todayValue(readings,'daylight_minutes'),mindful=(todayValue(readings,'mindfulness_minutes')||0)+appMindful,steps=todayValue(readings,'steps'),noise=latestValue(readings,'noise_db');
  const dash=loading?'…':'—';
