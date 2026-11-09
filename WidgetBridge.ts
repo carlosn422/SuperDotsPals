@@ -1,6 +1,6 @@
 import {Platform} from 'react-native';
 import {moodLabel} from './LittleSignalsData';
-import {computeStressPoints,dailyStress,energyScore,sameDay,STRESS_LEVELS,ScoredReading} from './StressEngine';
+import {stressPointsWithSaved,dailyStress,energyScore,sameDay,STRESS_LEVELS,ScoredReading} from './StressEngine';
 
 export const APP_GROUP='group.com.superdotspals.wellnest';
 
@@ -9,7 +9,7 @@ export function publishStressSnapshot(readings:ScoredReading[]){
  if(Platform.OS!=='ios')return;
  try{
   const {ExtensionStorage}=require('@bacons/apple-targets');
-  const today=dailyStress(computeStressPoints(readings));
+  const today=dailyStress(stressPointsWithSaved(readings));
   const now=Date.now();
   const sleep=readings.find(r=>r.metric==='sleep_minutes'&&now-new Date(r.recorded_at).getTime()<36*3600000)?.value??null;
   const kcal=readings.find(r=>r.metric==='active_energy_kcal'&&sameDay(new Date(r.recorded_at),new Date()))?.value??null;
