@@ -266,23 +266,38 @@ final class WatchThemeSync: ObservableObject {
 
     /// Uploads a watch-computed score as a `computed` stress_score row. Idempotent via source_record_key.
     func uploadStress(score:Int, at:Date, key:String) async {
+        await uploadReadings(raw: [], stress: (score, at, key))
+    }
+
+    /// Uploads watch HRV / resting heart rate samples as `healthkit` rows with the iPhone's keys ("hrv-<uuid>", "rest-<uuid>"),
+    /// so the iPhone's charts and stress score keep working when Apple Health stops syncing the watch's data to the phone.
+    /// Plus an optional `computed` stress_score row. One request; duplicates are ignored via source_record_key.
+    func uploadReadings(raw:[(metric:String, point:HealthPoint)], stress:(score:Int, at:Date, key:String)?) async {
         guard !moodOnly, connected, !userId.isEmpty, !refreshToken.isEmpty else { return }
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let row:[String:Any] = ["user_id":userId,"metric":"stress_score","value":score,"source":"computed",
-                                "source_record_key":key,"recorded_at":formatter.string(from:at)]
+        var rows:[[String:Any]] = raw.compactMap { item in
+            guard !item.point.uuid.isEmpty, item.point.value > 0, let prefix = ["hrv":"hrv","resting_heart_rate":"rest"][item.metric] else { return nil }
+            return ["user_id":userId,"metric":item.metric,"value":(item.point.value*100).rounded()/100,"source":"healthkit",
+                    "source_record_key":"\(prefix)-\(item.point.uuid)","recorded_at":formatter.string(from:item.point.date)]
+        }
+        if let stress {
+            rows.append(["user_id":userId,"metric":"stress_score","value":stress.score,"source":"computed",
+                         "source_record_key":stress.key,"recorded_at":formatter.string(from:stress.at)])
+        }
+        guard !rows.isEmpty else { return }
         let path = "/rest/v1/wellness_readings?on_conflict=user_id,source,metric,source_record_key"
         let headers = ["Prefer":"resolution=ignore-duplicates,return=minimal"]
         do {
-            let body = try JSONSerialization.data(withJSONObject:[row])
+            let body = try JSONSerialization.data(withJSONObject:rows)
             do { _ = try await request(path,method:"POST",body:body,extraHeaders:headers) }
             catch SyncError.server(401, _, _) {
                 try await renewIfNeeded()
                 _ = try await request(path,method:"POST",body:body,extraHeaders:headers)
             }
-            NSLog("[WatchSync] Uploaded stress_score %ld (%@)", score, key)
+            NSLog("[WatchSync] Uploaded %ld readings (stress %@)", rows.count, stress.map { "\($0.score)" } ?? "none")
         } catch {
-            NSLog("[WatchSync] Stress upload failed: %@", error.localizedDescription)
+            NSLog("[WatchSync] Reading upload failed: %@", error.localizedDescription)
         }
     }
 
