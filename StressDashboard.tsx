@@ -228,15 +228,16 @@ function nightValue(readings:Reading[],metric:Metric,day:Date){return readings.f
 
 export function SleepDetail({visible,onClose,readings}:{visible:boolean;onClose:()=>void;readings:Reading[]}){
  const {isPlus,showPaywall}=usePlus();
- const count=isPlus?7:FREE_HEALTH_DAYS;
- const nights=Array.from({length:count},(_,i)=>{const d=new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()-(count-1)+i);return {day:d,total:nightValue(readings,'sleep_minutes',d)}});
- const last=[...nights].reverse().find(n=>n.total!==null);
+ const count=7,shown=isPlus?count:FREE_HEALTH_DAYS;
+ const nights=Array.from({length:count},(_,i)=>{const d=new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()-(count-1)+i);return {day:d,total:nightValue(readings,'sleep_minutes',d),locked:i<count-shown}});
+ const open=nights.filter(n=>!n.locked);
+ const last=[...open].reverse().find(n=>n.total!==null);
  const day=last?.day||new Date();
  const stages=STAGES.map(x=>({...x,value:nightValue(readings,x.metric,day)??0}));
  const stageTotal=stages.reduce((t,x)=>t+x.value,0);
  const total=last?.total??null,awake=stages[0].value,hr=nightValue(readings,'sleep_heart_rate',day);
- const avg=median(nights.map(n=>n.total).filter((v):v is number=>v!==null));
- const maxNight=Math.max(480,...nights.map(n=>n.total||0));
+ const avg=median(open.map(n=>n.total).filter((v):v is number=>v!==null));
+ const maxNight=Math.max(480,...open.map(n=>n.total||0));
  return <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
   <ScrollView style={{flex:1,backgroundColor:SL.bg}} contentContainerStyle={{padding:20,gap:16,paddingBottom:50}}>
    <View style={st.cardTop}><Text style={[st.cardTitle,{color:'#fff',fontSize:26}]}>Sleep</Text><TouchableOpacity accessibilityLabel="Close sleep details" onPress={onClose} style={{padding:6}}><Ionicons name="close" size={26} color="#fff"/></TouchableOpacity></View>
@@ -246,7 +247,7 @@ export function SleepDetail({visible,onClose,readings}:{visible:boolean;onClose:
     <Text style={{color:SL.muted,fontSize:13}}>{total!==null?`${sleepQuality(total,awake)} · ${day.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'})}`:'No sleep synced yet. Wear your Apple Watch to bed and sync Apple Health.'}</Text>
     <View style={{flexDirection:'row',gap:26,marginTop:6}}>
      <View style={{alignItems:'center'}}><Text style={SLt.k}>Avg HR</Text><Text style={SLt.v}>{hr!==null?Math.round(hr)+' bpm':'—'}</Text></View>
-     <View style={{alignItems:'center'}}><Text style={SLt.k}>{count}-day avg</Text><Text style={SLt.v}>{avg!==null?hm(avg):'—'}</Text></View>
+     <View style={{alignItems:'center'}}><Text style={SLt.k}>{shown}-day avg</Text><Text style={SLt.v}>{avg!==null?hm(avg):'—'}</Text></View>
      <View style={{alignItems:'center'}}><Text style={SLt.k}>Awake</Text><Text style={SLt.v}>{stageTotal?Math.round(awake)+'m':'—'}</Text></View>
     </View>
    </View>
@@ -263,10 +264,10 @@ export function SleepDetail({visible,onClose,readings}:{visible:boolean;onClose:
    <View style={[st.card,{backgroundColor:SL.card}]}>
     <Text style={[st.cardTitle,{color:'#fff'}]}>Last {count} nights</Text>
     <View style={{flexDirection:'row',alignItems:'flex-end',height:130,gap:8}}>{nights.map((n,i)=><View key={i} style={{flex:1,alignItems:'center',gap:6,justifyContent:'flex-end',height:130}}>
-     <View style={{width:'70%',height:n.total?Math.max(6,100*n.total/maxNight):4,borderRadius:8,backgroundColor:n.total?(n.total>=420?'#8F86FF':'#5C55B8'):'#3A3266'}}/>
+     {n.locked?<TouchableOpacity accessibilityRole="button" accessibilityLabel="Locked night, MoodPals Plus" onPress={()=>{onClose();showPaywall('health')}} style={{width:'70%',height:40,borderRadius:8,backgroundColor:'#3A3266',alignItems:'center',justifyContent:'center'}}><Ionicons name="lock-closed" size={11} color={SL.muted}/></TouchableOpacity>:<View style={{width:'70%',height:n.total?Math.max(6,100*n.total/maxNight):4,borderRadius:8,backgroundColor:n.total?(n.total>=420?'#8F86FF':'#5C55B8'):'#3A3266'}}/>}
      <Text style={{fontSize:10,color:SL.muted}}>{['S','M','T','W','T','F','S'][n.day.getDay()]}</Text></View>)}</View>
     <Text style={{color:SL.muted,fontSize:11}}>Adults generally do best with 7–9 hours. Sleep data comes from Apple Health.</Text>
-    {isPlus?null:<TouchableOpacity accessibilityRole="button" onPress={()=>{onClose();showPaywall('health')}} style={{flexDirection:'row',alignItems:'center',gap:6}}><Ionicons name="lock-closed" size={12} color="#C9C3FF"/><Text style={{color:'#C9C3FF',fontWeight:'800',fontSize:12}}>See more nights with MoodPals Plus</Text></TouchableOpacity>}
+    {isPlus?null:<TouchableOpacity accessibilityRole="button" onPress={()=>{onClose();showPaywall('health')}} style={{flexDirection:'row',alignItems:'center',gap:6}}><Ionicons name="lock-closed" size={12} color="#C9C3FF"/><Text style={{color:'#C9C3FF',fontWeight:'800',fontSize:12}}>See all 7 nights with MoodPals Plus</Text></TouchableOpacity>}
    </View>
   </ScrollView>
  </Modal>;

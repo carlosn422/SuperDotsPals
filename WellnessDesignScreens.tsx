@@ -81,7 +81,7 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
   </TouchableOpacity>
   <EnergyCard/>
   <HrvTrendCard/>
-  <LockedPreviewCard title="Mood & Stress Trends" feature="trends" body="See how your mood and stress change over 30 days and 6 months."/>
+  <LockedPreviewCard title="Mood & Stress Trends" feature="trends" body="See how your mood and stress change over 30 days."/>
   <HeartRateCard/>
   <View style={{gap:10}}>
    <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={{fontWeight:'900',fontSize:19,color:INK}}>Today</Text><Text style={{color:MUTED,fontSize:12}}>{date}</Text></View>
