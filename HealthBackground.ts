@@ -1,6 +1,6 @@
 import {AppState} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {nativeHealth,syncNativeHealth,HEALTH_SYNCED_FLAG} from './HealthDataPanel';
+import {nativeHealth,syncNativeHealth,refreshSavedHealth,HEALTH_SYNCED_FLAG} from './HealthDataPanel';
 import {supabase} from './supabase';
 
 // HealthKit wakes the app (even after it was closed) when new HRV, heart-rate or sleep
@@ -36,6 +36,33 @@ export async function enableHealthBackgroundUpdates(){
   return true;
  }catch(e){console.warn('HealthKit background delivery unavailable',e);return false}
 }
+
+// The Apple Watch uploads its own stress, HRV and sleep. Refresh as soon as a row lands so the iPhone MoodPal matches the watch.
+let channel:ReturnType<typeof supabase.channel>|null=null,channelUser:string|null=null,refreshTimer:ReturnType<typeof setTimeout>|undefined;
+function scheduleRefresh(){
+ if(refreshTimer)clearTimeout(refreshTimer);
+ refreshTimer=setTimeout(()=>{refreshTimer=undefined;void refreshSavedHealth().catch(()=>{})},1500);
+}
+async function listenForReadings(userId:string|null,reconnect=false){
+ if(channel&&(reconnect||channelUser!==userId)){const old=channel;channel=null;channelUser=null;await supabase.removeChannel(old)}
+ if(!userId||channel)return;
+ channelUser=userId;
+ channel=supabase.channel('readings-sync:'+userId)
+  .on('postgres_changes',{event:'INSERT',schema:'public',table:'wellness_readings',filter:'user_id=eq.'+userId},scheduleRefresh)
+  .subscribe();
+}
+supabase.auth.onAuthStateChange((_event,session)=>{const id=session?.user.id??null;setTimeout(()=>void listenForReadings(id),0)});
+
+// Coming back to MoodPals re-reads Apple Health (at most every 15 minutes) and always reloads saved readings.
+// iOS drops the realtime socket while the app is suspended, so reconnect too.
+async function onForeground(){
+ const before=lastRun;
+ await backgroundSync();
+ if(lastRun===before)await refreshSavedHealth().catch(()=>{});
+ const {data}=await supabase.auth.getSession();
+ await listenForReadings(data.session?.user.id??null,true);
+}
+AppState.addEventListener('change',s=>{if(s==='active')void onForeground()});
 
 const h=nativeHealth();
 if(h?.addUpdateListener){
