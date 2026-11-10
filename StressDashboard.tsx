@@ -7,6 +7,7 @@ import SuperdotMascot from './SuperdotMascot';
 import {supabase} from './supabase';
 import {useSavedHealth,syncNativeHealth,healthKitAvailable,Reading,Metric,HEALTH_SYNCED_FLAG} from './HealthDataPanel';
 import {enableHealthBackgroundUpdates} from './HealthBackground';
+import {usePlus,FREE_HEALTH_DAYS} from './PlusStore';
 import {stressPointsWithSaved,dailyStress,baselineStatus,levelFor,levelDistribution,median,sameDay,sleepQuality,noiseLabel,formatMinutes,energyScore,energyLabel,STRESS_LEVELS,LEVEL_ORDER,StressPoint,MIN_BASELINE_SAMPLES,MIN_BASELINE_DAYS} from './StressEngine';
 
 export const SW={bg:'#F4FAF6',mint:'#E4F6EA',ink:'#1D2B33',muted:'#6E7D86',green:'#34B37E',line:'#E6EEEA',card:'#FFFFFF',hr:'#9A86F2',pink:'#EE6F86'};
@@ -226,7 +227,9 @@ const hm=(m:number)=>{const t=formatMinutes(m);return `${t.h}h ${t.m}m`};
 function nightValue(readings:Reading[],metric:Metric,day:Date){return readings.find(r=>r.metric===metric&&sameDay(new Date(r.recorded_at),day))?.value??null}
 
 export function SleepDetail({visible,onClose,readings}:{visible:boolean;onClose:()=>void;readings:Reading[]}){
- const nights=Array.from({length:7},(_,i)=>{const d=new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()-6+i);return {day:d,total:nightValue(readings,'sleep_minutes',d)}});
+ const {isPlus,showPaywall}=usePlus();
+ const count=isPlus?7:FREE_HEALTH_DAYS;
+ const nights=Array.from({length:count},(_,i)=>{const d=new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()-(count-1)+i);return {day:d,total:nightValue(readings,'sleep_minutes',d)}});
  const last=[...nights].reverse().find(n=>n.total!==null);
  const day=last?.day||new Date();
  const stages=STAGES.map(x=>({...x,value:nightValue(readings,x.metric,day)??0}));
@@ -243,7 +246,7 @@ export function SleepDetail({visible,onClose,readings}:{visible:boolean;onClose:
     <Text style={{color:SL.muted,fontSize:13}}>{total!==null?`${sleepQuality(total,awake)} · ${day.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'})}`:'No sleep synced yet. Wear your Apple Watch to bed and sync Apple Health.'}</Text>
     <View style={{flexDirection:'row',gap:26,marginTop:6}}>
      <View style={{alignItems:'center'}}><Text style={SLt.k}>Avg HR</Text><Text style={SLt.v}>{hr!==null?Math.round(hr)+' bpm':'—'}</Text></View>
-     <View style={{alignItems:'center'}}><Text style={SLt.k}>7-day avg</Text><Text style={SLt.v}>{avg!==null?hm(avg):'—'}</Text></View>
+     <View style={{alignItems:'center'}}><Text style={SLt.k}>{count}-day avg</Text><Text style={SLt.v}>{avg!==null?hm(avg):'—'}</Text></View>
      <View style={{alignItems:'center'}}><Text style={SLt.k}>Awake</Text><Text style={SLt.v}>{stageTotal?Math.round(awake)+'m':'—'}</Text></View>
     </View>
    </View>
@@ -258,11 +261,12 @@ export function SleepDetail({visible,onClose,readings}:{visible:boolean;onClose:
     </>:<Text style={{color:SL.muted,fontSize:12}}>Stages need an Apple Watch on watchOS 9 or later.</Text>}
    </View>
    <View style={[st.card,{backgroundColor:SL.card}]}>
-    <Text style={[st.cardTitle,{color:'#fff'}]}>Last 7 nights</Text>
+    <Text style={[st.cardTitle,{color:'#fff'}]}>Last {count} nights</Text>
     <View style={{flexDirection:'row',alignItems:'flex-end',height:130,gap:8}}>{nights.map((n,i)=><View key={i} style={{flex:1,alignItems:'center',gap:6,justifyContent:'flex-end',height:130}}>
      <View style={{width:'70%',height:n.total?Math.max(6,100*n.total/maxNight):4,borderRadius:8,backgroundColor:n.total?(n.total>=420?'#8F86FF':'#5C55B8'):'#3A3266'}}/>
      <Text style={{fontSize:10,color:SL.muted}}>{['S','M','T','W','T','F','S'][n.day.getDay()]}</Text></View>)}</View>
     <Text style={{color:SL.muted,fontSize:11}}>Adults generally do best with 7–9 hours. Sleep data comes from Apple Health.</Text>
+    {isPlus?null:<TouchableOpacity accessibilityRole="button" onPress={()=>{onClose();showPaywall('health')}} style={{flexDirection:'row',alignItems:'center',gap:6}}><Ionicons name="lock-closed" size={12} color="#C9C3FF"/><Text style={{color:'#C9C3FF',fontWeight:'800',fontSize:12}}>See more nights with MoodPals Plus</Text></TouchableOpacity>}
    </View>
   </ScrollView>
  </Modal>;

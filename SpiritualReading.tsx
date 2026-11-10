@@ -10,7 +10,8 @@ const purple='#6C56D3',ink='#251C45',muted='#817899';
 export default function SpiritualReading({initialCheckin}:{initialCheckin?:{mood:string;answers:Record<string,string>}}){
  const [step,setStep]=useState<'start'|'mood'|'questions'|'result'|'favorites'>(initialCheckin?'result':'start');
  const [mood,setMood]=useState(initialCheckin?.mood||''),[useHistory,setUseHistory]=useState(false);
- const [questions,setQuestions]=useState<string[]>([]),[index,setIndex]=useState(0),[answers,setAnswers]=useState<Record<string,string>>({});
+ const [items,setItems]=useState<{question:string;choices:string[]}[]>([]),[index,setIndex]=useState(0),[answers,setAnswers]=useState<Record<string,string>>({});
+ const questions=items.map(x=>x.question),current=items[index];
  const [passage,setPassage]=useState<Passage|null>(null),[reflection,setReflection]=useState(''),[busy,setBusy]=useState(false);
  const [favorites,setFavorites]=useState<{passage_id:number;scripture_passages:Passage}[]>([]);
  const [isFavorite,setIsFavorite]=useState(false);
@@ -20,7 +21,7 @@ export default function SpiritualReading({initialCheckin}:{initialCheckin?:{mood
   if(error||data?.error)throw Error(data?.error||'Could not load reading.');
   return data;
  }
- async function generateQuestions(){setBusy(true);try{const data=await invoke('questions');setQuestions((data.items||[]).map((x:{question:string})=>x.question));setAnswers({});setIndex(0);setStep('questions')}catch(e:any){Alert.alert('Unable to prepare questions',e.message)}finally{setBusy(false)}}
+ async function generateQuestions(){setBusy(true);try{const data=await invoke('questions');setItems((data.items||[]).filter((x:any)=>typeof x?.question==='string').map((x:any)=>({question:x.question,choices:Array.isArray(x.choices)?x.choices.filter((c:unknown)=>typeof c==='string'):[]})));setAnswers({});setIndex(0);setStep('questions')}catch(e:any){Alert.alert('Unable to prepare questions',e.message)}finally{setBusy(false)}}
  async function recommend(skip=false){setBusy(true);try{const data=await invoke('recommend',{questions,answers:skip?{}:answers});setPassage(data.passage);setReflection(data.reflection);setIsFavorite(false);setStep('result')}catch(e:any){Alert.alert('Unable to find Scripture',e.message)}finally{setBusy(false)}}
  useEffect(()=>{if(initialCheckin)void recommendFromCheckin(initialCheckin)},[]);
  async function recommendFromCheckin(checkin:{mood:string;answers:Record<string,string>}){setBusy(true);try{const {data,error}=await supabase.functions.invoke('spiritual-reading',{body:{action:'recommend',mood:checkin.mood,answers:checkin.answers,useHistory:false}});if(error||data?.error||!data?.passage)throw Error(data?.error||'Unable to load passage');setPassage(data.passage);setReflection(data.reflection||'');setIsFavorite(false);setStep('result')}catch(e:any){Alert.alert('Unable to find Scripture',e?.message||'Try again.');setStep('start')}finally{setBusy(false)}}
@@ -53,7 +54,7 @@ export default function SpiritualReading({initialCheckin}:{initialCheckin?:{mood
  {step==='questions'?<View style={{backgroundColor:'white',padding:17,borderRadius:22,gap:13}}>
   <View style={{flexDirection:'row',alignItems:'center',gap:12}}><SuperdotMascot id={mood} size={58}/><View style={{flex:1}}><Text style={{color:ink,fontWeight:'800'}}>{moodLabel(mood)}</Text><Text style={{color:muted,fontSize:11}}>Question {index+1} of {questions.length}</Text></View></View>
   <Text style={{fontSize:19,fontWeight:'900',color:ink}}>{questions[index]}</Text>
-  {['Yes','A little','No','Not sure','Prefer not to say'].map(x=>radio(x,answers[questions[index]]===x,()=>setAnswers(a=>({...a,[questions[index]]:x}))))}
+  {[...(current?.choices||[]),'Something else','Prefer not to say'].map(x=>radio(x,answers[questions[index]]===x,()=>setAnswers(a=>({...a,[questions[index]]:x}))))}
   <View style={{flexDirection:'row',gap:8}}><View style={{flex:1}}>{btn('Back',()=>index?setIndex(i=>i-1):setStep('mood'),false)}</View><View style={{flex:2}}>{btn(index===questions.length-1?'Find my verse →':'Next →',()=>index===questions.length-1?void recommend():setIndex(i=>i+1))}</View></View>
   <TouchableOpacity onPress={()=>void recommend(true)} style={{alignItems:'center',padding:8}}><Text style={{color:purple}}>Skip questions & find a verse</Text></TouchableOpacity>
  </View>:null}

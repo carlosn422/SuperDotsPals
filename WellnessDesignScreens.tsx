@@ -99,6 +99,7 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
 </View>;
 }
 export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpiritual,onChat,onMood,onJournal,onBreathing,caffeine}:{companion:string;accent:string;water:number;caffeine:number;onWater:()=>void;onCaffeine:()=>void;onSpiritual:()=>void;onChat:()=>void;onMood:()=>void;onJournal:()=>void;onBreathing:()=>void}){
+ const {isPlus,showPaywall}=usePlus();
  const [day,setDay]=React.useState(0);
  const [pastAmounts,setPastAmounts]=React.useState({water:0,caffeine:0});
  const [activitySummary,setActivitySummary]=React.useState<{count:number;minutes:number}>({count:0,minutes:0});
@@ -141,7 +142,12 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpi
     <Text style={{fontSize:13,fontWeight:'800',color:accent,marginTop:3}}>Check in  →</Text></View>
    <SuperdotMascot id={companion} size={91}/>
   </TouchableOpacity>
-  {day===0?<View style={{gap:9}}><SectionHeading title="Body & recovery" detail="Apple Health"/><HealthActionsGrid onMindfulness={onBreathing}/></View>:null}
+  {day===0?<View style={{gap:9}}><SectionHeading title="Body & recovery" detail={isPlus?'Apple Health':'MoodPals Plus'}/>
+   {isPlus?<HealthActionsGrid onMindfulness={onBreathing}/>:<TouchableOpacity accessibilityRole="button" accessibilityLabel="Body and recovery, MoodPals Plus" activeOpacity={0.8} onPress={()=>showPaywall('health')}>
+    <View pointerEvents="none" style={{opacity:0.4}}><HealthActionsGrid onMindfulness={onBreathing}/></View>
+    <View style={{position:'absolute',top:10,right:10,flexDirection:'row',alignItems:'center',gap:5,backgroundColor:'#FFFFFF',paddingHorizontal:10,paddingVertical:6,borderRadius:12,borderWidth:1,borderColor:'#ECEAF2'}}><Ionicons name="lock-closed" size={12} color={accent}/><Text style={{fontSize:12,fontWeight:'800',color:accent}}>Plus</Text></View>
+   </TouchableOpacity>}
+  </View>:null}
   <View style={{gap:9}}><SectionHeading title="Daily essentials"/>
    <View style={{flexDirection:'row',gap:10}}>
     <TouchableOpacity onPress={day===0?onWater:undefined} disabled={day!==0} style={{flex:1,backgroundColor:'#FFFFFF',borderRadius:20,padding:16,borderWidth:1,borderColor:'#ECEAF2',gap:7}}>
