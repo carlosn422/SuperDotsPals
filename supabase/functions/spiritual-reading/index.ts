@@ -5,7 +5,8 @@ const headers={"Content-Type":"application/json","Cache-Control":"no-store"};
 const out=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers});
 const moods=["Joyful","Calm","Sad","Angry","Anxious","Tired"];
 const fallback:Record<string,string>={Joyful:"Psalm 118:24",Calm:"Psalm 46:10",Sad:"Psalm 34:18",Angry:"James 1:19",Anxious:"Philippians 4:6–7",Tired:"Matthew 11:28–30"};
-const simpleQuestions:Record<string,string[]>={Joyful:["What has brought you joy today?","Would you like to express gratitude for something?"],Calm:["What has helped you feel grounded?","Would you like to make room for quiet reflection?"],Sad:["What has been weighing on your heart?","Would comfort or connection help today?"],Angry:["Has a conflict or an unmet expectation affected you?","Would you like to reflect on a patient response?"],Anxious:["Is uncertainty or a responsibility weighing on you?","Would reassurance or a moment of rest help?"],Tired:["Has rest been difficult lately?","Would taking a gentler pace help today?"]};
+// Built-in questions for Free users; each one matches the four answers in moodChoices below.
+const simpleQuestions:Record<string,string[]>={Joyful:["What has brought you joy today?","Who or what are you most grateful for?","How would you like to hold on to this joy?"],Calm:["What has helped you feel grounded?","What is helping you stay at peace?","How would you like to keep this peace?"],Sad:["What has been weighing on your heart?","What would bring you comfort today?","What would feel most supportive right now?"],Angry:["What stirred up these feelings?","What is making it harder to let go?","What would help you respond the way you want to?"],Anxious:["What is weighing on you most?","What is adding to the worry?","What would feel most supportive right now?"],Tired:["What is draining your energy?","What kind of tired are you feeling?","What would help you recharge?"]};
 function safeJson(input:string){try{return JSON.parse(input.replace(/^\x60\x60\x60(?:json)?/,"").replace(/\x60\x60\x60$/,"").trim())}catch{return {}}}
 Deno.serve(async(req:Request)=>{
  if(req.method!=="POST")return out({error:"POST required"},405);
@@ -69,7 +70,7 @@ Deno.serve(async(req:Request)=>{
     Anxious:[["An upcoming decision","Work or family responsibilities","Uncertainty about the future","Something hard to explain"],["Having too much to do","Fear of letting someone down","A difficult relationship","Not enough rest"],["Reassurance and perspective","One manageable next step","Support from someone","Quiet time to reflect"]],
     Tired:[["Not enough sleep","An emotionally demanding day","Too many responsibilities","Feeling unmotivated"],["Physical exhaustion","Feeling mentally drained","Not enough downtime","Something weighing on me"],["Permission to rest","Help with a responsibility","Some quiet time","Encouragement to slow down"]]
    };
-   const fallbackItems=[...simpleQuestions[mood], "What would feel most supportive for you right now?"].map((question,i)=>({question,choices:moodChoices[mood][i]}));
+   const fallbackItems=simpleQuestions[mood].map((question,i)=>({question,choices:moodChoices[mood][i]}));
    return out({items:items.length===3?items:fallbackItems,usedAI:items.length===3&&usedAI});
   }
   const selected=catalog.find(p=>p.reference===aiResult?.reference)||catalog.find(p=>p.reference===fallback[mood])||catalog[0];

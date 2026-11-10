@@ -6,6 +6,7 @@ import {supabase} from './supabase';
 import {computeStressPoints,dailyStress} from './StressEngine';
 import {maybeSendStressAlert} from './StressAlerts';
 import {publishStressSnapshot} from './WidgetBridge';
+import {FREE_HEALTH_DAYS} from './PlusStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 export const HEALTH_SYNCED_FLAG='moodpals-health-synced';
 
@@ -46,6 +47,13 @@ async function fetchReadings(force=false):Promise<Reading[]>{
 
 // Re-reads saved readings (including what the Apple Watch uploaded) and updates every card and the widget.
 export async function refreshSavedHealth(){const fresh=await fetchReadings(true);publishStressSnapshot(fresh);return fresh}
+const FREE_LIMITED=new Set<Metric>(['sleep_minutes','sleep_deep_minutes','sleep_rem_minutes','sleep_core_minutes','sleep_awake_minutes','sleep_heart_rate','steps','active_energy_kcal','exercise_minutes','stand_hours','daylight_minutes','mindfulness_minutes','noise_db','heart_rate']);
+// Server-side Plus status (RevenueCat webhook). If it can't be read, upload everything rather than drop a subscriber's data.
+async function hasPlus(userId:string){
+ const {data,error}=await supabase.from('plus_entitlements').select('is_active,expires_at').eq('user_id',userId).maybeSingle();
+ if(error)return true;
+ return !!data?.is_active&&(!data.expires_at||new Date(data.expires_at).getTime()>Date.now());
+}
 export async function syncNativeHealth():Promise<number>{
  const h=nativeHealth();
  if(!h||!h.isAvailable())throw Error('Apple Health is not available. Install a native iOS development build on an iPhone.');
@@ -125,6 +133,11 @@ export async function syncNativeHealth():Promise<number>{
  samples(8).forEach((v:any)=>{const a=new Date(v.startDate),b=new Date(v.endDate);if(Number.isNaN(a.getTime())||!(b>a))return;const k=dayKey(a);const cur=mindful.get(k)||{minutes:0,at:new Date(a.getFullYear(),a.getMonth(),a.getDate(),12)};cur.minutes+=(b.getTime()-a.getTime())/60000;mindful.set(k,cur)});
  mindful.forEach((v,k)=>append('mindfulness_minutes',v.minutes,'mindful-'+k,v.at));
  daily(9,'noise_db','noise','average');
+ // Free plans keep only the last FREE_HEALTH_DAYS days of sleep and fitness on our side; HRV and resting HR stay for the stress baseline.
+ if(!(await hasPlus(user.id))){
+  const cutoff=new Date();cutoff.setHours(0,0,0,0);cutoff.setDate(cutoff.getDate()-(FREE_HEALTH_DAYS-1));
+  for(let i=uploaded.length-1;i>=0;i--)if(FREE_LIMITED.has(uploaded[i].metric)&&new Date(uploaded[i].recorded_at)<cutoff)uploaded.splice(i,1);
+ }
  // Derived stress scores, one per HRV sample, from the user's own baseline.
  const previous=await fetchReadings(true).catch(()=>[] as Reading[]);
  const combined=[...uploaded.map(u=>({metric:u.metric,value:u.value,recorded_at:u.recorded_at,source:u.source})),...previous];
