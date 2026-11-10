@@ -44,6 +44,8 @@ async function fetchReadings(force=false):Promise<Reading[]>{
  try{return await inflight}finally{inflight=null}
 }
 
+// Re-reads saved readings (including what the Apple Watch uploaded) and updates every card and the widget.
+export async function refreshSavedHealth(){const fresh=await fetchReadings(true);publishStressSnapshot(fresh);return fresh}
 export async function syncNativeHealth():Promise<number>{
  const h=nativeHealth();
  if(!h||!h.isAvailable())throw Error('Apple Health is not available. Install a native iOS development build on an iPhone.');
