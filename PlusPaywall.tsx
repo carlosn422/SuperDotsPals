@@ -10,7 +10,7 @@ import {appleAvailable,linkApple} from './AppleAuth';
 const TERMS_URL='https://moodpals.com/terms',PRIVACY_URL='https://moodpals.com/privacy';
 const CALM=require('./assets/mascot-animations/disgust/preview400/frame_000.png');
 const BENEFITS:{icon:React.ComponentProps<typeof Ionicons>['name'];text:string}[]=[
- {icon:'stats-chart',text:'Advanced wellness trends and full history'},
+ {icon:'stats-chart',text:'Advanced wellness trends and 30-day history'},
  {icon:'color-palette',text:'Extra customization for app and watch'},
  {icon:'people',text:'Expanded private circles'},
  {icon:'watch',text:'Up to 4 family watches'},
@@ -77,7 +77,7 @@ export function PlusPaywallSheet({nested=false}:{nested?:boolean}){
 }
 
 const TRY:{feature:PlusFeature;label:string;icon:React.ComponentProps<typeof Ionicons>['name']}[]=[
- {feature:'trends',label:'Open 6-month trends',icon:'stats-chart-outline'},
+ {feature:'trends',label:'Open 30-day trends',icon:'stats-chart-outline'},
  {feature:'customization',label:'Pick an extra watch colour',icon:'color-palette-outline'},
  {feature:'circles',label:'Create a second group',icon:'people-outline'},
  {feature:'reflections',label:'Get an AI reflection',icon:'sparkles-outline'},
