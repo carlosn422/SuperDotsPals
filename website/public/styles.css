@@ -159,6 +159,19 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 .plan li::before{content:"✓";position:absolute;left:0;top:1px;width:20px;height:20px;border-radius:50%;background:var(--mint);color:var(--green);font-size:12px;display:grid;place-items:center}
 .plan .badge{position:absolute;top:-14px;right:22px;background:linear-gradient(180deg,var(--orange2),var(--orange));color:#fff;font:700 13px Fredoka,sans-serif;padding:6px 12px;border-radius:12px}
 .fine.center{text-align:center;max-width:720px;margin:24px auto 0}
+.compare{max-width:860px;margin:34px auto 0;background:#fff;border-radius:var(--radius);padding:26px 28px;box-shadow:0 14px 34px rgba(43,30,69,.08)}
+.compare h3{text-align:center;font-size:24px}
+.compare table{width:100%;border-collapse:collapse}
+.compare th,.compare td{padding:13px 8px;border-bottom:1px solid #EEE6F7;text-align:center;font-weight:700}
+.compare tbody tr:last-child th,.compare tbody tr:last-child td{border-bottom:0}
+.compare tbody th{text-align:left;color:var(--ink)}
+.compare thead th{border-bottom:0;width:26%}.compare thead th:first-child{width:auto}
+.compare .pill{display:inline-block;font:700 16px Fredoka,sans-serif;padding:8px 20px;border-radius:16px;background:#EEE9F6;color:var(--ink)}
+.compare .pill.plus{background:var(--teal);color:#fff}
+.compare .yes{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--mint);color:var(--green);font-size:13px}
+.compare .no{color:#C9C0DA}.compare .val{color:var(--muted);font-size:14px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media(max-width:560px){.compare{padding:18px 12px}.compare th,.compare td{padding:11px 4px;font-size:14px}.compare .pill{padding:6px 12px;font-size:14px}.compare .val{font-size:12px}}
 .text-link{color:var(--teal);font-weight:800}
 .foot-links{display:flex;flex-wrap:wrap;gap:16px}.foot-links a{text-decoration:none;font-weight:700}.foot-links a:hover{color:var(--ink)}
 /* legal & support pages */
