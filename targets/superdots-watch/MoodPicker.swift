@@ -1,7 +1,7 @@
 import SwiftUI
 import WatchKit
 
-/// Mood picker: a large preview of the highlighted MoodPal over a row of the other moods as small circular MoodPals.
+/// Mood picker: a row of all MoodPals with the highlighted one big in the middle.
 /// Tap, swipe or turn the Digital Crown to browse; only Set Mood saves (browsing never changes the mood).
 struct MoodPicker: View {
     struct Option: Equatable {
@@ -33,6 +33,7 @@ struct MoodPicker: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var index: Int
     @State private var crown: Double
+    @GestureState private var dragX: CGFloat = 0
     @State private var saving = false
     @State private var saved = false
     @State private var failed = false
@@ -79,6 +80,64 @@ struct MoodPicker: View {
         }
     }
 
+    /// All moods in one row: the highlighted pal is big in the middle and the others shrink toward the edges.
+    /// Dragging slides the row so pals grow as they near the middle; releasing snaps to the nearest one.
+    private func carousel(width: CGFloat, big: CGFloat) -> some View {
+        let near = big * 0.55, far = big * 0.38
+        // Neighbours tuck behind the pal in front of them, like an album selector.
+        let step1 = big * 0.6, step2 = big * 0.32
+        let position = Double(index) - Double(dragX / step1)
+        func size(_ d: Double) -> CGFloat {
+            d <= 1 ? big - (big - near) * CGFloat(d) : near - (near - far) * CGFloat(min(d, 2) - 1)
+        }
+        func offset(_ d: Double) -> CGFloat {
+            let a = abs(d)
+            let x = step1 * CGFloat(min(a, 1)) + step2 * CGFloat(max(0, a - 1))
+            return d < 0 ? -x : x
+        }
+        return ZStack {
+            ForEach(Self.options.indices, id: \.self) { i in
+                let d = Double(i) - position
+                let distance = min(1, abs(d))
+                let side = size(abs(d))
+                Button { select(i) } label: {
+                    AnimatedMoodMascot(mood: Self.options[i].mood, size: side * 0.86, isActive: i == index)
+                        .frame(width: side, height: side)
+                        .background(Circle().fill(Color.white.opacity(0.12 * distance)))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .opacity(abs(d) > 2.6 ? 0 : 1 - 0.25 * min(abs(d), 2))
+                .offset(x: offset(d))
+                .zIndex(-abs(d))
+                .accessibilityHidden(true)
+            }
+        }
+        .frame(width: width, height: big)
+        .clipped()
+        .contentShape(Rectangle())
+        .highPriorityGesture(
+            DragGesture(minimumDistance: 8)
+                .updating($dragX) { value, state, _ in state = value.translation.width }
+                .onEnded { value in
+                    let steps = Int((-value.translation.width / step1).rounded())
+                    select(index + steps)
+                }
+        )
+        .animation(reduceMotion ? nil : .interactiveSpring(response: 0.3, dampingFraction: 0.8), value: dragX)
+        .accessibilityElement()
+        .accessibilityLabel("Mood")
+        .accessibilityValue(option.label)
+        .accessibilityHint("Swipe up or down to choose a mood. Set Mood saves it.")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: select(index + 1)
+            case .decrement: select(index - 1)
+            @unknown default: break
+            }
+        }
+    }
+
     var body: some View {
         GeometryReader { geo in
             VStack(spacing: 4) {
@@ -94,46 +153,11 @@ struct MoodPicker: View {
                     Text("Mood set to \(option.label)").font(.system(size: 13, weight: .semibold))
                     Spacer(minLength: 0)
                 } else {
-                    let others = Self.options.indices.filter { $0 != index }
-                    let dot = max(24, min(30, (geo.size.width - 4 * CGFloat(others.count - 1)) / CGFloat(others.count)))
-                    let preview = max(44, min(96, geo.size.height - dot - 86))
-                    AnimatedMoodMascot(mood: option.mood, size: preview, isActive: true)
-                        .id(index)
-                        .transition(.opacity)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: preview)
-                        .contentShape(Rectangle())
-                        .highPriorityGesture(
-                            DragGesture(minimumDistance: 15)
-                                .onEnded { value in
-                                    let dx = value.translation.width
-                                    guard abs(dx) > abs(value.translation.height), abs(dx) > 25 else { return }
-                                    select(index + (dx < 0 ? 1 : -1))
-                                }
-                        )
-                        .accessibilityLabel("\(option.label) MoodPal preview")
+                    carousel(width: geo.size.width, big: max(50, min(92, geo.size.height - 70, geo.size.width * 0.45)))
                     Text(failed ? "Couldn't save" : option.label)
                         .font(.system(size: failed ? 11 : 13, weight: .semibold))
                         .foregroundStyle(failed ? .orange : .primary)
                         .lineLimit(1)
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 4) {
-                            ForEach(others, id: \.self) { i in
-                                Button { select(i) } label: {
-                                    AnimatedMoodMascot(mood: Self.options[i].mood, size: dot * 0.8, isActive: false)
-                                        .frame(width: dot, height: dot)
-                                        .background(Circle().fill(Color.white.opacity(0.12)))
-                                        .clipShape(Circle())
-                                }
-                                .buttonStyle(.plain)
-                                .transition(.scale.combined(with: .opacity))
-                                .accessibilityLabel(Self.options[i].label)
-                                .accessibilityHint("Previews this mood. Set Mood saves it.")
-                            }
-                        }
-                        .frame(minWidth: geo.size.width)
-                    }
-                    .frame(height: dot)
                     Spacer(minLength: 14)
                     Button(action: setMood) {
                         Group {
