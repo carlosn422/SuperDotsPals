@@ -21,13 +21,13 @@ app.use(express.static(path.join(__dirname, 'public'), {
 }));
 
 // Small per-IP limiter so the public form can't be used to flood the list.
-const hits = new Map(), eventHits = new Map();
-function limited(ip, map = hits, max = 8) {
+const hits = new Map();
+function limited(ip) {
   const now = Date.now();
-  const recent = (map.get(ip) || []).filter((t) => now - t < 10 * 60 * 1000);
+  const recent = (hits.get(ip) || []).filter((t) => now - t < 10 * 60 * 1000);
   recent.push(now);
-  map.set(ip, recent);
-  return recent.length > max;
+  hits.set(ip, recent);
+  return recent.length > 8;
 }
 
 async function saveToSupabase(row) {
@@ -43,33 +43,6 @@ async function saveToSupabase(row) {
   });
   if (!res.ok) throw new Error(`Supabase insert failed (${res.status}): ${await res.text()}`);
 }
-
-// Cookie-free analytics (table site_events): no IPs, cookies or identifiers are stored.
-const EVENTS = ['pageview', 'appstore_click'];
-const text = (v, n) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, n) : null);
-async function recordEvent(row) {
-  if (!SUPABASE_KEY) return;
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/site_events`, {
-    method: 'POST',
-    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-    body: JSON.stringify(row),
-  });
-  if (!res.ok) console.error(`site_events insert failed (${res.status})`);
-}
-
-app.post('/api/event', (req, res) => {
-  res.status(204).end();
-  const b = req.body || {};
-  if (!EVENTS.includes(b.event) || limited(req.ip, eventHits, 120)) return;
-  let referrer = null;
-  try { referrer = b.referrer ? new URL(b.referrer).hostname.replace(/^www\./, '') : null; } catch {}
-  if (referrer === 'moodpals.com') referrer = null;
-  recordEvent({
-    event: b.event, path: text(b.path, 200), referrer_host: text(referrer, 120), placement: text(b.placement, 40),
-    utm_source: text(b.utm_source, 80), utm_medium: text(b.utm_medium, 80), utm_campaign: text(b.utm_campaign, 80),
-    device: b.device === 'mobile' ? 'mobile' : 'desktop',
-  }).catch(() => {});
-});
 
 async function saveLocally(row) {
   let list = [];
@@ -94,7 +67,6 @@ app.post('/api/subscribe', async (req, res) => {
   try {
     if (SUPABASE_KEY) await saveToSupabase(row);
     else await saveLocally(row);
-    recordEvent({ event: 'waitlist_signup', path: '/' }).catch(() => {});
     res.json({ ok: true });
   } catch (err) {
     console.error(err.message);
