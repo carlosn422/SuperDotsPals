@@ -148,3 +148,20 @@ if (duo && 'IntersectionObserver' in window && !matchMedia('(prefers-reduced-mot
     else if (e.intersectionRatio >= 0.5 || e.intersectionRect.height >= innerHeight * 0.5) duo.classList.add('live');
   }, { threshold: [0, 0.25, 0.5, 0.75] }).observe(duo.querySelector('.duo-row'));
 }
+
+// Cookie-free analytics: page views and App Store clicks only, no cookies, IPs or identifiers.
+function track(event, placement) {
+  try {
+    const q = new URLSearchParams(location.search);
+    const body = JSON.stringify({ event, placement, path: location.pathname, referrer: document.referrer,
+      utm_source: q.get('utm_source'), utm_medium: q.get('utm_medium'), utm_campaign: q.get('utm_campaign'),
+      device: matchMedia('(max-width: 760px)').matches ? 'mobile' : 'desktop' });
+    if (navigator.sendBeacon) navigator.sendBeacon('/api/event', new Blob([body], { type: 'application/json' }));
+    else fetch('/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true });
+  } catch {}
+}
+track('pageview');
+document.addEventListener('click', (e) => {
+  const a = e.target.closest && e.target.closest('a[href*="apps.apple.com"]');
+  if (a) track('appstore_click', a.dataset.placement || 'page');
+});

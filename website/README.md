@@ -18,3 +18,13 @@ Subscribers are stored in Supabase table `waitlist_subscribers` when `SUPABASE_S
 | `SUPABASE_SERVICE_ROLE_KEY` | unset → local JSON file |
 
 iPhone screenshots live in `public/img/screens/` (`today.png`, `actions.png`, `diary.png`, `ask.png`). Until they exist the phones show HTML previews of those screens.
+
+## Analytics
+
+`public/app.js` sends a cookie-free `pageview` on load and an `appstore_click` (with `placement`: nav, hero, faq, cta) to `POST /api/event`; `server.js` also records `waitlist_signup`. Rows go to Supabase `site_events` (migration `20261123_site_events.sql`) only when `SUPABASE_SERVICE_ROLE_KEY` is set. No IPs, cookies or identifiers are stored.
+
+```sql
+select created_at::date day, count(*) filter (where event='pageview') views,
+       count(*) filter (where event='appstore_click') appstore_clicks
+from site_events group by 1 order by 1 desc;
+```
