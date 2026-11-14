@@ -3,7 +3,7 @@ import {View,Text,TouchableOpacity,ActivityIndicator,Alert,StyleSheet,Platform} 
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Constants,{ExecutionEnvironment} from 'expo-constants';
 import {supabase} from './supabase';
-import {computeStressPoints,dailyStress} from './StressEngine';
+import {computeStressPoints} from './StressEngine';
 import {maybeSendStressAlert} from './StressAlerts';
 import {publishStressSnapshot} from './WidgetBridge';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -147,8 +147,10 @@ export async function syncNativeHealth():Promise<number>{
  const fresh=await fetchReadings(true).catch(()=>[] as Reading[]);
  await AsyncStorage.setItem(HEALTH_SYNCED_FLAG,'1').catch(()=>{});
  publishStressSnapshot(fresh);
- const latestStress=dailyStress(computeStressPoints(fresh));
- if(latestStress)void maybeSendStressAlert(latestStress.score,latestStress.updated);
+ const phoneHrv=uploaded.filter(u=>u.metric==='hrv').map(u=>u.recorded_at).sort().pop();
+ if(phoneHrv)void supabase.rpc('note_phone_hrv',{at:phoneHrv}).then(()=>{},()=>{});
+ const latestPoint=computeStressPoints(fresh).pop();
+ if(latestPoint)void maybeSendStressAlert(latestPoint);
  return saved;
 }
 export function useSavedHealth(){

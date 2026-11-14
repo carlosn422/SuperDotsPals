@@ -310,6 +310,17 @@ final class WatchThemeSync: ObservableObject {
         await postReadings(rows, fresh: fresh, summary: "stress \(stress.map { "\($0.score)" } ?? "none")")
     }
 
+    /// True when this device should show the stress alert (see claim_stress_alert).
+    func claimStressAlert(score: Int, sampleAt: Date) async -> Bool {
+        guard !moodOnly, connected, !userId.isEmpty else { return false }
+        let formatter = ISO8601DateFormatter()
+        guard let body = try? JSONSerialization.data(withJSONObject: ["score": score, "from_watch": true, "sample_at": formatter.string(from: sampleAt)]) else { return false }
+        do {
+            let data = try await request("/rest/v1/rpc/claim_stress_alert", method: "POST", body: body, timeout: 15)
+            return (try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])) as? Bool == true
+        } catch { return false }
+    }
+
     /// Uploads watch sleep nights with the iPhone's keys ("sleep-<day>", "sleep-deep-<day>", ...). Insert-only, so Apple Health on
     /// the iPhone stays primary: a night the iPhone already saved is kept, and the iPhone's next sync overwrites a watch row.
     /// Returns false when the upload could not run (not signed in, or the request failed).

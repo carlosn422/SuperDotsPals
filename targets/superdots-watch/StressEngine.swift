@@ -1,5 +1,6 @@
 import Foundation
 import HealthKit
+import UserNotifications
 import WidgetKit
 
 /// Same personal, baseline-relative stress estimate as the iPhone (StressEngine.ts).
@@ -337,10 +338,36 @@ final class HealthStressMonitor: @unchecked Sendable {
         }
         let reading = StressReading(score: point.score, at: point.at, source: .watch)
         let isNew = WatchStressStore.offer(reading)
+        if isNew { await StressAlert.notifyIfNeeded(score: point.score, hrv: point.sample.value, at: point.at) }
         if upload, isNew || !raw.isEmpty {
             // Same key as the iPhone ("stress-hrv-<HealthKit UUID>") so both devices upsert one row.
             await WatchThemeSync.shared.uploadReadings(raw: raw, stress: isNew ? (point.score, point.at, "stress-hrv-\(point.sample.uuid)") : nil)
         }
         return reading
+    }
+}
+
+/// HRV stress alert from the watch's own reading, for when Apple Health stops syncing to the iPhone.
+/// `claim_stress_alert` shares the iPhone's 3-hour cooldown and declines while the iPhone is still reading HRV.
+enum StressAlert {
+    // Same wording as StressAlerts.ts on the iPhone.
+    static func body(_ level: StressLevel) -> String? {
+        switch level {
+        case .elevated: return "Your HRV is below your usual range, and your stress level looks a little high. A short break or a few slow breaths can help."
+        case .overload: return "Your HRV is well below your usual range, and your stress level looks elevated. Take things a little slower, get some rest, and give your body time to recover."
+        default: return nil
+        }
+    }
+
+    static func notifyIfNeeded(score: Int, hrv: Double, at: Date) async {
+        let level = StressEngine.level(for: score)
+        guard let body = body(level), Date().timeIntervalSince(at) < 6 * 3600 else { return }
+        let center = UNUserNotificationCenter.current()
+        guard await center.notificationSettings().authorizationStatus == .authorized,
+              await WatchThemeSync.shared.claimStressAlert(score: score, sampleAt: at) else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "HRV \(Int(hrv.rounded()))ms · \(level.label) · \(at.formatted(date: .omitted, time: .shortened))"
+        content.body = body
+        try? await center.add(UNNotificationRequest(identifier: "stress-\(Int(at.timeIntervalSince1970))", content: content, trigger: nil))
     }
 }

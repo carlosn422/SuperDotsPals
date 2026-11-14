@@ -10,8 +10,8 @@ const TIMES=[{hour:8,name:'8 AM'},{hour:9,name:'9 AM'},{hour:12,name:'12 PM'},{h
 const prefs={enabled:false,hour:9,minute:0};
 const THRESHOLDS=[{value:60,name:'Elevated'},{value:75,name:'High'},{value:85,name:'Overload'}];
 function StressAlertSettings({account}:{account:string|null}){
- const [enabled,setEnabled]=useState(false),[threshold,setThreshold]=useState(75),[busy,setBusy]=useState(false),[available,setAvailable]=useState(true);
- useEffect(()=>{if(!account)return;void supabase.from('user_settings').select('stress_alerts_enabled,stress_alert_threshold').eq('user_id',account).maybeSingle().then(({data,error})=>{if(error){setAvailable(false);return}setEnabled(!!data?.stress_alerts_enabled);setThreshold(Number(data?.stress_alert_threshold??75))})},[account]);
+ const [enabled,setEnabled]=useState(false),[threshold,setThreshold]=useState(60),[busy,setBusy]=useState(false),[available,setAvailable]=useState(true);
+ useEffect(()=>{if(!account)return;void supabase.from('user_settings').select('stress_alerts_enabled,stress_alert_threshold').eq('user_id',account).maybeSingle().then(({data,error})=>{if(error){setAvailable(false);return}setEnabled(!!data?.stress_alerts_enabled);setThreshold(Number(data?.stress_alert_threshold??60))})},[account]);
  async function save(nextEnabled:boolean,nextThreshold=threshold){
   if(!account)return;setBusy(true);
   try{
@@ -24,7 +24,7 @@ function StressAlertSettings({account}:{account:string|null}){
  return <View style={{gap:12}}>
   <TouchableOpacity disabled={busy} onPress={()=>void save(!enabled)} style={s.toggle}><View style={{flex:1,gap:4}}><Text style={s.name}>Stress alerts</Text><Text style={s.sub}>{enabled?'Notify me when my stress score is high':'Off'}</Text></View><Ionicons name={enabled?'pulse':'pulse-outline'} size={26} color={enabled?'#EE6F86':'#A99FC0'}/></TouchableOpacity>
   <View style={s.grid}>{THRESHOLDS.map(t=><TouchableOpacity key={t.value} disabled={busy} onPress={()=>void save(enabled,t.value)} style={[s.chip,{backgroundColor:threshold===t.value?'#34B37E':'#E4F6EA'}]}><Text style={{color:threshold===t.value?'#fff':'#1D2B33',fontWeight:'800'}}>{t.name} · {t.value}+</Text></TouchableOpacity>)}</View>
-  <Text style={s.foot}>Checked each time MoodPals syncs Apple Health, at most once every 3 hours. Alerts never include your health values and are not medical advice.</Text>
+  <Text style={s.foot}>Checked each time MoodPals syncs Apple Health or your Apple Watch reads HRV, at most once every 3 hours. Alerts show your HRV and stress level and are not medical advice.</Text>
  </View>;
 }
 export default function WellnessReminders(){
