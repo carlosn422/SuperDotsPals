@@ -73,7 +73,6 @@ struct ContentView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                NavigationStack {
                 VStack(spacing: 3) {
                     Group {
                         Spacer(minLength: 0)
@@ -120,16 +119,22 @@ struct ContentView: View {
                     }
                 }
                 .padding(.horizontal, 5)
-                .toolbar {
+                // Same style as the former inline drink buttons, in the top-left corner opposite the clock.
+                .overlay(alignment: .topLeading) {
                     if !sync.moodOnly {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button { showingDrinks = true } label: {
-                                Image(systemName: "drop.fill").foregroundStyle(DrinksView.waterColor)
-                            }
-                            .accessibilityLabel("Water and caffeine")
+                        Button { showingDrinks = true } label: {
+                            Image(systemName: "drop.fill")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(DrinksView.waterColor)
+                                .frame(width: 34, height: 34)
+                                .background(Circle().fill(DrinksView.waterColor.opacity(0.22)))
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Water and caffeine")
+                        .padding(.leading, 10)
+                        .padding(.top, 4)
+                        .ignoresSafeArea()
                     }
-                }
                 }
             }
         }
