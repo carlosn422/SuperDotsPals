@@ -2,7 +2,8 @@ import React,{useMemo,useState} from 'react';
 import {View,Text,TouchableOpacity,TextInput,StyleSheet,Alert,ActivityIndicator} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {supabase} from './supabase';
-import {useStress,SW} from './StressDashboard';
+import {useStress} from './StressDashboard';
+import {SW} from './StressTheme';
 import {STRESS_LEVELS,StressLevel,StressPoint,LEVEL_ORDER,levelFor,median} from './StressEngine';
 
 export type DiaryEntry={id:string;body:string;mood:string|null;intensity:number|null;energy_level:string|null;stress_factors:string[];occurred_at:string};
