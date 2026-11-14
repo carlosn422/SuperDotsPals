@@ -90,7 +90,8 @@ function Body({kind,onClose,onSaved,onAskAI}:{kind:Drink;onClose:()=>void;onSave
   try{await task()}catch(e:any){Alert.alert('Unable to save',e?.message||'Please retry')}finally{setBusy(false)}
  }
  const add=(habit:Drink,n:number)=>setTotal(habit,(dayTotal(rows,habit,day)||0)+n);
- const undo=()=>run(async()=>{const r=dayRows(rows,kind,day);await setTotal(kind,r[1]?rowAmount(r[1]):0)});
+ // Step back to the newest earlier total below the current one, so repeated undos keep going back.
+ const undo=()=>run(async()=>{const r=dayRows(rows,kind,day),cur=r[0]?rowAmount(r[0]):0;const prev=r.find(x=>rowAmount(x)<cur);await setTotal(kind,prev?rowAmount(prev):0)});
  const addDrink=(d:{name:string;mg:number;oz:number})=>run(async()=>{await add('caffeine',d.mg);setPrompt({name:d.name,oz:d.oz})});
  const saveManual=()=>{const n=Number((manual||'').replace(',','.'));setManual(null);if(n>0&&n<=(kind==='water'?200:1000))void run(()=>add(kind,n))};
  const updateReminder=async(r:WaterReminder)=>{const prev=reminder;setReminder(r);try{if(!(await saveWaterReminder(r))){setReminder(prev);Alert.alert('Notifications are off','Allow notifications for MoodPals in iPhone Settings to get water reminders.')}}catch(e:any){setReminder(prev);Alert.alert('Could not update reminders',e?.message||'Please retry')}};
