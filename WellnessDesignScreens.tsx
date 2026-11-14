@@ -8,7 +8,7 @@ import {supabase} from './supabase';
 import {usePlus} from './PlusStore';
 import HealthDataPanel,{HealthMiniStats,useSavedHealth} from './HealthDataPanel';
 import RecoveryInsights from './RecoveryInsights';
-import {InviteFriendsCard,LockedPreviewCard,PlusOfferCard,UpgradePill} from './TodayUpsell';
+import {InviteFriendsCard,LockedPreviewCard,PlusBadge,PlusOfferCard,UpgradePill} from './TodayUpsell';
 import HealthTrendOverview from './HealthTrendOverview';
 import {StressHero,EnergyCard,HrvTrendCard,HeartRateCard,HealthActionsGrid,StressTrendCard} from './StressDashboard';
 
@@ -99,7 +99,6 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
 </View>;
 }
 export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpiritual,onChat,onMood,onJournal,onBreathing,caffeine}:{companion:string;accent:string;water:number;caffeine:number;onWater:()=>void;onCaffeine:()=>void;onSpiritual:()=>void;onChat:()=>void;onMood:()=>void;onJournal:()=>void;onBreathing:()=>void}){
- const {isPlus,showPaywall}=usePlus();
  const [day,setDay]=React.useState(0);
  const [pastAmounts,setPastAmounts]=React.useState({water:0,caffeine:0});
  const [activitySummary,setActivitySummary]=React.useState<{count:number;minutes:number}>({count:0,minutes:0});
@@ -121,10 +120,11 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpi
  },[day]);
  const shownWater=day===0?water:pastAmounts.water,shownCaffeine=day===0?caffeine:pastAmounts.caffeine;
  const dates=Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()+i-6);return d});
- const item=(icon:any,title:string,detail:string,tint:string,press?:()=>void)=>(
+ const {isPlus:plusMember}=usePlus();
+ const item=(icon:any,title:string,detail:string,tint:string,press?:()=>void,badge=false)=>(
  <TouchableOpacity disabled={!press} onPress={press} style={{backgroundColor:'#fff',borderRadius:18,paddingHorizontal:15,paddingVertical:16,flexDirection:'row',alignItems:'center',gap:13,borderWidth:1,borderColor:'#ECEAF2'}}>
   <View style={{width:43,height:43,backgroundColor:tint,borderRadius:15,alignItems:'center',justifyContent:'center'}}><Ionicons name={icon} size={21} color={accent}/></View>
-  <View style={{flex:1,gap:3}}><Text style={{fontSize:15,fontWeight:'800',color:INK}}>{title}</Text><Text style={{fontSize:12,color:MUTED}}>{detail}</Text></View>
+  <View style={{flex:1,gap:3}}><View style={{flexDirection:'row',alignItems:'center',gap:6}}><Text style={{fontSize:15,fontWeight:'800',color:INK}}>{title}</Text>{badge?<PlusBadge/>:null}</View><Text style={{fontSize:12,color:MUTED}}>{detail}</Text></View>
   {press?<Ionicons name="chevron-forward" size={18} color="#A6A1B5"/>:null}
  </TouchableOpacity>);
  return <View style={[s.page,{gap:15}]}>
@@ -142,12 +142,7 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpi
     <Text style={{fontSize:13,fontWeight:'800',color:accent,marginTop:3}}>Check in  →</Text></View>
    <SuperdotMascot id={companion} size={91}/>
   </TouchableOpacity>
-  {day===0?<View style={{gap:9}}><SectionHeading title="Body & recovery" detail={isPlus?'Apple Health':'MoodPals Plus'}/>
-   {isPlus?<HealthActionsGrid onMindfulness={onBreathing}/>:<TouchableOpacity accessibilityRole="button" accessibilityLabel="Body and recovery, MoodPals Plus" activeOpacity={0.8} onPress={()=>showPaywall('health')}>
-    <View pointerEvents="none" style={{opacity:0.4}}><HealthActionsGrid onMindfulness={onBreathing}/></View>
-    <View style={{position:'absolute',top:10,right:10,flexDirection:'row',alignItems:'center',gap:5,backgroundColor:'#FFFFFF',paddingHorizontal:10,paddingVertical:6,borderRadius:12,borderWidth:1,borderColor:'#ECEAF2'}}><Ionicons name="lock-closed" size={12} color={accent}/><Text style={{fontSize:12,fontWeight:'800',color:accent}}>Plus</Text></View>
-   </TouchableOpacity>}
-  </View>:null}
+  <View style={{gap:9}}><SectionHeading title="Body & recovery" detail="Apple Health"/><HealthActionsGrid day={day} onMindfulness={onBreathing} onChat={onChat}/></View>
   <View style={{gap:9}}><SectionHeading title="Daily essentials"/>
    <View style={{flexDirection:'row',gap:10}}>
     <TouchableOpacity onPress={day===0?onWater:undefined} disabled={day!==0} style={{flex:1,backgroundColor:'#FFFFFF',borderRadius:20,padding:16,borderWidth:1,borderColor:'#ECEAF2',gap:7}}>
@@ -164,7 +159,7 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpi
    <View style={{backgroundColor:"#FFFFFF",borderRadius:17,padding:13,borderWidth:1,borderColor:"#ECEAF2"}}><Text style={{color:INK,fontSize:13,fontWeight:"800"}}>Activities logged: {activitySummary.count}</Text><Text style={{color:MUTED,fontSize:12}}>{activitySummary.minutes} minutes recorded {day===0?"today":"on this day"}</Text></View>
    {item('book-outline','Spiritual Reading','Personalized Scripture and encouragement','#E7F5ED',onSpiritual)}
    {item('book-outline','Your journal','Review your private reflections','#F4EBFF',onJournal)}
-   {item('chatbubble-ellipses-outline','Ask AI about your stress','Chat with MoodPals about your readings','#EFE9FF',onChat)}
+   {item('chatbubble-ellipses-outline','Ask AI about your stress','Chat with MoodPals about your readings','#EFE9FF',onChat,!plusMember)}
    {item('leaf-outline','Breathing break','Calm, box and unwind exercises','#E4F6EA',onBreathing)}
   </View>
  </View>;

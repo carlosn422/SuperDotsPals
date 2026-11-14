@@ -27,6 +27,7 @@ import CircleNavigator,{CircleRoute} from './MyCircleScreens';
 import {LittleSignalsTodayCard} from './CircleComponents';
 import WatchThemesScreen from './WatchThemesScreen';
 import {PlusPaywallSheet,PlusSettingsScreen} from './PlusPaywall';
+import {usePlus} from './PlusStore';
 import {AccountRequired,AccountSummary,CreateAccountScreen,DeleteAccountScreen,useAppleLink,useIsGuest} from './Account';
 import {useWatchAutoLink} from './WatchAutoLink';
 import {CIRCLE_MOODS} from './LittleSignalsData';
@@ -75,8 +76,9 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  const [actionDetail,setActionDetail]=useState<'water'|'caffeine'|null>(null);
  const [actionView,setActionView]=useState<'checkin'|'chat'|'history'|'spiritual'|'breathing'|null>(null);
  const [actionVersion,setActionVersion]=useState(0);
+ const {isPlus,showPaywall}=usePlus();
  const [spiritualCheckin,setSpiritualCheckin]=useState<{mood:string;answers:Record<string,string>}|undefined>(undefined);
- const openAction=(view:'checkin'|'chat'|'history'|'spiritual'|'breathing')=>{if(view==='spiritual')setSpiritualCheckin(undefined);setActionDetail(null);setActionView(view);setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});};
+ const openAction=(view:'checkin'|'chat'|'history'|'spiritual'|'breathing')=>{if(view==='chat'&&!isPlus){showPaywall('reflections');return;}if(view==='spiritual')setSpiritualCheckin(undefined);setActionDetail(null);setActionView(view);setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});};
  const [watchesPage,setWatchesPage]=useState<'main'|'themes'>('main');
  const [settingsPage,setSettingsPage]=useState<'main'|'watch'|'devices'|'health'|'notifications'|'privacy'|'help'|'circle'|'watchThemes'|'plus'|'account'|'delete'>('main');
  // Each Settings sub-page opens at its top, not at the list's scroll position.

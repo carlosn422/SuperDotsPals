@@ -2,7 +2,7 @@ import React from 'react';
 import {StyleSheet,Text,TouchableOpacity,View} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import SuperdotMascot from './SuperdotMascot';
-import {SW} from './StressDashboard';
+import {SW} from './StressTheme';
 import {PlusFeature,usePlus} from './PlusStore';
 
 const PLUS='#7B5CE6',PLUS_SOFT='#F1ECFF';

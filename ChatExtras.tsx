@@ -1,7 +1,8 @@
 import React,{useEffect,useRef} from 'react';
 import {View,Text,TouchableOpacity,StyleSheet,Animated} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import {useStress,SW} from './StressDashboard';
+import {useStress} from './StressDashboard';
+import {SW} from './StressTheme';
 import {STRESS_LEVELS,formatMinutes} from './StressEngine';
 
 export type ChatAction='breathing'|'water'|'trends'|'reminders';

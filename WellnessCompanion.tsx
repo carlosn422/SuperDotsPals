@@ -71,7 +71,7 @@ export default function WellnessCompanion({companion,color,initialView='checkin'
  }
  return <View style={s.container}>
  {view!=='checkin'?<><View style={s.header}><SuperdotMascot id={companion} color={color} size={66}/><View style={{flex:1}}><Text style={s.title}>{view==='chat'?'Ask MoodPal':'Stress diary'}</Text><Text style={s.sub}>{view==='chat'?'Answers based on your own readings and diary.':'See what drives your stress over time.'}</Text></View></View>
- <View style={s.tabs}>{(['chat','history'] as const).map(t=><TouchableOpacity key={t} onPress={()=>setView(t)} style={[s.tab,view===t&&{backgroundColor:color}]}><Text style={[s.tabText,view===t&&{color:'#fff'}]}>{t==='chat'?'Ask MoodPal':'Stress diary'}</Text></TouchableOpacity>)}</View></>:null}
+ <View style={s.tabs}>{(['chat','history'] as const).map(t=><TouchableOpacity key={t} onPress={()=>t==='chat'&&!isPlus?showPaywall('reflections'):setView(t)} style={[s.tab,view===t&&{backgroundColor:color}]}><Text style={[s.tabText,view===t&&{color:'#fff'}]}>{t==='chat'?'Ask MoodPal':'Stress diary'}</Text></TouchableOpacity>)}</View></>:null}
  {view==='checkin'?<MoodCheckinWizard color={color} onShareWithCircle={onShareWithCircle} onSaved={nextMood=>onMoodSaved?.(nextMood)} onDone={()=>onCheckinDone?.()} onJournal={()=>setView('history')} onInsights={()=>onOpenInsights?.()} onFindVerse={(selectedMood,answers)=>onFindVerse?.(selectedMood,answers)} onNavigate={onWizardNavigate} onExploreAI={selectedMood=>{setChatText("I'd like to explore feeling "+selectedMood+". Please ask me one supportive, open-ended question.");setView('chat');}}/>:null}
  {view==='chat'?<View style={s.card}>
   <StressContextBar chips={ctx.chips}/>
