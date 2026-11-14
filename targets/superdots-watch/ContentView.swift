@@ -81,12 +81,11 @@ struct ContentView: View {
                         Button {
                             choosingMood = true
                         } label: {
-                            AnimatedMoodMascot(mood: shownMood, size: WKInterfaceDevice.current().screenBounds.height < 220 ? 52 : 64, isActive: scenePhase == .active)
+                            AnimatedMoodMascot(mood: shownMood, size: WKInterfaceDevice.current().screenBounds.height < 220 ? 64 : 80, isActive: scenePhase == .active)
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Current mood \(MoodLabel.display(shownMood)). Tap to change.")
-                        Text(MoodLabel.display(shownMood)).font(.headline)
                         }
                         if !sync.moodOnly {
                             StressSummary(reading: store.stress, hrv: store.latestHRV)
