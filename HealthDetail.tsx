@@ -116,6 +116,7 @@ function DetailBody({kind,initialDay,readings,onClose,onAskAI,onBreathing}:{kind
  const forward=()=>{if(canForward){const n=addDays(day,span);setDay(n>today?today:n)}};
  const dateLabel=period==='D'?day.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):`${days[0].toLocaleDateString(undefined,{month:'short',day:'numeric'})} – ${day.toLocaleDateString(undefined,{month:'short',day:'numeric'})}`;
  const main=value(k.metric);
+ const dataDays=series(k.metric).filter(v=>v!==null).length;
  const goal=k.goals[0]?goals[k.goals[0]]:null;
  const ask=()=>{onClose();onAskAI()};
 
@@ -170,7 +171,7 @@ function DetailBody({kind,initialDay,readings,onClose,onAskAI,onBreathing}:{kind
       <Text style={st.ringGoal}>{kind==='noise'?(main===null?' ':'average'):'/'+GOAL_INFO[k.goals[0]].fmt(goal!)}</Text>
      </Rings>}
     <Text style={st.status}>{status}</Text>
-    {period!=='D'&&!noData?<Text style={st.muted}>Daily average over {series(k.metric).filter(v=>v!==null).length} days with data</Text>:null}
+    {period!=='D'&&!noData?<Text style={st.muted}>Daily average over {dataDays} day{dataDays===1?'':'s'} with data</Text>:null}
    </View>
 
    <View style={st.card}>
