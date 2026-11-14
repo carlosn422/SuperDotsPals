@@ -8,7 +8,7 @@ import {supabase} from './supabase';
 import {usePlus} from './PlusStore';
 import HealthDataPanel,{HealthMiniStats,useSavedHealth} from './HealthDataPanel';
 import RecoveryInsights from './RecoveryInsights';
-import {InviteFriendsCard,LockedPreviewCard,PlusOfferCard,UpgradePill} from './TodayUpsell';
+import {InviteFriendsCard,LockedPreviewCard,PlusBadge,PlusOfferCard,UpgradePill} from './TodayUpsell';
 import HealthTrendOverview from './HealthTrendOverview';
 import {StressHero,EnergyCard,HrvTrendCard,HeartRateCard,HealthActionsGrid,StressTrendCard} from './StressDashboard';
 
@@ -120,10 +120,11 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpi
  },[day]);
  const shownWater=day===0?water:pastAmounts.water,shownCaffeine=day===0?caffeine:pastAmounts.caffeine;
  const dates=Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()+i-6);return d});
- const item=(icon:any,title:string,detail:string,tint:string,press?:()=>void)=>(
+ const {isPlus:plusMember}=usePlus();
+ const item=(icon:any,title:string,detail:string,tint:string,press?:()=>void,badge=false)=>(
  <TouchableOpacity disabled={!press} onPress={press} style={{backgroundColor:'#fff',borderRadius:18,paddingHorizontal:15,paddingVertical:16,flexDirection:'row',alignItems:'center',gap:13,borderWidth:1,borderColor:'#ECEAF2'}}>
   <View style={{width:43,height:43,backgroundColor:tint,borderRadius:15,alignItems:'center',justifyContent:'center'}}><Ionicons name={icon} size={21} color={accent}/></View>
-  <View style={{flex:1,gap:3}}><Text style={{fontSize:15,fontWeight:'800',color:INK}}>{title}</Text><Text style={{fontSize:12,color:MUTED}}>{detail}</Text></View>
+  <View style={{flex:1,gap:3}}><View style={{flexDirection:'row',alignItems:'center',gap:6}}><Text style={{fontSize:15,fontWeight:'800',color:INK}}>{title}</Text>{badge?<PlusBadge/>:null}</View><Text style={{fontSize:12,color:MUTED}}>{detail}</Text></View>
   {press?<Ionicons name="chevron-forward" size={18} color="#A6A1B5"/>:null}
  </TouchableOpacity>);
  return <View style={[s.page,{gap:15}]}>
@@ -158,7 +159,7 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpi
    <View style={{backgroundColor:"#FFFFFF",borderRadius:17,padding:13,borderWidth:1,borderColor:"#ECEAF2"}}><Text style={{color:INK,fontSize:13,fontWeight:"800"}}>Activities logged: {activitySummary.count}</Text><Text style={{color:MUTED,fontSize:12}}>{activitySummary.minutes} minutes recorded {day===0?"today":"on this day"}</Text></View>
    {item('book-outline','Spiritual Reading','Personalized Scripture and encouragement','#E7F5ED',onSpiritual)}
    {item('book-outline','Your journal','Review your private reflections','#F4EBFF',onJournal)}
-   {item('chatbubble-ellipses-outline','Ask AI about your stress','Chat with MoodPals about your readings','#EFE9FF',onChat)}
+   {item('chatbubble-ellipses-outline','Ask AI about your stress','Chat with MoodPals about your readings','#EFE9FF',onChat,!plusMember)}
    {item('leaf-outline','Breathing break','Calm, box and unwind exercises','#E4F6EA',onBreathing)}
   </View>
  </View>;

@@ -8,6 +8,7 @@ import SuperdotMascot from './SuperdotMascot';
 import {supabase} from './supabase';
 import type {Metric,Reading} from './HealthDataPanel';
 import {FREE_HEALTH_DAYS,PLUS_HEALTH_DAYS,usePlus} from './PlusStore';
+import {PlusBadge} from './TodayUpsell';
 import {PlusPaywallSheet} from './PlusPaywall';
 import {median,noiseLabel,sameDay,sleepQuality} from './StressEngine';
 
@@ -118,7 +119,7 @@ function DetailBody({kind,initialDay,readings,onClose,onAskAI,onBreathing}:{kind
  const main=value(k.metric);
  const dataDays=series(k.metric).filter(v=>v!==null).length;
  const goal=k.goals[0]?goals[k.goals[0]]:null;
- const ask=()=>{onClose();onAskAI()};
+ const ask=()=>{if(!isPlus){showPaywall('reflections');return}onClose();onAskAI()};
 
  if(page==='goals')return <View style={{flex:1,backgroundColor:BG,paddingTop:insets.top+8}}>
   <View style={st.goalHead}><TouchableOpacity accessibilityRole="button" accessibilityLabel="Back" onPress={()=>setPage('main')} style={st.round}><Ionicons name="arrow-back" size={22} color={k.color}/></TouchableOpacity><Text style={st.goalTitle}>{k.title}</Text><View style={{width:46}}/></View>
@@ -184,7 +185,7 @@ function DetailBody({kind,initialDay,readings,onClose,onAskAI,onBreathing}:{kind
     </View>:null}
     <View style={{flexDirection:'row',gap:10,alignItems:'flex-start'}}><SuperdotMascot id={mascot} size={34} animate={false}/><Text style={[st.body,{flex:1}]}>{insight}</Text></View>
     <View style={{height:1,backgroundColor:LINE}}/>
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Ask AI about your '+k.title.toLowerCase()} onPress={ask} style={{alignItems:'center',paddingVertical:4}}><Text style={{color:k.color,fontWeight:'700',fontSize:15}}>Ask AI</Text></TouchableOpacity>
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Ask AI about your '+k.title.toLowerCase()} onPress={ask} style={{flexDirection:'row',justifyContent:'center',alignItems:'center',gap:6,paddingVertical:4}}><Text style={{color:k.color,fontWeight:'700',fontSize:15}}>Ask AI</Text>{isPlus?null:<PlusBadge/>}</TouchableOpacity>
    </View>
 
    {kind==='mindfulness'&&onBreathing?<TouchableOpacity accessibilityRole="button" onPress={()=>{onClose();onBreathing()}} style={[st.cta,{backgroundColor:k.color}]}><Ionicons name="leaf" size={18} color="#fff"/><Text style={{color:'#fff',fontWeight:'800',fontSize:15}}>Start a breathing break</Text></TouchableOpacity>:null}
