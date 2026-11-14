@@ -30,6 +30,16 @@ final class WatchDrinks: ObservableObject {
         return try JSONSerialization.jsonObject(with: data) as? [[String: Any]] ?? []
     }
 
+    // Re-read per-tap amounts so a change made on the iPhone applies to the very next tap.
+    private func syncTaps() async {
+        let path = "/rest/v1/user_settings?select=water_tap_oz,caffeine_tap_mg&user_id=eq.\(WatchThemeSync.shared.accountId)&limit=1"
+        guard let data = try? await WatchThemeSync.shared.restRequest(path, method: "GET"),
+              let row = (try? JSONSerialization.jsonObject(with: data) as? [[String: Any]])?.first else { return }
+        for key in ["water_tap_oz", "caffeine_tap_mg"] {
+            if let v = (row[key] as? NSNumber)?.doubleValue { UserDefaults.standard.set(v, forKey: key) }
+        }
+    }
+
     func refresh() async {
         guard !WatchProfile.moodOnly, WatchThemeSync.shared.connected, let rows = try? await todayRows() else { return }
         water = Self.latest(rows, "water")
@@ -40,6 +50,7 @@ final class WatchDrinks: ObservableObject {
         guard habit == "water" || habit == "caffeine", !WatchProfile.moodOnly, WatchThemeSync.shared.connected, !busy else { return }
         busy = true
         defer { busy = false }
+        await syncTaps()
         do {
             let next = Self.latest(try await todayRows(), habit) + (habit == "water" ? waterTap : caffeineTap)
             let row: [String: Any] = ["user_id": WatchThemeSync.shared.accountId, "habit": habit, "amount": next, "unit": habit == "water" ? "oz" : "mg"]
