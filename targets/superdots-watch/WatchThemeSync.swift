@@ -312,13 +312,10 @@ final class WatchThemeSync: ObservableObject {
 
     /// True when this device should show the stress alert (see claim_stress_alert).
     func claimStressAlert(score: Int, sampleAt: Date) async -> Bool {
-        guard !moodOnly, connected, !userId.isEmpty else { return false }
-        let formatter = ISO8601DateFormatter()
-        guard let body = try? JSONSerialization.data(withJSONObject: ["score": score, "from_watch": true, "sample_at": formatter.string(from: sampleAt)]) else { return false }
-        do {
-            let data = try await request("/rest/v1/rpc/claim_stress_alert", method: "POST", body: body, timeout: 15)
-            return (try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])) as? Bool == true
-        } catch { return false }
+        guard !moodOnly, !userId.isEmpty else { return false }
+        let params: [String: Any] = ["score": score, "from_watch": true, "sample_at": ISO8601DateFormatter().string(from: sampleAt)]
+        guard let data = try? await rpc("claim_stress_alert", params) else { return false }
+        return (try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])) as? Bool == true
     }
 
     /// Uploads watch sleep nights with the iPhone's keys ("sleep-<day>", "sleep-deep-<day>", ...). Insert-only, so Apple Health on
