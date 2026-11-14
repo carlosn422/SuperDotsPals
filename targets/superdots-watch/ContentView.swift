@@ -91,6 +91,7 @@ struct ContentView: View {
                         }
                         if !sync.moodOnly {
                             StressSummary(reading: store.stress, hrv: store.latestHRV, heartRate: store.latestHeartRate)
+                                .padding(.bottom, 10)
                         }
                         HStack(spacing: 6) {
                             if !sync.moodOnly {
