@@ -1,5 +1,5 @@
-import React,{useCallback,useEffect,useState} from 'react';
-import {ActivityIndicator,Alert,Modal,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native';
+import React,{useCallback,useEffect,useRef,useState} from 'react';
+import {ActivityIndicator,Alert,Animated,Easing,Modal,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import Svg,{ClipPath,Defs,LinearGradient,Path,Rect,Stop} from 'react-native-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -232,16 +232,31 @@ function Choice({label,options,value,text,color,onPick}:{label:string;options:nu
  return <View style={{gap:6}}><Text style={st.muted}>{label}</Text><View style={{flexDirection:'row',flexWrap:'wrap',gap:6}}>{options.map(o=><TouchableOpacity key={o} accessibilityRole="button" accessibilityState={{selected:o===value}} onPress={()=>onPick(o)} style={[s.choice,o===value&&{backgroundColor:color,borderColor:color}]}><Text style={{fontWeight:'700',color:o===value?'#fff':INK}}>{text(o)}</Text></TouchableOpacity>)}</View></View>;
 }
 // A drop (water) or cup (caffeine) that fills toward the goal.
+// Same tapered cup and rising wave as the Apple Watch drinks screen.
+const CUP={x:20,y:10,w:160,h:200};
+const cupPath=()=>{const {x,y,w,h}=CUP,inset=w*0.12,r=w*0.16,R=x+w,B=y+h;
+ return `M${x} ${y} H${R} L${R-inset} ${B-r} Q${R-inset} ${B} ${R-inset-r} ${B} H${x+inset+r} Q${x+inset} ${B} ${x+inset} ${B-r} Z`};
+const wavePath=(level:number,phase:number)=>{if(level<=0)return '';const {x,y,w,h}=CUP,B=y+h,top=B-h*level,amp=level>=1?0:6;
+ let d=`M${x} ${B} L${x} ${top}`;for(let px=0;px<=w;px+=4)d+=` L${x+px} ${top+amp*Math.sin(px/w*2*Math.PI+phase)}`;return d+` L${x+w} ${B} Z`};
 function Fill({kind,progress,color}:{kind:Drink;progress:number;color:string}){
- const p=Math.max(0,Math.min(1,progress));
- const shape=kind==='water'?'M100 8 C100 8 28 96 28 146 A72 72 0 0 0 172 146 C172 96 100 8 100 8 Z':'M30 40 H150 V150 A50 50 0 0 1 100 200 H80 A50 50 0 0 1 30 150 Z';
- const top=kind==='water'?8:40,bottom=kind==='water'?218:200;
- return <Svg width={200} height={220} viewBox="0 0 200 220">
-  <Defs><ClipPath id="fill"><Path d={shape}/></ClipPath></Defs>
-  {kind==='caffeine'?<Path d="M150 70 H162 A26 26 0 0 1 162 122 H150" stroke={color+'33'} strokeWidth={14} fill="none"/>:null}
-  <Path d={shape} fill={color+'22'}/>
-  <Rect x="0" y={bottom-p*(bottom-top)} width="200" height="220" fill={color} opacity={0.8} clipPath="url(#fill)"/>
- </Svg>;
+ const target=Math.max(0,Math.min(1,progress));
+ const anim=useRef(new Animated.Value(0)).current;
+ const [level,setLevel]=useState(0);
+ useEffect(()=>{const id=anim.addListener(({value})=>setLevel(value));return()=>anim.removeListener(id)},[anim]);
+ useEffect(()=>{Animated.timing(anim,{toValue:target,duration:900,easing:Easing.inOut(Easing.ease),useNativeDriver:false}).start()},[target,anim]);
+ const cup=cupPath();
+ return <View style={{width:200,height:220,alignItems:'center',justifyContent:'center'}}>
+  <Svg width={200} height={220} viewBox="0 0 200 220" style={StyleSheet.absoluteFill}>
+   <Defs>
+    <ClipPath id={'cup-'+kind}><Path d={cup}/></ClipPath>
+    <LinearGradient id={'liquid-'+kind} x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor={color} stopOpacity={0.75}/><Stop offset="1" stopColor={color} stopOpacity={1}/></LinearGradient>
+   </Defs>
+   <Path d={cup} fill={color+'14'}/>
+   <Path d={wavePath(level,level*12)} fill={`url(#liquid-${kind})`} clipPath={`url(#cup-${kind})`}/>
+   <Path d={cup} fill="none" stroke={color} strokeOpacity={0.9} strokeWidth={4} strokeLinejoin="round"/>
+  </Svg>
+  <Ionicons name={kind==='water'?'water':'cafe'} size={34} color="#fff" style={{textShadowColor:'rgba(0,0,0,0.3)',textShadowRadius:4,marginTop:20}}/>
+ </View>;
 }
 
 const s=StyleSheet.create({
