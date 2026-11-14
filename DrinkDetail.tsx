@@ -31,7 +31,7 @@ export default function DrinkDetail({kind,onClose,onSaved,onAskAI}:{kind:Drink|n
 }
 
 function Body({kind,onClose,onSaved,onAskAI}:{kind:Drink;onClose:()=>void;onSaved:(k:Drink,todayTotal:number)=>void;onAskAI:()=>void}){
- const {isPlus,showPaywall}=usePlus();
+ const {isPlus,plusKnown,showPaywall}=usePlus();
  const {goals,setGoal}=useDrinkGoals(isPlus);
  const insets=useSafeAreaInsets();
  const k=CONF[kind];
@@ -58,7 +58,7 @@ function Body({kind,onClose,onSaved,onAskAI}:{kind:Drink;onClose:()=>void;onSave
  },[k.title]);
  useEffect(()=>{void load();void loadWaterReminder().then(setReminder)},[load]);
  // Reminders are Plus; turn them off if Plus has ended.
- useEffect(()=>{if(!isPlus&&reminder.enabled){const off={...reminder,enabled:false};setReminder(off);void saveWaterReminder(off).catch(()=>{})}},[isPlus,reminder]);
+ useEffect(()=>{if(plusKnown&&!isPlus&&reminder.enabled){const off={...reminder,enabled:false};setReminder(off);void saveWaterReminder(off).catch(()=>{})}},[plusKnown,isPlus,reminder]);
 
  const span=period==='D'?1:period==='W'?7:30;
  const choosePeriod=(p:Period)=>{if(!isPlus&&p!=='D'){showPaywall('trends');return}setPicker(false);setPeriod(p)};

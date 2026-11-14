@@ -45,7 +45,7 @@ export const PLAN_FEATURES:{label:string;free:string|boolean;plus:string|boolean
 ];
 
 type PlusState={
- isPlus:boolean;plan:PlusPlan|null;prices:Record<PlusPlan,PlusPrice>;
+ isPlus:boolean;plusKnown:boolean;plan:PlusPlan|null;prices:Record<PlusPlan,PlusPrice>;
  paywall:{feature:PlusFeature}|null;
  showPaywall:(feature?:PlusFeature)=>void;hidePaywall:()=>void;nestedPaywalls:number;setNestedPaywalls:React.Dispatch<React.SetStateAction<number>>;
  purchase:(plan:PlusPlan)=>Promise<boolean>;restore:()=>Promise<boolean>;resetToFree:()=>void;
@@ -61,6 +61,8 @@ const activePlan=(info:CustomerInfo):PlusPlan|null=>{
 
 export function PlusProvider({children}:{children:React.ReactNode}){
  const [plan,setPlan]=useState<PlusPlan|null>(null);
+ // False until RevenueCat has reported the user's entitlement.
+ const [plusKnown,setPlusKnown]=useState(PLUS_MOCKUP);
  const [prices,setPrices]=useState(PLUS_PRICES);
  const [packages,setPackages]=useState<Partial<Record<PlusPlan,PurchasesPackage>>>({});
  const [paywall,setPaywall]=useState<{feature:PlusFeature}|null>(null);
@@ -70,7 +72,7 @@ export function PlusProvider({children}:{children:React.ReactNode}){
  useEffect(()=>{
   if(PLUS_MOCKUP)return;
   let active=true;
-  const apply=(info:CustomerInfo)=>{if(active)setPlan(activePlan(info))};
+  const apply=(info:CustomerInfo)=>{if(active){setPlan(activePlan(info));setPlusKnown(true)}};
   const sync=async(userId:string|undefined)=>{
    if(!userId||userId===userRef.current)return;
    userRef.current=userId;
@@ -130,7 +132,7 @@ export function PlusProvider({children}:{children:React.ReactNode}){
   }
  },[plan]);
  const resetToFree=useCallback(()=>{if(PLUS_MOCKUP)setPlan(null)},[]);
- const value=useMemo(()=>({isPlus:plan!==null,plan,prices,paywall,showPaywall,hidePaywall,nestedPaywalls,setNestedPaywalls,purchase,restore,resetToFree}),[plan,prices,paywall,showPaywall,hidePaywall,nestedPaywalls,purchase,restore,resetToFree]);
+ const value=useMemo(()=>({isPlus:plan!==null,plusKnown,plan,prices,paywall,showPaywall,hidePaywall,nestedPaywalls,setNestedPaywalls,purchase,restore,resetToFree}),[plan,plusKnown,prices,paywall,showPaywall,hidePaywall,nestedPaywalls,purchase,restore,resetToFree]);
  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
