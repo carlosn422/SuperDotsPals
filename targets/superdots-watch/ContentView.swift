@@ -14,6 +14,12 @@ struct ContentView: View {
     @State private var showingDrinks = false
 
     private var purple: Color { store.theme.accent }
+    /// The stress bar only shows with a fresh reading; without it the pal grows into that space.
+    private var showBar: Bool { !sync.moodOnly && store.stress?.isFresh == true }
+    private var palSize: CGFloat {
+        let small = WKInterfaceDevice.current().screenBounds.height < 220
+        return showBar ? (small ? 72 : 92) : (small ? 100 : 124)
+    }
 
     private var simulatorDemo: Bool {
         #if DEBUG && targetEnvironment(simulator)
@@ -82,13 +88,13 @@ struct ContentView: View {
                         Button {
                             choosingMood = true
                         } label: {
-                            AnimatedMoodMascot(mood: shownMood, size: WKInterfaceDevice.current().screenBounds.height < 220 ? 72 : 92, isActive: scenePhase == .active)
+                            AnimatedMoodMascot(mood: shownMood, size: palSize, isActive: scenePhase == .active)
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Current mood \(MoodLabel.display(shownMood)). Tap to change.")
                         }
-                        if !sync.moodOnly {
+                        if showBar {
                             StressSummary(reading: store.stress, hrv: store.latestHRV, heartRate: store.latestHeartRate)
                                 .padding(.bottom, 10)
                         }
@@ -115,24 +121,26 @@ struct ContentView: View {
                                 CircleButton(unread: circle.unread.count, accent: purple) { showingCircle = true }
                             }
                         }
-                        Spacer(minLength: 0)
                     }
                 }
                 .padding(.horizontal, 5)
-                // Same style as the former inline drink buttons, in the top-left corner opposite the clock.
+                // Same style as the former inline drink buttons, in the top-left corner opposite the clock,
+                // inset in proportion to the screen so the rounded display corner never clips it.
                 .overlay(alignment: .topLeading) {
                     if !sync.moodOnly {
+                        let width = WKInterfaceDevice.current().screenBounds.width
+                        let size: CGFloat = width < 180 ? 30 : 34
                         Button { showingDrinks = true } label: {
                             Image(systemName: "drop.fill")
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.system(size: size * 0.44, weight: .semibold))
                                 .foregroundStyle(DrinksView.waterColor)
-                                .frame(width: 34, height: 34)
+                                .frame(width: size, height: size)
                                 .background(Circle().fill(DrinksView.waterColor.opacity(0.22)))
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Water and caffeine")
-                        .padding(.leading, 10)
-                        .padding(.top, 4)
+                        .padding(.leading, width * 0.15 - size / 2)
+                        .padding(.top, width * 0.13 - size / 2)
                         .ignoresSafeArea()
                     }
                 }
@@ -239,19 +247,19 @@ private struct StressSummary: View {
         return parts.isEmpty ? nil : parts.joined(separator: "  ·  ")
     }
 
+    // Always laid out (hidden without a fresh reading) so the Measure now row stays at the bottom.
     var body: some View {
-        if let reading, reading.isFresh {
-            VStack(spacing: 4) {
-                if let vitals {
-                    Text("\(reading.level.label) · \(vitals)")
-                        .font(.system(size: 13, weight: .semibold)).monospacedDigit()
-                        .lineLimit(1).minimumScaleFactor(0.7)
-                }
-                StressBar(score: reading.score, level: reading.level)
-            }
-            .accessibilityElement()
-            .accessibilityLabel(["Stress \(reading.level.label)", heartRate.map { "heart rate \(Int($0.rounded())) beats per minute" }, hrv.map { "HRV \(Int($0.rounded())) milliseconds" }].compactMap { $0 }.joined(separator: ", "))
+        let fresh = reading?.isFresh == true
+        VStack(spacing: 4) {
+            Text(fresh ? ([reading!.level.label] + [vitals].compactMap { $0 }).joined(separator: " · ") : " ")
+                .font(.system(size: 13, weight: .semibold)).monospacedDigit()
+                .lineLimit(1).minimumScaleFactor(0.7)
+            StressBar(score: reading?.score ?? 0, level: reading?.level ?? .great)
         }
+        .opacity(fresh ? 1 : 0)
+        .accessibilityElement()
+        .accessibilityHidden(!fresh)
+        .accessibilityLabel(fresh ? ["Stress \(reading!.level.label)", heartRate.map { "heart rate \(Int($0.rounded())) beats per minute" }, hrv.map { "HRV \(Int($0.rounded())) milliseconds" }].compactMap { $0 }.joined(separator: ", ") : "")
     }
 }
 
