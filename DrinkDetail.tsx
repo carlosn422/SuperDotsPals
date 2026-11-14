@@ -103,6 +103,7 @@ function Body({kind,onClose,onSaved,onAskAI}:{kind:Drink;onClose:()=>void;onSave
   if(busy)return;setBusy(true);
   try{await task()}catch(e:any){Alert.alert('Unable to save',e?.message||'Please retry')}finally{setBusy(false)}
  }
+ const reachGoal=async()=>{const r=await freshDayRows('water'),cur=r[0]?rowAmount(r[0]):0;if(cur<goals.water)await setTotal('water',goals.water,r)};
  const add=async(habit:Drink,n:number)=>{const r=await freshDayRows(habit);await setTotal(habit,(r[0]?rowAmount(r[0]):0)+n,r)};
  // Step back to the newest earlier total below the current one, so repeated undos keep going back.
  const undo=()=>run(async()=>{const r=await freshDayRows(kind),cur=r[0]?rowAmount(r[0]):0;const prev=r.find(x=>rowAmount(x)<cur);await setTotal(kind,prev?rowAmount(prev):0,r)});
@@ -184,7 +185,7 @@ function Body({kind,onClose,onSaved,onAskAI}:{kind:Drink;onClose:()=>void;onSave
    {editable?<View style={{gap:10}}>
     <View style={s.buttons}>
      {kind==='water'?WATER_SIZES.map(n=><Btn key={n} color={k.color} label={`+${n} oz`} disabled={busy} onPress={()=>void run(()=>add('water',n))}/>):DRINKS.map(d=><Btn key={d.name} color={k.color} label={`+ ${d.name}`} disabled={busy} onPress={()=>void addDrink(d)}/>)}
-     {kind==='water'&&value!==null&&value<goal||kind==='water'&&value===null?<Btn color={k.color} label="Reach Goal" disabled={busy} onPress={()=>void run(()=>add('water',goal-(value||0)))}/>:null}
+     {kind==='water'&&value!==null&&value<goal||kind==='water'&&value===null?<Btn color={k.color} label="Reach Goal" disabled={busy} onPress={()=>void run(reachGoal)}/>:null}
      <Btn color={k.color} label="Enter Manually" disabled={busy} onPress={()=>setManual('')}/>
     </View>
     {kind==='caffeine'?<Text style={[st.muted,{textAlign:'center'}]}>Amounts are typical for an 8 oz cup (espresso: one shot).</Text>:null}
