@@ -261,7 +261,7 @@ function DayCards({kind,day,val,readings,goal,color}:{kind:HealthKind;day:Date;v
 export function TrendCard({title,days,values,goal,color,fmt,lowerIsBetter=false}:{title:string;days:Date[];values:(number|null)[];goal:number|null;color:string;fmt:(v:number)=>string;lowerIsBetter?:boolean}){
  const have=values.filter((v):v is number=>v!==null);
  const best=have.length?(lowerIsBetter?Math.min(...have):Math.max(...have)):null;
- const met=goal!==null?have.filter(v=>v>=goal).length:null;
+ const met=goal!==null?have.filter(v=>lowerIsBetter?v<=goal:v>=goal).length:null;
  const labels=days.map((d,i)=>days.length<=7?['S','M','T','W','T','F','S'][d.getDay()]:i%5===0?String(d.getDate()):'');
  return <View style={st.card}><Text style={st.cardTitle}>{title}</Text>
   {have.length?<><View style={{flexDirection:'row'}}><MiniStat label="Average" value={fmt(avg(values)!)}/><MiniStat label={lowerIsBetter?'Quietest day':'Best day'} value={fmt(best!)}/>{met!==null?<MiniStat label="Goal met" value={`${met} of ${have.length}`}/>:null}</View>
