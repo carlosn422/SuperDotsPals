@@ -7,8 +7,9 @@ const RC_KEY=Platform.OS==='ios'?process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY||'':
 // Without a RevenueCat key the store runs as a local preview and no purchase is made.
 export const PLUS_MOCKUP=!RC_KEY;
 export const PLUS_ENTITLEMENT='plus';
-// Free plans see this many days of health data (7 are kept, so upgrading reveals the rest); Plus sees 30.
-export const FREE_HEALTH_DAYS=3;
+// Free plans see the Day view for this many days of health data; Plus also gets Week/Month and 30 days.
+export const FREE_HEALTH_DAYS=7;
+export const PLUS_HEALTH_DAYS=30;
 
 export type PlusPlan='monthly'|'annual';
 export type PlusFeature='general'|'trends'|'customization'|'circles'|'reflections'|'family'|'health';
@@ -21,11 +22,11 @@ export const PLUS_PRICES:Record<PlusPlan,PlusPrice>={
 
 export const FEATURE_COPY:Record<PlusFeature,{title:string;body:string}>={
  general:{title:'MoodPals Plus',body:'A little more care, every day.'},
- trends:{title:'Advanced trends',body:'See 30 days of your mood, stress, sleep and fitness, not just the last 3.'},
+ trends:{title:'Advanced trends',body:'See 30 days of your mood, stress, sleep and fitness, with week and month views.'},
  customization:{title:'More customization',body:'Unlock extra watch colours and ways to make MoodPals yours.'},
  circles:{title:'Bigger circles',body:'Create more private groups for the people closest to you.'},
  reflections:{title:'AI reflections',body:'Get gentle reflections on your check-ins, up to 100 a month.'},
- health:{title:'Sleep & fitness history',body:'See your body and recovery from Apple Health, with up to 30 days of sleep and fitness. Free shows the last 3 days.'},
+ health:{title:'Sleep & fitness history',body:'See your body and recovery from Apple Health, with up to 30 days of sleep and fitness. Free shows each day for the last 7 days.'},
  family:{title:'More family watches',body:'Link up to 4 family watches, each with its own mood-only profile. Free includes 1.'},
 };
 
@@ -35,7 +36,7 @@ export const PLAN_FEATURES:{label:string;free:string|boolean;plus:string|boolean
  {label:'Apple Watch app and complications',free:true,plus:true},
  {label:'Family watches (mood-only)',free:'1',plus:'Up to 4'},
  {label:'Advanced trends and 30-day history',free:false,plus:true},
- {label:'Sleep and fitness history',free:'3 days',plus:'30 days'},
+ {label:'Sleep and fitness history',free:'7 days',plus:'30 days'},
  {label:'Extra customization',free:false,plus:true},
  {label:'Private circles',free:'Friends group',plus:'Unlimited groups'},
  {label:'AI reflections',free:false,plus:'100 / month'},

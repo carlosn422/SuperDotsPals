@@ -1,5 +1,5 @@
 import React,{createContext,useContext,useEffect,useMemo,useState} from 'react';
-import {View,Text,TouchableOpacity,StyleSheet,ActivityIndicator,Alert,Modal,ScrollView} from 'react-native';
+import {View,Text,TouchableOpacity,StyleSheet,ActivityIndicator,Alert} from 'react-native';
 import Svg,{Circle,Line,Path,Rect} from 'react-native-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -7,7 +7,7 @@ import SuperdotMascot from './SuperdotMascot';
 import {supabase} from './supabase';
 import {useSavedHealth,syncNativeHealth,healthKitAvailable,Reading,Metric,HEALTH_SYNCED_FLAG} from './HealthDataPanel';
 import {enableHealthBackgroundUpdates} from './HealthBackground';
-import {usePlus,FREE_HEALTH_DAYS} from './PlusStore';
+import HealthDetail,{HealthKind,addDays,dayValue,hm,noon,useAppMindfulness,useHealthGoals} from './HealthDetail';
 import {stressPointsWithSaved,dailyStress,baselineStatus,levelFor,levelDistribution,median,sameDay,sleepQuality,noiseLabel,formatMinutes,energyScore,energyLabel,STRESS_LEVELS,LEVEL_ORDER,StressPoint,MIN_BASELINE_SAMPLES,MIN_BASELINE_DAYS} from './StressEngine';
 
 export const SW={bg:'#F4FAF6',mint:'#E4F6EA',ink:'#1D2B33',muted:'#6E7D86',green:'#34B37E',line:'#E6EEEA',card:'#FFFFFF',hr:'#9A86F2',pink:'#EE6F86'};
@@ -130,26 +130,24 @@ function Ring({progress,color,size=64,stroke=8,children}:{progress:number;color:
  return <View style={{width:size,height:size,alignItems:'center',justifyContent:'center'}}><Svg width={size} height={size} style={{position:'absolute'}}><Circle cx={size/2} cy={size/2} r={r} stroke={color} strokeOpacity={0.18} strokeWidth={stroke} fill="none"/><Circle cx={size/2} cy={size/2} r={r} stroke={color} strokeWidth={stroke} fill="none" strokeLinecap="round" strokeDasharray={`${c*p} ${c}`} transform={`rotate(-90 ${size/2} ${size/2})`}/></Svg>{children}</View>;
 }
 
-function todayValue(readings:Reading[],metric:Metric){return readings.find(r=>r.metric===metric&&sameDay(new Date(r.recorded_at),new Date()))?.value??null}
+export function todayValue(readings:Reading[],metric:Metric){return readings.find(r=>r.metric===metric&&sameDay(new Date(r.recorded_at),new Date()))?.value??null}
 function latestValue(readings:Reading[],metric:Metric){return readings.find(r=>r.metric===metric)?.value??null}
 
-export function HealthActionsGrid({onMindfulness,onSteps}:{onMindfulness:()=>void;onSteps?:()=>void}){
+export function HealthActionsGrid({day=0,onMindfulness,onChat}:{day?:number;onMindfulness:()=>void;onChat?:()=>void}){
  const {readings,loading}=useSavedHealth();
- const [appMindful,setAppMindful]=useState(0);
- useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;const start=new Date();start.setHours(0,0,0,0);
-  const {data,error}=await supabase.from('habit_entries').select('amount').eq('user_id',user.id).eq('habit','mindfulness').gte('recorded_at',start.toISOString());
-  if(!error&&alive)setAppMindful((data||[]).reduce((t,r)=>t+Number(r.amount||0),0))})();return()=>{alive=false}},[readings]);
- // Only last night's sleep; older readings would show a stale night as today's.
- const lastNight=(metric:Metric)=>{const r=readings.find(x=>x.metric===metric);return r&&Date.now()-new Date(r.recorded_at).getTime()<36*3600000?r.value:null};
- const sleep=lastNight('sleep_minutes'),awake=lastNight('sleep_awake_minutes')||0,sleepHr=lastNight('sleep_heart_rate');
- const move=todayValue(readings,'active_energy_kcal'),exercise=todayValue(readings,'exercise_minutes'),stand=todayValue(readings,'stand_hours');
- const daylight=todayValue(readings,'daylight_minutes'),mindful=(todayValue(readings,'mindfulness_minutes')||0)+appMindful,steps=todayValue(readings,'steps'),noise=latestValue(readings,'noise_db');
+ const {goals}=useHealthGoals();
+ const date=useMemo(()=>addDays(noon(new Date()),day),[day]);
+ const app=useAppMindfulness(7,readings);
+ const [open,setOpen]=useState<HealthKind|null>(null);
+ const v=(m:Metric)=>dayValue(readings,m,date);
+ const sleep=v('sleep_minutes'),awake=v('sleep_awake_minutes')||0,sleepHr=v('sleep_heart_rate');
+ const move=v('active_energy_kcal'),exercise=v('exercise_minutes'),stand=v('stand_hours');
+ const daylight=v('daylight_minutes'),mindful=(v('mindfulness_minutes')||0)+(app[date.toDateString()]||0),steps=v('steps'),noise=v('noise_db');
  const dash=loading?'…':'—';
  const sl=sleep!==null?formatMinutes(sleep):null;
- const [sleepOpen,setSleepOpen]=useState(false);
  return <View style={{gap:11}}>
-  <SleepDetail visible={sleepOpen} onClose={()=>setSleepOpen(false)} readings={readings}/>
-  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open sleep details" onPress={()=>setSleepOpen(true)} style={[st.card,st.row]}>
+  <HealthDetail kind={open} initialDay={date} readings={readings} onClose={()=>setOpen(null)} onAskAI={()=>onChat?.()} onBreathing={onMindfulness}/>
+  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open sleep details" onPress={()=>setOpen('sleep')} style={[st.card,st.row]}>
    <View style={{flex:1,gap:10}}>
     <View style={st.tileHead}><Ionicons name="bed" size={17} color="#6C63E0"/><Text style={st.tileTitle}>Sleep</Text></View>
     <View style={{flexDirection:'row',gap:16}}>
@@ -158,9 +156,9 @@ export function HealthActionsGrid({onMindfulness,onSteps}:{onMindfulness:()=>voi
      <Stat label="Avg HR" value={sleepHr!==null?String(Math.round(sleepHr)):dash} unit={sleepHr!==null?'bpm':''}/>
     </View>
    </View>
-   <Ring progress={(sleep||0)/480} color="#6C63E0"/>
+   <Ring progress={(sleep||0)/goals.sleep} color="#6C63E0"/>
   </TouchableOpacity>
-  <Card style={st.row}>
+  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open fitness details" onPress={()=>setOpen('fitness')} style={[st.card,st.row]}>
    <View style={{flex:1,gap:10}}>
     <View style={st.tileHead}><Ionicons name="flame" size={17} color="#F2685A"/><Text style={st.tileTitle}>Fitness</Text></View>
     <View style={{flexDirection:'row',gap:16}}>
@@ -169,13 +167,13 @@ export function HealthActionsGrid({onMindfulness,onSteps}:{onMindfulness:()=>voi
      <Stat label="Stand" color="#3BB5D8" value={stand!==null?String(Math.round(stand)):dash} unit={stand!==null?'h':''}/>
     </View>
    </View>
-   <Ring progress={(move||0)/500} color="#F2685A" size={70} stroke={7}><Ring progress={(exercise||0)/30} color="#5CC15A" size={52} stroke={7}><Ring progress={(stand||0)/12} color="#3BB5D8" size={34} stroke={7}/></Ring></Ring>
-  </Card>
+   <Ring progress={(move||0)/goals.move} color="#F2685A" size={70} stroke={7}><Ring progress={(exercise||0)/goals.exercise} color="#5CC15A" size={52} stroke={7}><Ring progress={(stand||0)/goals.stand} color="#3BB5D8" size={34} stroke={7}/></Ring></Ring>
+  </TouchableOpacity>
   <View style={st.grid}>
-   <Tile icon="sunny" color="#F4A83A" title="Daylight" value={daylight!==null?String(Math.round(daylight)):dash} unit={daylight!==null?'m':''} note="Time outdoors in daylight"/>
-   <Tile icon="flower" color="#4FA9E8" title="Mindfulness" value={String(Math.round(mindful))} unit="m" note="Tap for a breathing break" onPress={onMindfulness}/>
-   <Tile icon="footsteps" color="#34B37E" title="Steps" value={steps!==null?Math.round(steps).toLocaleString():dash} note="From iPhone & Apple Watch" onPress={onSteps}/>
-   <Tile icon="ear" color="#E58A6C" title="Noise Levels" value={noise!==null?noiseLabel(noise):dash} note={noise!==null?`${Math.round(noise)} dB average`:'Environmental audio'}/>
+   <Tile icon="sunny" color="#F4A83A" title="Daylight" value={daylight!==null?String(Math.round(daylight)):dash} unit={daylight!==null?'m':''} note="Time outdoors in daylight" onPress={()=>setOpen('daylight')}/>
+   <Tile icon="flower" color="#4FA9E8" title="Mindfulness" value={String(Math.round(mindful))} unit="m" note="Breathing and mindful minutes" onPress={()=>setOpen('mindfulness')}/>
+   <Tile icon="footsteps" color="#34B37E" title="Steps" value={steps!==null?Math.round(steps).toLocaleString():dash} note="From iPhone & Apple Watch" onPress={()=>setOpen('steps')}/>
+   <Tile icon="ear" color="#E58A6C" title="Noise Levels" value={noise!==null?noiseLabel(noise):dash} note={noise!==null?`${Math.round(noise)} dB average`:'Environmental audio'} onPress={()=>setOpen('noise')}/>
   </View>
  </View>;
 }
@@ -217,62 +215,6 @@ export function StressTrendCard({period}:{period:'Day'|'Week'|'Month'|'Year'}){
  </Card>;
 }
 
-const STAGES:{metric:Metric;label:string;color:string}[]=[
- {metric:'sleep_awake_minutes',label:'Awake',color:'#F7A072'},
- {metric:'sleep_rem_minutes',label:'REM',color:'#7FD3F7'},
- {metric:'sleep_core_minutes',label:'Core',color:'#7B83F2'},
- {metric:'sleep_deep_minutes',label:'Deep',color:'#4A3FB8'}
-];
-const hm=(m:number)=>{const t=formatMinutes(m);return `${t.h}h ${t.m}m`};
-function nightValue(readings:Reading[],metric:Metric,day:Date){return readings.find(r=>r.metric===metric&&sameDay(new Date(r.recorded_at),day))?.value??null}
-
-export function SleepDetail({visible,onClose,readings}:{visible:boolean;onClose:()=>void;readings:Reading[]}){
- const {isPlus,showPaywall}=usePlus();
- const count=7,shown=isPlus?count:FREE_HEALTH_DAYS;
- const nights=Array.from({length:count},(_,i)=>{const d=new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()-(count-1)+i);return {day:d,total:nightValue(readings,'sleep_minutes',d),locked:i<count-shown}});
- const open=nights.filter(n=>!n.locked);
- const last=[...open].reverse().find(n=>n.total!==null);
- const day=last?.day||new Date();
- const stages=STAGES.map(x=>({...x,value:nightValue(readings,x.metric,day)??0}));
- const stageTotal=stages.reduce((t,x)=>t+x.value,0);
- const total=last?.total??null,awake=stages[0].value,hr=nightValue(readings,'sleep_heart_rate',day);
- const avg=median(open.map(n=>n.total).filter((v):v is number=>v!==null));
- const maxNight=Math.max(480,...open.map(n=>n.total||0));
- return <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-  <ScrollView style={{flex:1,backgroundColor:SL.bg}} contentContainerStyle={{padding:20,gap:16,paddingBottom:50}}>
-   <View style={st.cardTop}><Text style={[st.cardTitle,{color:'#fff',fontSize:26}]}>Sleep</Text><TouchableOpacity accessibilityLabel="Close sleep details" onPress={onClose} style={{padding:6}}><Ionicons name="close" size={26} color="#fff"/></TouchableOpacity></View>
-   <View style={[st.card,{backgroundColor:SL.card,alignItems:'center'}]}>
-    <Ionicons name="moon" size={34} color="#C9C3FF"/>
-    <Text style={{color:'#fff',fontSize:40,fontWeight:'900'}}>{total!==null?hm(total):'—'}</Text>
-    <Text style={{color:SL.muted,fontSize:13}}>{total!==null?`${sleepQuality(total,awake)} · ${day.toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'})}`:'No sleep synced yet. Wear your Apple Watch to bed and sync Apple Health.'}</Text>
-    <View style={{flexDirection:'row',gap:26,marginTop:6}}>
-     <View style={{alignItems:'center'}}><Text style={SLt.k}>Avg HR</Text><Text style={SLt.v}>{hr!==null?Math.round(hr)+' bpm':'—'}</Text></View>
-     <View style={{alignItems:'center'}}><Text style={SLt.k}>{shown}-day avg</Text><Text style={SLt.v}>{avg!==null?hm(avg):'—'}</Text></View>
-     <View style={{alignItems:'center'}}><Text style={SLt.k}>Awake</Text><Text style={SLt.v}>{stageTotal?Math.round(awake)+'m':'—'}</Text></View>
-    </View>
-   </View>
-   <View style={[st.card,{backgroundColor:SL.card}]}>
-    <Text style={[st.cardTitle,{color:'#fff'}]}>Sleep stages</Text>
-    {stageTotal?<>
-     <View style={{flexDirection:'row',height:16,borderRadius:8,overflow:'hidden'}}>{stages.filter(x=>x.value).map(x=><View key={x.metric} style={{flex:x.value,backgroundColor:x.color}}/>)}</View>
-     {stages.map(x=><View key={x.metric} style={{flexDirection:'row',alignItems:'center',gap:10}}>
-      <View style={[st.dot,{backgroundColor:x.color}]}/><Text style={{color:'#fff',fontWeight:'700',flex:1}}>{x.label}</Text>
-      <Text style={{color:SL.muted,width:44,textAlign:'right'}}>{Math.round(100*x.value/stageTotal)}%</Text><Text style={{color:'#fff',fontWeight:'800',width:70,textAlign:'right'}}>{hm(x.value)}</Text>
-     </View>)}
-    </>:<Text style={{color:SL.muted,fontSize:12}}>Stages need an Apple Watch on watchOS 9 or later.</Text>}
-   </View>
-   <View style={[st.card,{backgroundColor:SL.card}]}>
-    <Text style={[st.cardTitle,{color:'#fff'}]}>Last {count} nights</Text>
-    <View style={{flexDirection:'row',alignItems:'flex-end',height:130,gap:8}}>{nights.map((n,i)=><View key={i} style={{flex:1,alignItems:'center',gap:6,justifyContent:'flex-end',height:130}}>
-     {n.locked?<TouchableOpacity accessibilityRole="button" accessibilityLabel="Locked night, MoodPals Plus" onPress={()=>{onClose();showPaywall('health')}} style={{width:'70%',height:40,borderRadius:8,backgroundColor:'#3A3266',alignItems:'center',justifyContent:'center'}}><Ionicons name="lock-closed" size={11} color={SL.muted}/></TouchableOpacity>:<View style={{width:'70%',height:n.total?Math.max(6,100*n.total/maxNight):4,borderRadius:8,backgroundColor:n.total?(n.total>=420?'#8F86FF':'#5C55B8'):'#3A3266'}}/>}
-     <Text style={{fontSize:10,color:SL.muted}}>{['S','M','T','W','T','F','S'][n.day.getDay()]}</Text></View>)}</View>
-    <Text style={{color:SL.muted,fontSize:11}}>Adults generally do best with 7–9 hours. Sleep data comes from Apple Health.</Text>
-    {isPlus?null:<TouchableOpacity accessibilityRole="button" onPress={()=>{onClose();showPaywall('health')}} style={{flexDirection:'row',alignItems:'center',gap:6}}><Ionicons name="lock-closed" size={12} color="#C9C3FF"/><Text style={{color:'#C9C3FF',fontWeight:'800',fontSize:12}}>See all 7 nights with MoodPals Plus</Text></TouchableOpacity>}
-   </View>
-  </ScrollView>
- </Modal>;
-}
-
 export function EnergyCard(){
  const {readings,today}=useStress();
  const now=new Date();
@@ -289,9 +231,6 @@ export function EnergyCard(){
   </View>
  </Card>;
 }
-
-const SL={bg:'#1E1840',card:'#2B2358',muted:'#A9A3D6'};
-const SLt=StyleSheet.create({k:{color:SL.muted,fontSize:11,fontWeight:'700'},v:{color:'#fff',fontSize:16,fontWeight:'800'}});
 
 const st=StyleSheet.create({
  hero:{borderRadius:30,padding:20,paddingTop:12,alignItems:'center',gap:8},
