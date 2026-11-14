@@ -22,7 +22,7 @@ drop trigger if exists wellness_readings_retention on public.wellness_readings;
 create trigger wellness_readings_retention before insert on public.wellness_readings
   for each row execute function public.wellness_readings_retention();
 
--- Deletes readings past the limit for those accounts. Not scheduled yet; to turn on:
+-- Deletes readings past the limit for those accounts. Scheduled daily in 20261125_schedule_health_purge.sql:
 --   select cron.schedule('purge-old-health-readings', '15 9 * * *', 'select public.purge_old_health_readings()');
 create or replace function public.purge_old_health_readings() returns bigint
 language plpgsql security definer set search_path = '' as $$
