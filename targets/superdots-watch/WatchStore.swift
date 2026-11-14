@@ -51,6 +51,7 @@ final class WatchStore: ObservableObject {
     }
     @Published var latestHRV: Double? = nil
     @Published var latestRestingHeartRate: Double? = nil
+    @Published var latestHeartRate: Double? = nil
     @Published var latestSteps: Double? = nil
     @Published var latestSleepMinutes: Double? = nil
     @Published var sessionsCompleted: Int = 0

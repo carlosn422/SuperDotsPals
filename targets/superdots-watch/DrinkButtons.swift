@@ -67,35 +67,104 @@ final class WatchDrinks: ObservableObject {
     }
 }
 
-struct DrinkButtons: View {
+/// Full-screen drink tracker opened from the top-left button on the home screen.
+struct DrinksView: View {
     @ObservedObject private var drinks = WatchDrinks.shared
     static let waterColor = Color(red: 0.29, green: 0.61, blue: 0.92)
     static let caffeineColor = Color(red: 0.77, green: 0.50, blue: 0.31)
+    // Daily goals set on the iPhone are not synced yet, so the watch uses the app's defaults.
+    static let waterGoal = 64.0, caffeineLimit = 400.0
 
     var body: some View {
-        HStack(spacing: 18) {
-            button("water", icon: "drop.fill", color: Self.waterColor, total: "\(Int(drinks.water.rounded())) oz", label: "Log \(Int(drinks.waterTap)) ounces of water")
-            button("caffeine", icon: "cup.and.saucer.fill", color: Self.caffeineColor, total: "\(Int(drinks.caffeine.rounded())) mg", label: "Log \(Int(drinks.caffeineTap)) milligrams of caffeine")
+        HStack(spacing: 10) {
+            DrinkCup(habit: "water", icon: "drop.fill", color: Self.waterColor,
+                     total: drinks.water, goal: Self.waterGoal, unit: "oz", tap: drinks.waterTap)
+            DrinkCup(habit: "caffeine", icon: "cup.and.saucer.fill", color: Self.caffeineColor,
+                     total: drinks.caffeine, goal: Self.caffeineLimit, unit: "mg", tap: drinks.caffeineTap)
         }
-        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 4)
         .task { await drinks.refresh() }
     }
+}
 
-    private func button(_ habit: String, icon: String, color: Color, total: String, label: String) -> some View {
-        VStack(spacing: 3) {
-            Button { Task { await drinks.log(habit) } } label: {
+/// A cup that fills to today's level and animates up after each tap.
+private struct DrinkCup: View {
+    @ObservedObject private var drinks = WatchDrinks.shared
+    let habit: String, icon: String, color: Color
+    let total: Double, goal: Double, unit: String, tap: Double
+    @State private var level: Double = 0
+
+    private var target: Double { min(max(total / goal, 0), 1) }
+
+    var body: some View {
+        Button { Task { await drinks.log(habit) } } label: {
+            VStack(spacing: 4) {
                 ZStack {
-                    Circle().fill(color.opacity(0.22))
+                    CupShape().fill(Color.white.opacity(0.08))
+                    Wave(level: level, phase: level * 12)
+                        .fill(LinearGradient(colors: [color.opacity(0.75), color], startPoint: .top, endPoint: .bottom))
+                        .clipShape(CupShape())
+                    CupShape().stroke(color.opacity(0.9), lineWidth: 2)
                     Image(systemName: drinks.confirmed == habit ? "checkmark" : icon)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(color)
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.35), radius: 2)
                 }
-                .frame(width: 38, height: 38)
+                .frame(height: 92)
+                Text("\(Int(total.rounded())) / \(Int(goal)) \(unit)")
+                    .font(.system(size: 12, weight: .semibold)).monospacedDigit()
+                Text("+\(Int(tap)) \(unit)")
+                    .font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
             }
-            .buttonStyle(.plain)
-            .disabled(drinks.busy)
-            .accessibilityLabel(label)
-            Text(total).font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary).accessibilityHidden(true)
+            .frame(maxWidth: .infinity)
         }
+        .buttonStyle(.plain)
+        .disabled(drinks.busy)
+        .accessibilityLabel(habit == "water"
+            ? "Water, \(Int(total.rounded())) of \(Int(goal)) ounces today. Tap to log \(Int(tap)) ounces."
+            : "Caffeine, \(Int(total.rounded())) of \(Int(goal)) milligrams today. Tap to log \(Int(tap)) milligrams.")
+        .onAppear { withAnimation(.easeOut(duration: 0.9)) { level = target } }
+        .onChange(of: target) { _, next in withAnimation(.easeInOut(duration: 0.9)) { level = next } }
+    }
+}
+
+/// A slightly tapered cup with a rounded base.
+private struct CupShape: Shape {
+    func path(in r: CGRect) -> Path {
+        let inset = r.width * 0.12, radius = r.width * 0.16
+        var p = Path()
+        p.move(to: CGPoint(x: r.minX, y: r.minY))
+        p.addLine(to: CGPoint(x: r.maxX, y: r.minY))
+        p.addLine(to: CGPoint(x: r.maxX - inset, y: r.maxY - radius))
+        p.addQuadCurve(to: CGPoint(x: r.maxX - inset - radius, y: r.maxY), control: CGPoint(x: r.maxX - inset, y: r.maxY))
+        p.addLine(to: CGPoint(x: r.minX + inset + radius, y: r.maxY))
+        p.addQuadCurve(to: CGPoint(x: r.minX + inset, y: r.maxY - radius), control: CGPoint(x: r.minX + inset, y: r.maxY))
+        p.closeSubpath()
+        return p
+    }
+}
+
+/// Liquid filled from the bottom up to `level` (0...1) with a gentle wave on top.
+private struct Wave: Shape {
+    var level: Double
+    var phase: Double
+    var animatableData: AnimatablePair<Double, Double> {
+        get { AnimatablePair(level, phase) }
+        set { level = newValue.first; phase = newValue.second }
+    }
+    func path(in r: CGRect) -> Path {
+        guard level > 0 else { return Path() }
+        let top = r.maxY - r.height * level
+        let amp = level >= 1 ? 0 : min(3, r.height * 0.04)
+        var p = Path()
+        p.move(to: CGPoint(x: r.minX, y: r.maxY))
+        p.addLine(to: CGPoint(x: r.minX, y: top))
+        for x in stride(from: r.minX, through: r.maxX, by: 2) {
+            let y = top + amp * sin((x - r.minX) / r.width * 2 * .pi + phase)
+            p.addLine(to: CGPoint(x: x, y: y))
+        }
+        p.addLine(to: CGPoint(x: r.maxX, y: r.maxY))
+        p.closeSubpath()
+        return p
     }
 }
