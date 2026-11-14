@@ -12,7 +12,7 @@ export const FREE_HEALTH_DAYS=7;
 export const PLUS_HEALTH_DAYS=30;
 
 export type PlusPlan='monthly'|'annual';
-export type PlusFeature='general'|'trends'|'customization'|'circles'|'reflections'|'family'|'health';
+export type PlusFeature='general'|'trends'|'customization'|'circles'|'reflections'|'family'|'health'|'hydration';
 export type PlusPrice={price:string;period:string;label:string;note?:string};
 
 export const PLUS_PRICES:Record<PlusPlan,PlusPrice>={
@@ -27,6 +27,7 @@ export const FEATURE_COPY:Record<PlusFeature,{title:string;body:string}>={
  circles:{title:'Bigger circles',body:'Create more private groups for the people closest to you.'},
  reflections:{title:'AI reflections',body:'Get gentle reflections on your check-ins, up to 100 a month.'},
  health:{title:'Sleep & fitness history',body:'See your body and recovery from Apple Health, with up to 30 days of sleep and fitness. Free shows each day for the last 7 days.'},
+ hydration:{title:'Hydration goal & reminders',body:'Set your own daily water goal and caffeine limit, and get gentle water reminders through the day. Logging stays free.'},
  family:{title:'More family watches',body:'Link up to 4 family watches, each with its own mood-only profile. Free includes 1.'},
 };
 
@@ -37,6 +38,7 @@ export const PLAN_FEATURES:{label:string;free:string|boolean;plus:string|boolean
  {label:'Family watches (mood-only)',free:'1',plus:'Up to 4'},
  {label:'Advanced trends and 30-day history',free:false,plus:true},
  {label:'Sleep and fitness history',free:'7 days',plus:'30 days'},
+ {label:'Hydration goal and water reminders',free:false,plus:true},
  {label:'Extra customization',free:false,plus:true},
  {label:'Private circles',free:'Friends group',plus:'Unlimited groups'},
  {label:'AI reflections',free:false,plus:'100 / month'},

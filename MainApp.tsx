@@ -11,7 +11,8 @@ import {sendMoodToWatch} from './modules/watch-link';
 import SuperdotMascot from './SuperdotMascot';
 import BreathingStudio from './BreathingStudio';
 import WellnessCompanion from './WellnessCompanion';
-import HabitDetails from './HabitDetails';
+import DrinkDetail from './DrinkDetail';
+import {rowAmount} from './Drinks';
 import WellnessReminders from './WellnessReminders';
 import {signOutAndUnregister} from './PushRegistration';
 import WellnessReportExport from './WellnessReportExport';
@@ -176,9 +177,9 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  const [coffee,setCoffee]=useState(0);
  useEffect(()=>{let alive=true;(async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;
  const today=new Date();today.setHours(0,0,0,0);
- const {data,error}=await supabase.from('habit_entries').select('habit,amount,recorded_at').eq('user_id',user.id).in('habit',['water','caffeine']).gte('recorded_at',today.toISOString()).order('recorded_at',{ascending:false}).limit(100);
+ const {data,error}=await supabase.from('habit_entries').select('habit,amount,unit,recorded_at').eq('user_id',user.id).in('habit',['water','caffeine']).gte('recorded_at',today.toISOString()).order('recorded_at',{ascending:false}).limit(100);
  if(error){console.warn('Loading habits failed:',error.message);return;}
- if(alive){const w=data?.find(x=>x.habit==='water');const c=data?.find(x=>x.habit==='caffeine');setWater(w?Number(w.amount):0);setCoffee(c?Number(c.amount):0);}
+ if(alive){const w=data?.find(x=>x.habit==='water');const c=data?.find(x=>x.habit==='caffeine');setWater(w?rowAmount(w):0);setCoffee(c?rowAmount(c):0);}
  })();return()=>{alive=false}},[]);
  const [breathing,setBreathing]=useState(false);
  const [companion,setCompanion]=useState<'happy'|'sleepy'>('happy');
@@ -210,13 +211,14 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
    if(authError||!user)throw Error('Please sign in to log your habits.');
    const start=new Date();start.setHours(0,0,0,0);
    const {data:latest,error:loadError}=await supabase.from('habit_entries')
-    .select('amount').eq('user_id',user.id).eq('habit',habit)
+    .select('habit,amount,unit').eq('user_id',user.id).eq('habit',habit)
     .gte('recorded_at',start.toISOString())
     .order('recorded_at',{ascending:false}).limit(1).maybeSingle();
    if(loadError)throw loadError;
-   const next=Number(latest?.amount||0)+1;
+   // Quick add: one 8 oz cup of water, or one coffee (95 mg).
+   const next=(latest?rowAmount(latest):0)+(habit==='water'?8:95);
    const {error:saveError}=await supabase.from('habit_entries').insert({
-    user_id:user.id,habit,amount:next,unit:habit==='water'?'cups':'servings'
+    user_id:user.id,habit,amount:next,unit:habit==='water'?'oz':'mg'
    });
    if(saveError)throw saveError;
    if(habit==='water')setWater(next);else setCoffee(next);
@@ -234,13 +236,12 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   <ScrollView ref={pager} horizontal pagingEnabled scrollEnabled={!chartScrubbing} bounces={false} showsHorizontalScrollIndicator={false} scrollEventThrottle={16} onMomentumScrollEnd={onPageSettled} directionalLockEnabled style={{flex:1}} keyboardShouldPersistTaps="handled">
   <View key="Today" style={{width:pageWidth,flex:1}}><ChartScrubContext.Provider value={setChartScrubbing}><ScrollView ref={todayScroll} scrollEnabled={!chartScrubbing} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><FamilySwitcher disabled={isGuest} focused={tab==='Today'&&!moreScreen} onAdd={()=>go('Watches')} onChat={id=>setCircleSheet([{name:'chat',id}])} onSignal={id=>setCircleSheet([{name:'send',friendId:id,locked:true}])}><WellnessToday onHealthMood={applyHealthMood} onInvite={()=>{if(isGuest){go('Settings');setSettingsPage('account')}else setCircleSheet([{name:'invite'}])}} onPlans={()=>{go('Settings');setSettingsPage('plus')}} dayRow={isGuest?null:<MiniMoodCalendar/>} socialCard={<LittleSignalsTodayCard onOpenSignals={()=>setCircleSheet([{name:'today'}])} onOpenMood={id=>setCircleSheet([{name:'friendMood',id}])} onOpenSignal={id=>setCircleSheet([{name:'signalReceived',signalId:id}])} onSend={()=>setCircleSheet([{name:'send'}])}/>} companion={shownMood} accent={colors.accent} water={water} caffeine={coffee} mood={mood} onCheckin={()=>{go('Actions');openAction('checkin')}} onBreathing={()=>{go('Actions');openAction('breathing')}} onChat={()=>{go('Actions');openAction('chat')}} onActions={()=>{go('Actions');setActionView(null);setActionDetail('water')}} onCaffeine={()=>{go('Actions');setActionView(null);setActionDetail('caffeine')}} onJournal={()=>{go('Actions');openAction('history')}} onAddWater={()=>void quickAddHabit('water')} onAddCaffeine={()=>void quickAddHabit('caffeine')} addingWater={quickAdding.water} addingCaffeine={quickAdding.caffeine}/></FamilySwitcher></ScrollView></ChartScrubContext.Provider></View>
   <View key="Actions" style={{width:pageWidth,flex:1}}><ScrollView ref={actionScroll} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-  {actionDetail||actionView?<TouchableOpacity onPress={()=>{setActionView(null);setActionDetail(null);actionScroll.current?.scrollTo({y:0,animated:true});}} style={{flexDirection:'row',alignItems:'center',gap:8,paddingVertical:9}}><Ionicons name="arrow-back" size={20} color={colors.accent}/><Text style={{color:colors.accent,fontWeight:'800'}}>All actions</Text></TouchableOpacity>:null}
-  {actionDetail?<HabitDetails habit={actionDetail} onBack={()=>{setActionDetail(null);actionScroll.current?.scrollTo({y:0,animated:true})}} onSaved={(habit,n)=>{if(habit==='water')setWater(n);else setCoffee(n)}}/>:
-  actionView==='spiritual'?<SpiritualReading key={actionVersion} initialCheckin={spiritualCheckin}/>:
+  {actionView?<TouchableOpacity onPress={()=>{setActionView(null);setActionDetail(null);actionScroll.current?.scrollTo({y:0,animated:true});}} style={{flexDirection:'row',alignItems:'center',gap:8,paddingVertical:9}}><Ionicons name="arrow-back" size={20} color={colors.accent}/><Text style={{color:colors.accent,fontWeight:'800'}}>All actions</Text></TouchableOpacity>:null}
+  {actionView==='spiritual'?<SpiritualReading key={actionVersion} initialCheckin={spiritualCheckin}/>:
   actionView==='breathing'?<BreathingStudio key={actionVersion} onDone={()=>{setActionView(null);actionScroll.current?.scrollTo({y:0,animated:true})}}/>:
   actionView?<WellnessCompanion key={actionVersion} onShareWithCircle={m=>{const cm=CIRCLE_MOODS.find(x=>x.toLowerCase()===m.toLowerCase());if(cm)setCircleSheet([{name:'share',mood:cm}]);}} initialView={actionView as 'checkin'|'chat'|'history'} companion={shownMood} onMoodSaved={saveMood} onWizardNavigate={()=>actionScroll.current?.scrollTo({y:0,animated:false})} onCheckinDone={()=>{setActionView(null);go('Today');}} onOpenInsights={()=>{setActionView(null);go('Trends');}} onFindVerse={(selectedMood,answers)=>{setSpiritualCheckin({mood:selectedMood,answers});setActionView('spiritual');setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});}} onAction={a=>{if(a==='breathing')openAction('breathing');else if(a==='water')void quickAddHabit('water');else if(a==='trends'){setActionView(null);go('Trends')}else{setActionView(null);go('Settings');setSettingsPage('notifications')}}} color={colors.accent}/>:
   <WellnessActions companion={shownMood} accent={colors.accent} water={water} caffeine={coffee} onCaffeine={()=>{setActionView(null);setActionDetail('caffeine');actionScroll.current?.scrollTo({y:0,animated:true})}} onWater={()=>{setActionView(null);setActionDetail('water');actionScroll.current?.scrollTo({y:0,animated:true})}} onSpiritual={()=>openAction('spiritual')} onChat={()=>openAction('chat')} onMood={()=>openAction('checkin')} onJournal={()=>openAction('history')} onBreathing={()=>openAction('breathing')}/>}
-</ScrollView></View>
+</ScrollView><DrinkDetail kind={actionDetail} onClose={()=>setActionDetail(null)} onSaved={(habit,n)=>{if(habit==='water')setWater(n);else setCoffee(n)}} onAskAI={()=>openAction('chat')}/></View>
   <View key="Circle" style={{width:pageWidth,flex:1}}>{isGuest?<ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><AccountRequired accent={colors.accent} backLabel="Today" onBack={()=>go('Today')} onCreate={()=>{go('Settings');setSettingsPage('account')}}/></ScrollView>:<CircleNavigator onExit={()=>go('Today')} mood={mood} contentStyle={s.scroll} resetKey={circleReset}/>}</View>
   <View key="Watches" style={{width:pageWidth,flex:1}}><ScrollView ref={watchesScroll} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>{watchesPage==='themes'?<WatchThemesScreen backLabel="Watches" onBack={()=>setWatchesPage('main')}/>:<ConnectedDevices key={watchesReset} focused={tab==='Watches'&&!moreScreen} onOpenThemes={()=>setWatchesPage('themes')} onCreateAccount={()=>{go('Settings');setSettingsPage('account')}}/>}</ScrollView></View>
   </ScrollView>
