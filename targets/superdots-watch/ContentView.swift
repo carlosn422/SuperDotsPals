@@ -119,20 +119,23 @@ struct ContentView: View {
                     }
                 }
                 .padding(.horizontal, 5)
-                // Same style as the former inline drink buttons, in the top-left corner opposite the clock.
+                // Same style as the former inline drink buttons, in the top-left corner opposite the clock,
+                // inset in proportion to the screen so the rounded display corner never clips it.
                 .overlay(alignment: .topLeading) {
                     if !sync.moodOnly {
+                        let width = WKInterfaceDevice.current().screenBounds.width
+                        let size: CGFloat = width < 180 ? 30 : 34
                         Button { showingDrinks = true } label: {
                             Image(systemName: "drop.fill")
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.system(size: size * 0.44, weight: .semibold))
                                 .foregroundStyle(DrinksView.waterColor)
-                                .frame(width: 34, height: 34)
+                                .frame(width: size, height: size)
                                 .background(Circle().fill(DrinksView.waterColor.opacity(0.22)))
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Water and caffeine")
-                        .padding(.leading, 10)
-                        .padding(.top, 4)
+                        .padding(.leading, width * 0.15 - size / 2)
+                        .padding(.top, width * 0.13 - size / 2)
                         .ignoresSafeArea()
                     }
                 }
