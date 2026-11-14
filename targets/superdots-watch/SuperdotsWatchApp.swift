@@ -26,6 +26,7 @@ final class WatchAppDelegate: NSObject, WKApplicationDelegate, UNUserNotificatio
         // HealthKit background delivery only wakes the app for observer queries registered at launch.
         HealthStressMonitor.shared.startObserving()
         WatchPhoneLink.shared.activate()
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         Self.scheduleMoodRefresh()
     }
 

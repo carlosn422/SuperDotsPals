@@ -51,7 +51,13 @@ async function listenForReadings(userId:string|null,reconnect=false){
   .on('postgres_changes',{event:'INSERT',schema:'public',table:'wellness_readings',filter:'user_id=eq.'+userId},scheduleRefresh)
   .subscribe();
 }
-supabase.auth.onAuthStateChange((_event,session)=>{const id=session?.user.id??null;setTimeout(()=>void listenForReadings(id),0)});
+// Serialized: overlapping calls (sign-in + foreground) otherwise reuse a channel that is already subscribed.
+let listenQueue:Promise<void>=Promise.resolve();
+function listen(userId:string|null,reconnect=false){
+ listenQueue=listenQueue.then(()=>listenForReadings(userId,reconnect)).catch(e=>console.warn('Readings realtime unavailable',e));
+ return listenQueue;
+}
+supabase.auth.onAuthStateChange((_event,session)=>{const id=session?.user.id??null;setTimeout(()=>void listen(id),0)});
 
 // Coming back to MoodPals re-reads Apple Health (at most every 15 minutes) and always reloads saved readings.
 // iOS drops the realtime socket while the app is suspended, so reconnect too.
@@ -60,7 +66,7 @@ async function onForeground(){
  await backgroundSync();
  if(lastRun===before)await refreshSavedHealth().catch(()=>{});
  const {data}=await supabase.auth.getSession();
- await listenForReadings(data.session?.user.id??null,true);
+ await listen(data.session?.user.id??null,true);
 }
 AppState.addEventListener('change',s=>{if(s==='active')void onForeground()});
 
