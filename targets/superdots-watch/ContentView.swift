@@ -81,7 +81,7 @@ struct ContentView: View {
                         Button {
                             choosingMood = true
                         } label: {
-                            AnimatedMoodMascot(mood: shownMood, size: 96, isActive: scenePhase == .active)
+                            AnimatedMoodMascot(mood: shownMood, size: WKInterfaceDevice.current().screenBounds.height < 220 ? 52 : 64, isActive: scenePhase == .active)
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.plain)
