@@ -46,6 +46,7 @@ export function useHealthGoals(){
 }
 
 // Minutes logged with the in-app breathing exercises, by day.
+const mindful=(health:number|null,app?:number)=>health===null&&!app?null:(health||0)+(app||0);
 export function useAppMindfulness(days:number,refresh?:unknown){
  const [byDay,setByDay]=useState<Record<string,number>>({});
  useEffect(()=>{let alive=true;(async()=>{
@@ -106,7 +107,7 @@ function DetailBody({kind,initialDay,readings,onClose,onAskAI,onBreathing}:{kind
  const app=useAppMindfulness(limit,readings);
  const span=period==='D'?1:period==='W'?7:30;
  const choosePeriod=(p:Period)=>{if(!isPlus&&p!=='D'){showPaywall('trends');return}setPicker(false);setPeriod(p)};
- const val=(m:Metric,d:Date)=>m==='mindfulness_minutes'?(dayValue(readings,m,d)||0)+(app[d.toDateString()]||0):dayValue(readings,m,d);
+ const val=(m:Metric,d:Date)=>m==='mindfulness_minutes'?mindful(dayValue(readings,m,d),app[d.toDateString()]):dayValue(readings,m,d);
  const days=Array.from({length:span},(_,i)=>addDays(day,i-(span-1))).filter(d=>d>=minDay);
  const series=(m:Metric)=>days.map(d=>val(m,d));
  const value=(m:Metric)=>period==='D'?val(m,day):avg(series(m));
