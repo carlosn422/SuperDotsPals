@@ -243,7 +243,7 @@ private struct StressSummary: View {
                         .font(.system(size: 13, weight: .semibold)).monospacedDigit()
                         .lineLimit(1).minimumScaleFactor(0.7)
                 }
-                StressBar(score: reading.score)
+                StressBar(score: reading.score, level: reading.level)
             }
             .accessibilityElement()
             .accessibilityLabel(["Stress \(reading.level.label)", heartRate.map { "heart rate \(Int($0.rounded())) beats per minute" }, hrv.map { "HRV \(Int($0.rounded())) milliseconds" }].compactMap { $0 }.joined(separator: ", "))
@@ -254,13 +254,14 @@ private struct StressSummary: View {
 /// Overload (left) to Great (right) in four segments, like the iPhone scale, with a ring at the current score.
 private struct StressBar: View {
     let score: Int
+    let level: StressLevel
     // Same colours as STRESS_LEVELS on the iPhone, in LEVEL_ORDER.
     static let colors = [Color(red: 0.93, green: 0.44, blue: 0.53), Color(red: 0.95, green: 0.65, blue: 0.44),
                          Color(red: 0.54, green: 0.61, blue: 0.94), Color(red: 0.30, green: 0.73, blue: 0.50)]
     var body: some View {
         GeometryReader { geo in
             let position = min(max(Double(100 - score), 2), 96) / 100
-            let ring = Self.colors[min(3, Int(Double(100 - min(max(score, 0), 100)) / 25))]
+            let ring = Self.colors[[.overload, .elevated, .normal, .great].firstIndex(of: level) ?? 3]
             ZStack(alignment: .leading) {
                 HStack(spacing: 4) {
                     ForEach(0..<4, id: \.self) { Capsule().fill(Self.colors[$0]).frame(height: 8) }
