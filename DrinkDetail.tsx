@@ -177,8 +177,11 @@ function Body({kind,onClose,onSaved,onAskAI}:{kind:Drink;onClose:()=>void;onSave
 
    <View style={{alignItems:'center',gap:8,marginTop:4}}>
     <Fill kind={kind} progress={pct} color={k.color}/>
-    {loading?<ActivityIndicator color={k.color}/>:<Text style={s.big}>{value===null?'0':Math.round(value)}</Text>}
-    <Text style={st.muted}>{kind==='water'?`/${fmt(kind,goal)}${value!==null&&value<goal?`, ${fmt(kind,goal-value)} remaining`:''}`:`mg of ${fmt(kind,goal)} daily limit`}</Text>
+    {loading?<ActivityIndicator color={k.color}/>:<View style={s.total}>
+     <Text style={s.big}>{value===null?'0':Math.round(value)}</Text>
+     <Text style={s.of}>/ {fmt(kind,goal)}</Text>
+    </View>}
+    <Text style={st.muted}>{kind==='caffeine'?'Daily limit':value!==null&&value<goal?`${fmt(kind,goal-value)} to go`:'Daily goal'}</Text>
     <Text style={st.status}>{status}</Text>
    </View>
 
@@ -242,7 +245,7 @@ function Fill({kind,progress,color}:{kind:Drink;progress:number;color:string}){
 }
 
 const s=StyleSheet.create({
- big:{fontSize:52,fontWeight:'900',color:INK},
+ total:{flexDirection:'row',alignItems:'baseline',gap:6},big:{fontSize:52,fontWeight:'900',color:INK},of:{fontSize:20,fontWeight:'700',color:MUTED},
  buttons:{flexDirection:'row',flexWrap:'wrap',justifyContent:'center',gap:10},
  btn:{minWidth:96,paddingHorizontal:16,paddingVertical:12,borderRadius:22,alignItems:'center'},btnText:{color:'#fff',fontWeight:'800',fontSize:15},
  row:{flexDirection:'row',alignItems:'center',gap:10,minHeight:40},rowLabel:{flex:1,fontSize:16,color:INK},rowValue:{fontSize:15,color:MUTED,marginLeft:6},

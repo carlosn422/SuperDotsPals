@@ -87,10 +87,10 @@ struct DrinkButtons: View {
                 ZStack {
                     Circle().fill(color.opacity(0.22))
                     Image(systemName: drinks.confirmed == habit ? "checkmark" : icon)
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(color)
                 }
-                .frame(width: 44, height: 44)
+                .frame(width: 38, height: 38)
             }
             .buttonStyle(.plain)
             .disabled(drinks.busy)
