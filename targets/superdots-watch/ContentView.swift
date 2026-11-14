@@ -197,8 +197,7 @@ struct ContentView: View {
             guard !sync.moodOnly else { return }
             while !Task.isCancelled {
                 let monitor = HealthStressMonitor.shared
-                let points = await monitor.samples(monitor.heartRateType, unit: HealthStressMonitor.bpm, since: Date().addingTimeInterval(-7200))
-                store.latestHeartRate = points.last?.value
+                store.latestHeartRate = await monitor.latestSample(monitor.heartRateType, unit: HealthStressMonitor.bpm, since: Date().addingTimeInterval(-7200))?.value
                 do { try await Task.sleep(for: .seconds(60)) } catch { break }
             }
         }
