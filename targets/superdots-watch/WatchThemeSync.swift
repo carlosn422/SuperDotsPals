@@ -118,9 +118,12 @@ final class WatchThemeSync: ObservableObject {
             syncWarning = [syncWarning, "Mood: \(error.localizedDescription)"].compactMap{$0}.joined(separator:"; ")
         }
         do {
-            let data = try await request("/rest/v1/user_settings?select=watch_theme&user_id=eq.\(userId)&limit=1",method:"GET")
+            let data = try await request("/rest/v1/user_settings?select=watch_theme,water_tap_oz,caffeine_tap_mg&user_id=eq.\(userId)&limit=1",method:"GET")
             let rows = try JSONSerialization.jsonObject(with:data) as? [[String:Any]] ?? []
             if let id = rows.first?["watch_theme"] as? String, id != store.theme.id { store.applyTheme(id) }
+            for key in ["water_tap_oz", "caffeine_tap_mg"] {
+                if let v = (rows.first?[key] as? NSNumber)?.doubleValue { UserDefaults.standard.set(v, forKey: key) }
+            }
         } catch {
             NSLog("[WatchSync] Theme sync failed: %@", error.localizedDescription)
         }
@@ -522,6 +525,18 @@ final class WatchThemeSync: ObservableObject {
     }
 
     /// Calls a Postgres RPC as the signed-in user, renewing the session once if the access token expired.
+    var accountId: String { userId }
+
+    /// Authenticated PostgREST call for the own-account watch, renewing once on 401.
+    func restRequest(_ path: String, method: String, body: Data? = nil, headers: [String: String] = [:]) async throws -> Data {
+        guard !moodOnly, connected, !userId.isEmpty else { throw URLError(.userAuthenticationRequired) }
+        do { return try await request(path, method: method, body: body, extraHeaders: headers, timeout: 8) }
+        catch SyncError.server(401, _, _) {
+            try await renewIfNeeded()
+            return try await request(path, method: method, body: body, extraHeaders: headers, timeout: 8)
+        }
+    }
+
     func rpc(_ name: String, _ params: [String: Any]) async throws -> Data {
         guard connected, !refreshToken.isEmpty else { throw SyncError.notSignedIn }
         let body = try JSONSerialization.data(withJSONObject: params)

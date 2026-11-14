@@ -14,7 +14,7 @@ import {median,noiseLabel,sameDay,sleepQuality} from './StressEngine';
 
 export type HealthKind='sleep'|'fitness'|'daylight'|'steps'|'mindfulness'|'noise';
 export type GoalKey='sleep'|'move'|'exercise'|'stand'|'daylight'|'steps'|'mindfulness';
-type Period='D'|'W'|'M';
+export type Period='D'|'W'|'M';
 
 const INK='#1D2B33',MUTED='#6E7D86',BG='#F4FAF6',LINE='#E6EEEA';
 export const hm=(minutes:number)=>{const r=Math.round(minutes),h=Math.floor(r/60),m=r%60;return h&&m?`${h}h ${m}m`:h?`${h}h`:`${m}m`};
@@ -258,10 +258,10 @@ function DayCards({kind,day,val,readings,goal,color}:{kind:HealthKind;day:Date;v
  </View>;
 }
 
-function TrendCard({title,days,values,goal,color,fmt,lowerIsBetter=false}:{title:string;days:Date[];values:(number|null)[];goal:number|null;color:string;fmt:(v:number)=>string;lowerIsBetter?:boolean}){
+export function TrendCard({title,days,values,goal,color,fmt,lowerIsBetter=false}:{title:string;days:Date[];values:(number|null)[];goal:number|null;color:string;fmt:(v:number)=>string;lowerIsBetter?:boolean}){
  const have=values.filter((v):v is number=>v!==null);
  const best=have.length?(lowerIsBetter?Math.min(...have):Math.max(...have)):null;
- const met=goal!==null?have.filter(v=>v>=goal).length:null;
+ const met=goal!==null?have.filter(v=>lowerIsBetter?v<=goal:v>=goal).length:null;
  const labels=days.map((d,i)=>days.length<=7?['S','M','T','W','T','F','S'][d.getDay()]:i%5===0?String(d.getDate()):'');
  return <View style={st.card}><Text style={st.cardTitle}>{title}</Text>
   {have.length?<><View style={{flexDirection:'row'}}><MiniStat label="Average" value={fmt(avg(values)!)}/><MiniStat label={lowerIsBetter?'Quietest day':'Best day'} value={fmt(best!)}/>{met!==null?<MiniStat label="Goal met" value={`${met} of ${have.length}`}/>:null}</View>
@@ -315,3 +315,4 @@ const st=StyleSheet.create({
  goalHead:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:18,paddingBottom:16},goalTitle:{fontSize:18,fontWeight:'800',color:INK},
  goalRow:{flexDirection:'row',alignItems:'center',gap:10,paddingVertical:14},step:{width:34,height:34,borderRadius:17,backgroundColor:BG,alignItems:'center',justifyContent:'center'},
 });
+export {st as detailStyles};

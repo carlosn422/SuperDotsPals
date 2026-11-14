@@ -6,6 +6,7 @@ import {Image as RNImage} from 'react-native';
 import {APP_THEME} from './MoodMascot';
 import {supabase} from './supabase';
 import {usePlus} from './PlusStore';
+import {rowAmount,useDrinkGoals} from './Drinks';
 import HealthDataPanel,{HealthMiniStats,useSavedHealth} from './HealthDataPanel';
 import RecoveryInsights from './RecoveryInsights';
 import {InviteFriendsCard,LockedPreviewCard,PlusBadge,PlusOfferCard,UpgradePill} from './TodayUpsell';
@@ -62,12 +63,13 @@ export function MeetYourMoods({onCheckin}:{onCheckin:()=>void}){
 }
 export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,onHealthMood,onChat,onBreathing,onActions,onCaffeine,onJournal,onAddWater,onAddCaffeine,addingWater,addingCaffeine,socialCard,dayRow,onInvite,onPlans}:{onInvite:()=>void;onPlans:()=>void;socialCard?:React.ReactNode;dayRow?:React.ReactNode;companion:string;accent:string;water:number;caffeine:number;mood:string;onCheckin:()=>void;onChat:()=>void;onBreathing:()=>void;onActions:()=>void;onCaffeine:()=>void;onJournal:()=>void;onAddWater:()=>void;onAddCaffeine:()=>void;addingWater:boolean;addingCaffeine:boolean;onHealthMood?:()=>void}){
  const today=new Date();
+ const {goals:drinkGoals}=useDrinkGoals(usePlus().isPlus);
  const date=today.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
  const row=(icon:any,label:string,detail:string,onPress:()=>void,quickAdd?:()=>void,adding=false)=>(
   <TouchableOpacity onPress={onPress} style={{backgroundColor:'#FFFFFF',paddingVertical:13,paddingHorizontal:13,flexDirection:'row',alignItems:'center',gap:12,borderBottomColor:'#F0EEF5',borderBottomWidth:1}}>
    <View style={{width:39,height:39,borderRadius:13,backgroundColor:label==='Water'?'#EEF5FF':label==='Caffeine'?'#FFF7E8':APP_THEME.primarySoft,alignItems:'center',justifyContent:'center'}}><Ionicons name={icon} color={label==='Water'?'#4A8CFF':label==='Caffeine'?'#F4B400':accent} size={21}/></View>
    <View style={{flex:1,gap:3}}><Text style={{fontWeight:'800',color:INK,fontSize:14}}>{label}</Text><Text style={{color:MUTED,fontSize:11}}>{detail}</Text></View>
-   {quickAdd?<TouchableOpacity accessibilityRole="button" accessibilityLabel={'Add one '+(label==='Water'?'cup of water':'caffeine serving')} disabled={adding} onPress={quickAdd} style={{width:38,height:38,borderRadius:19,backgroundColor:APP_THEME.primarySoft,alignItems:'center',justifyContent:'center',opacity:adding?0.5:1}}><Ionicons name={adding?'ellipsis-horizontal':'add'} color={accent} size={23}/></TouchableOpacity>:<Ionicons name="chevron-forward" color={accent} size={18}/>}
+   {quickAdd?<TouchableOpacity accessibilityRole="button" accessibilityLabel={label==='Water'?'Add 8 ounces of water':'Add one coffee, 95 milligrams'} disabled={adding} onPress={quickAdd} style={{width:38,height:38,borderRadius:19,backgroundColor:APP_THEME.primarySoft,alignItems:'center',justifyContent:'center',opacity:adding?0.5:1}}><Ionicons name={adding?'ellipsis-horizontal':'add'} color={accent} size={23}/></TouchableOpacity>:<Ionicons name="chevron-forward" color={accent} size={18}/>}
   </TouchableOpacity>
  );
  const {isPlus}=usePlus();
@@ -86,8 +88,8 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
   <View style={{gap:10}}>
    <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={{fontWeight:'900',fontSize:19,color:INK}}>Today</Text><Text style={{color:MUTED,fontSize:12}}>{date}</Text></View>
    <View style={{borderRadius:20,overflow:'hidden',borderColor:APP_THEME.border,borderWidth:1}}>
-    {row('water','Water',water+' of 8 cups · daily goal',onActions,onAddWater,addingWater)}
-    {row('cafe','Caffeine',caffeine+' '+(caffeine===1?'serving':'servings')+' logged today',onCaffeine,onAddCaffeine,addingCaffeine)}
+    {row('water','Water',water+' of '+drinkGoals.water+' oz · daily goal',onActions,onAddWater,addingWater)}
+    {row('cafe','Caffeine',caffeine+' mg logged today',onCaffeine,onAddCaffeine,addingCaffeine)}
     {row('book-outline','Journal','View your private reflections',onJournal)}
     {row('happy-outline','Mood',mood||'Not checked in yet',onCheckin)}
    </View>
@@ -101,6 +103,7 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
 export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpiritual,onChat,onMood,onJournal,onBreathing,caffeine}:{companion:string;accent:string;water:number;caffeine:number;onWater:()=>void;onCaffeine:()=>void;onSpiritual:()=>void;onChat:()=>void;onMood:()=>void;onJournal:()=>void;onBreathing:()=>void}){
  const [day,setDay]=React.useState(0);
  const [pastAmounts,setPastAmounts]=React.useState({water:0,caffeine:0});
+ const {goals:drinkGoals}=useDrinkGoals(usePlus().isPlus);
  const [activitySummary,setActivitySummary]=React.useState<{count:number;minutes:number}>({count:0,minutes:0});
  React.useEffect(()=>{let active=true;(async()=>{
   const {data:{user}}=await supabase.auth.getUser();if(!user)return;
@@ -114,8 +117,8 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpi
  (async()=>{try{const {data:{user}}=await supabase.auth.getUser();if(!user)return;
  const d=new Date();d.setDate(d.getDate()+day);d.setHours(0,0,0,0);
  const end=new Date(d);end.setDate(end.getDate()+1);
- const {data,error}=await supabase.from('habit_entries').select('habit,amount').eq('user_id',user.id).in('habit',['water','caffeine']).gte('recorded_at',d.toISOString()).lt('recorded_at',end.toISOString()).order('recorded_at',{ascending:false}).limit(100);
- if(error)throw error;if(alive)setPastAmounts({water:Number(data?.find(r=>r.habit==='water')?.amount||0),caffeine:Number(data?.find(r=>r.habit==='caffeine')?.amount||0)});
+ const {data,error}=await supabase.from('habit_entries').select('habit,amount,unit').eq('user_id',user.id).in('habit',['water','caffeine']).gte('recorded_at',d.toISOString()).lt('recorded_at',end.toISOString()).order('recorded_at',{ascending:false}).limit(100);
+ if(error)throw error;if(alive){const w=data?.find(r=>r.habit==='water'),c=data?.find(r=>r.habit==='caffeine');setPastAmounts({water:w?rowAmount(w):0,caffeine:c?rowAmount(c):0})};
  }catch(e){console.warn('Daily habit history unavailable',e)}})();return()=>{alive=false};
  },[day]);
  const shownWater=day===0?water:pastAmounts.water,shownCaffeine=day===0?caffeine:pastAmounts.caffeine;
@@ -147,11 +150,11 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpi
    <View style={{flexDirection:'row',gap:10}}>
     <TouchableOpacity onPress={day===0?onWater:undefined} disabled={day!==0} style={{flex:1,backgroundColor:'#FFFFFF',borderRadius:20,padding:16,borderWidth:1,borderColor:'#ECEAF2',gap:7}}>
      <Ionicons name="water" size={24} color="#4A8CFF"/><Text style={{fontSize:14,fontWeight:'800',color:INK}}>Water</Text>
-     <Text style={{fontSize:20,fontWeight:'900',color:INK}}>{shownWater} / 8 cups</Text><Text style={{fontSize:11,color:MUTED}}>{day===0?'Tap to log':'Recorded that day'}</Text>
+     <Text style={{fontSize:20,fontWeight:'900',color:INK}}>{shownWater} / {drinkGoals.water} oz</Text><Text style={{fontSize:11,color:MUTED}}>{day===0?'Tap to log':'Recorded that day'}</Text>
     </TouchableOpacity>
     <TouchableOpacity onPress={day===0?onCaffeine:undefined} disabled={day!==0} style={{flex:1,backgroundColor:'#FFFFFF',borderRadius:20,padding:16,borderWidth:1,borderColor:'#ECEAF2',gap:7}}>
      <Ionicons name="cafe" size={24} color="#F4B400"/><Text style={{fontSize:14,fontWeight:'800',color:INK}}>Caffeine</Text>
-     <Text style={{fontSize:20,fontWeight:'900',color:INK}}>{shownCaffeine} {shownCaffeine===1?'serving':'servings'}</Text><Text style={{fontSize:11,color:MUTED}}>{day===0?'Tap to log':'Recorded that day'}</Text>
+     <Text style={{fontSize:20,fontWeight:'900',color:INK}}>{shownCaffeine} mg</Text><Text style={{fontSize:11,color:MUTED}}>{day===0?'Tap to log':'Recorded that day'}</Text>
     </TouchableOpacity>
    </View>
   </View>

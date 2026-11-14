@@ -87,10 +87,10 @@ struct ContentView: View {
                         .buttonStyle(.plain)
                         .accessibilityLabel("Current mood \(MoodLabel.display(shownMood)). Tap to change.")
                         Text(MoodLabel.display(shownMood)).font(.headline)
-                        Text(store.moodFromHealth(at: context.date) ? "From your heart data" : "Tap to change mood").font(.caption2).foregroundStyle(.secondary)
                         }
                         if !sync.moodOnly {
-                            StressSummary(reading: store.stress, calibrating: store.stressCalibrating, theme: store.theme)
+                            StressSummary(reading: store.stress, hrv: store.latestHRV)
+                            DrinkButtons()
                         }
                         HStack(spacing: 6) {
                             if !sync.moodOnly {
@@ -202,25 +202,34 @@ struct ContentView: View {
 
 private struct StressSummary: View {
     let reading: StressReading?
-    let calibrating: Bool
-    let theme: WatchTheme
+    let hrv: Double?
 
     var body: some View {
-        Group {
-            if let reading, reading.isFresh {
-                HStack(spacing: 4) {
-                    AnimatedMoodMascot(mood: theme.face(reading.level), size: 16, isActive: false).frame(width: 16, height: 16)
-                    Text("Stress \(reading.level.label) · \(reading.score)")
-                    Text(reading.at, style: .relative).foregroundStyle(.secondary)
-                }
-            } else if calibrating {
-                Text("Stress: Calibrating")
-            } else {
-                Text("Stress: no recent reading").foregroundStyle(.secondary)
-            }
+        if let reading, reading.isFresh {
+            StressBar(score: reading.score)
+                .accessibilityElement()
+                .accessibilityLabel(hrv.map { "Stress \(reading.level.label), HRV \(Int($0.rounded())) milliseconds" } ?? "Stress \(reading.level.label)")
         }
-        .font(.system(size: 10))
-        .lineLimit(1)
-        .minimumScaleFactor(0.7)
+    }
+}
+
+/// Overload (left) to Great (right), with a dot at the current score.
+private struct StressBar: View {
+    let score: Int
+    var body: some View {
+        GeometryReader { geo in
+            let x = geo.size.width * (1 - CGFloat(min(max(score, 0), 100)) / 100)
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(LinearGradient(colors: [.pink, .orange, .blue, .green], startPoint: .leading, endPoint: .trailing))
+                    .frame(height: 4)
+                Circle().fill(.white).frame(width: 9, height: 9)
+                    .shadow(color: .black.opacity(0.4), radius: 1)
+                    .offset(x: min(max(x - 4.5, 0), geo.size.width - 9))
+            }
+            .frame(maxHeight: .infinity)
+        }
+        .frame(height: 9)
+        .padding(.horizontal, 14)
     }
 }

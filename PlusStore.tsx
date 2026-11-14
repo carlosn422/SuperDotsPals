@@ -12,7 +12,7 @@ export const FREE_HEALTH_DAYS=7;
 export const PLUS_HEALTH_DAYS=30;
 
 export type PlusPlan='monthly'|'annual';
-export type PlusFeature='general'|'trends'|'customization'|'circles'|'reflections'|'family'|'health';
+export type PlusFeature='general'|'trends'|'customization'|'circles'|'reflections'|'family'|'health'|'hydration';
 export type PlusPrice={price:string;period:string;label:string;note?:string};
 
 export const PLUS_PRICES:Record<PlusPlan,PlusPrice>={
@@ -27,6 +27,7 @@ export const FEATURE_COPY:Record<PlusFeature,{title:string;body:string}>={
  circles:{title:'Bigger circles',body:'Create more private groups for the people closest to you.'},
  reflections:{title:'AI reflections',body:'Get gentle reflections on your check-ins, up to 100 a month.'},
  health:{title:'Sleep & fitness history',body:'See your body and recovery from Apple Health, with up to 30 days of sleep and fitness. Free shows each day for the last 7 days.'},
+ hydration:{title:'Hydration goal & reminders',body:'Set your own daily water goal and caffeine limit, and get gentle water reminders through the day. Logging stays free.'},
  family:{title:'More family watches',body:'Link up to 4 family watches, each with its own mood-only profile. Free includes 1.'},
 };
 
@@ -37,13 +38,14 @@ export const PLAN_FEATURES:{label:string;free:string|boolean;plus:string|boolean
  {label:'Family watches (mood-only)',free:'1',plus:'Up to 4'},
  {label:'Advanced trends and 30-day history',free:false,plus:true},
  {label:'Sleep and fitness history',free:'7 days',plus:'30 days'},
+ {label:'Hydration goal and water reminders',free:false,plus:true},
  {label:'Extra customization',free:false,plus:true},
  {label:'Private circles',free:'Friends group',plus:'Unlimited groups'},
  {label:'AI reflections',free:false,plus:'100 / month'},
 ];
 
 type PlusState={
- isPlus:boolean;plan:PlusPlan|null;prices:Record<PlusPlan,PlusPrice>;
+ isPlus:boolean;plusKnown:boolean;plan:PlusPlan|null;prices:Record<PlusPlan,PlusPrice>;
  paywall:{feature:PlusFeature}|null;
  showPaywall:(feature?:PlusFeature)=>void;hidePaywall:()=>void;nestedPaywalls:number;setNestedPaywalls:React.Dispatch<React.SetStateAction<number>>;
  purchase:(plan:PlusPlan)=>Promise<boolean>;restore:()=>Promise<boolean>;resetToFree:()=>void;
@@ -59,6 +61,8 @@ const activePlan=(info:CustomerInfo):PlusPlan|null=>{
 
 export function PlusProvider({children}:{children:React.ReactNode}){
  const [plan,setPlan]=useState<PlusPlan|null>(null);
+ // False until RevenueCat has reported the user's entitlement.
+ const [plusKnown,setPlusKnown]=useState(PLUS_MOCKUP);
  const [prices,setPrices]=useState(PLUS_PRICES);
  const [packages,setPackages]=useState<Partial<Record<PlusPlan,PurchasesPackage>>>({});
  const [paywall,setPaywall]=useState<{feature:PlusFeature}|null>(null);
@@ -68,7 +72,7 @@ export function PlusProvider({children}:{children:React.ReactNode}){
  useEffect(()=>{
   if(PLUS_MOCKUP)return;
   let active=true;
-  const apply=(info:CustomerInfo)=>{if(active)setPlan(activePlan(info))};
+  const apply=(info:CustomerInfo)=>{if(active){setPlan(activePlan(info));setPlusKnown(true)}};
   const sync=async(userId:string|undefined)=>{
    if(!userId||userId===userRef.current)return;
    userRef.current=userId;
@@ -128,7 +132,7 @@ export function PlusProvider({children}:{children:React.ReactNode}){
   }
  },[plan]);
  const resetToFree=useCallback(()=>{if(PLUS_MOCKUP)setPlan(null)},[]);
- const value=useMemo(()=>({isPlus:plan!==null,plan,prices,paywall,showPaywall,hidePaywall,nestedPaywalls,setNestedPaywalls,purchase,restore,resetToFree}),[plan,prices,paywall,showPaywall,hidePaywall,nestedPaywalls,purchase,restore,resetToFree]);
+ const value=useMemo(()=>({isPlus:plan!==null,plusKnown,plan,prices,paywall,showPaywall,hidePaywall,nestedPaywalls,setNestedPaywalls,purchase,restore,resetToFree}),[plan,plusKnown,prices,paywall,showPaywall,hidePaywall,nestedPaywalls,purchase,restore,resetToFree]);
  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
