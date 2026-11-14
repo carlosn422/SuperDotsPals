@@ -91,6 +91,7 @@ struct ContentView: View {
                         }
                         if !sync.moodOnly {
                             StressSummary(reading: store.stress, calibrating: store.stressCalibrating, theme: store.theme)
+                            DrinkButtons()
                         }
                         HStack(spacing: 6) {
                             if !sync.moodOnly {

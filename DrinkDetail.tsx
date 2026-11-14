@@ -47,6 +47,7 @@ function Body({kind,onClose,onSaved,onAskAI}:{kind:Drink;onClose:()=>void;onSave
  const [manual,setManual]=useState<string|null>(null);
  const [prompt,setPrompt]=useState<{name:string;oz:number}|null>(null);
  const [reminder,setReminder]=useState<WaterReminder>(WATER_REMINDER_DEFAULT);
+ const [tap,setTap]=useState<Record<Drink,number>>({water:8,caffeine:95});
 
  const load=useCallback(async()=>{
   try{const {data:{user}}=await supabase.auth.getUser();if(!user)throw Error('Please sign in');
@@ -57,6 +58,9 @@ function Body({kind,onClose,onSaved,onAskAI}:{kind:Drink;onClose:()=>void;onSave
   finally{setLoading(false)}
  },[k.title]);
  useEffect(()=>{void load();void loadWaterReminder().then(setReminder)},[load]);
+ useEffect(()=>{void (async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data}=await supabase.from('user_settings').select('water_tap_oz,caffeine_tap_mg').eq('user_id',user.id).maybeSingle();if(data)setTap({water:Number(data.water_tap_oz)||8,caffeine:Number(data.caffeine_tap_mg)||95})})()},[]);
+ // Amount the Apple Watch buttons and watch-face shortcuts log per tap.
+ const changeTap=async(v:number)=>{const prev=tap[kind];setTap(t=>({...t,[kind]:v}));try{const {data:{user}}=await supabase.auth.getUser();if(!user)throw Error('Please sign in');const {error}=await supabase.from('user_settings').update(kind==='water'?{water_tap_oz:v}:{caffeine_tap_mg:v}).eq('user_id',user.id);if(error)throw error}catch(e:any){setTap(t=>({...t,[kind]:prev}));Alert.alert('Could not save',e?.message||'Please retry')}};
  // Reminders are Plus; turn them off if Plus has ended.
  useEffect(()=>{if(plusKnown&&!isPlus&&reminder.enabled){const off={...reminder,enabled:false};setReminder(off);void saveWaterReminder(off).catch(()=>{})}},[plusKnown,isPlus,reminder]);
 
@@ -116,6 +120,15 @@ function Body({kind,onClose,onSaved,onAskAI}:{kind:Drink;onClose:()=>void;onSave
      <Text style={{fontSize:15,fontWeight:'700',color:INK,minWidth:62,textAlign:'center'}}>{fmt(kind,goal)}</Text>
      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Raise" onPress={plusOnly(()=>setGoal(kind,Math.min(kind==='water'?160:600,goal+(kind==='water'?4:25))))} style={st.step}><Ionicons name="add" size={18} color={INK}/></TouchableOpacity>
     </View>
+   </View>
+   <View style={[st.card,{gap:8}]}>
+    <View style={s.row}>
+     <Ionicons name="watch-outline" size={20} color={k.color}/><Text style={s.rowLabel}>Apple Watch per tap</Text>
+     <TouchableOpacity accessibilityRole="button" accessibilityLabel="Lower per tap" onPress={()=>void changeTap(Math.max(kind==='water'?1:5,tap[kind]-(kind==='water'?1:5)))} style={st.step}><Ionicons name="remove" size={18} color={INK}/></TouchableOpacity>
+     <Text style={{fontSize:15,fontWeight:'700',color:INK,minWidth:62,textAlign:'center'}}>{fmt(kind,tap[kind])}</Text>
+     <TouchableOpacity accessibilityRole="button" accessibilityLabel="Raise per tap" onPress={()=>void changeTap(Math.min(kind==='water'?32:300,tap[kind]+(kind==='water'?1:5)))} style={st.step}><Ionicons name="add" size={18} color={INK}/></TouchableOpacity>
+    </View>
+    <Text style={st.muted}>Tapping the {kind==='water'?'water drop':'cup'} on your Apple Watch or watch face logs this amount.</Text>
    </View>
    <Text style={[st.muted,{marginHorizontal:6}]}>{kind==='water'?'Water is logged in fluid ounces (1 cup = 8 oz).':'400 mg a day is a common upper guide for healthy adults.'} Goals are only used inside MoodPals and are not medical advice.</Text>
   </ScrollView>

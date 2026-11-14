@@ -21,6 +21,7 @@ module.exports = {
   infoPlist: {
     CFBundleIconName: 'AppIcon',
     WKRunsIndependentlyOfCompanionApp: true,
+    CFBundleURLTypes: [{ CFBundleURLSchemes: ['moodpals-watch'] }],
     NSLocationWhenInUseUsageDescription: "MoodPals shares this watch's location with the family member who set it up, only when you open the app or set a mood.",
   },
 };

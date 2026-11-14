@@ -66,6 +66,11 @@ struct SuperdotsWatchApp: App {
             ContentView()
                 .environmentObject(store)
                 .tint(store.companion.color)
+                // Watch-face "Log Water" / "Log Caffeine" shortcuts.
+                .onOpenURL { url in
+                    guard url.scheme == "moodpals-watch", url.host == "log" else { return }
+                    Task { await WatchDrinks.shared.log(url.lastPathComponent) }
+                }
         }
     }
 }

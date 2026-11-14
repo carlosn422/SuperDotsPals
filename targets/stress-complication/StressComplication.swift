@@ -217,5 +217,7 @@ struct MoodPalsComplications: WidgetBundle {
         MoodComplication()
         StressComplication()
         StressScoreComplication()
+        LogWaterComplication()
+        LogCaffeineComplication()
     }
 }

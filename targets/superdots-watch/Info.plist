@@ -8,17 +8,26 @@
 	</array>
 	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
-	<key>WKRunsIndependentlyOfCompanionApp</key>
-	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>moodpals-watch</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSHealthShareUsageDescription</key>
 	<string>MoodPals reads heart rate, heart rate variability, resting heart rate and sleep on your watch to estimate your stress level compared with your own baseline, and to fill in sleep your iPhone is missing.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>MoodPals starts a short mind &amp; body session during Measure now to read your heart rate. The session is not saved as a workout.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>MoodPals shares this watch&apos;s location with the family member who set it up, only when you open the app or set a mood.</string>
+	<string>MoodPals shares this watch's location with the family member who set it up, only when you open the app or set a mood.</string>
 	<key>WKBackgroundModes</key>
 	<array>
 		<string>workout-processing</string>
 	</array>
+	<key>WKRunsIndependentlyOfCompanionApp</key>
+	<true/>
 </dict>
 </plist>
