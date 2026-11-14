@@ -151,7 +151,7 @@ function Body({kind,onClose,onSaved,onAskAI}:{kind:Drink;onClose:()=>void;onSave
    </View>:null}
 
    <View style={{alignItems:'center',gap:8,marginTop:4}}>
-    <View><Fill kind={kind} progress={pct} color={k.color}/><View style={s.pal} pointerEvents="none"><SuperdotMascot id={mascot} size={74} animate={false}/></View></View>
+    <Fill kind={kind} progress={pct} color={k.color}/>
     {loading?<ActivityIndicator color={k.color}/>:<Text style={s.big}>{value===null?'0':Math.round(value)}</Text>}
     <Text style={st.muted}>{kind==='water'?`/${fmt(kind,goal)}${value!==null&&value<goal?`, ${fmt(kind,goal-value)} remaining`:''}`:`mg of ${fmt(kind,goal)} daily limit`}</Text>
     <Text style={st.status}>{status}</Text>
@@ -217,7 +217,6 @@ function Fill({kind,progress,color}:{kind:Drink;progress:number;color:string}){
 }
 
 const s=StyleSheet.create({
- pal:{position:'absolute',left:0,right:0,top:0,bottom:0,alignItems:'center',justifyContent:'center',paddingTop:50},
  big:{fontSize:52,fontWeight:'900',color:INK},
  buttons:{flexDirection:'row',flexWrap:'wrap',justifyContent:'center',gap:10},
  btn:{minWidth:96,paddingHorizontal:16,paddingVertical:12,borderRadius:22,alignItems:'center'},btnText:{color:'#fff',fontWeight:'800',fontSize:15},
