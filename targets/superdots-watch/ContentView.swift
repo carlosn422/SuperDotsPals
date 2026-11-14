@@ -73,7 +73,6 @@ struct ContentView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                NavigationStack {
                 VStack(spacing: 3) {
                     Group {
                         Spacer(minLength: 0)
@@ -120,16 +119,22 @@ struct ContentView: View {
                     }
                 }
                 .padding(.horizontal, 5)
-                .toolbar {
+                // Same flat style as the Circle button, in the top-left corner opposite the clock.
+                .overlay(alignment: .topLeading) {
                     if !sync.moodOnly {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button { showingDrinks = true } label: {
-                                Image(systemName: "drop.fill").foregroundStyle(DrinksView.waterColor)
-                            }
-                            .accessibilityLabel("Water and caffeine")
+                        Button { showingDrinks = true } label: {
+                            Image(systemName: "drop.fill")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 30, height: 30)
+                                .background(Circle().fill(purple.opacity(0.35)))
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Water and caffeine")
+                        .padding(.leading, 10)
+                        .padding(.top, 4)
+                        .ignoresSafeArea()
                     }
-                }
                 }
             }
         }
