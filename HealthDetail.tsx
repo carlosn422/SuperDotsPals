@@ -188,7 +188,7 @@ function DetailBody({kind,initialDay,readings,onClose,onAskAI,onBreathing}:{kind
    {kind==='mindfulness'&&onBreathing?<TouchableOpacity accessibilityRole="button" onPress={()=>{onClose();onBreathing()}} style={[st.cta,{backgroundColor:k.color}]}><Ionicons name="leaf" size={18} color="#fff"/><Text style={{color:'#fff',fontWeight:'800',fontSize:15}}>Start a breathing break</Text></TouchableOpacity>:null}
 
    {period==='D'?<DayCards kind={kind} day={day} val={val} readings={readings} goal={goal} color={k.color}/>:
-    <TrendCard title={kind==='fitness'?'Daily Move':'Daily Trend'} days={days} values={series(k.metric)} goal={kind==='fitness'?goals.move:goal} color={k.color} fmt={kind==='fitness'?(v:number)=>fmtNum(v)+' cal':k.fmt}/>}
+    <TrendCard title={kind==='fitness'?'Daily Move':'Daily Trend'} days={days} values={series(k.metric)} goal={kind==='fitness'?goals.move:goal} color={k.color} fmt={kind==='fitness'?(v:number)=>fmtNum(v)+' cal':k.fmt} lowerIsBetter={kind==='noise'}/>}
    <Text style={[st.muted,{textAlign:'center'}]}>From Apple Health{kind==='mindfulness'?' and MoodPals breathing breaks':''}. Not a medical measurement.</Text>
   </ScrollView>
  </View>;
@@ -255,13 +255,13 @@ function DayCards({kind,day,val,readings,goal,color}:{kind:HealthKind;day:Date;v
  </View>;
 }
 
-function TrendCard({title,days,values,goal,color,fmt}:{title:string;days:Date[];values:(number|null)[];goal:number|null;color:string;fmt:(v:number)=>string}){
+function TrendCard({title,days,values,goal,color,fmt,lowerIsBetter=false}:{title:string;days:Date[];values:(number|null)[];goal:number|null;color:string;fmt:(v:number)=>string;lowerIsBetter?:boolean}){
  const have=values.filter((v):v is number=>v!==null);
- const best=have.length?Math.max(...have):null;
+ const best=have.length?(lowerIsBetter?Math.min(...have):Math.max(...have)):null;
  const met=goal!==null?have.filter(v=>v>=goal).length:null;
  const labels=days.map((d,i)=>days.length<=7?['S','M','T','W','T','F','S'][d.getDay()]:i%5===0?String(d.getDate()):'');
  return <View style={st.card}><Text style={st.cardTitle}>{title}</Text>
-  {have.length?<><View style={{flexDirection:'row'}}><MiniStat label="Average" value={fmt(avg(values)!)}/><MiniStat label="Best day" value={fmt(best!)}/>{met!==null?<MiniStat label="Goal met" value={`${met} of ${have.length}`}/>:null}</View>
+  {have.length?<><View style={{flexDirection:'row'}}><MiniStat label="Average" value={fmt(avg(values)!)}/><MiniStat label={lowerIsBetter?'Quietest day':'Best day'} value={fmt(best!)}/>{met!==null?<MiniStat label="Goal met" value={`${met} of ${have.length}`}/>:null}</View>
    <Bars values={values} color={color} labels={labels} goal={goal}/></>:<Text style={[st.muted,{textAlign:'center',paddingVertical:30}]}>No Data</Text>}
  </View>;
 }
