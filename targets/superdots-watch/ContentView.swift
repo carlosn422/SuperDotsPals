@@ -119,15 +119,15 @@ struct ContentView: View {
                     }
                 }
                 .padding(.horizontal, 5)
-                // Same flat style as the Circle button, in the top-left corner opposite the clock.
+                // Same style as the former inline drink buttons, in the top-left corner opposite the clock.
                 .overlay(alignment: .topLeading) {
                     if !sync.moodOnly {
                         Button { showingDrinks = true } label: {
                             Image(systemName: "drop.fill")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .frame(width: 30, height: 30)
-                                .background(Circle().fill(purple.opacity(0.35)))
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(DrinksView.waterColor)
+                                .frame(width: 34, height: 34)
+                                .background(Circle().fill(DrinksView.waterColor.opacity(0.22)))
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Water and caffeine")
