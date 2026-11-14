@@ -78,9 +78,19 @@ function Body({kind,onClose,onSaved,onAskAI}:{kind:Drink;onClose:()=>void;onSave
  const ask=()=>{if(!isPlus){showPaywall('reflections');return}onClose();onAskAI()};
  const plusOnly=(go:()=>void)=>()=>{if(!isPlus){showPaywall('hydration');return}go()};
 
- async function setTotal(habit:Drink,next:number){
+ // Re-read the day's entries so totals logged from the watch or Today since opening aren't overwritten.
+ async function freshDayRows(habit:Drink){
   const {data:{user}}=await supabase.auth.getUser();if(!user)throw Error('Please sign in');
-  const prev=dayRows(rows,habit,day)[0];
+  const start=new Date(day);start.setHours(0,0,0,0);
+  const {data,error}=await supabase.from('habit_entries').select('habit,amount,unit,recorded_at').eq('user_id',user.id).eq('habit',habit).gte('recorded_at',start.toISOString()).lt('recorded_at',addDays(start,1).toISOString()).order('recorded_at',{ascending:false});
+  if(error)throw error;
+  const fresh=(data||[]) as DrinkRow[];
+  setRows(r=>[...fresh,...r.filter(x=>!(x.habit===habit&&sameDay(new Date(x.recorded_at),day)))]);
+  return fresh;
+ }
+ async function setTotal(habit:Drink,next:number,current?:DrinkRow[]){
+  const {data:{user}}=await supabase.auth.getUser();if(!user)throw Error('Please sign in');
+  const prev=(current??dayRows(rows,habit,day))[0];
   const prevAt=prev?new Date(prev.recorded_at).getTime():0;
   // Past days: just after that day's last entry so it becomes the day's total.
   const at=sameDay(day,today)?new Date(Math.max(Date.now(),prevAt+1)):new Date(prev?prevAt+1:noon(day).getTime());
@@ -93,9 +103,9 @@ function Body({kind,onClose,onSaved,onAskAI}:{kind:Drink;onClose:()=>void;onSave
   if(busy)return;setBusy(true);
   try{await task()}catch(e:any){Alert.alert('Unable to save',e?.message||'Please retry')}finally{setBusy(false)}
  }
- const add=(habit:Drink,n:number)=>setTotal(habit,(dayTotal(rows,habit,day)||0)+n);
+ const add=async(habit:Drink,n:number)=>{const r=await freshDayRows(habit);await setTotal(habit,(r[0]?rowAmount(r[0]):0)+n,r)};
  // Step back to the newest earlier total below the current one, so repeated undos keep going back.
- const undo=()=>run(async()=>{const r=dayRows(rows,kind,day),cur=r[0]?rowAmount(r[0]):0;const prev=r.find(x=>rowAmount(x)<cur);await setTotal(kind,prev?rowAmount(prev):0)});
+ const undo=()=>run(async()=>{const r=await freshDayRows(kind),cur=r[0]?rowAmount(r[0]):0;const prev=r.find(x=>rowAmount(x)<cur);await setTotal(kind,prev?rowAmount(prev):0,r)});
  const addDrink=(d:{name:string;mg:number;oz:number})=>run(async()=>{await add('caffeine',d.mg);setPrompt({name:d.name,oz:d.oz})});
  const saveManual=()=>{const n=Number((manual||'').replace(',','.'));setManual(null);if(n>0&&n<=(kind==='water'?200:1000))void run(()=>add(kind,n))};
  const updateReminder=async(r:WaterReminder)=>{const prev=reminder;setReminder(r);try{if(!(await saveWaterReminder(r))){setReminder(prev);Alert.alert('Notifications are off','Allow notifications for MoodPals in iPhone Settings to get water reminders.')}}catch(e:any){setReminder(prev);Alert.alert('Could not update reminders',e?.message||'Please retry')}};
