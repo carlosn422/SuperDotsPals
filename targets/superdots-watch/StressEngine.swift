@@ -260,6 +260,21 @@ final class HealthStressMonitor: @unchecked Sendable {
         }
     }
 
+    /// Newest sample of `type` since `since`, without the 1,000-sample cap of `samples`.
+    func latestSample(_ type: HKQuantityType, unit: HKUnit, since: Date) async -> HealthPoint? {
+        await withCheckedContinuation { continuation in
+            let predicate = HKQuery.predicateForSamples(withStart: since, end: Date(), options: [])
+            let sort = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: 1, sortDescriptors: [sort]) { _, results, _ in
+                let point = (results as? [HKQuantitySample])?.first.map {
+                    HealthPoint(value: $0.quantity.doubleValue(for: unit), date: $0.endDate, uuid: $0.uuid.uuidString)
+                }
+                continuation.resume(returning: point.flatMap { $0.value > 0 ? $0 : nil })
+            }
+            store.execute(query)
+        }
+    }
+
     func samples(_ type: HKQuantityType, unit: HKUnit, since: Date, until: Date = Date()) async -> [HealthPoint] {
         await withCheckedContinuation { continuation in
             let predicate = HKQuery.predicateForSamples(withStart: since, end: until, options: [])

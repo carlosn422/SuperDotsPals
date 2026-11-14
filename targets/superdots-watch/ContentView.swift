@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var choosingTheme = false
     @ObservedObject private var circle = WatchCircleStore.shared
     @State private var showingCircle = false
+    @State private var showingDrinks = false
 
     private var purple: Color { store.theme.accent }
 
@@ -72,6 +73,7 @@ struct ContentView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
+                NavigationStack {
                 VStack(spacing: 3) {
                     Group {
                         Spacer(minLength: 0)
@@ -81,15 +83,15 @@ struct ContentView: View {
                         Button {
                             choosingMood = true
                         } label: {
-                            AnimatedMoodMascot(mood: shownMood, size: WKInterfaceDevice.current().screenBounds.height < 220 ? 64 : 80, isActive: scenePhase == .active)
+                            AnimatedMoodMascot(mood: shownMood, size: WKInterfaceDevice.current().screenBounds.height < 220 ? 72 : 92, isActive: scenePhase == .active)
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Current mood \(MoodLabel.display(shownMood)). Tap to change.")
                         }
                         if !sync.moodOnly {
-                            StressSummary(reading: store.stress, hrv: store.latestHRV)
-                            DrinkButtons()
+                            StressSummary(reading: store.stress, hrv: store.latestHRV, heartRate: store.latestHeartRate)
+                                .padding(.bottom, 10)
                         }
                         HStack(spacing: 6) {
                             if !sync.moodOnly {
@@ -118,6 +120,17 @@ struct ContentView: View {
                     }
                 }
                 .padding(.horizontal, 5)
+                .toolbar {
+                    if !sync.moodOnly {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button { showingDrinks = true } label: {
+                                Image(systemName: "drop.fill").foregroundStyle(DrinksView.waterColor)
+                            }
+                            .accessibilityLabel("Water and caffeine")
+                        }
+                    }
+                }
+                }
             }
         }
         .tint(purple)
@@ -134,6 +147,9 @@ struct ContentView: View {
         .sheet(isPresented: $choosingMood) {
             MoodPicker(current: store.displayMood(), accent: purple, commit: commitMood)
         }
+        .sheet(isPresented: $showingDrinks) {
+            DrinksView()
+        }
         .sheet(isPresented: $choosingTheme) {
             NavigationStack { WatchThemePicker() }.environmentObject(store)
         }
@@ -142,7 +158,7 @@ struct ContentView: View {
         }
         .onChange(of: circle.openRequest, initial: true) { _, request in
             guard request > 0 else { return }
-            choosingMood = false; measuring = false; choosingTheme = false
+            choosingMood = false; measuring = false; choosingTheme = false; showingDrinks = false
             showingCircle = true
         }
         .overlay {
@@ -163,7 +179,7 @@ struct ContentView: View {
         .onChange(of: scenePhase == .active && sync.connected && !sync.pairingActive, initial: true) { _, isActive in
             circle.setActive(isActive)
         }
-        .onChange(of: choosingMood || measuring || choosingTheme || showingCircle || store.applyingTheme != nil, initial: true) { _, covered in
+        .onChange(of: choosingMood || measuring || choosingTheme || showingCircle || showingDrinks || store.applyingTheme != nil, initial: true) { _, covered in
             circle.hold = covered
         }
         .task {
@@ -175,6 +191,15 @@ struct ContentView: View {
                 await HealthStressMonitor.shared.recompute(upload: sync.connected)
             }
             store.reloadStress()
+        }
+        .task {
+            // Latest heart rate from the last 2 hours, shown above the stress bar.
+            guard !sync.moodOnly else { return }
+            while !Task.isCancelled {
+                let monitor = HealthStressMonitor.shared
+                store.latestHeartRate = await monitor.latestSample(monitor.heartRateType, unit: HealthStressMonitor.bpm, since: Date().addingTimeInterval(-7200))?.value
+                do { try await Task.sleep(for: .seconds(60)) } catch { break }
+            }
         }
         .task(id: sync.connected) {
             guard sync.connected else { return }
@@ -202,33 +227,52 @@ struct ContentView: View {
 private struct StressSummary: View {
     let reading: StressReading?
     let hrv: Double?
+    let heartRate: Double?
+
+    private var vitals: String? {
+        let parts = [heartRate.map { "♥ \(Int($0.rounded()))" }, hrv.map { "HRV \(Int($0.rounded())) ms" }].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: "  ·  ")
+    }
 
     var body: some View {
         if let reading, reading.isFresh {
-            StressBar(score: reading.score)
-                .accessibilityElement()
-                .accessibilityLabel(hrv.map { "Stress \(reading.level.label), HRV \(Int($0.rounded())) milliseconds" } ?? "Stress \(reading.level.label)")
+            VStack(spacing: 4) {
+                if let vitals {
+                    Text("\(reading.level.label) · \(vitals)")
+                        .font(.system(size: 13, weight: .semibold)).monospacedDigit()
+                        .lineLimit(1).minimumScaleFactor(0.7)
+                }
+                StressBar(score: reading.score, level: reading.level)
+            }
+            .accessibilityElement()
+            .accessibilityLabel(["Stress \(reading.level.label)", heartRate.map { "heart rate \(Int($0.rounded())) beats per minute" }, hrv.map { "HRV \(Int($0.rounded())) milliseconds" }].compactMap { $0 }.joined(separator: ", "))
         }
     }
 }
 
-/// Overload (left) to Great (right), with a dot at the current score.
+/// Overload (left) to Great (right) in four segments, like the iPhone scale, with a ring at the current score.
 private struct StressBar: View {
     let score: Int
+    let level: StressLevel
+    // Same colours as STRESS_LEVELS on the iPhone, in LEVEL_ORDER.
+    static let colors = [Color(red: 0.93, green: 0.44, blue: 0.53), Color(red: 0.95, green: 0.65, blue: 0.44),
+                         Color(red: 0.54, green: 0.61, blue: 0.94), Color(red: 0.30, green: 0.73, blue: 0.50)]
     var body: some View {
         GeometryReader { geo in
-            let x = geo.size.width * (1 - CGFloat(min(max(score, 0), 100)) / 100)
+            let position = min(max(Double(100 - score), 2), 96) / 100
+            let ring = Self.colors[[.overload, .elevated, .normal, .great].firstIndex(of: level) ?? 3]
             ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(LinearGradient(colors: [.pink, .orange, .blue, .green], startPoint: .leading, endPoint: .trailing))
-                    .frame(height: 4)
-                Circle().fill(.white).frame(width: 9, height: 9)
-                    .shadow(color: .black.opacity(0.4), radius: 1)
-                    .offset(x: min(max(x - 4.5, 0), geo.size.width - 9))
+                HStack(spacing: 4) {
+                    ForEach(0..<4, id: \.self) { Capsule().fill(Self.colors[$0]).frame(height: 8) }
+                }
+                Circle().fill(.white)
+                    .overlay(Circle().stroke(ring, lineWidth: 3.5))
+                    .frame(width: 15, height: 15)
+                    .offset(x: geo.size.width * position - 7.5)
             }
             .frame(maxHeight: .infinity)
         }
-        .frame(height: 9)
+        .frame(height: 15)
         .padding(.horizontal, 14)
     }
 }
