@@ -124,6 +124,8 @@ struct DrawingArtworkView: View {
     var minWidth: CGFloat = 1
     // Zoom to the drawn area instead of the whole canvas (used where the widget is tiny).
     var fitInk = false
+    // Shown inside a circle: widen the frame so the ink's corners stay within the inscribed circle.
+    var round = false
 
     private var frame: CGRect {
         let full = CGRect(x: 0, y: 0, width: drawingCanvasSize, height: drawingCanvasSize)
@@ -133,7 +135,7 @@ struct DrawingArtworkView: View {
             for p in s.points { box = box.union(CGRect(x: p.x, y: p.y, width: 0, height: 0).insetBy(dx: -s.width / 2, dy: -s.width / 2)) }
         }
         guard !box.isNull else { return full }
-        let side = max(box.width, box.height, 200)
+        let side = max(box.width, box.height, 200) * (round ? 1.42 : 1)
         return CGRect(x: box.midX - side / 2, y: box.midY - side / 2, width: side, height: side)
     }
 
@@ -191,8 +193,8 @@ struct CircleDrawingLockView: View {
         ZStack {
             if circular { AccessoryWidgetBackground() }
             if let d = entry.drawing, !d.strokes.isEmpty {
-                DrawingArtworkView(drawing: d, tint: .primary, minWidth: 1.5, fitInk: true)
-                    .padding(circular ? 8 : 2)
+                DrawingArtworkView(drawing: d, tint: .primary, minWidth: 1.5, fitInk: true, round: circular)
+                    .padding(circular ? 4 : 2)
             } else {
                 Image(systemName: "scribble.variable").font(.system(size: 22, weight: .semibold))
             }
