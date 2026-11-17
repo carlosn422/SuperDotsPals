@@ -2,7 +2,7 @@
 -- kind 'start' lets the server start the drawing activity while MoodPals is closed (iOS 17.2+);
 -- kind 'update' belongs to one running activity (iOS ends them after 8–12 hours).
 create table public.circle_drawing_live_tokens (
-  token text primary key check (token ~ '^[0-9a-f]{16,400}$'),
+  token text primary key check (token ~ '^[0-9a-f]+$' and char_length(token) between 16 and 400),
   user_id uuid not null references auth.users(id) on delete cascade,
   kind text not null check (kind in ('start', 'update')),
   activity_id text,
@@ -47,5 +47,6 @@ $$;
 
 revoke all on function public.circle_drawing_live_register(text, text, text, uuid, text), public.circle_drawing_live_unregister(text[]),
   public.circle_drawing_live_targets(uuid) from public, anon;
+revoke all on function public.circle_drawing_live_targets(uuid) from authenticated;
 grant execute on function public.circle_drawing_live_register(text, text, text, uuid, text), public.circle_drawing_live_unregister(text[]) to authenticated;
 grant execute on function public.circle_drawing_live_targets(uuid) to service_role;
