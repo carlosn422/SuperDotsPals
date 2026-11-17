@@ -17,7 +17,7 @@ create table public.circle_group_canvas (
 create table public.circle_drawing_prefs (
   user_id uuid primary key references auth.users(id) on delete cascade,
   widget_group_id uuid references public.circle_groups(id) on delete set null,
-  widget_token_hash text unique,
+  widget_token_hashes text[] not null default '{}',  -- one per device, newest first
   publish_day date,
   publish_count int not null default 0
 );
@@ -25,11 +25,16 @@ create table public.circle_drawing_prefs (
 alter table public.circle_group_canvas enable row level security;
 alter table public.circle_drawing_prefs enable row level security;
 
-create function public.circle_drawing_member(p_group uuid, p_user uuid default auth.uid()) returns boolean
+create function public.circle_drawing_member_of(p_group uuid, p_user uuid) returns boolean
 language sql stable security definer set search_path = public as $$
   select exists(select 1 from circle_groups g where g.id = p_group and g.owner_id = p_user)
       or exists(select 1 from circle_group_members m where m.group_id = p_group and m.member_id = p_user);
 $$;
+create function public.circle_drawing_member(p_group uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select public.circle_drawing_member_of(p_group, auth.uid());
+$$;
+create index circle_drawing_prefs_tokens on public.circle_drawing_prefs using gin (widget_token_hashes);
 
 create policy cgc_select on public.circle_group_canvas for select to authenticated using (public.circle_drawing_member(group_id));
 create policy cdp_select on public.circle_drawing_prefs for select to authenticated using (user_id = auth.uid());
@@ -51,7 +56,8 @@ language sql immutable set search_path = '' as $$
      and coalesce(s->>'c', '') ~* '^#[0-9A-F]{6}$'
      and jsonb_typeof(s->'w') = 'number' and (s->>'w')::numeric between 1 and 60
      and jsonb_typeof(s->'p') = 'array' and jsonb_array_length(s->'p') between 2 and 4000
-     and jsonb_array_length(s->'p') % 2 = 0;
+     and jsonb_array_length(s->'p') % 2 = 0
+     and char_length(coalesce(s->>'f', '')) <= 40;
 $$;
 
 -- Owner turns the shared canvas on or off. Turning it off removes the canvas.
@@ -91,23 +97,36 @@ $$;
 create function public.circle_canvas_publish(p_group uuid, p_remove text[] default '{}', p_add jsonb default '[]'::jsonb, p_background text default null)
 returns int
 language plpgsql security definer set search_path = public as $$
-declare me uuid := auth.uid(); plus boolean := has_plus(auth.uid()); cur jsonb; s jsonb; used int; lim int;
+declare me uuid := auth.uid(); plus boolean := has_plus(auth.uid()); rm text[] := coalesce(p_remove, '{}');
+  orig jsonb; cur jsonb; added jsonb := '[]'::jsonb; s jsonb; src jsonb; used int; lim int;
 begin
   if not circle_drawing_member(p_group) then raise exception 'You are not in this Circle.'; end if;
   if jsonb_typeof(coalesce(p_add, '[]'::jsonb)) <> 'array' or jsonb_array_length(coalesce(p_add, '[]'::jsonb)) > 1500 then raise exception 'Invalid drawing'; end if;
-  for s in select * from jsonb_array_elements(coalesce(p_add, '[]'::jsonb)) loop
-    if not circle_stroke_is_valid(s) then raise exception 'Invalid stroke'; end if;
-    -- Pieces left by erasing keep their original look, so only brand-new looks by the caller are checked.
-    if not plus and not circle_stroke_is_free(s) and coalesce(s->>'u', me::text) = me::text and not exists(
-      select 1 from circle_group_canvas c, jsonb_array_elements(c.strokes) o
-      where c.group_id = p_group and o->>'id' = any(coalesce(p_remove, '{}'))
-        and o->>'b' is not distinct from s->>'b' and o->>'c' = s->>'c' and o->'w' = s->'w') then
-      raise exception 'More brushes, colors and sizes are part of MoodPals Plus.' using errcode = 'P0001';
-    end if;
-  end loop;
   if p_background is not null and upper(p_background) <> '#FFFFFF' and not plus then
     raise exception 'Background colors are part of MoodPals Plus.' using errcode = 'P0001';
   end if;
+  select strokes into orig from circle_group_canvas where group_id = p_group for update;
+  if not found then raise exception 'This Circle''s canvas is turned off.'; end if;
+
+  for s in select * from jsonb_array_elements(coalesce(p_add, '[]'::jsonb)) loop
+    if not coalesce(circle_stroke_is_valid(s), false) then raise exception 'Invalid stroke'; end if;
+    if s->>'f' = any(rm) then
+      -- A piece left after erasing part of saved stroke f: keeps that stroke's look and author.
+      src := null;
+      select o.value into src from jsonb_array_elements(orig) o where o.value->>'id' = s->>'f' limit 1;
+      if src is null then continue; end if;  -- someone else already erased the whole stroke
+      if coalesce(src->>'b', 'pen') <> coalesce(s->>'b', 'pen') or upper(src->>'c') <> upper(s->>'c') or (src->>'w')::numeric <> (s->>'w')::numeric then
+        raise exception 'Invalid stroke';
+      end if;
+      s := (s - 'f' - 'u') || jsonb_strip_nulls(jsonb_build_object('u', src->'u'));
+    else
+      if not plus and not circle_stroke_is_free(s) then
+        raise exception 'More brushes, colors and sizes are part of MoodPals Plus.' using errcode = 'P0001';
+      end if;
+      s := (s - 'f') || jsonb_build_object('u', me);
+    end if;
+    added := added || jsonb_build_array(s);
+  end loop;
 
   lim := case when plus then 500 else 5 end;  -- Plus is unlimited for ordinary use; the cap only stops runaway clients.
   insert into circle_drawing_prefs(user_id, publish_day, publish_count) values (me, current_date, 0)
@@ -118,12 +137,10 @@ begin
     raise exception 'You''ve shared 5 drawings today. MoodPals Plus includes unlimited drawing.' using errcode = 'P0001';
   end if;
 
-  select strokes into cur from circle_group_canvas where group_id = p_group for update;
-  if not found then raise exception 'This Circle''s canvas is turned off.'; end if;
-  select coalesce(jsonb_agg(o), '[]'::jsonb) into cur from jsonb_array_elements(cur) o where not (o->>'id' = any(coalesce(p_remove, '{}')));
-  select cur || coalesce(jsonb_agg(jsonb_set(a, '{u}', to_jsonb(coalesce(a->>'u', me::text)))), '[]'::jsonb) into cur
-    from jsonb_array_elements(coalesce(p_add, '[]'::jsonb)) a
-    where not exists(select 1 from jsonb_array_elements(cur) o where o->>'id' = a->>'id');
+  select coalesce(jsonb_agg(o.value), '[]'::jsonb) into cur from jsonb_array_elements(orig) o where not (o.value->>'id' = any(rm));
+  select cur || coalesce(jsonb_agg(a.value), '[]'::jsonb) into cur
+    from jsonb_array_elements(added) a
+    where not exists(select 1 from jsonb_array_elements(cur) o where o.value->>'id' = a.value->>'id');
   if jsonb_array_length(cur) > 3000 or pg_column_size(cur) > 900000 then
     raise exception 'This canvas is full. Erase a little to keep going.' using errcode = 'P0001';
   end if;
@@ -165,8 +182,8 @@ language plpgsql security definer set search_path = public, extensions as $$
 declare t text := encode(gen_random_bytes(24), 'hex');
 begin
   if auth.uid() is null then raise exception 'Not signed in'; end if;
-  insert into circle_drawing_prefs(user_id, widget_token_hash) values (auth.uid(), encode(digest(t, 'sha256'), 'hex'))
-    on conflict (user_id) do update set widget_token_hash = excluded.widget_token_hash;
+  insert into circle_drawing_prefs(user_id, widget_token_hashes) values (auth.uid(), array[encode(digest(t, 'sha256'), 'hex')])
+    on conflict (user_id) do update set widget_token_hashes = (excluded.widget_token_hashes || circle_drawing_prefs.widget_token_hashes)[1:5];
   return t;
 end $$;
 
@@ -176,8 +193,8 @@ returns table(group_id uuid, background text, strokes jsonb, version bigint)
 language sql stable security definer set search_path = public, extensions as $$
   select c.group_id, c.background, case when c.version = p_version then null else c.strokes end, c.version
   from circle_drawing_prefs p join circle_group_canvas c on c.group_id = p.widget_group_id
-  where p.widget_token_hash = encode(digest(coalesce(p_token, ''), 'sha256'), 'hex')
-    and circle_drawing_member(c.group_id, p.user_id);
+  where p.widget_token_hashes @> array[encode(digest(coalesce(p_token, ''), 'sha256'), 'hex')]
+    and circle_drawing_member_of(c.group_id, p.user_id);
 $$;
 
 -- Live updates: members subscribe to the private broadcast topic "drawing:<group id>".
@@ -202,13 +219,15 @@ create policy circle_drawing_broadcast_read on realtime.messages for select to a
 create policy circle_drawing_broadcast_write on realtime.messages for insert to authenticated
   with check (realtime.messages.extension = 'broadcast' and public.circle_drawing_topic_ok(realtime.topic()));
 
-revoke all on function public.circle_drawing_member(uuid, uuid), public.circle_stroke_is_free(jsonb), public.circle_stroke_is_valid(jsonb),
+revoke all on function public.circle_drawing_member_of(uuid, uuid), public.circle_drawing_member(uuid), public.circle_stroke_is_free(jsonb), public.circle_stroke_is_valid(jsonb),
   public.circle_canvas_enable(uuid, boolean), public.circle_canvas_list(), public.circle_drawing_publishes_left(),
   public.circle_canvas_publish(uuid, text[], jsonb, text), public.circle_canvas_clear(uuid), public.circle_group_leave(uuid),
   public.circle_drawing_set_widget(uuid), public.circle_drawing_widget_token(), public.circle_drawing_widget_latest(text, bigint),
   public.circle_canvas_announce(), public.circle_drawing_topic_ok(text) from public, anon;
-grant execute on function public.circle_drawing_member(uuid, uuid), public.circle_canvas_enable(uuid, boolean), public.circle_canvas_list(),
+grant execute on function public.circle_drawing_member(uuid), public.circle_canvas_enable(uuid, boolean), public.circle_canvas_list(),
   public.circle_drawing_publishes_left(), public.circle_canvas_publish(uuid, text[], jsonb, text), public.circle_canvas_clear(uuid),
   public.circle_group_leave(uuid), public.circle_drawing_set_widget(uuid), public.circle_drawing_widget_token(),
   public.circle_drawing_topic_ok(text) to authenticated;
 grant execute on function public.circle_drawing_widget_latest(text, bigint) to anon, authenticated;
+revoke all on function public.circle_drawing_member_of(uuid, uuid), public.circle_stroke_is_free(jsonb), public.circle_stroke_is_valid(jsonb),
+  public.circle_canvas_announce() from authenticated;
