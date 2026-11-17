@@ -17,6 +17,7 @@ private func hex(_ data: Data) -> String { data.map { String(format: "%02x", $0)
 // closed, and one per running activity to replace its drawing. Only the newest drawing activity is kept.
 public class DrawingLiveModule: Module {
     private var tokens: [String: [String: String]] = [:]
+    private let lock = NSLock()
     private var tasks: [Task<Void, Never>] = []
 
     public func definition() -> ModuleDefinition {
@@ -26,7 +27,10 @@ public class DrawingLiveModule: Module {
         OnCreate { self.observe() }
         OnDestroy { self.tasks.forEach { $0.cancel() } }
 
-        Function("getTokens") { () -> [[String: String]] in Array(self.tokens.values) }
+        Function("getTokens") { () -> [[String: String]] in
+            self.lock.lock(); defer { self.lock.unlock() }
+            return Array(self.tokens.values)
+        }
 
         Function("isEnabled") { () -> Bool in
             if #available(iOS 16.2, *) { return ActivityAuthorizationInfo().areActivitiesEnabled }
@@ -54,7 +58,9 @@ public class DrawingLiveModule: Module {
     }
 
     private func emit(_ t: [String: String]) {
+        lock.lock()
         tokens[t["kind"]! + (t["activity"] ?? "")] = t
+        lock.unlock()
         sendEvent("onToken", t)
     }
 
