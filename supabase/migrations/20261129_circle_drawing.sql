@@ -74,13 +74,14 @@ end $$;
 -- Canvases I can draw on, with members (visible to everyone in a group once its canvas is on).
 create function public.circle_canvas_list() returns table(
   group_id uuid, name text, icon text, color text, owner_id uuid, is_owner boolean, version bigint,
-  updated_at timestamptz, updated_by uuid, is_widget boolean, members jsonb)
+  updated_at timestamptz, updated_by uuid, is_widget boolean, members jsonb, plus boolean)
 language sql stable security definer set search_path = public as $$
   select g.id, g.name, g.icon, g.color, g.owner_id, g.owner_id = auth.uid(), c.version, c.updated_at, c.updated_by,
     coalesce((select p.widget_group_id = g.id from circle_drawing_prefs p where p.user_id = auth.uid()), false),
     (select coalesce(jsonb_agg(jsonb_build_object('id', u.uid, 'name', coalesce(pr.display_name, 'Friend'), 'color', coalesce(pr.avatar_color, '#7BC6A4'), 'owner', u.uid = g.owner_id) order by u.uid <> g.owner_id, pr.display_name), '[]'::jsonb)
        from (select g.owner_id uid union select m.member_id from circle_group_members m where m.group_id = g.id) u
-       left join circle_profiles pr on pr.user_id = u.uid)
+       left join circle_profiles pr on pr.user_id = u.uid),
+    has_plus(g.owner_id)
   from circle_groups g join circle_group_canvas c on c.group_id = g.id
   where circle_drawing_member(g.id)
   order by coalesce(c.updated_at, g.created_at) desc;
@@ -88,16 +89,17 @@ $$;
 
 create function public.circle_drawing_publishes_left() returns int
 language sql stable security definer set search_path = public as $$
-  select case when has_plus(auth.uid()) then null
-    else greatest(0, 5 - coalesce((select publish_count from circle_drawing_prefs where user_id = auth.uid() and publish_day = current_date), 0)) end;
+  select greatest(0, 5 - coalesce((select publish_count from circle_drawing_prefs where user_id = auth.uid() and publish_day = current_date), 0));
 $$;
 
 -- Publishes one drawing session: removes erased strokes by id, adds new ones, optionally changes the background.
--- Merges with anything other members published meanwhile. Free: 5 publishes a day. Returns publishes left (null = unlimited).
+-- Merges with anything other members published meanwhile. The group owner's plan decides the canvas:
+-- owner has Plus = unlimited publishes and all tools for every member; otherwise each member gets 5 publishes a day and basic tools.
+-- Returns my free publishes left today (null on a Plus owner's canvas).
 create function public.circle_canvas_publish(p_group uuid, p_remove text[] default '{}', p_add jsonb default '[]'::jsonb, p_background text default null)
 returns int
 language plpgsql security definer set search_path = public as $$
-declare me uuid := auth.uid(); plus boolean := has_plus(auth.uid()); rm text[] := coalesce(p_remove, '{}');
+declare me uuid := auth.uid(); plus boolean := has_plus((select owner_id from circle_groups where id = p_group)); rm text[] := coalesce(p_remove, '{}');
   orig jsonb; cur jsonb; added jsonb := '[]'::jsonb; s jsonb; src jsonb; used int; lim int;
 begin
   if not circle_drawing_member(p_group) then raise exception 'You are not in this Circle.'; end if;

@@ -42,7 +42,7 @@ export const PLAN_FEATURES:{label:string;free:string|boolean;plus:string|boolean
  {label:'Hydration goal and water reminders',free:false,plus:true},
  {label:'Extra customization',free:false,plus:true},
  {label:'Private circles',free:'Friends group',plus:'Unlimited groups'},
- {label:'Drawing Rooms',free:'Pen and 6 colors',plus:'Brushes, sizes, colors and backgrounds'},
+ {label:'Circle drawing',free:'5 shares a day, pen and 6 colors',plus:'Unlimited for your Circles, brushes, sizes, colors and backgrounds'},
  {label:'AI reflections',free:false,plus:'100 / month'},
 ];
 
