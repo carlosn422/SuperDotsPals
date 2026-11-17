@@ -11,7 +11,7 @@ export type Brush='pen'|'marker'|'pencil'|'highlighter';
 // f: the saved stroke this piece was left from after erasing (only sent when publishing).
 export type Stroke={id:string;u?:string;f?:string;b:Brush;c:string;w:number;p:number[]};
 export type CanvasMember={id:string;name:string;color:string;owner:boolean};
-export type CircleCanvas={groupId:string;name:string;icon:string;color:string;ownerId:string;isOwner:boolean;version:number;updatedAt:string|null;updatedBy:string|null;isWidget:boolean;plus:boolean;members:CanvasMember[]};
+export type CircleCanvas={groupId:string;name:string;icon:string;color:string;ownerId:string;isOwner:boolean;version:number;updatedAt:string|null;updatedBy:string|null;isWidget:boolean;members:CanvasMember[]};
 export type CanvasData={background:string;strokes:Stroke[];version:number};
 // What one person changed in a drawing session, applied on top of the latest canvas.
 export type CanvasDiff={remove:string[];add:Stroke[];background?:string};
@@ -53,7 +53,7 @@ export function useCircleDrawing(){return useSyncExternalStore(subscribe,()=>sta
 
 function toCanvas(r:any):CircleCanvas{
  return {groupId:r.group_id,name:r.name,icon:r.icon||'people',color:r.color||'#3BA986',ownerId:r.owner_id,isOwner:!!r.is_owner,version:Number(r.version)||0,
-  updatedAt:r.updated_at,updatedBy:r.updated_by,isWidget:!!r.is_widget,plus:!!r.plus,members:Array.isArray(r.members)?r.members:[]};
+  updatedAt:r.updated_at,updatedBy:r.updated_by,isWidget:!!r.is_widget,members:Array.isArray(r.members)?r.members:[]};
 }
 
 export async function refreshCircleDrawing(){
@@ -83,7 +83,7 @@ export async function loadCanvas(groupId:string){
 export async function publishCanvas(groupId:string,diff:CanvasDiff):Promise<string|null>{
  const {data,error}=await supabase.rpc('circle_canvas_publish',{p_group:groupId,p_remove:diff.remove,p_add:diff.add,p_background:diff.background??null});
  if(error)return error.message;
- if(data!==null)update({publishesLeft:data as number});
+ update({publishesLeft:data as number|null});
  await loadCanvas(groupId);
  void refreshCircleDrawing();
  return null;

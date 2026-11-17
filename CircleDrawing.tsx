@@ -54,11 +54,7 @@ function eraseDiff(base:CanvasData|undefined,diff:CanvasDiff,x:number,y:number,r
 
 type Tool='pen'|'eraser';type Panel=null|'pen'|'color';
 export function DrawingCanvasModal({canvas,visible,onClose}:{canvas:CircleCanvas;visible:boolean;onClose:()=>void}){
- const {showPaywall}=usePlus();
- // The Circle owner's plan decides tools and limits for everyone on this canvas.
- const isPlus=canvas.plus;
- const owner=canvas.members.find(m=>m.owner)?.name||'the owner';
- const plusInfo=()=>canvas.isOwner?showPaywall('drawing'):Alert.alert('MoodPals Plus','Extra tools and unlimited drawing on this canvas come with '+owner+'’s MoodPals Plus.');
+ const {isPlus,showPaywall}=usePlus();
  const st=useCircleDrawing();const base=st.data[canvas.groupId];
  const {width,height}=useWindowDimensions();
  const size=Math.max(200,Math.min(width-32,height-300));
@@ -135,20 +131,20 @@ export function DrawingCanvasModal({canvas,visible,onClose}:{canvas:CircleCanvas
 
  const shown=useMemo(()=>applyDiffs(base,[...Object.values(others).map(o=>o.diff),diff]),[base,others,diff]);
  const drawingNow=Object.values(others).filter(o=>!diffIsEmpty(o.diff));
- const locked=()=>{setPanel(null);plusInfo();};
+ const locked=()=>{setPanel(null);showPaywall('drawing');};
  const done=async()=>{
   if(saving)return;
   if(diffIsEmpty(diff)){onClose();return;}
   if(!isPlus&&st.publishesLeft===0){
    Alert.alert('You’ve shared '+FREE_PUBLISHES+' drawings today','Free includes '+FREE_PUBLISHES+' shares a day. MoodPals Plus includes unlimited drawing.',[
-    {text:'Keep Drawing',style:'cancel'},{text:'Discard',style:'destructive',onPress:onClose},...(canvas.isOwner?[{text:'See Plus',onPress:()=>showPaywall('drawing')}]:[])]);
+    {text:'Keep Drawing',style:'cancel'},{text:'Discard',style:'destructive',onPress:onClose},{text:'See Plus',onPress:()=>showPaywall('drawing')}]);
    return;
   }
   setSaving(true);
   const err=await publishCanvas(canvas.groupId,diff);
   setSaving(false);
   if(!err){onClose();return;}
-  if(/Plus/.test(err)){if(canvas.isOwner)Alert.alert('MoodPals Plus',err,[{text:'Not Now',style:'cancel'},{text:'See Plus',onPress:()=>showPaywall('drawing')}]);else plusInfo();}
+  if(/Plus/.test(err))Alert.alert('MoodPals Plus',err,[{text:'Not Now',style:'cancel'},{text:'See Plus',onPress:()=>showPaywall('drawing')}]);
   else Alert.alert('Couldn’t share your drawing',err);
  };
 
