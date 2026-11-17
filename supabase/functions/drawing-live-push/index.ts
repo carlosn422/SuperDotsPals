@@ -7,7 +7,8 @@ import {packCanvas} from "./pack.ts";
 const url=Deno.env.get("SUPABASE_URL")||"",anon=Deno.env.get("SUPABASE_ANON_KEY")||"",service=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
 const P8=Deno.env.get("APNS_KEY_P8")||"",KEY_ID=Deno.env.get("APNS_KEY_ID")||"",TEAM_ID=Deno.env.get("APNS_TEAM_ID")||"Y355786FS4";
 const TOPIC=(Deno.env.get("APNS_TOPIC")||"com.superdotspals.wellnest")+".push-type.liveactivity";
-const json=(x:unknown,status=200)=>new Response(JSON.stringify(x),{status,headers:{"Content-Type":"application/json"}});
+const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS"};
+const json=(x:unknown,status=200)=>new Response(JSON.stringify(x),{status,headers:{...CORS,"Content-Type":"application/json"}});
 const admin=createClient(url,service,{auth:{persistSession:false,autoRefreshToken:false}});
 
 const b64url=(b:Uint8Array)=>btoa(String.fromCharCode(...b)).replace(/=+$/,"").replace(/\+/g,"-").replace(/\//g,"_");
@@ -41,6 +42,7 @@ async function send(t:Target,aps:Record<string,unknown>){
 }
 
 Deno.serve(async req=>{
+ if(req.method==="OPTIONS")return new Response("ok",{headers:CORS});
  const bearer=req.headers.get("Authorization")||"";
  if(!bearer.startsWith("Bearer "))return json({error:"Sign in first"},401);
  const client=createClient(url,anon,{global:{headers:{Authorization:bearer}},auth:{persistSession:false,autoRefreshToken:false}});
