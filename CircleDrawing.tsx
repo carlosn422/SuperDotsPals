@@ -3,13 +3,12 @@ import {ActivityIndicator,Alert,Modal,PanResponder,Text,TouchableOpacity,View,us
 import {SafeAreaView} from 'react-native-safe-area-context';
 import Svg,{Path,Rect} from 'react-native-svg';
 import {Ionicons,MaterialCommunityIcons} from '@expo/vector-icons';
-import {supabase} from './supabase';
 import {usePlus} from './PlusStore';
 import {PlusPaywallSheet} from './PlusPaywall';
 import {timeAgo} from './LittleSignalsData';
 import {Avatar,CCard,CHeading,CRow,CT,EmptyState,PrimaryButton,SoftButton,ToggleRow,cs} from './CircleComponents';
 import {BACKGROUNDS,BRUSHES,Brush,CANVAS,CanvasData,CanvasDiff,CircleCanvas,EMPTY_DIFF,FREE_COLORS,FREE_PUBLISHES,FREE_WIDTH,PLUS_COLORS,Stroke,WIDTHS,
- applyDiffs,brushOpacity,clearCanvas,diffIsEmpty,leaveGroup,loadCanvas,newId,publishCanvas,refreshCircleDrawing,setCanvasEnabled,setWidgetCanvas,useCircleDrawing} from './CircleDrawingStore';
+ applyDiffs,brushOpacity,listenDrawing,sendDrawing,clearCanvas,diffIsEmpty,leaveGroup,loadCanvas,newId,publishCanvas,refreshCircleDrawing,setCanvasEnabled,setWidgetCanvas,useCircleDrawing} from './CircleDrawingStore';
 
 type Nav={push:(r:any)=>void;back:()=>void};
 const initials=(n:string)=>n.trim().split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase()||'?';
@@ -40,7 +39,7 @@ function eraseAt(strokes:Stroke[],x:number,y:number,r:number){
   let any=false;for(let i=0;i<s.p.length;i+=2)if(inside(i)){any=true;break;}
   if(!any)continue;
   hit.push(s);let run:number[]=[];
-  const flush=()=>{if(run.length)pieces.push({...s,id:newId(),p:run});run=[];};
+  const flush=()=>{if(run.length)pieces.push({...s,id:newId(),f:s.f??s.id,p:run});run=[];};
   for(let i=0;i<s.p.length;i+=2){if(inside(i))flush();else run.push(s.p[i],s.p[i+1]);}
   flush();
  }
@@ -71,21 +70,19 @@ export function DrawingCanvasModal({canvas,visible,onClose}:{canvas:CircleCanvas
  const [saving,setSaving]=useState(false);
  const ref=useRef({diff,tool,brush,color,strokeWidth,base,current:null as Stroke|null,last:null as null|[number,number],sentAt:0,timer:undefined as any});
  ref.current={...ref.current,diff,tool,brush,color,strokeWidth,base};
- const channel=useRef<ReturnType<typeof supabase.channel>|null>(null);
  const me=st.me||'';const myName=canvas.members.find(m=>m.id===me)?.name||'Friend';
 
  useEffect(()=>{
   if(!visible)return;
   setDiff(EMPTY_DIFF);setUndo([]);setPanel(null);setOthers({});setCurrent(null);
   void loadCanvas(canvas.groupId);
-  const ch=supabase.channel('drawing:'+canvas.groupId,{config:{private:true,broadcast:{self:false}}})
-   .on('broadcast',{event:'canvas'},()=>void loadCanvas(canvas.groupId))
-   .on('broadcast',{event:'draft'},({payload})=>{if(payload?.u&&payload.u!==me)setOthers(o=>({...o,[payload.u]:{name:payload.name||'Friend',diff:payload.diff,at:Date.now()}}))})
-   .on('broadcast',{event:'leave'},({payload})=>setOthers(o=>{const n={...o};delete n[payload?.u];return n}))
-   .subscribe();
-  channel.current=ch;
+  const stop=listenDrawing(canvas.groupId,(ev,payload)=>{
+   if(ev==='canvas')void loadCanvas(canvas.groupId);
+   else if(ev==='draft'&&payload?.u&&payload.u!==me)setOthers(o=>({...o,[payload.u]:{name:payload.name||'Friend',diff:payload.diff,at:Date.now()}}));
+   else if(ev==='leave')setOthers(o=>{const n={...o};delete n[payload?.u];return n});
+  });
   const prune=setInterval(()=>setOthers(o=>Object.fromEntries(Object.entries(o).filter(([,v])=>Date.now()-v.at<90000))),15000);
-  return()=>{clearInterval(prune);clearTimeout(ref.current.timer);void ch.send({type:'broadcast',event:'leave',payload:{u:me}});void supabase.removeChannel(ch);channel.current=null;};
+  return()=>{clearInterval(prune);clearTimeout(ref.current.timer);sendDrawing(canvas.groupId,'leave',{u:me});stop();};
  },[visible,canvas.groupId]);
 
  // Share my in-progress drawing so everyone in the canvas sees it live.
@@ -95,7 +92,7 @@ export function DrawingCanvasModal({canvas,visible,onClose}:{canvas:CircleCanvas
   if(wait>0){r.timer=setTimeout(sendDraft,wait);return;}
   r.sentAt=Date.now();
   const d=r.current?{...r.diff,add:[...r.diff.add,r.current]}:r.diff;
-  void channel.current?.send({type:'broadcast',event:'draft',payload:{u:me,name:myName,diff:d}});
+  sendDrawing(canvas.groupId,'draft',{u:me,name:myName,diff:d});
  };
  useEffect(()=>{if(visible)sendDraft()},[diff]);
 

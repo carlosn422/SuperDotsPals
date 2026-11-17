@@ -8,7 +8,8 @@ import {publishDrawingSnapshot} from './WidgetBridge';
 // Only the latest canvas of each group exists; strokes are vectors on a CANVAS x CANVAS square.
 export const CANVAS=1000;
 export type Brush='pen'|'marker'|'pencil'|'highlighter';
-export type Stroke={id:string;u?:string;b:Brush;c:string;w:number;p:number[]};
+// f: the saved stroke this piece was left from after erasing (only sent when publishing).
+export type Stroke={id:string;u?:string;f?:string;b:Brush;c:string;w:number;p:number[]};
 export type CanvasMember={id:string;name:string;color:string;owner:boolean};
 export type CircleCanvas={groupId:string;name:string;icon:string;color:string;ownerId:string;isOwner:boolean;version:number;updatedAt:string|null;updatedBy:string|null;isWidget:boolean;members:CanvasMember[]};
 export type CanvasData={background:string;strokes:Stroke[];version:number};
@@ -64,7 +65,8 @@ export async function refreshCircleDrawing(){
  if(list.error){console.warn('Circle drawing refresh failed',list.error.message);return;}
  const canvases=(list.data||[]).map(toCanvas);
  const ids=new Set(canvases.map((c:CircleCanvas)=>c.groupId));
- update({canvases,loaded:true,data:Object.fromEntries(Object.entries(state.data).filter(([id])=>ids.has(id))),publishesLeft:left.error?state.publishesLeft:(left.data as number|null)});
+ const listed=new Map<string,number>(canvases.map((c:CircleCanvas)=>[c.groupId,c.version] as [string,number]));
+ update({canvases,loaded:true,data:Object.fromEntries(Object.entries(state.data).filter(([id,d])=>ids.has(id)&&d.version<=(listed.get(id)??0))),publishesLeft:left.error?state.publishesLeft:(left.data as number|null)});
  await publishWidget();
 }
 
@@ -103,15 +105,29 @@ async function widgetAuth(me:string){
  return {url:SUPABASE_URL,key:SUPABASE_PUBLISHABLE_KEY,token};
 }
 
+// One shared Realtime channel per canvas topic (supabase.channel reuses topics), with listeners counted.
+type Listener=(event:string,payload:any)=>void;
+const channels:Record<string,{ch:ReturnType<typeof supabase.channel>;listeners:Set<Listener>}>={};
+export function listenDrawing(groupId:string,fn:Listener){
+ let e=channels[groupId];
+ if(!e){
+  const listeners=new Set<Listener>();
+  const ch=supabase.channel('drawing:'+groupId,{config:{private:true}});
+  for(const ev of ['canvas','draft','leave'])ch.on('broadcast',{event:ev},({payload})=>listeners.forEach(f=>f(ev,payload)));
+  ch.subscribe();
+  e=channels[groupId]={ch,listeners};
+ }
+ const entry=e;entry.listeners.add(fn);
+ return()=>{entry.listeners.delete(fn);if(!entry.listeners.size&&channels[groupId]===entry){delete channels[groupId];void supabase.removeChannel(entry.ch);}};
+}
+export function sendDrawing(groupId:string,event:string,payload:unknown){void channels[groupId]?.ch.send({type:'broadcast',event,payload});}
+
 // Live version announcements for the Circle shown in my widget, so it refreshes as soon as anyone publishes.
-let widgetChannel:ReturnType<typeof supabase.channel>|null=null;let widgetTopic='';
+let widgetGroup:string|null=null;let unwatch:(()=>void)|null=null;
 function watchWidget(groupId:string|null){
- const topic=groupId?'drawing:'+groupId:'';
- if(topic===widgetTopic)return;
- if(widgetChannel)void supabase.removeChannel(widgetChannel);
- widgetChannel=null;widgetTopic=topic;
- if(!groupId)return;
- widgetChannel=supabase.channel(topic,{config:{private:true}}).on('broadcast',{event:'canvas'},()=>void loadCanvas(groupId).then(()=>publishWidget())).subscribe();
+ if(groupId===widgetGroup)return;
+ unwatch?.();unwatch=null;widgetGroup=groupId;
+ if(groupId)unwatch=listenDrawing(groupId,ev=>{if(ev==='canvas')void loadCanvas(groupId).then(()=>publishWidget())});
 }
 
 let published='';
@@ -134,7 +150,11 @@ export function startCircleDrawingSync(){
  let t:ReturnType<typeof setTimeout>|undefined;
  const soon=()=>{if(t)clearTimeout(t);t=setTimeout(()=>void refreshCircleDrawing(),300);};
  soon();
- const auth=supabase.auth.onAuthStateChange(()=>soon());
+ const auth=supabase.auth.onAuthStateChange((_e,session)=>{
+  // Clear the widget right away on sign-out; the deferred refresh may never run.
+  if(!session){published='';publishDrawingSnapshot(null,null);watchWidget(null);}
+  soon();
+ });
  const app=AppState.addEventListener('change',s=>{if(s==='active')soon();});
  return()=>{started=false;if(t)clearTimeout(t);auth.data.subscription.unsubscribe();app.remove();watchWidget(null);};
 }
