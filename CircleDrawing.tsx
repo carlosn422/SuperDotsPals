@@ -235,6 +235,7 @@ export function CircleDrawingScreen({id,nav}:{id:string;nav:Nav}){
  const {width}=useWindowDimensions();
  const [open,setOpen]=useState(false);const [busy,setBusy]=useState(false);
  useEffect(()=>{void refreshCircleDrawing();void loadCanvas(id)},[id]);
+ useEffect(()=>listenDrawing(id,ev=>{if(ev==='canvas'){void refreshCircleDrawing();void loadCanvas(id);}}),[id]);
  if(!c)return st.loaded?<EmptyState mood="Sad" title="This canvas isn’t available" detail="The owner may have turned it off, or you’re no longer in this group."/>:<ActivityIndicator color={CT.primary} style={{marginTop:30}}/>;
  const run=(f:()=>Promise<unknown>,after?:()=>void)=>{setBusy(true);f().then(()=>after?.()).catch(e=>Alert.alert('Something went wrong',String(e?.message||e))).finally(()=>setBusy(false));};
  const size=Math.min(width-64,420);
