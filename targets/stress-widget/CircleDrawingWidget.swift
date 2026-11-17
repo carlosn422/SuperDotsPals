@@ -120,6 +120,8 @@ private func strokePath(_ pts: [CGPoint], scale k: CGFloat, offset o: CGPoint) -
 // The artwork only, centred and scaled to fit; no labels, icons or overlays.
 struct DrawingArtworkView: View {
     let drawing: DrawingSnapshot
+    var tint: Color? = nil
+    var minWidth: CGFloat = 1
     var body: some View {
         GeometryReader { geo in
             let side = min(geo.size.width, geo.size.height)
@@ -128,7 +130,7 @@ struct DrawingArtworkView: View {
             ZStack {
                 ForEach(Array(drawing.strokes.enumerated()), id: \.offset) { _, s in
                     strokePath(s.points, scale: k, offset: o)
-                        .stroke(s.color.opacity(s.opacity), style: StrokeStyle(lineWidth: max(1, s.width * k), lineCap: .round, lineJoin: .round))
+                        .stroke((tint ?? s.color).opacity(s.opacity), style: StrokeStyle(lineWidth: max(minWidth, s.width * k), lineCap: .round, lineJoin: .round))
                 }
             }
         }
@@ -164,20 +166,35 @@ struct CircleDrawingWidget: Widget {
     }
 }
 
-// Lock Screen: a compact button that opens the selected Circle's canvas.
+// Lock Screen: the selected Circle's strokes in the system's Lock Screen tint; tapping opens the canvas.
+struct CircleDrawingLockView: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: DrawingEntry
+    var body: some View {
+        let circular = family == .accessoryCircular
+        ZStack {
+            if circular { AccessoryWidgetBackground() }
+            if let d = entry.drawing, !d.strokes.isEmpty {
+                DrawingArtworkView(drawing: d, tint: .primary, minWidth: 1.5)
+                    .padding(circular ? 8 : 2)
+            } else {
+                Image(systemName: "scribble.variable").font(.system(size: 22, weight: .semibold))
+            }
+        }
+        .clipShape(circular ? AnyShape(Circle()) : AnyShape(Rectangle()))
+        .widgetAccentable()
+    }
+}
+
 struct CircleDrawingLockWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "MoodPalsCircleDrawingLock", provider: DrawingProvider()) { entry in
-            ZStack {
-                AccessoryWidgetBackground()
-                Image(systemName: "scribble.variable").font(.system(size: 22, weight: .semibold))
-            }
-            .widgetAccentable()
-            .containerBackground(.clear, for: .widget)
-            .widgetURL(drawingURL(entry.drawing))
+            CircleDrawingLockView(entry: entry)
+                .containerBackground(.clear, for: .widget)
+                .widgetURL(drawingURL(entry.drawing))
         }
-        .configurationDisplayName("Draw Together")
-        .description("Opens your Circle’s drawing canvas.")
-        .supportedFamilies([.accessoryCircular])
+        .configurationDisplayName("Circle Drawing")
+        .description("Your Circle’s latest drawing. Tap to draw together.")
+        .supportedFamilies([.accessoryCircular, .accessoryRectangular])
     }
 }
