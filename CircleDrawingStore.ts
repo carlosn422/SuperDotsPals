@@ -100,11 +100,12 @@ const pushLockScreens=(groupId:string)=>void supabase.functions.invoke('drawing-
 // Sends this phone's Live Activity tokens to the server; remembered so sign-out can remove them.
 export const LIVE_TOKENS_KEY='circleDrawing.liveTokens';
 const DEVICE_KEY='circleDrawing.deviceId';
-async function deviceId(){
+let device:Promise<string>|undefined;
+const deviceId=()=>device??=(async()=>{
  let id=await AsyncStorage.getItem(DEVICE_KEY).catch(()=>null);
  if(!id){id=newId();await AsyncStorage.setItem(DEVICE_KEY,id).catch(()=>{});}
  return id;
-}
+})();
 // One save at a time so overlapping registrations can't drop a token that sign-out must remove.
 let liveSaves=Promise.resolve();
 async function registerLiveToken(t:{kind:string;token:string;activity?:string;group?:string}){
