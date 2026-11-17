@@ -54,8 +54,10 @@ function eraseDiff(base:CanvasData|undefined,diff:CanvasDiff,x:number,y:number,r
 
 type Tool='pen'|'eraser';type Panel=null|'pen'|'color';
 export function DrawingCanvasModal({canvas,visible,onClose}:{canvas:CircleCanvas;visible:boolean;onClose:()=>void}){
- const {isPlus,showPaywall}=usePlus();
- const st=useCircleDrawing();const base=st.data[canvas.groupId];
+ const {isPlus:storePlus,showPaywall}=usePlus();
+ const st=useCircleDrawing();
+ // The server reports no daily limit (null) when the account's Plus entitlement is active there.
+ const isPlus=storePlus||st.publishesLeft===null;const base=st.data[canvas.groupId];
  const {width,height}=useWindowDimensions();
  const size=Math.max(200,Math.min(width-32,height-300));
  const [diff,setDiff]=useState<CanvasDiff>(EMPTY_DIFF);
