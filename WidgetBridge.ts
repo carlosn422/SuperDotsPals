@@ -56,6 +56,5 @@ export function publishDrawingSnapshot(snapshot:DrawingWidgetSnapshot|null,auth?
   store.set('drawingSnapshot',snapshot?JSON.stringify(snapshot):undefined);
   if(auth!==undefined)store.set('drawingWidgetAuth',auth?JSON.stringify(auth):undefined);
   ExtensionStorage.reloadWidget('MoodPalsCircleDrawing');
-  ExtensionStorage.reloadWidget('MoodPalsCircleDrawingLock');
  }catch(e){console.warn('Drawing widget snapshot skipped',e)}
 }

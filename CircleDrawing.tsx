@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
-import {ActivityIndicator,Alert,Modal,PanResponder,Text,TouchableOpacity,View,useWindowDimensions} from 'react-native';
+import {ActivityIndicator,Alert,Linking,Modal,Platform,PanResponder,Text,TouchableOpacity,View,useWindowDimensions} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import Svg,{Path,Rect} from 'react-native-svg';
 import {Ionicons,MaterialCommunityIcons} from '@expo/vector-icons';
@@ -249,7 +249,8 @@ export function CircleDrawingScreen({id,nav}:{id:string;nav:Nav}){
    <View style={{alignSelf:'stretch'}}><PrimaryButton label="Draw Together" icon="brush-outline" onPress={()=>setOpen(true)}/></View>
   </CCard>
   <CCard style={{paddingVertical:4}}>
-   <ToggleRow title="Show on my widget" subtitle="Your Home Screen and Lock Screen drawing widgets use one Circle. This doesn’t change anyone else’s widget." value={c.isWidget} onChange={v=>run(()=>setWidgetCanvas(v?id:null))} last/>
+   <ToggleRow title="Show on my widget" subtitle="Your Home Screen widget and Lock Screen wallpaper use one Circle. This doesn’t change anyone else’s." value={c.isWidget} onChange={v=>run(()=>setWidgetCanvas(v?id:null))} last={!c.isWidget||Platform.OS!=='ios'}/>
+   {c.isWidget&&Platform.OS==='ios'?<CRow icon="phone-portrait-outline" title="Lock Screen Wallpaper" subtitle="Show this drawing across your whole Lock Screen" onPress={wallpaperHelp} last/>:null}
   </CCard>
   <CHeading title={'Members ('+c.members.length+')'}/>
   <CCard style={{paddingVertical:4}}>{c.members.map((m,i)=><CRow key={m.id} last={i===c.members.length-1} leading={<Avatar initials={initials(m.name)} color={m.color} size={34}/>} title={m.name+(m.id===st.me?' (you)':'')} subtitle={m.owner?'Owner':undefined}/>)}</CCard>
@@ -260,6 +261,13 @@ export function CircleDrawingScreen({id,nav}:{id:string;nav:Nav}){
   </>:<SoftButton danger label="Leave Group" icon="exit-outline" disabled={busy} onPress={()=>Alert.alert('Leave '+c.name+'?','Your drawings stay on the canvas. You’ll stay friends with everyone.',[{text:'Cancel',style:'cancel'},{text:'Leave',style:'destructive',onPress:()=>run(()=>leaveGroup(id),nav.back)}])}/>}
   <DrawingCanvasModal canvas={c} visible={open} onClose={()=>setOpen(false)}/>
  </>;
+}
+
+// iOS only lets Shortcuts change the wallpaper, so the app provides a "Get Circle Drawing" action for an automation.
+function wallpaperHelp(){
+ Alert.alert('Use as Lock Screen wallpaper',
+  '1. Open Shortcuts → Automation → New Automation → App.\n2. Choose MoodPals, tick “Is Closed”, and pick Run Immediately.\n3. Add MoodPals’ “Get Circle Drawing” action, then “Set Wallpaper Photo” → Lock Screen, and turn off Show Preview.\n\nYour wallpaper updates with the latest drawing each time you leave MoodPals. Add a Time of Day automation with the same actions to update it during the day too.',
+  [{text:'Not Now',style:'cancel'},{text:'Open Shortcuts',onPress:()=>void Linking.openURL('shortcuts://').catch(()=>{})}]);
 }
 
 // Group owner's switch, shown on the existing group screen.
