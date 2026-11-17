@@ -44,3 +44,17 @@ export function publishCircleSnapshot(data:{signals:CircleWidgetSignal[];unseen:
   ExtensionStorage.reloadWidget();
  }catch(e){console.warn('Circle widget snapshot skipped',e)}
 }
+
+// Circle drawing widget: the selected Circle's latest drawing (artwork only) plus credentials so the widget can
+// fetch newer drawings by itself (see CircleDrawingWidget.swift and circle_drawing_widget_latest()).
+export type DrawingWidgetSnapshot={groupId:string;background:string;version:number;strokes:{b:string;c:string;w:number;p:number[]}[]};
+export function publishDrawingSnapshot(snapshot:DrawingWidgetSnapshot|null,auth?:{url:string;key:string;token:string}|null){
+ if(Platform.OS!=='ios')return;
+ try{
+  const {ExtensionStorage}=require('@bacons/apple-targets');
+  const store=new ExtensionStorage(APP_GROUP);
+  store.set('drawingSnapshot',snapshot?JSON.stringify(snapshot):undefined);
+  if(auth!==undefined)store.set('drawingWidgetAuth',auth?JSON.stringify(auth):undefined);
+  ExtensionStorage.reloadWidget('MoodPalsCircleDrawing');
+ }catch(e){console.warn('Drawing widget snapshot skipped',e)}
+}

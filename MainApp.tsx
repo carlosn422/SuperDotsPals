@@ -24,6 +24,7 @@ import MoreSheet,{type MoreItem} from './MoreSheet';
 import * as Notifications from 'expo-notifications';
 import {Linking} from 'react-native';
 import {CircleProvider,circleNewCount,useCircle} from './CircleStore';
+import {startCircleDrawingSync} from './CircleDrawingStore';
 import CircleNavigator,{CircleRoute} from './MyCircleScreens';
 import {LittleSignalsTodayCard} from './CircleComponents';
 import WatchThemesScreen from './WatchThemesScreen';
@@ -154,7 +155,8 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   if(!mood||!moodAt)return;
   void supabase.auth.getSession().then(({data:{session}})=>{if(session?.user.id)sendMoodToWatch(mood,moodAt,session.user.id,healthMoodAt)});
  },[mood,moodAt,healthMoodAt]);
- useEffect(()=>{const open=(url:string|null)=>{const m=url?.match(/^wellnest:\/\/circle\/?(\w*)/);if(m)setCircleSheet([{name:m[1]==='send'?'send':'today'}])};Linking.getInitialURL().then(open).catch(()=>{});const sub=Linking.addEventListener('url',e=>open(e.url));return()=>sub.remove()},[]);
+ useEffect(()=>startCircleDrawingSync(),[]);
+ useEffect(()=>{const open=(url:string|null)=>{const d=url?.match(/^wellnest:\/\/drawing\/?([\w-]*)/);if(d){setCircleSheet(d[1]?[{name:'drawings'},{name:'drawing',id:d[1]}]:[{name:'drawings'}]);return;}const m=url?.match(/^wellnest:\/\/circle\/?(\w*)/);if(m)setCircleSheet([{name:m[1]==='send'?'send':'today'}])};Linking.getInitialURL().then(open).catch(()=>{});const sub=Linking.addEventListener('url',e=>open(e.url));return()=>sub.remove()},[]);
  // Opens the screen a notification points at, whether the tap launched the app or arrived while it was running.
  const openNotification=(r:Notifications.NotificationResponse)=>{
   const key=r.notification.request.identifier;if(handledNotifications.has(key))return;handledNotifications.add(key);

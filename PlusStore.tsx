@@ -12,7 +12,7 @@ export const FREE_HEALTH_DAYS=7;
 export const PLUS_HEALTH_DAYS=30;
 
 export type PlusPlan='monthly'|'annual';
-export type PlusFeature='general'|'trends'|'customization'|'circles'|'reflections'|'family'|'health'|'hydration';
+export type PlusFeature='general'|'trends'|'customization'|'circles'|'reflections'|'family'|'health'|'hydration'|'drawing';
 export type PlusPrice={price:string;period:string;label:string;note?:string};
 
 export const PLUS_PRICES:Record<PlusPlan,PlusPrice>={
@@ -28,6 +28,7 @@ export const FEATURE_COPY:Record<PlusFeature,{title:string;body:string}>={
  reflections:{title:'AI reflections',body:'Get gentle reflections on your check-ins, up to 100 a month.'},
  health:{title:'Sleep & fitness history',body:'See your body and recovery from Apple Health, with up to 30 days of sleep and fitness. Free shows each day for the last 7 days.'},
  hydration:{title:'Hydration goal & reminders',body:'Set your own daily water goal and caffeine limit, and get gentle water reminders through the day. Logging stays free.'},
+ drawing:{title:'More ways to draw',body:'Unlock extra brushes, more colors, brush sizes and solid-color backgrounds in Drawing Rooms.'},
  family:{title:'More family watches',body:'Link up to 4 family watches, each with its own mood-only profile. Free includes 1.'},
 };
 
@@ -41,6 +42,7 @@ export const PLAN_FEATURES:{label:string;free:string|boolean;plus:string|boolean
  {label:'Hydration goal and water reminders',free:false,plus:true},
  {label:'Extra customization',free:false,plus:true},
  {label:'Private circles',free:'Friends group',plus:'Unlimited groups'},
+ {label:'Circle drawing',free:'5 shares a day, pen and 6 colors',plus:'Unlimited shares, brushes, sizes, colors and backgrounds'},
  {label:'AI reflections',free:false,plus:'100 / month'},
 ];
 

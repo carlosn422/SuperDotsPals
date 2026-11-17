@@ -9,15 +9,17 @@ import {usePlus} from './PlusStore';
 import {Avatar,CCard,CHeading,CRow,CT,Chip,EmptyState,MoodPalThumb,OfflineBanner,PrimaryButton,SampleDataNote,SignalBurst,SoftButton,ToggleRow,cs} from './CircleComponents';
 import {ConversationScreen,MessagesInbox,conversationRef,conversationsFor} from './CircleConversations';
 import CircleSignalSheet,{SentBubble,SignalPicker} from './CircleSignalSheet';
+import {CanvasToggleCard,CircleDrawingList,CircleDrawingScreen} from './CircleDrawing';
 
 export type CircleRoute=
  |{name:'home'}|{name:'invite';groupId?:string}|{name:'enterCode'}|{name:'requests';groupId?:string;groupName?:string}|{name:'assignGroups';requestId:string;groupId?:string;groupName?:string}
  |{name:'friends'}|{name:'friend';id:string}|{name:'groups'}|{name:'group';id?:string;draft?:GroupDraft}|{name:'permissions'}
  |{name:'share';mood:CircleMood}|{name:'send';friendId?:string;locked?:boolean}|{name:'signalSent';signal:SignalId;friendIds:string[]}
  |{name:'signalReceived';signalId:string}|{name:'friendMood';id:string}|{name:'room';id:string}|{name:'today'}
- |{name:'notifications'}|{name:'widgets'}|{name:'circleSettings'}|{name:'revoked'}|{name:'fromNotification';ref:string}|{name:'chat';id:string;focus?:string};
+ |{name:'notifications'}|{name:'widgets'}|{name:'circleSettings'}|{name:'revoked'}|{name:'fromNotification';ref:string}|{name:'chat';id:string;focus?:string}
+ |{name:'drawings'}|{name:'drawing';id:string};
 
-const TITLES:Record<CircleRoute['name'],string>={chat:'Messages',circleSettings:'Circle Settings',fromNotification:'Circle',home:'Circle',invite:'Invite Friends',enterCode:'Enter Invite Code',requests:'Friend Requests',assignGroups:'Add to Groups',friends:'Friends',friend:'Friend',groups:'Manage Groups',group:'Group',permissions:'Mood Sharing',share:'Choose Audience',send:'Send a Little Signal',signalSent:'Signal Sent',signalReceived:'Little Signal',friendMood:'Shared Mood',room:'Your Mood',today:'Messages',notifications:'Circle Notifications',widgets:'Widgets',revoked:'Not Available'};
+const TITLES:Record<CircleRoute['name'],string>={drawings:'Drawing',drawing:'Drawing',chat:'Messages',circleSettings:'Circle Settings',fromNotification:'Circle',home:'Circle',invite:'Invite Friends',enterCode:'Enter Invite Code',requests:'Friend Requests',assignGroups:'Add to Groups',friends:'Friends',friend:'Friend',groups:'Manage Groups',group:'Group',permissions:'Mood Sharing',share:'Choose Audience',send:'Send a Little Signal',signalSent:'Signal Sent',signalReceived:'Little Signal',friendMood:'Shared Mood',room:'Your Mood',today:'Messages',notifications:'Circle Notifications',widgets:'Widgets',revoked:'Not Available'};
 type GroupDraft={group:CircleGroup;knownFriendIds:string[]};
 const GROUP_ICONS=['heart','home','leaf','star','people','sunny','musical-notes','paw'] as const;
 const GROUP_COLORS=['#E76B8A','#488CD9','#3BA986','#E3A426','#7139E9','#D9704B'];
@@ -45,6 +47,7 @@ export default function CircleNavigator({initial=[{name:'home'}],exitLabel='Sett
  const body=<View style={{gap:14}}>
   {isHome?<View style={{flexDirection:'row',alignItems:'center',gap:8}}>
    <View style={{flex:1}}><Text style={[cs.title,{textAlign:'left'}]} accessibilityRole="header">Circle</Text><Text style={[cs.muted,{fontSize:14}]}>Stay connected through moods.</Text></View>
+   {store.live?<HeaderButton icon="brush-outline" label="Drawing" onPress={()=>push({name:'drawings'})}/>:null}
    <HeaderButton icon="notifications-outline" label={pendingRequests?pendingRequests+' friend requests':'Requests and invites'} dot={pendingRequests>0} onPress={()=>push({name:'requests'})}/>
   </View>:
   <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center', position: 'relative'}}>
@@ -83,6 +86,8 @@ function Screen({route,nav,mood,homeTab='messages',setHomeTab=()=>{}}:{route:Cir
   case 'room':return <OpenConversation refId={route.id} nav={nav} missing={<OpenInbox nav={nav}/>}/>;
   case 'notifications':return <NotificationSettings/>;
   case 'widgets':return <WidgetPreviews/>;
+  case 'drawings':return <CircleDrawingList nav={nav}/>;
+  case 'drawing':return <CircleDrawingScreen key={route.id} id={route.id} nav={nav}/>;
   case 'circleSettings':return <CircleSettings nav={nav}/>;
   case 'fromNotification':return <OpenFromNotification id={route.ref} nav={nav}/>;
   case 'revoked':return <EmptyState mood="Sad" title="This mood is no longer available" detail="It may have expired after 24 hours, or the person stopped sharing with you. Shared moods are only visible to people they were shared with."/>;
@@ -236,6 +241,7 @@ function Home({nav,tab='messages',onTab=()=>{}}:{nav:Nav;tab?:HomeTab;onTab?:(t:
     :<Text style={cs.rowSub}>Groups like Family or Close Friends let you choose who sees which moods.</Text>}
    <SoftButton label="Create a Group" icon="add" onPress={()=>!isPlus?showPaywall('circles'):nav.push({name:'group'})}/>
   </CCard>
+  {store.live?<CCard style={{paddingVertical:4}}><CRow icon="brush-outline" title="Drawing" subtitle="Draw and write together on a shared canvas" onPress={()=>nav.push({name:'drawings'})} last/></CCard>:null}
   <CCard style={{paddingVertical:4}}><CRow icon="settings-outline" title="Circle Settings" subtitle="Mood sharing, notifications and widgets" onPress={()=>nav.push({name:'circleSettings'})} last/></CCard>
   </>}
   {store.live?null:<PrototypeControls nav={nav}/>}
@@ -519,6 +525,7 @@ function GroupEdit({id,draft,nav}:{id?:string;draft?:GroupDraft;nav:Nav}){
    <CRow icon="person-add-outline" title={store.friends.length?'Invite more friends':'Invite Friends'} subtitle="Share your personal invite code" onPress={()=>leave({name:'invite'})} last/>
   </CCard>
   {existing?<GroupInviteCard group={existing}/>:null}
+  {existing&&store.live?<CanvasToggleCard groupId={existing.id} onOpen={()=>nav.push({name:'drawing',id:existing.id})}/>:null}
   <PrimaryButton label={existing?'Save Group':'Create Group'} disabled={!g.name.trim()} onPress={()=>{store.saveGroup({...g,name:g.name.trim()});nav.back()}}/>
   {existing&&!existing.isDefault?<SoftButton danger label="Delete Group" icon="trash-outline" onPress={()=>Alert.alert('Delete '+g.name+'?','Members stay your friends. They’ll stop seeing moods shared only with this group.',[{text:'Cancel',style:'cancel'},{text:'Delete',style:'destructive',onPress:()=>{store.deleteGroup(g.id);nav.back()}}])}/>:null}
  </>;
