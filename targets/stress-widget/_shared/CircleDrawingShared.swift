@@ -82,6 +82,19 @@ struct DrawingSnapshot: Sendable {
     }
 }
 
+extension DrawingSnapshot {
+    // Canvas area covered by ink (at least 120 units each way), or the whole canvas when empty.
+    var inkFrame: CGRect {
+        var box = CGRect.null
+        for s in strokes {
+            for p in s.points { box = box.union(CGRect(x: p.x, y: p.y, width: 0, height: 0).insetBy(dx: -s.width / 2, dy: -s.width / 2)) }
+        }
+        guard !box.isNull else { return CGRect(x: 0, y: 0, width: drawingCanvasSize, height: drawingCanvasSize) }
+        let w = max(box.width, 120), h = max(box.height, 120)
+        return CGRect(x: box.midX - w / 2, y: box.midY - h / 2, width: w, height: h)
+    }
+}
+
 private func drawingColor(_ hex: String?) -> Color? {
     guard var h = hex?.trimmingCharacters(in: .whitespaces) else { return nil }
     if h.hasPrefix("#") { h.removeFirst() }
@@ -108,24 +121,10 @@ func drawingStrokePath(_ pts: [CGPoint], scale k: CGFloat, offset o: CGPoint) ->
 // The artwork only, centred and scaled to fit; no labels, icons or overlays.
 struct DrawingArtworkView: View {
     let drawing: DrawingSnapshot
-    // Zoom to the drawn area instead of the whole canvas (used for the Lock Screen wallpaper).
-    var fitInk = false
-
-    private var frame: CGRect {
-        let full = CGRect(x: 0, y: 0, width: drawingCanvasSize, height: drawingCanvasSize)
-        guard fitInk else { return full }
-        var box = CGRect.null
-        for s in drawing.strokes {
-            for p in s.points { box = box.union(CGRect(x: p.x, y: p.y, width: 0, height: 0).insetBy(dx: -s.width / 2, dy: -s.width / 2)) }
-        }
-        guard !box.isNull else { return full }
-        let w = max(box.width, 120), h = max(box.height, 120)
-        return CGRect(x: box.midX - w / 2, y: box.midY - h / 2, width: w, height: h)
-    }
 
     var body: some View {
         GeometryReader { geo in
-            let f = frame
+            let f = CGRect(x: 0, y: 0, width: drawingCanvasSize, height: drawingCanvasSize)
             let k = min(geo.size.width / f.width, geo.size.height / f.height)
             let o = CGPoint(x: (geo.size.width - f.width * k) / 2 - f.minX * k, y: (geo.size.height - f.height * k) / 2 - f.minY * k)
             ZStack {
