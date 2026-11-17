@@ -122,11 +122,27 @@ struct DrawingArtworkView: View {
     let drawing: DrawingSnapshot
     var tint: Color? = nil
     var minWidth: CGFloat = 1
+    // Zoom to the drawn area instead of the whole canvas (used where the widget is tiny).
+    var fitInk = false
+
+    private var frame: CGRect {
+        let full = CGRect(x: 0, y: 0, width: drawingCanvasSize, height: drawingCanvasSize)
+        guard fitInk else { return full }
+        var box = CGRect.null
+        for s in drawing.strokes {
+            for p in s.points { box = box.union(CGRect(x: p.x, y: p.y, width: 0, height: 0).insetBy(dx: -s.width / 2, dy: -s.width / 2)) }
+        }
+        guard !box.isNull else { return full }
+        let side = max(box.width, box.height, 200)
+        return CGRect(x: box.midX - side / 2, y: box.midY - side / 2, width: side, height: side)
+    }
+
     var body: some View {
         GeometryReader { geo in
+            let f = frame
             let side = min(geo.size.width, geo.size.height)
-            let k = side / drawingCanvasSize
-            let o = CGPoint(x: (geo.size.width - side) / 2, y: (geo.size.height - side) / 2)
+            let k = side / f.width
+            let o = CGPoint(x: (geo.size.width - side) / 2 - f.minX * k, y: (geo.size.height - side) / 2 - f.minY * k)
             ZStack {
                 ForEach(Array(drawing.strokes.enumerated()), id: \.offset) { _, s in
                     strokePath(s.points, scale: k, offset: o)
@@ -175,7 +191,7 @@ struct CircleDrawingLockView: View {
         ZStack {
             if circular { AccessoryWidgetBackground() }
             if let d = entry.drawing, !d.strokes.isEmpty {
-                DrawingArtworkView(drawing: d, tint: .primary, minWidth: 1.5)
+                DrawingArtworkView(drawing: d, tint: .primary, minWidth: 1.5, fitInk: true)
                     .padding(circular ? 8 : 2)
             } else {
                 Image(systemName: "scribble.variable").font(.system(size: 22, weight: .semibold))
