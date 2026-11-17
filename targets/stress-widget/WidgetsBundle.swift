@@ -7,5 +7,6 @@ struct MoodPalsWidgets: WidgetBundle {
         StressWidget()
         LittleSignalsWidget()
         CircleDrawingWidget()
+        CircleDrawingLiveActivity()
     }
 }

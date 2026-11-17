@@ -3,6 +3,8 @@ import {useSyncExternalStore} from 'react';
 import {AppState} from 'react-native';
 import {SUPABASE_PUBLISHABLE_KEY,SUPABASE_URL,supabase} from './supabase';
 import {publishDrawingSnapshot} from './WidgetBridge';
+import {endDrawingLiveActivities,onLiveToken,showDrawingLiveActivity} from './modules/drawing-live';
+import {packCanvas} from './supabase/functions/drawing-live-push/pack';
 
 // Shared canvases for Circle groups (see supabase/migrations/20261129_circle_drawing.sql).
 // Only the latest canvas of each group exists; strokes are vectors on a CANVAS x CANVAS square.
@@ -84,13 +86,26 @@ export async function publishCanvas(groupId:string,diff:CanvasDiff):Promise<stri
  const {data,error}=await supabase.rpc('circle_canvas_publish',{p_group:groupId,p_remove:diff.remove,p_add:diff.add,p_background:diff.background??null});
  if(error)return error.message;
  update({publishesLeft:data as number|null});
+ pushLockScreens(groupId);
  await loadCanvas(groupId);
  void refreshCircleDrawing();
  return null;
 }
 const rpc=async(fn:string,args:Record<string,unknown>)=>{const {error}=await supabase.rpc(fn,args);if(error)throw error;await refreshCircleDrawing();};
 export const setCanvasEnabled=(groupId:string,on:boolean)=>rpc('circle_canvas_enable',{p_group:groupId,p_on:on});
-export const clearCanvas=async(groupId:string)=>{await rpc('circle_canvas_clear',{p_group:groupId});await loadCanvas(groupId);};
+export const clearCanvas=async(groupId:string)=>{await rpc('circle_canvas_clear',{p_group:groupId});pushLockScreens(groupId);await loadCanvas(groupId);};
+// Shows the new drawing on the Lock Screen of members who picked this Circle (Live Activity push).
+const pushLockScreens=(groupId:string)=>void supabase.functions.invoke('drawing-live-push',{body:{group:groupId}}).catch(()=>{});
+
+// Sends this phone's Live Activity tokens to the server; remembered so sign-out can remove them.
+export const LIVE_TOKENS_KEY='circleDrawing.liveTokens';
+async function registerLiveToken(t:{kind:string;token:string;activity?:string;group?:string}){
+ const {data}=await supabase.auth.getSession();if(!data.session)return;
+ const {error}=await supabase.rpc('circle_drawing_live_register',{p_token:t.token,p_kind:t.kind,p_activity:t.activity??null,p_group:t.group??null,p_env:__DEV__?'sandbox':'production'});
+ if(error)return;
+ const list:string[]=JSON.parse(await AsyncStorage.getItem(LIVE_TOKENS_KEY).catch(()=>null)||'[]');
+ if(!list.includes(t.token))await AsyncStorage.setItem(LIVE_TOKENS_KEY,JSON.stringify([t.token,...list].slice(0,10))).catch(()=>{});
+}
 export const leaveGroup=(groupId:string)=>rpc('circle_group_leave',{p_group:groupId});
 export const setWidgetCanvas=(groupId:string|null)=>rpc('circle_drawing_set_widget',{p_group:groupId});
 
@@ -141,6 +156,7 @@ async function publishWidget(){
  const sig=me+'|'+(sel&&c?sel.groupId+':'+c.version:'off')+'|'+!!auth;
  if(sig===published)return;published=sig;
  publishDrawingSnapshot(sel&&c?{groupId:sel.groupId,background:c.background,version:c.version,strokes:c.strokes.map(({b,c:color,w,p})=>({b,c:color,w,p}))}:null,auth);
+ if(sel&&c)showDrawingLiveActivity(sel.groupId,packCanvas(c.strokes,c.background,c.version));else void endDrawingLiveActivities();
 }
 
 let started=false;
@@ -152,9 +168,12 @@ export function startCircleDrawingSync(){
  soon();
  const auth=supabase.auth.onAuthStateChange((_e,session)=>{
   // Clear the widget right away on sign-out; the deferred refresh may never run.
-  if(!session){published='';publishDrawingSnapshot(null,null);watchWidget(null);}
+  if(!session){published='';publishDrawingSnapshot(null,null);void endDrawingLiveActivities();watchWidget(null);}
   soon();
  });
  const app=AppState.addEventListener('change',s=>{if(s==='active')soon();});
- return()=>{started=false;if(t)clearTimeout(t);auth.data.subscription.unsubscribe();app.remove();watchWidget(null);};
+ let tokens:{kind:string;token:string;activity?:string;group?:string}[]=[];
+ const live=onLiveToken(tk=>{tokens=[...tokens.filter(x=>x.kind!==tk.kind||x.activity!==tk.activity),tk];void registerLiveToken(tk);});
+ const relink=supabase.auth.onAuthStateChange((e)=>{if(e==='SIGNED_IN')tokens.forEach(tk=>void registerLiveToken(tk));});
+ return()=>{started=false;if(t)clearTimeout(t);auth.data.subscription.unsubscribe();relink.data.subscription.unsubscribe();live.remove();app.remove();watchWidget(null);};
 }

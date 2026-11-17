@@ -26,6 +26,8 @@ export async function signOutAndUnregister(options?:Parameters<typeof supabase.a
  try{
   const token=await AsyncStorage.getItem(TOKEN_KEY);
   if(token){await supabase.from('circle_push_tokens').delete().eq('token',token);await AsyncStorage.removeItem(TOKEN_KEY);}
+  const live=JSON.parse(await AsyncStorage.getItem('circleDrawing.liveTokens')||'[]');
+  if(live.length){await supabase.rpc('circle_drawing_live_unregister',{p_tokens:live});await AsyncStorage.removeItem('circleDrawing.liveTokens');}
  }catch{}
  return supabase.auth.signOut(options);
 }
