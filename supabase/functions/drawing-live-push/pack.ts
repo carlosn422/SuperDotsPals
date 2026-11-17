@@ -11,9 +11,9 @@ function simplify(pts:[number,number][],tol:number):[number,number][]{
  const keep=new Uint8Array(pts.length);keep[0]=keep[pts.length-1]=1;
  const stack:[number,number][]=[[0,pts.length-1]];
  while(stack.length){
-  const [a,b]=stack.pop()!;const [ax,ay]=pts[a],[bx,by]=pts[b];const dx=bx-ax,dy=by-ay,len=Math.hypot(dx,dy)||1;
+  const [a,b]=stack.pop()!;const [ax,ay]=pts[a],[bx,by]=pts[b];const dx=bx-ax,dy=by-ay,len=Math.hypot(dx,dy);
   let far=-1,dist=tol;
-  for(let i=a+1;i<b;i++){const d=Math.abs(dy*(pts[i][0]-ax)-dx*(pts[i][1]-ay))/len;if(d>dist){dist=d;far=i;}}
+  for(let i=a+1;i<b;i++){const d=len?Math.abs(dy*(pts[i][0]-ax)-dx*(pts[i][1]-ay))/len:Math.hypot(pts[i][0]-ax,pts[i][1]-ay);if(d>dist){dist=d;far=i;}}
   if(far>0){keep[far]=1;stack.push([a,far],[far,b]);}
  }
  return pts.filter((_,i)=>keep[i]);
