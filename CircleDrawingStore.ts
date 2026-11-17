@@ -99,11 +99,17 @@ const pushLockScreens=(groupId:string)=>void supabase.functions.invoke('drawing-
 
 // Sends this phone's Live Activity tokens to the server; remembered so sign-out can remove them.
 export const LIVE_TOKENS_KEY='circleDrawing.liveTokens';
+const DEVICE_KEY='circleDrawing.deviceId';
+async function deviceId(){
+ let id=await AsyncStorage.getItem(DEVICE_KEY).catch(()=>null);
+ if(!id){id=newId();await AsyncStorage.setItem(DEVICE_KEY,id).catch(()=>{});}
+ return id;
+}
 // One save at a time so overlapping registrations can't drop a token that sign-out must remove.
 let liveSaves=Promise.resolve();
 async function registerLiveToken(t:{kind:string;token:string;activity?:string;group?:string}){
  const {data}=await supabase.auth.getSession();if(!data.session)return;
- const {error}=await supabase.rpc('circle_drawing_live_register',{p_token:t.token,p_kind:t.kind,p_activity:t.activity??null,p_group:t.group??null,p_env:__DEV__?'sandbox':'production'});
+ const {error}=await supabase.rpc('circle_drawing_live_register',{p_token:t.token,p_kind:t.kind,p_activity:t.activity??null,p_group:t.group??null,p_env:__DEV__?'sandbox':'production',p_device:await deviceId()});
  if(error)return;
  liveSaves=liveSaves.then(async()=>{
   const list:string[]=JSON.parse(await AsyncStorage.getItem(LIVE_TOKENS_KEY).catch(()=>null)||'[]');

@@ -24,7 +24,7 @@ async function apnsJwt(){
  return jwt.token;
 }
 
-type Target={token:string;kind:"start"|"update";env:string;user_id:string};
+type Target={token:string;kind:"start"|"update";env:string;user_id:string;device:string|null};
 // Tries the token's environment first, then the other one (Debug builds use the sandbox).
 async function send(t:Target,aps:Record<string,unknown>){
  const hosts=t.env==="sandbox"?["api.sandbox.push.apple.com","api.push.apple.com"]:["api.push.apple.com","api.sandbox.push.apple.com"];
@@ -61,11 +61,12 @@ Deno.serve(async req=>{
  const state=packCanvas(canvas.strokes||[],canvas.background,canvas.version);
  const now=Math.floor(Date.now()/1000);
  const alert={title:circle?.name||"MoodPals",body:"New drawing"};
- const byUser=new Map<string,Target[]>();
- for(const t of (targets||[]) as Target[])byUser.set(t.user_id,[...(byUser.get(t.user_id)||[]),t]);
+ // Per phone: update its running card, or start one when it has none.
+ const byDevice=new Map<string,Target[]>();
+ for(const t of (targets||[]) as Target[]){const k=t.user_id+"/"+(t.device||t.token);byDevice.set(k,[...(byDevice.get(k)||[]),t]);}
  let sent=0;
- await Promise.all([...byUser].map(async([uid,ts])=>{
-  const ping=uid===user.id?{}:{alert};
+ await Promise.all([...byDevice.values()].map(async ts=>{
+  const ping=ts[0].user_id===user.id?{}:{alert};
   let ok=false;
   for(const t of ts.filter(t=>t.kind==="update"))ok=(await send(t,{timestamp:now,event:"update","content-state":state,"stale-date":now+8*3600,...ping}))||ok;
   if(!ok)for(const t of ts.filter(t=>t.kind==="start"))ok=(await send(t,{timestamp:now,event:"start","content-state":state,"attributes-type":"CircleDrawingAttributes",attributes:{group},"stale-date":now+8*3600,...ping}))||ok;
