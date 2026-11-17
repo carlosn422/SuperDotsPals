@@ -135,16 +135,19 @@ struct DrawingArtworkView: View {
             for p in s.points { box = box.union(CGRect(x: p.x, y: p.y, width: 0, height: 0).insetBy(dx: -s.width / 2, dy: -s.width / 2)) }
         }
         guard !box.isNull else { return full }
-        let side = max(box.width, box.height, 200) * (round ? 1.42 : 1)
-        return CGRect(x: box.midX - side / 2, y: box.midY - side / 2, width: side, height: side)
+        if round {
+            let side = max(box.width, box.height, 200) * 1.42
+            return CGRect(x: box.midX - side / 2, y: box.midY - side / 2, width: side, height: side)
+        }
+        let w = max(box.width, 120), h = max(box.height, 120)
+        return CGRect(x: box.midX - w / 2, y: box.midY - h / 2, width: w, height: h)
     }
 
     var body: some View {
         GeometryReader { geo in
             let f = frame
-            let side = min(geo.size.width, geo.size.height)
-            let k = side / f.width
-            let o = CGPoint(x: (geo.size.width - side) / 2 - f.minX * k, y: (geo.size.height - side) / 2 - f.minY * k)
+            let k = min(geo.size.width / f.width, geo.size.height / f.height)
+            let o = CGPoint(x: (geo.size.width - f.width * k) / 2 - f.minX * k, y: (geo.size.height - f.height * k) / 2 - f.minY * k)
             ZStack {
                 ForEach(Array(drawing.strokes.enumerated()), id: \.offset) { _, s in
                     strokePath(s.points, scale: k, offset: o)
