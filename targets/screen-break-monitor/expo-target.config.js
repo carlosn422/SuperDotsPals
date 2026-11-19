@@ -3,7 +3,7 @@ module.exports = (config) => ({
   type: 'device-activity-monitor',
   name: 'MoodPalsScreenBreakMonitor',
   displayName: 'MoodPals Screen Break',
-  bundleIdentifier: '.screenbreak.monitor',
+  bundleIdentifier: '.screenbreakmonitor',
   deploymentTarget: '16.4',
   frameworks: ['DeviceActivity', 'FamilyControls', 'ManagedSettings'],
   entitlements: {

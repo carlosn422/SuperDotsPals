@@ -3,7 +3,7 @@ module.exports = (config) => ({
   type: 'shield-action',
   name: 'MoodPalsScreenBreakShieldAction',
   displayName: 'MoodPals Screen Break',
-  bundleIdentifier: '.screenbreak.shieldaction',
+  bundleIdentifier: '.screenbreakshieldaction',
   deploymentTarget: '16.4',
   frameworks: ['ManagedSettings'],
   entitlements: {

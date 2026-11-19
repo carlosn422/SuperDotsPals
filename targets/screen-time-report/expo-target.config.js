@@ -5,7 +5,7 @@ module.exports = (config) => ({
   type: 'app-intent',
   name: 'MoodPalsScreenTimeReport',
   displayName: 'MoodPals Screen Time',
-  bundleIdentifier: '.screentime.report',
+  bundleIdentifier: '.screentimereport',
   deploymentTarget: '16.4',
   frameworks: ['DeviceActivity', 'SwiftUI'],
   entitlements: {
