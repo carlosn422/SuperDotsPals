@@ -85,12 +85,12 @@ export function SignalBurst({mood,emoji,size=150,play=true}:{mood:CircleMood;emo
  </View>;
 }
 
-export function LittleSignalsTodayCard({onOpenSignals,onOpenMood,onOpenSignal,onSend}:{onOpenSignals:()=>void;onOpenMood:(id:string)=>void;onOpenSignal:(id:string)=>void;onSend:()=>void}){
+export function LittleSignalsTodayCard({onOpenSignals,onOpenMood,onOpenSignal,onSend}:{onOpenSignals:()=>void;onOpenMood:(friendId:string,moodId:string)=>void;onOpenSignal:(friendId:string,signalId:string)=>void;onSend:()=>void}){
  const store=useCircle();
  const items=[
-  ...store.signals.filter(s=>Date.now()-new Date(s.at).getTime()<864e5).map(s=>({key:'s'+s.id,at:s.at,isNew:!s.seen,open:()=>onOpenSignal(s.id),
+  ...store.signals.filter(s=>Date.now()-new Date(s.at).getTime()<864e5).map(s=>({key:'s'+s.id,at:s.at,isNew:!s.seen,open:()=>onOpenSignal(s.friendId,s.id),
    leading:<View style={cs.signalEmoji}><Text style={{fontSize:22}}>{signalById(s.signal).emoji}</Text></View>,title:signalById(s.signal).notify(friendName(store,s.friendId))})),
-  ...activeFriendMoods(store).map(m=>({key:'m'+m.id,at:m.sharedAt,isNew:isMoodNew(store,m),open:()=>onOpenMood(m.id),
+  ...activeFriendMoods(store).map(m=>({key:'m'+m.id,at:m.sharedAt,isNew:isMoodNew(store,m),open:()=>onOpenMood(m.friendId,m.id),
    leading:<MoodPalThumb mood={m.mood} size={44}/>,title:friendName(store,m.friendId)+' is feeling '+moodLabel(m.mood)+(m.myReaction?' · you sent '+m.myReaction:'')})),
  ].sort((x,y)=>y.at.localeCompare(x.at));
  const unseen=items.filter(i=>i.isNew).length;
