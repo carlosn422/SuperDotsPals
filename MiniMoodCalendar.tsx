@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import YourDay from './YourDay';
@@ -26,7 +26,7 @@ export default function MiniMoodCalendar() {
   const insets = useSafeAreaInsets();
   const { moods, days } = useMoodCalendar();
   const {readings}=useSavedHealth();
-  const timelineMoods=combinedMoodEvents(moods,readings);
+  const timelineMoods=useMemo(()=>combinedMoodEvents(moods,readings),[moods,readings]);
 
   const getMoodForDay = (day: Date) => {
     const dayStart = startOfDay(day);
