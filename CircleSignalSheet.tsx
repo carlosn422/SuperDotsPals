@@ -2,7 +2,7 @@ import React,{useEffect,useRef,useState} from 'react';
 import {Animated,Easing,Modal,ScrollView,StyleSheet,Text,TouchableOpacity,View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import {LITTLE_SIGNALS,SignalId,isToday,signalById} from './LittleSignalsData';
+import {SELECTABLE_LITTLE_SIGNALS,SignalId,isToday,signalById} from './LittleSignalsData';
 import {familyFriend,useCircle} from './CircleStore';
 import {CT,EmptyState,PrimaryButton,cs,useReduceMotion} from './CircleComponents';
 import {PersonAvatar,firstName,personName} from './CircleConversations';
@@ -55,7 +55,7 @@ export function SignalPicker({initial=[],locked,onSent,onInvite}:{initial?:strin
    </TouchableOpacity>})}
   </View>}</>}
   <Text style={{fontSize:16,fontWeight:'900',color:CT.ink,marginTop:2}}>Signal</Text>
-  <View style={{flexDirection:'row',flexWrap:'wrap',gap:9}}>{LITTLE_SIGNALS.map(s=>{const on=sig===s.id;return <TouchableOpacity key={s.id} onPress={()=>setSig(s.id)} accessibilityRole="radio" accessibilityState={{selected:on}}
+  <View style={{flexDirection:'row',flexWrap:'wrap',gap:9}}>{SELECTABLE_LITTLE_SIGNALS.map(s=>{const on=sig===s.id;return <TouchableOpacity key={s.id} onPress={()=>setSig(s.id)} accessibilityRole="radio" accessibilityState={{selected:on}}
    style={{width:'48%',flexGrow:1,flexDirection:'row',alignItems:'center',gap:9,padding:12,borderRadius:16,borderWidth:1.5,borderColor:on?CT.primary:CT.border,backgroundColor:on?CT.primarySoft:'#fff'}}>
    <Text style={{fontSize:24}}>{s.emoji}</Text><Text style={{flex:1,fontWeight:'800',fontSize:13,color:CT.ink}}>{s.label}</Text></TouchableOpacity>})}</View>
   {sentToday>=20?<Text style={[cs.muted,{textAlign:'center'}]}>You’ve sent a lot of signals today. Try again tomorrow.</Text>:null}
