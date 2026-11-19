@@ -245,7 +245,7 @@ type ReactionRow={id:string;mood:string;shared_at:string;reactor_name:string;emo
 const SELECTED_KEY='moodpals.familySelectedProfile';
 export function shortProfileName(name:string){return name.replace(/[’']s\s+Apple\s+Watch$/i,'').replace(/\s*Apple\s+Watch$/i,'').trim()||name}
 
-export function FamilySwitcher({children,disabled=false,onAdd,focused=true,onChat,onSignal}:{children:React.ReactNode;disabled?:boolean;onAdd?:()=>void;focused?:boolean;onChat?:(id:string)=>void;onSignal?:(id:string)=>void}){
+export function FamilySwitcher({children,disabled=false,onAdd,focused=true,onChat,onSignal,onScreenBreak}:{children:React.ReactNode;disabled?:boolean;onAdd?:()=>void;focused?:boolean;onChat?:(id:string)=>void;onSignal?:(id:string)=>void;onScreenBreak?:(id:string)=>void}){
  const {profiles,slots,load,loaded}=useFamilyProfiles(!disabled);
  const {isPlus,showPaywall}=usePlus();
  const [selected,setSelectedState]=useState<string|null>(null),[moods,setMoods]=useState<MoodRow[]>([]),[reactions,setReactions]=useState<ReactionRow[]>([]),[tick,setTick]=useState(0),[loading,setLoading]=useState(false),[error,setError]=useState('');
@@ -289,6 +289,7 @@ export function FamilySwitcher({children,disabled=false,onAdd,focused=true,onCha
     {onSignal?<TouchableOpacity accessibilityRole="button" onPress={()=>onSignal(profile.id)} style={styles.familyAction}><Ionicons name="heart-outline" size={18} color={purple}/><Text style={styles.familyActionText}>Little Signal</Text></TouchableOpacity>:null}
     {onChat?<TouchableOpacity accessibilityRole="button" onPress={()=>onChat(profile.id)} style={styles.familyAction}><Ionicons name="chatbubble-ellipses-outline" size={18} color={purple}/><Text style={styles.familyActionText}>Open Chat</Text></TouchableOpacity>:null}
    </View>:null}
+   {onScreenBreak?<TouchableOpacity accessibilityRole="button" onPress={()=>onScreenBreak(profile.id)} style={styles.familyAction}><Ionicons name="hourglass-outline" size={18} color={purple}/><Text style={styles.familyActionText}>Screen Break</Text></TouchableOpacity>:null}
    <FamilyLocation profileId={profile.id} name={shortProfileName(profile.name)} tick={tick}/>
   </View>}
  </View>;

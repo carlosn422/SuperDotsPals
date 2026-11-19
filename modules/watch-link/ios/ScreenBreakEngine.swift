@@ -108,8 +108,12 @@ final class ScreenBreakEngine {
         trialStartedAt: date("trialStartedAt"),
         trialEndsAt: date("trialEndsAt"),
         checkedAt: Date())
+      let previous = loadEntitlement()
       if let data = try? JSONEncoder().encode(next) { defaults.set(data, forKey: entitlementKey) }
-      notifyLocked()
+      // Only a real change is pushed to the Watch and the UI (every sync refreshes checkedAt).
+      var unchanged = next
+      unchanged.checkedAt = previous?.checkedAt ?? next.checkedAt
+      if unchanged != previous { notifyLocked() }
     }
   }
 

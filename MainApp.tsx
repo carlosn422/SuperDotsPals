@@ -1,5 +1,6 @@
 import ConnectedDevices from './ConnectedDevices';
 import {FamilySwitcher} from './FamilyWatches';
+import FamilyScreenBreak,{useScreenBreakSync} from './FamilyScreenBreak';
 import MiniMoodCalendar from './MiniMoodCalendar';
 
 import SpiritualReading from './SpiritualReading';
@@ -48,6 +49,7 @@ const MORE_ITEMS:MoreItem[]=[
  {key:'Settings',title:'Settings',detail:'Account, notifications, health data and more',icon:'settings'},
  {key:'Health',title:'Health',detail:'Heart, sleep and activity readings',icon:'heart'},
  {key:'Trends',title:'Trends',detail:'Mood and stress history',icon:'bar-chart'},
+ {key:'family',title:'Family',detail:'Screen Break and Screen Time Insights',icon:'people'},
  {key:'plus',title:'Subscription',detail:'MoodPals Plus and Free plans',icon:'star'},
  {key:'help',title:'Help & Support',detail:'FAQs and troubleshooting',icon:'help-circle'},
  {key:'privacy',title:'Privacy',detail:'Privacy & Data',icon:'shield-checkmark'},
@@ -81,12 +83,14 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  const [spiritualCheckin,setSpiritualCheckin]=useState<{mood:string;answers:Record<string,string>}|undefined>(undefined);
  const openAction=(view:'checkin'|'chat'|'history'|'spiritual'|'breathing')=>{if(view==='chat'&&!isPlus){showPaywall('reflections');return;}if(view==='spiritual')setSpiritualCheckin(undefined);setActionDetail(null);setActionView(view);setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});};
  const [watchesPage,setWatchesPage]=useState<'main'|'themes'>('main');
- const [settingsPage,setSettingsPage]=useState<'main'|'watch'|'devices'|'health'|'notifications'|'privacy'|'help'|'circle'|'watchThemes'|'plus'|'account'|'delete'>('main');
+ const [settingsPage,setSettingsPage]=useState<'main'|'watch'|'devices'|'health'|'notifications'|'privacy'|'help'|'circle'|'watchThemes'|'plus'|'account'|'delete'|'family'>('main');
+ const [familyTarget,setFamilyTarget]=useState<{childId?:string;profileId?:string;at:number}|null>(null);
  // Each Settings sub-page opens at its top, not at the list's scroll position.
  useEffect(()=>{settingsScroll.current?.scrollTo({y:0,animated:false})},[settingsPage]);
  const isGuest=useIsGuest();
  const circleUnread=circleNewCount(useCircle());
  const appleLink=useAppleLink();
+ useScreenBreakSync(!isGuest);
  useWatchAutoLink(isGuest,()=>{go('Settings');setSettingsPage('account')});
  const [circleSheet,setCircleSheet]=useState<CircleRoute[]|null>(null);
  const [period,setPeriod]=useState<Period>('Day');
@@ -160,6 +164,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   const key=r.notification.request.identifier;if(handledNotifications.has(key))return;handledNotifications.add(key);
   const d=(r.notification.request.content.data||{}) as Record<string,unknown>;
   const ref=typeof d.ref==='string'&&d.ref?d.ref:undefined;
+  if(d.action==='screenBreak'){setCircleSheet(null);go('Settings');setSettingsPage('family');setFamilyTarget({childId:typeof d.childId==='string'?d.childId:undefined,at:Date.now()});return;}
   if(d.action==='breathing'){setCircleSheet(null);go('Actions');openAction('breathing');return;}
   if(d.action==='circle'){
    if(d.route==='watches'){setCircleSheet(null);go('Watches');return;}
@@ -198,7 +203,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   else if(t==='Circle')setCircleReset(n=>n+1);
   else if(t==='Watches'){setWatchesPage('main');setWatchesReset(n=>n+1);watchesScroll.current?.scrollTo({y:0,animated:true});}
  };
- const pickMore=(key:string)=>{if(key==='plus'||key==='help'||key==='privacy'){go('Settings');setSettingsPage(key);}else go(key as MorePage);};
+ const pickMore=(key:string)=>{if(key==='plus'||key==='help'||key==='privacy'||key==='family'){go('Settings');setSettingsPage(key);}else go(key as MorePage);};
  const onPageSettled=(event:NativeSyntheticEvent<NativeScrollEvent>)=>{
   const index=Math.max(0,Math.min(tabs.length-1,Math.round(event.nativeEvent.contentOffset.x/pageWidth)));
   setTab(tabs[index].name);
@@ -239,7 +244,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   <View style={s.top}></View>
   <View style={{flex:1}}>
   <ScrollView ref={pager} horizontal pagingEnabled scrollEnabled={!chartScrubbing} bounces={false} showsHorizontalScrollIndicator={false} scrollEventThrottle={16} onMomentumScrollEnd={onPageSettled} directionalLockEnabled style={{flex:1}} keyboardShouldPersistTaps="handled">
-  <View key="Today" style={{width:pageWidth,flex:1}}><ChartScrubContext.Provider value={setChartScrubbing}><ScrollView ref={todayScroll} scrollEnabled={!chartScrubbing} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><FamilySwitcher disabled={isGuest} focused={tab==='Today'&&!moreScreen} onAdd={()=>go('Watches')} onChat={id=>setCircleSheet([{name:'chat',id}])} onSignal={id=>setCircleSheet([{name:'send',friendId:id,locked:true}])}><WellnessToday onHealthMood={applyHealthMood} onInvite={()=>{if(isGuest){go('Settings');setSettingsPage('account')}else setCircleSheet([{name:'invite'}])}} onPlans={()=>{go('Settings');setSettingsPage('plus')}} dayRow={isGuest?null:<MiniMoodCalendar/>} socialCard={<LittleSignalsTodayCard onOpenSignals={()=>setCircleSheet([{name:'today'}])} onOpenMood={(friendId,moodId)=>setCircleSheet([{name:'chat',id:friendId,focus:'m'+moodId}])} onOpenSignal={(friendId,signalId)=>setCircleSheet([{name:'chat',id:friendId,focus:'s'+signalId}])} onSend={()=>setCircleSheet([{name:'send'}])}/>} companion={shownMood} accent={colors.accent} water={water} caffeine={coffee} mood={mood} onCheckin={()=>{go('Actions');openAction('checkin')}} onBreathing={()=>{go('Actions');openAction('breathing')}} onChat={()=>{go('Actions');openAction('chat')}} onActions={()=>{go('Actions');setActionView(null);setActionDetail('water')}} onCaffeine={()=>{go('Actions');setActionView(null);setActionDetail('caffeine')}} onJournal={()=>{go('Actions');openAction('history')}} onAddWater={()=>void quickAddHabit('water')} onAddCaffeine={()=>void quickAddHabit('caffeine')} addingWater={quickAdding.water} addingCaffeine={quickAdding.caffeine}/></FamilySwitcher></ScrollView></ChartScrubContext.Provider></View>
+  <View key="Today" style={{width:pageWidth,flex:1}}><ChartScrubContext.Provider value={setChartScrubbing}><ScrollView ref={todayScroll} scrollEnabled={!chartScrubbing} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><FamilySwitcher disabled={isGuest} focused={tab==='Today'&&!moreScreen} onAdd={()=>go('Watches')} onChat={id=>setCircleSheet([{name:'chat',id}])} onSignal={id=>setCircleSheet([{name:'send',friendId:id,locked:true}])} onScreenBreak={id=>{go('Settings');setSettingsPage('family');setFamilyTarget({profileId:id,at:Date.now()})}}><WellnessToday onHealthMood={applyHealthMood} onInvite={()=>{if(isGuest){go('Settings');setSettingsPage('account')}else setCircleSheet([{name:'invite'}])}} onPlans={()=>{go('Settings');setSettingsPage('plus')}} dayRow={isGuest?null:<MiniMoodCalendar/>} socialCard={<LittleSignalsTodayCard onOpenSignals={()=>setCircleSheet([{name:'today'}])} onOpenMood={(friendId,moodId)=>setCircleSheet([{name:'chat',id:friendId,focus:'m'+moodId}])} onOpenSignal={(friendId,signalId)=>setCircleSheet([{name:'chat',id:friendId,focus:'s'+signalId}])} onSend={()=>setCircleSheet([{name:'send'}])}/>} companion={shownMood} accent={colors.accent} water={water} caffeine={coffee} mood={mood} onCheckin={()=>{go('Actions');openAction('checkin')}} onBreathing={()=>{go('Actions');openAction('breathing')}} onChat={()=>{go('Actions');openAction('chat')}} onActions={()=>{go('Actions');setActionView(null);setActionDetail('water')}} onCaffeine={()=>{go('Actions');setActionView(null);setActionDetail('caffeine')}} onJournal={()=>{go('Actions');openAction('history')}} onAddWater={()=>void quickAddHabit('water')} onAddCaffeine={()=>void quickAddHabit('caffeine')} addingWater={quickAdding.water} addingCaffeine={quickAdding.caffeine}/></FamilySwitcher></ScrollView></ChartScrubContext.Provider></View>
   <View key="Actions" style={{width:pageWidth,flex:1}}><ScrollView ref={actionScroll} style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
   {actionView?<TouchableOpacity onPress={()=>{setActionView(null);setActionDetail(null);actionScroll.current?.scrollTo({y:0,animated:true});}} style={{flexDirection:'row',alignItems:'center',gap:8,paddingVertical:9}}><Ionicons name="arrow-back" size={20} color={colors.accent}/><Text style={{color:colors.accent,fontWeight:'800'}}>All actions</Text></TouchableOpacity>:null}
   {actionView==='spiritual'?<SpiritualReading key={actionVersion} initialCheckin={spiritualCheckin}/>:
@@ -259,6 +264,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
     {isGuest?<SettingsItem title="Create your account" subtitle="Save your MoodPals and use My Circle" status="You're using MoodPals as a guest" icon="person-circle-outline" accent={colors.accent} onPress={()=>setSettingsPage('account')}/>:null}
     <SettingsItem title="MoodPals Plus" subtitle="Free and Plus plans" status="Advanced trends, circles and reflections" icon="sparkles-outline" accent={colors.accent} onPress={()=>setSettingsPage('plus')}/>
 
+    <SettingsItem title="Family" subtitle="Screen Break and Screen Time Insights" status="Lend your iPhone with a timer you control" icon="hourglass-outline" accent={colors.accent} onPress={()=>setSettingsPage('family')}/>
     <SettingsItem title="Apple Watch" subtitle="Setup, linked watches and watch theme" status="Family watches too" icon="watch-outline" accent={colors.accent} onPress={()=>go('Watches')}/>
     <SettingsItem title="Health Data" subtitle="Permissions and wearable readings" status="Open Health to connect or sync" icon="heart-outline" accent={colors.accent} onPress={()=>setSettingsPage('health')}/>
     <SettingsItem title="Notifications" subtitle="Reminders and preferences" status="Daily reminders and stress alerts" icon="notifications-outline" accent={colors.accent} onPress={()=>setSettingsPage('notifications')}/>
@@ -269,7 +275,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
     {!isGuest&&appleLink.available?<SettingsItem title="Sign in with Apple" subtitle={appleLink.linked?'Linked to this account':'Also sign in to this account with Apple'} status={appleLink.linked?'Linked':undefined} icon="logo-apple" accent={colors.accent} onPress={()=>appleLink.linked?Alert.alert('Sign in with Apple','Apple is already linked. You can sign in with Apple or with your email and password.'):void appleLink.link()}/>:null}
     {isGuest?null:<TouchableOpacity style={s.settingsRow} onPress={()=>void signOutAndUnregister()}><Ionicons name="log-out-outline" size={22} color="#D65B79"/><Text style={[s.settingsTitle,{color:'#D65B79'}]}>Sign out</Text></TouchableOpacity>}
     <TouchableOpacity accessibilityRole="button" style={s.settingsRow} onPress={()=>setSettingsPage('delete')}><Ionicons name="trash-outline" size={22} color="#D65B79"/><Text style={[s.settingsTitle,{color:'#D65B79'}]}>Delete account</Text></TouchableOpacity>
-   </>:settingsPage==='account'?<CreateAccountScreen accent={colors.accent} onBack={()=>setSettingsPage('main')}/>:settingsPage==='delete'?<DeleteAccountScreen accent={colors.accent} onBack={()=>setSettingsPage('main')}/>:settingsPage==='plus'?<PlusSettingsScreen accent={colors.accent} onBack={()=>setSettingsPage('main')}/>:settingsPage==='watchThemes'?<WatchThemesScreen onBack={()=>setSettingsPage('main')}/>:settingsPage==='circle'?(isGuest?<AccountRequired accent={colors.accent} backLabel="Settings" onBack={()=>setSettingsPage('main')} onCreate={()=>setSettingsPage('account')}/>:<CircleNavigator onExit={()=>setSettingsPage('main')} mood={mood} onRouteChange={()=>settingsScroll.current?.scrollTo({y:0,animated:false})}/>):<>
+   </>:settingsPage==='account'?<CreateAccountScreen accent={colors.accent} onBack={()=>setSettingsPage('main')}/>:settingsPage==='delete'?<DeleteAccountScreen accent={colors.accent} onBack={()=>setSettingsPage('main')}/>:settingsPage==='family'?<FamilyScreenBreak target={familyTarget} onBack={()=>setSettingsPage('main')} onAddWatch={()=>go('Watches')}/>:settingsPage==='plus'?<PlusSettingsScreen accent={colors.accent} onBack={()=>setSettingsPage('main')}/>:settingsPage==='watchThemes'?<WatchThemesScreen onBack={()=>setSettingsPage('main')}/>:settingsPage==='circle'?(isGuest?<AccountRequired accent={colors.accent} backLabel="Settings" onBack={()=>setSettingsPage('main')} onCreate={()=>setSettingsPage('account')}/>:<CircleNavigator onExit={()=>setSettingsPage('main')} mood={mood} onRouteChange={()=>settingsScroll.current?.scrollTo({y:0,animated:false})}/>):<>
     <TouchableOpacity style={s.settingsBack} onPress={()=>setSettingsPage('main')}><Ionicons name="chevron-back" size={18} color={colors.accent}/><Text style={{color:colors.accent,fontWeight:'800'}}>Settings</Text></TouchableOpacity>
     <Text style={s.mainTitle}>{({watch:'Apple Watch & Widgets',devices:'Connected Devices',health:'Apple Health',notifications:'Notifications',privacy:'Privacy & Data',help:'Help & Support'} as const)[settingsPage]}</Text>
     {settingsPage==='devices'?<ConnectedDevices/>:null}
