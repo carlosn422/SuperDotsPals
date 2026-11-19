@@ -1,5 +1,5 @@
 import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {ActivityIndicator,Alert,AppState,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native';
+import {ActivityIndicator,Alert,AppState,Modal,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {supabase} from './supabase';
 import {APP_THEME as T} from './MoodMascot';
@@ -150,7 +150,7 @@ function AddChild({onAdded}:{onAdded:()=>void}){
 function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAddWatch}:{child:FamilyChild;children:FamilyChild[];onBack:()=>void;onInsights:()=>void;onChanged:()=>void;onRemoved:()=>void;onAddWatch?:()=>void}){
  const [state,setState]=useBreakState();
  const {isPlus,showPaywall}=usePlus();
- const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState(''),[minutes,setMinutes]=useState(30),[custom,setCustom]=useState(''),[useCustom,setUseCustom]=useState(false);
+ const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState(''),[minutes,setMinutes]=useState(30),[useCustom,setUseCustom]=useState(false),[customOpen,setCustomOpen]=useState(false);
  const session=state?.session;
  const mine=session&&session.childId===child.id&&(session.status==='active'||session.status==='restricted')?session:null;
  const other=session&&session.childId!==child.id&&session.status==='active'?session:null;
@@ -178,7 +178,7 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
   setBusy(null);refresh();
  }
  async function pick(){setBusy('pick');try{await pickBreakApps()}catch{setError('Unable to open the app picker.')}setBusy(null);refresh()}
- const chosen=useCustom?Math.round(Number(custom)):minutes;
+ const chosen=minutes;
  const validMinutes=Number.isFinite(chosen)&&chosen>=1&&chosen<=720;
  const ready=!!state?.authorized&&(state?.selectionCount||0)>0;
  const trialDaysLeft=state?.trialEndsAt?Math.max(0,Math.ceil((state.trialEndsAt*1000-Date.now())/864e5)):null;
@@ -207,18 +207,24 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
    </View>:<View style={st.card}>
     <Text style={st.heading}>Screen Break</Text>
     {other?<Text style={st.body}>{other.childName}'s Screen Break is running on this iPhone. One session runs at a time.</Text>:null}
-    <Step done={!!state?.authorized} n={1} title="Allow Screen Time access" detail="You approve with this iPhone's Face ID or passcode. MoodPals only pauses the apps you choose." action={state?.authorized?undefined:'Allow'} onPress={()=>void authorize()} busy={busy==='auth'}/>
-    <Step done={(state?.selectionCount||0)>0} n={2} title="Choose apps to pause" detail={(state?.selectionCount||0)>0?state!.selectionCount+' apps, categories or websites':'Picked with Apple\'s app list. Nothing about them leaves this iPhone.'} action={(state?.selectionCount||0)>0?'Change':'Choose'} onPress={()=>void pick()} busy={busy==='pick'} disabled={!state?.authorized}/>
-    <Text style={[st.rowTitle,{marginTop:4}]}>3. Screen time</Text>
-    <View style={st.chips}>
-     {DURATIONS.map(m=><Chip key={m} label={m+' min'} on={!useCustom&&minutes===m} onPress={()=>{setUseCustom(false);setMinutes(m)}}/>)}
-     <Chip label="Custom" on={useCustom} onPress={()=>setUseCustom(true)}/>
+    <View style={st.setupStatus}>
+     <StatusRow done={!!state?.authorized} title={state?.authorized?'Screen Time Ready':'Screen Time Access Needed'} detail={state?.authorized?'Approved on this iPhone':'Allow Screen Time access to pause selected apps'} action={state?.authorized?undefined:'Allow'} onPress={()=>void authorize()} busy={busy==='auth'}/>
+     <View style={{height:1,backgroundColor:T.border,marginLeft:34}}/>
+     <StatusRow done={(state?.selectionCount||0)>0} title="Apps to pause" detail={(state?.selectionCount||0)>0?state!.selectionCount+' selected':'Choose apps, categories or websites'} action={(state?.selectionCount||0)>0?'Change':'Choose'} onPress={()=>void pick()} busy={busy==='pick'} disabled={!state?.authorized}/>
     </View>
-    {useCustom?<TextInput value={custom} onChangeText={t=>setCustom(t.replace(/[^0-9]/g,''))} keyboardType="number-pad" placeholder="Minutes (1–720)" maxLength={3} style={st.input} accessibilityLabel="Custom minutes"/>:null}
-    <TouchableOpacity accessibilityRole="button" disabled={!ready||!validMinutes||!!busy||!!other} onPress={()=>run('start',{minutes:chosen})} style={[st.cta,(!ready||!validMinutes||!!busy||!!other)&&{opacity:0.5}]}>
-     <Text style={st.ctaText}>{validMinutes?'Start · '+formatDuration(chosen*60):'Start'}</Text>
+    <Text style={[st.rowTitle,{marginTop:8}]}>How long can {child.name} use the phone?</Text>
+    <View style={st.durationRow}>
+     {DURATIONS.map(m=><TouchableOpacity key={m} accessibilityRole="button" accessibilityState={{selected:!useCustom&&minutes===m}} onPress={()=>{setUseCustom(false);setMinutes(m)}} style={[st.durationPreset,!useCustom&&minutes===m&&{backgroundColor:T.primary}]}>
+      <Text style={[st.durationText,!useCustom&&minutes===m&&{color:'#fff'}]}>{m}</Text><Text style={[st.durationUnit,!useCustom&&minutes===m&&{color:'#fff'}]}>min</Text>
+     </TouchableOpacity>)}
+    </View>
+    <TouchableOpacity accessibilityRole="button" onPress={()=>setCustomOpen(true)} style={[st.customRow,useCustom&&{borderColor:T.primary,backgroundColor:T.primarySoft}]}>
+     <Ionicons name="options-outline" size={19} color={T.primary}/><Text style={[st.rowTitle,{flex:1,fontSize:14}]}>Custom duration</Text><Text style={st.sub}>{useCustom?formatDuration(minutes*60):'Choose time'}</Text><Ionicons name="chevron-forward" size={17} color={T.muted}/>
     </TouchableOpacity>
-    <Text style={st.sub}>When time is up, the chosen apps show the Joy break screen until you release it. You'll get a reminder 5 minutes before. Control it from your Apple Watch too: Family → {child.name}.</Text>
+    <View style={st.selectedDuration}><Ionicons name="time-outline" size={20} color={T.primary}/><Text style={{color:T.ink,fontWeight:'800',fontSize:14}}>Selected time · {formatDuration(chosen*60)}</Text></View>
+    <TouchableOpacity accessibilityRole="button" disabled={!ready||!validMinutes||!!busy||!!other} onPress={()=>run('start',{minutes:chosen})} style={[st.cta,(!ready||!validMinutes||!!busy||!!other)&&{opacity:0.5}]}><Text style={st.ctaText}>Start Screen Break</Text></TouchableOpacity>
+    <Text style={[st.sub,{textAlign:'center'}]}>Chosen apps pause when time is up. You'll get a reminder 5 minutes before. You can manage the session from your Apple Watch.</Text>
+    <CustomDurationSheet visible={customOpen} initialMinutes={minutes} onClose={()=>setCustomOpen(false)} onChoose={m=>{setMinutes(m);setUseCustom(true);setCustomOpen(false)}}/>
    </View>}
    {busy&&busy!=='auth'&&busy!=='pick'?<ActivityIndicator color={T.primary}/>:null}
    {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
@@ -238,12 +244,48 @@ function PlanNote({state,daysLeft,onUpgrade}:{state:BreakState;daysLeft:number|n
  </TouchableOpacity>;
 }
 
-function Step({n,title,detail,done,action,onPress,busy,disabled}:{n:number;title:string;detail:string;done:boolean;action?:string;onPress:()=>void;busy?:boolean;disabled?:boolean}){
+function StatusRow({done,title,detail,action,onPress,busy,disabled}:{done:boolean;title:string;detail:string;action?:string;onPress:()=>void;busy?:boolean;disabled?:boolean}){
  return <View style={st.step}>
-  <Ionicons name={done?'checkmark-circle':'ellipse-outline'} size={22} color={done?T.primary:'#B8C4BE'}/>
-  <View style={{flex:1}}><Text style={st.rowTitle}>{n}. {title}</Text><Text style={st.sub}>{detail}</Text></View>
-  {action?<TouchableOpacity accessibilityRole="button" disabled={busy||disabled} onPress={onPress} style={[st.small,(busy||disabled)&&{opacity:0.5}]}>{busy?<ActivityIndicator size="small" color={T.primary}/>:<Text style={st.smallText}>{action}</Text>}</TouchableOpacity>:null}
+  <Ionicons name={done?'checkmark-circle':'ellipse-outline'} size={23} color={done?T.primary:'#B8C4BE'}/>
+  <View style={{flex:1,gap:2}}><Text style={st.rowTitle}>{title}</Text><Text style={st.sub}>{detail}</Text></View>
+  {action?<TouchableOpacity accessibilityRole="button" accessibilityLabel={action+' '+title} disabled={busy||disabled} onPress={onPress} style={[st.small,(busy||disabled)&&{opacity:0.5}]}>{busy?<ActivityIndicator size="small" color={T.primary}/>:<Text style={st.smallText}>{action}</Text>}</TouchableOpacity>:null}
  </View>;
+}
+
+function DurationWheel({values,value,onChange,suffix}:{values:number[];value:number;onChange:(n:number)=>void;suffix:string}){
+ const ref=useRef<ScrollView>(null);
+ const rowHeight=44;
+ useEffect(()=>{if(ref.current)ref.current.scrollTo({y:Math.max(0,values.indexOf(value))*rowHeight,animated:false})},[]);
+ const update=(y:number)=>onChange(values[Math.max(0,Math.min(values.length-1,Math.round(y/rowHeight)))]);
+ return <View style={{flex:1,height:132,overflow:'hidden'}}>
+  <View pointerEvents="none" style={{position:'absolute',top:44,left:2,right:2,height:44,borderRadius:12,backgroundColor:T.primarySoft}}/>
+  <ScrollView ref={ref} showsVerticalScrollIndicator={false} nestedScrollEnabled snapToInterval={rowHeight} decelerationRate="fast" contentContainerStyle={{paddingVertical:44}} onMomentumScrollEnd={e=>update(e.nativeEvent.contentOffset.y)} onScrollEndDrag={e=>{const y=e.nativeEvent.contentOffset.y;update(y)}}>
+   {values.map(n=><TouchableOpacity key={n} onPress={()=>{onChange(n);ref.current?.scrollTo({y:values.indexOf(n)*rowHeight,animated:true})}} accessibilityRole="button" accessibilityLabel={n+' '+suffix} style={{height:rowHeight,alignItems:'center',justifyContent:'center'}}>
+    <Text style={{fontSize:n===value?22:18,fontWeight:n===value?'900':'500',color:n===value?T.ink:T.muted}}>{String(n).padStart(2,'0')}</Text>
+   </TouchableOpacity>)}
+  </ScrollView>
+ </View>;
+}
+
+function CustomDurationSheet({visible,initialMinutes,onClose,onChoose}:{visible:boolean;initialMinutes:number;onClose:()=>void;onChoose:(n:number)=>void}){
+ const [hours,setHours]=useState(Math.floor(initialMinutes/60)),[mins,setMins]=useState(initialMinutes%60);
+ useEffect(()=>{if(visible){setHours(Math.floor(initialMinutes/60));setMins(initialMinutes%60)}},[visible,initialMinutes]);
+ const total=hours*60+mins;
+ return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+  <View style={{flex:1,justifyContent:'flex-end'}}>
+   <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={onClose} accessibilityLabel="Close custom duration" accessibilityRole="button"/>
+   <View style={st.durationSheet}>
+    <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'}}/>
+    <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={st.heading}>Set Custom Duration</Text><TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={23} color={T.muted}/></TouchableOpacity></View>
+    <View style={{flexDirection:'row',gap:14}}>
+     <View style={{flex:1,alignItems:'center',gap:8}}><Text style={st.kicker}>Hours</Text><DurationWheel key={'hours-'+visible} values={Array.from({length:13},(_,i)=>i)} value={hours} onChange={setHours} suffix="hours"/></View>
+     <View style={{flex:1,alignItems:'center',gap:8}}><Text style={st.kicker}>Minutes</Text><DurationWheel key={'mins-'+visible} values={Array.from({length:60},(_,i)=>i)} value={mins} onChange={setMins} suffix="minutes"/></View>
+    </View>
+    <Text style={[st.sub,{textAlign:'center'}]}>Choose 1 minute to 12 hours.</Text>
+    <TouchableOpacity accessibilityRole="button" disabled={total<1||total>720} onPress={()=>onChoose(total)} style={[st.cta,(total<1||total>720)&&{opacity:0.5}]}><Text style={st.ctaText}>Use {formatDuration(total*60)}</Text></TouchableOpacity>
+   </View>
+  </View>
+ </Modal>;
 }
 
 function Chip({label,on,onPress,disabled}:{label:string;on?:boolean;onPress:()=>void;disabled?:boolean}){
@@ -417,6 +459,15 @@ const st=StyleSheet.create({
  chipOn:{backgroundColor:T.primary},
  chipText:{fontSize:14,fontWeight:'800',color:T.primary},
  step:{flexDirection:'row',alignItems:'center',gap:10},
+ setupStatus:{gap:12,backgroundColor:'#fff',borderRadius:16,padding:12,borderWidth:1,borderColor:T.border},
+ durationRow:{flexDirection:'row',gap:7,justifyContent:'space-between'},
+ durationPreset:{flex:1,alignItems:'center',borderRadius:16,paddingVertical:10,backgroundColor:T.primarySoft,gap:1},
+ durationText:{fontSize:15,fontWeight:'900',color:T.primary},
+ durationUnit:{fontSize:10,fontWeight:'700',color:T.primary},
+ customRow:{flexDirection:'row',alignItems:'center',gap:9,borderRadius:16,borderWidth:1,borderColor:T.border,padding:12,backgroundColor:'#fff'},
+ selectedDuration:{flexDirection:'row',alignItems:'center',gap:9,borderRadius:16,padding:13,backgroundColor:T.primarySoft},
+ durationSheet:{backgroundColor:T.surface,borderTopLeftRadius:28,borderTopRightRadius:28,paddingHorizontal:20,paddingTop:16,paddingBottom:38,gap:16,borderWidth:1,borderColor:T.border},
+
  small:{borderRadius:14,paddingHorizontal:12,paddingVertical:8,backgroundColor:T.primarySoft,alignItems:'center'},
  smallText:{fontSize:13,fontWeight:'800',color:T.primary},
  note:{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:T.primarySoft,borderRadius:16,padding:12},
