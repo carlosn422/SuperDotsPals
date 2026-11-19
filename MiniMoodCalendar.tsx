@@ -17,18 +17,22 @@ function startOfDay(d: Date) {
 }
 
 import { useMoodCalendar } from './useMoodCalendar';
+import {useSavedHealth} from './HealthDataPanel';
+import {combinedMoodEvents} from './HRVMoodTracker';
 
 export default function MiniMoodCalendar() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [open, setOpen] = useState(false);
   const insets = useSafeAreaInsets();
   const { moods, days } = useMoodCalendar();
+  const {readings}=useSavedHealth();
+  const timelineMoods=combinedMoodEvents(moods,readings);
 
   const getMoodForDay = (day: Date) => {
     const dayStart = startOfDay(day);
     const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
 
-    const moodForDay = moods.find((mood: TimelineMood) => {
+    const moodForDay = timelineMoods.find((mood: TimelineMood) => {
       const moodDate = new Date(mood.occurred_at);
       return moodDate >= dayStart && moodDate < dayEnd;
     });
