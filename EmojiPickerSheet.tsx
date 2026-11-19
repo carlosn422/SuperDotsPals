@@ -1,94 +1,38 @@
-import React,{useEffect,useMemo,useRef,useState} from 'react';
-import {Animated,Easing,FlatList,Modal,Pressable,ScrollView,Text,TextInput,TextStyle,TouchableOpacity,View,useWindowDimensions} from 'react-native';
+import React,{useState} from 'react';
+import {Modal,Pressable,Text,TouchableOpacity,View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import {EMOJI_GROUPS,Emoji,EmojiItem,EmojiStyle,emojiItem} from './EmojiCatalog';
+import {Emoji,EmojiStyle} from './EmojiCatalog';
 import {usePlus} from './PlusStore';
 import {PlusPaywallSheet} from './PlusPaywall';
-import {CT,useReduceMotion} from './CircleComponents';
+import {CT} from './CircleComponents';
 
-const RECENT_KEY='circle.recentEmoji';
-const ICONS:Record<string,keyof typeof Ionicons.glyphMap>={recent:'time-outline',smileys:'happy-outline',animals:'paw-outline',food:'fast-food-outline',activity:'football-outline',travel:'car-outline',objects:'bulb-outline',symbols:'shapes-outline',flags:'flag-outline'};
-const COLS=8;
+// Circle-specific Plus picker: support reactions only, not an unrelated emoji keyboard.
+// Keep 3D artwork as a Plus benefit while showing older reactions unchanged in chat.
+import {SUPPORT_REACTIONS,REACTION_LABELS} from './LittleSignalsData';
 
-// One line that slowly scrolls to its end and back when it's too long to fit; wraps instead with Reduce Motion on.
-function Marquee({text,style}:{text:string;style:TextStyle}){
- const reduce=useReduceMotion();
- const [box,setBox]=useState(0);
- const [width,setWidth]=useState(0);
- const x=useRef(new Animated.Value(0)).current;
- const over=Math.ceil(width-box);
- useEffect(()=>{
-  x.setValue(0);
-  if(reduce||!box||over<=0)return;
-  const move=(toValue:number)=>Animated.timing(x,{toValue,duration:over*30,easing:Easing.linear,useNativeDriver:true});
-  const loop=Animated.loop(Animated.sequence([Animated.delay(1200),move(-over),Animated.delay(1500),move(0)]));
-  loop.start();
-  return()=>loop.stop();
- },[over,box,reduce,text]);
- if(reduce)return <Text numberOfLines={2} style={[style,{flex:1}]}>{text}</Text>;
- return <View style={{flex:1}} onLayout={e=>setBox(e.nativeEvent.layout.width)} accessible accessibilityLabel={text}>
-  <ScrollView horizontal scrollEnabled={false} showsHorizontalScrollIndicator={false}>
-   <Animated.Text onLayout={e=>setWidth(e.nativeEvent.layout.width)} numberOfLines={1} style={[style,{transform:[{translateX:x}]}]}>{text}</Animated.Text>
-  </ScrollView>
- </View>;
-}
-
-// Plus emoji sheet: every emoji in Standard (Apple) or 3D (Fluent) art. Free accounts see it greyed out; a tap opens the paywall.
 export default function EmojiPickerSheet({visible,title,onClose,onPick}:{visible:boolean;title:string;onClose:()=>void;onPick:(e:string,style:EmojiStyle)=>void}){
  const {isPlus,showPaywall}=usePlus();
- const {width,height}=useWindowDimensions();
  const [style,setStyle]=useState<EmojiStyle>('standard');
- const [query,setQuery]=useState('');
- const [recent,setRecent]=useState<string[]>([]);
- const [tab,setTab]=useState('smileys');
- useEffect(()=>{if(!visible)return;setQuery('');AsyncStorage.getItem(RECENT_KEY).then(v=>{const r:string[]=v?JSON.parse(v):[];setRecent(r);setTab(t=>r.length&&t==='smileys'?'recent':t)}).catch(()=>{})},[visible]);
-
- const items:EmojiItem[]=useMemo(()=>{
-  const q=query.trim().toLowerCase();
-  if(q)return EMOJI_GROUPS.flatMap(g=>g.items).filter(i=>i.name.includes(q));
-  if(tab==='recent')return recent.map(e=>emojiItem(e)).filter((i):i is EmojiItem=>!!i);
-  return EMOJI_GROUPS.find(g=>g.id===tab)?.items||[];
- },[query,tab,recent]);
- const cell=Math.floor((width-24)/COLS);
- const tabs=[...(recent.length?['recent']:[]),...EMOJI_GROUPS.map(g=>g.id)];
-
- const pick=(e:string)=>{
-  if(!isPlus){showPaywall('circles');return}
-  const next=[e,...recent.filter(x=>x!==e)].slice(0,COLS*3);
-  setRecent(next);AsyncStorage.setItem(RECENT_KEY,JSON.stringify(next)).catch(()=>{});
+ const select=(e:string)=>{
+  if(!isPlus){showPaywall('circles');return;}
   onPick(e,style);
  };
-
  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-  <Pressable style={{flex:1,backgroundColor:'rgba(0,0,0,.25)'}} onPress={onClose} accessibilityLabel="Close emoji picker"/>
-  <View style={{height:Math.round(height*.66),backgroundColor:'#fff',borderTopLeftRadius:26,borderTopRightRadius:26,paddingTop:8}}>
-   <View style={{alignSelf:'center',width:38,height:5,borderRadius:3,backgroundColor:'#DDE5E0',marginBottom:10}}/>
-   <View style={{flexDirection:'row',alignItems:'center',paddingHorizontal:16,gap:10}}>
-    <Marquee text={title} style={{fontSize:15,fontWeight:'900',color:CT.ink}}/>
-    <View style={{flexDirection:'row',backgroundColor:'#F0F4F2',borderRadius:14,padding:3}}>
-     {(['standard','3d'] as EmojiStyle[]).map(s=><TouchableOpacity key={s} onPress={()=>setStyle(s)} accessibilityRole="button" accessibilityState={{selected:style===s}}
-      style={{paddingHorizontal:12,paddingVertical:6,borderRadius:11,backgroundColor:style===s?'#fff':'transparent'}}>
-      <Text style={{fontSize:13,fontWeight:'800',color:style===s?CT.primary:CT.muted}}>{s==='3d'?'3D':'Standard'}</Text></TouchableOpacity>)}
-    </View>
-    <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8}><Ionicons name="close" size={24} color={CT.muted}/></TouchableOpacity>
+  <Pressable style={{flex:1,backgroundColor:'rgba(0,0,0,.25)'}} onPress={onClose} accessibilityLabel="Close reaction picker"/>
+  <View style={{backgroundColor:'#fff',borderTopLeftRadius:26,borderTopRightRadius:26,padding:18,gap:16}}>
+   <View style={{alignSelf:'center',width:38,height:5,borderRadius:3,backgroundColor:'#DDE5E0'}}/>
+   <View style={{flexDirection:'row',alignItems:'center',gap:10}}>
+    <Text style={{flex:1,fontSize:16,fontWeight:'900',color:CT.ink}} numberOfLines={2}>{title}</Text>
+    <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={CT.muted}/></TouchableOpacity>
    </View>
-   {!isPlus?<TouchableOpacity onPress={()=>showPaywall('circles')} accessibilityRole="button" style={{flexDirection:'row',alignItems:'center',gap:8,marginHorizontal:16,marginTop:10,backgroundColor:CT.primarySoft,borderRadius:14,paddingHorizontal:12,paddingVertical:9}}>
-    <Ionicons name="lock-closed" size={15} color={CT.primary}/><Text style={{flex:1,fontSize:13,fontWeight:'700',color:CT.ink}}>Every emoji, in Standard and 3D, comes with Plus</Text><Text style={{fontSize:13,fontWeight:'900',color:CT.primary}}>Unlock</Text>
-   </TouchableOpacity>:null}
-   <View style={{flexDirection:'row',alignItems:'center',gap:6,marginHorizontal:16,marginTop:10,borderRadius:12,borderWidth:1,borderColor:CT.line,paddingHorizontal:10}}>
-    <Ionicons name="search" size={16} color={CT.muted}/>
-    <TextInput value={query} onChangeText={setQuery} placeholder="Search" placeholderTextColor={CT.muted} autoCorrect={false} style={{flex:1,paddingVertical:8,fontSize:15,color:CT.ink}}/>
+   <Text style={{fontSize:13,color:CT.muted}}>Choose a supportive response.</Text>
+   <View style={{flexDirection:'row',backgroundColor:'#F0F4F2',borderRadius:14,padding:3,alignSelf:'flex-start'}}>
+    {(['standard','3d'] as EmojiStyle[]).map(t=><TouchableOpacity key={t} onPress={()=>setStyle(t)} accessibilityRole="button" accessibilityState={{selected:style===t}} style={{paddingHorizontal:18,paddingVertical:9,borderRadius:11,backgroundColor:style===t?'#fff':'transparent'}}><Text style={{fontWeight:'800',color:style===t?CT.primary:CT.muted}}>{t==='3d'?'3D':'Standard'}</Text></TouchableOpacity>)}
    </View>
-   {!query?<View style={{flexDirection:'row',justifyContent:'space-between',paddingHorizontal:12,marginTop:8}}>
-    {tabs.map(t=><TouchableOpacity key={t} onPress={()=>setTab(t)} accessibilityRole="tab" accessibilityLabel={t==='recent'?'Recent':EMOJI_GROUPS.find(g=>g.id===t)?.title} accessibilityState={{selected:tab===t}}
-     style={{paddingHorizontal:6,paddingVertical:6,borderBottomWidth:2,borderBottomColor:tab===t?CT.primary:'transparent'}}><Ionicons name={ICONS[t]} size={20} color={tab===t?CT.primary:CT.muted}/></TouchableOpacity>)}
-   </View>:null}
-   <FlatList key={style+tab+query} data={items} keyExtractor={i=>i.e} numColumns={COLS} keyboardShouldPersistTaps="handled" initialNumToRender={COLS*8} windowSize={7}
-    contentContainerStyle={{paddingHorizontal:12,paddingTop:6,paddingBottom:30}}
-    ListEmptyComponent={<Text style={{textAlign:'center',color:CT.muted,marginTop:30}}>No emoji found</Text>}
-    renderItem={({item})=><TouchableOpacity onPress={()=>pick(item.e)} accessibilityRole="button" accessibilityLabel={item.name+(isPlus?'':', Plus')}
-     style={{width:cell,height:cell,alignItems:'center',justifyContent:'center',opacity:isPlus?1:.35}}><Emoji e={item.e} style={style} size={Math.round(cell*.62)}/></TouchableOpacity>}/>
+   <View style={{flexDirection:'row',flexWrap:'wrap',gap:10}}>
+    {SUPPORT_REACTIONS.map(e=><TouchableOpacity key={e} onPress={()=>select(e)} accessibilityRole="button" accessibilityLabel={REACTION_LABELS[e]+(isPlus?'':', Plus')} style={{width:'30%',minWidth:88,flexGrow:1,borderRadius:16,backgroundColor:'#F5F8F6',paddingVertical:14,alignItems:'center',gap:6,opacity:isPlus?1:.55}}><Emoji e={e} style={style} size={30}/><Text style={{fontSize:11,color:CT.ink,fontWeight:'700',textAlign:'center'}}>{REACTION_LABELS[e]}</Text></TouchableOpacity>)}
+   </View>
+   {!isPlus?<TouchableOpacity onPress={()=>showPaywall('circles')} style={{padding:12,borderRadius:12,backgroundColor:CT.primarySoft,flexDirection:'row',gap:8,alignItems:'center'}}><Ionicons name="lock-closed" color={CT.primary} size={16}/><Text style={{flex:1,color:CT.ink,fontWeight:'700'}}>Unlock more reaction styles with Plus</Text></TouchableOpacity>:null}
   </View>
   {visible?<PlusPaywallSheet nested/>:null}
  </Modal>;

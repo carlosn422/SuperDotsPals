@@ -19,22 +19,26 @@ export const MOOD_TINTS:Record<CircleMood,{color:string;tint:string}>={
 };
 
 // Must stay a subset of public.circle_reaction_allowed (the server rejects anything else via RLS).
+// Keep the Circle reaction picker focused on explicit emotional support. All six
+// glyphs are already accepted by the existing server-side reaction allow-list.
+export const SUPPORT_REACTIONS=['❤️','🫂','🫶','🌿','💪','🌙'] as const;
 export const MOOD_REACTIONS:Record<CircleMood,string[]>={
- Joyful:['🎉','🙌','✨','❤️'],
- Calm:['🌿','☀️','💚','✨'],
- Sad:['🫂','🫶','💙','❤️'],
- Angry:['🫂','🫶','🌿','💪'],
- Anxious:['🌿','🫶','🤗','☀️'],
- Tired:['🌙','☕','🫂','💜'],
+ Joyful:['❤️','🫶','💪','🫂'],
+ Calm:['❤️','🫶','🌿','🫂'],
+ Sad:['❤️','🫂','🫶','🌿'],
+ Angry:['🫂','🫶','🌿','❤️'],
+ Anxious:['🫂','🌿','🫶','❤️'],
+ Tired:['🌙','🫂','❤️','🫶'],
 };
 
-// Keep in sync with public.circle_reaction_label (push notification text).
+// Historical reactions still use their original glyphs and descriptions.
 export const REACTION_LABELS:Record<string,string>={
  '🎉':'So happy for you','🙌':'Love this','✨':'Keep shining','❤️':'Thinking of you','💜':'Thinking of you',
  '🌿':'Take a breath','☀️':'Sending sunshine','💚':'Glad you’re feeling good','🫂':'Sending a hug',
  '🫶':'Here for you','🤗':'Sending a hug','💙':'You’re not alone','💪':'You’ve got this','🌙':'Rest well','☕':'Coffee’s on me',
 };
 
+// Retain the full catalogue for previously sent signals, notifications and history.
 export const LITTLE_SIGNALS=[
  {id:'thinking',emoji:'❤️',label:'Thinking of you',notify:(n:string)=>n+' is thinking of you 💚'},
  {id:'hug',emoji:'🤗',label:'Sending a hug',notify:(n:string)=>n+' sent you a hug 🤗'},
@@ -49,6 +53,9 @@ export const LITTLE_SIGNALS=[
  {id:'calm',emoji:'🌿',label:'Sending calm',notify:(n:string)=>n+' sent you some calm 🌿'},
  {id:'highfive',emoji:'🙌',label:'High five',notify:(n:string)=>n+' sent you a high five 🙌'},
 ] as const;
+// The new signal picker is intentionally smaller; legacy IDs stay readable.
+export const SELECTABLE_LITTLE_SIGNALS=LITTLE_SIGNALS.filter(s=>
+ (['thinking','hug','here','gotthis','calm'] as string[]).includes(s.id));
 export type SignalId=typeof LITTLE_SIGNALS[number]['id'];
 export const signalById=(id:SignalId)=>LITTLE_SIGNALS.find(x=>x.id===id)!;
 

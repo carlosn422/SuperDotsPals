@@ -4,10 +4,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import {CIRCLE_MOODS,CircleMood,MOOD_TINTS,moodLabel} from './LittleSignalsData';
 import {MoodPalThumb} from './CircleComponents';
 
-export type TimelineMood={mood:string;occurred_at:string};
+export type TimelineMood={mood:string;occurred_at:string;source?:'manual'|'hrv';stress_level?:string;stress_score?:number};
 export type TimelineReaction={share_id?:string;id:string;mood:string;shared_at:string;reactor_name:string;emoji:string;reacted_at:string};
 type Reaction={id:string;name:string;emoji:string;at:string};
-type MoodEvent={key:string;mood:CircleMood;at:string;reactions:Reaction[]};
+type MoodEvent={key:string;mood:CircleMood;at:string;reactions:Reaction[];source:'manual'|'hrv';stress_level?:string;stress_score?:number};
 type Bubble={emoji:string;count:number;name:string;at:string};
 
 export const RETENTION_DAYS=7;
@@ -26,10 +26,11 @@ export function buildMoodEvents(moods:TimelineMood[],reactions:TimelineReaction[
  for(const r of reactions){const key=r.share_id||r.mood.toLowerCase()+'|'+r.shared_at;const s=shares.get(key)||{mood:r.mood.toLowerCase(),sharedAt:Date.parse(r.shared_at),reactions:[]};s.reactions.push({id:r.id,name:r.reactor_name,emoji:r.emoji,at:r.reacted_at});shares.set(key,s)}
  const used=new Set<string>();
  return moods.map(m=>{
+  if(m.source==='hrv')return {key:'hrv:'+m.occurred_at,mood:circleMood(m.mood),at:m.occurred_at,reactions:[],source:'hrv' as const,stress_level:m.stress_level,stress_score:m.stress_score};
   const at=Date.parse(m.occurred_at);let best:string|null=null,gap=Infinity;
   shares.forEach((s,key)=>{const d=s.sharedAt-at;if(used.has(key)||s.mood!==m.mood.toLowerCase()||d<-SHARE_WINDOW_BEFORE_MS||d>SHARE_WINDOW_AFTER_MS)return;if(Math.abs(d)<gap){gap=Math.abs(d);best=key}});
   if(best)used.add(best);
-  return {key:m.occurred_at,mood:circleMood(m.mood),at:m.occurred_at,reactions:best?shares.get(best)!.reactions:[]};
+  return {key:m.occurred_at,mood:circleMood(m.mood),at:m.occurred_at,reactions:best?shares.get(best)!.reactions:[],source:'manual' as const};
  });
 }
 
@@ -54,10 +55,15 @@ function MoodReactionDetails({event,onBack}:{event:MoodEvent;onBack:()=>void}){
  return <View style={{gap:14}}>
   <View style={{alignItems:'center',gap:4}}>
    <MoodPalThumb mood={event.mood} size={120} animate/>
-   <Text style={[st.title,{fontSize:24}]}>{event.mood} Reactions</Text>
+   <Text style={[st.title,{fontSize:24}]}>{moodLabel(event.mood)} {event.source==='hrv'?'· HRV Mood':'Reactions'}</Text>
    <Text style={st.sub}>{date.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})} · {time(event.at)}</Text>
   </View>
-  <View style={st.card}>
+  {event.source==='hrv'?<View style={st.card}>
+   <Text style={{fontWeight:'800',color:ink}}>HRV Mood</Text>
+   <Text style={st.sub}>Estimated from heart-rate variability and your personal stress baseline. This is a body-signal estimate, not a measured emotion or a mood you selected.</Text>
+   {typeof event.stress_score==='number'?<Text style={st.sub}>Stress score: {event.stress_score}/100</Text>:null}
+   <Text style={st.sub}>Private to your timeline · Not shared with Circle</Text>
+  </View>:<View style={st.card}>
    <View style={[st.chip,{alignSelf:'flex-start',backgroundColor:t.tint}]}><Text style={[st.chipText,{color:t.color}]}>{event.reactions.length} total reaction{event.reactions.length===1?'':'s'}</Text></View>
    {bubbles.length?<View style={{flexDirection:'row',flexWrap:'wrap',marginHorizontal:-4}}>
     {bubbles.map(b=><View key={b.emoji} accessible accessibilityLabel={b.emoji+' '+b.count+' from '+b.name+' at '+time(b.at)} style={{width:'33.333%',padding:4}}>
@@ -69,7 +75,7 @@ function MoodReactionDetails({event,onBack}:{event:MoodEvent;onBack:()=>void}){
      </View>
     </View>)}
    </View>:<Text style={st.sub}>No reactions to this mood.</Text>}
-  </View>
+  </View>}
  </View>;
 }
 
@@ -90,13 +96,13 @@ export default function FamilyTimeline({name,moods,reactions,onDay,openKey,onOpe
       <View style={[st.dot,{backgroundColor:MOOD_TINTS[e.mood].color}]}/>
       {i<dayEvents.length-1?<View style={[st.line,{backgroundColor:MOOD_TINTS[e.mood].color}]}/>:null}
      </View>
-     <TouchableOpacity accessibilityRole="button" accessibilityLabel={moodLabel(e.mood)+' at '+time(e.at)+', '+e.reactions.length+' reactions'} onPress={()=>onOpenKey(e.key)} style={[st.card,{flex:1,marginBottom:8}]}>
+     <TouchableOpacity accessibilityRole="button" accessibilityLabel={moodLabel(e.mood)+' at '+time(e.at)+(e.source==='hrv'?', HRV Mood':', '+e.reactions.length+' reactions')} onPress={()=>onOpenKey(e.key)} style={[st.card,{flex:1,marginBottom:8}]}>
       <View style={{flexDirection:'row',alignItems:'center',gap:10}}>
        <View style={{backgroundColor:MOOD_TINTS[e.mood].tint,borderRadius:30}}><MoodPalThumb mood={e.mood} size={52}/></View>
        <View style={{flex:1}}><Text style={{fontWeight:'800',fontSize:16,color:ink}}>{moodLabel(e.mood)}</Text><Text style={st.sub}>{time(e.at)}</Text></View>
        <Ionicons name="chevron-forward" size={18} color={muted}/>
       </View>
-      <ReactionSummary reactions={e.reactions}/>
+      {e.source==='hrv'?<Text style={[st.sub,{color:purple,fontWeight:'800'}]}>HRV Mood</Text>:<ReactionSummary reactions={e.reactions}/>}
      </TouchableOpacity>
     </View>):<View style={st.card}><Text style={st.sub}>No mood changes on this day.</Text></View>}
    </View>;

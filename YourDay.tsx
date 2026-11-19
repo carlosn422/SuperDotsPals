@@ -5,6 +5,8 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {supabase} from './supabase';
 import {friendName,useCircle} from './CircleStore';
 import FamilyTimeline,{TimelineMood,TimelineReaction} from './FamilyTimeline';
+import {useSavedHealth} from './HealthDataPanel';
+import {combinedMoodEvents} from './HRVMoodTracker';
 
 const ink='#251C45',muted='#807694';
 
@@ -19,16 +21,24 @@ import MonthlyCalendar, { localDayKey } from './MonthlyCalendar';
 // The signed-in user's own day: their journal moods plus reactions on their Circle shares. No retention limit.
 export default function YourDay({onClose,top,bottom,date:initialDate}:{onClose:()=>void;top:number;bottom:number;date?:Date|null}){
   const store=useCircle();
+  const {readings}=useSavedHealth();
   const [openKey,setOpenKey]=useState<string|null>(null);
-  const [moods,setMoods]=useState<TimelineMood[]>([]);
-  const [monthlyMoods, setMonthlyMoods] = useState<{ [key: string]: string }>({});
+  const [manualMoods,setManualMoods]=useState<TimelineMood[]>([]);
+  const [monthManualMoods,setMonthManualMoods]=useState<TimelineMood[]>([]);
   const [selectedDate, setSelectedDate] = useState(initialDate || new Date());
 
+  const allMoods=useMemo(()=>combinedMoodEvents(manualMoods,readings),[manualMoods,readings]);
+  const monthMoods=useMemo(()=>combinedMoodEvents(monthManualMoods,readings),[monthManualMoods,readings]);
+  const monthlyMoods=useMemo(()=>{
+    const map:Record<string,string>={};
+    for(const item of monthMoods){const key=localDayKey(new Date(item.occurred_at));if(!map[key])map[key]=item.mood}
+    return map;
+  },[monthMoods]);
   const reactions=useMemo<TimelineReaction[]>(()=>store.myMoods.flatMap(m=>m.reactions.map(r=>({share_id:m.id,id:m.id+r.friendId,mood:m.mood,shared_at:m.sharedAt,reactor_name:friendName(store,r.friendId),emoji:r.emoji,reacted_at:r.at}))),[store]);
   
   useEffect(() => {
     const firstDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-    const lastDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+    const nextMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 1);
 
     const fetchMoods = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -40,19 +50,12 @@ export default function YourDay({onClose,top,bottom,date:initialDate}:{onClose:(
         .eq('user_id', user.id)
         .not('mood', 'is', null)
         .gte('occurred_at', firstDay.toISOString())
-        .lt('occurred_at', lastDay.toISOString())
+        .lt('occurred_at', nextMonth.toISOString())
         .order('occurred_at', { ascending: false });
 
       if (!error && data) {
-        const moodsByDay: { [key: string]: string } = {};
-        for (const mood of data) {
-          const dayString = localDayKey(new Date(mood.occurred_at));
-          if (!moodsByDay[dayString]) {
-            moodsByDay[dayString] = mood.mood;
-          }
-        }
-        setMonthlyMoods(moodsByDay);
-        setMoods(data.filter(m => startOfDay(new Date(m.occurred_at)).getTime() === startOfDay(selectedDate).getTime()));
+        setMonthManualMoods(data);
+        setManualMoods(data.filter(m => startOfDay(new Date(m.occurred_at)).getTime() === startOfDay(selectedDate).getTime()));
       }
     };
 
@@ -77,7 +80,7 @@ export default function YourDay({onClose,top,bottom,date:initialDate}:{onClose:(
         )}
         <FamilyTimeline 
             name="You" 
-            moods={moods} 
+            moods={allMoods} 
             reactions={reactions} 
             openKey={openKey} 
             onOpenKey={setOpenKey} 
