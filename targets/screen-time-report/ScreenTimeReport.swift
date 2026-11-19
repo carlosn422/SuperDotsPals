@@ -1,4 +1,5 @@
 import DeviceActivity
+import ExtensionKit
 import SwiftUI
 
 // Apple Screen Time usage for the Insights screen. Data stays inside this extension: it is only drawn here,
