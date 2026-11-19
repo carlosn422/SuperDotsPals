@@ -1,5 +1,6 @@
 import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {ActivityIndicator,Alert,AppState,Modal,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native';
+import {ActivityIndicator,Alert,AppState,Modal,PanResponder,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native';
+import Svg,{Circle,Defs,Line,LinearGradient,Path,Stop} from 'react-native-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {supabase} from './supabase';
 import {APP_THEME as T} from './MoodMascot';
@@ -7,7 +8,7 @@ import SuperdotMascot from './SuperdotMascot';
 import {usePlus} from './PlusStore';
 import {useIsGuest} from './Account';
 import {ScreenTimeReport,ackBreakSync,getBreakState,onBreakState,pendingBreakSync,pickBreakApps,requestScreenTimeAccess,screenBreakSupported,sendBreakCommand,setBreakChildren,setBreakEntitlement,type BreakAction,type BreakSession,type BreakState,type BreakSyncRow} from './modules/watch-link/screenBreak';
-import {comparison,formatDuration,observations,periodRange,periodStats,sessionInterval,type BreakPeriod,type SessionRow} from './ScreenBreakInsights';
+import {comparison,formatDuration,observations,periodRange,periodStats,sessionInterval,type BreakPeriod,type Bucket,type SessionRow} from './ScreenBreakInsights';
 
 export type FamilyChild={id:string;name:string;profile_user_id:string|null};
 type Entitlement={has_plus:boolean;trial_started_at:string|null;trial_ends_at:string|null;trial_available:boolean;allowed:boolean};
@@ -385,7 +386,6 @@ function InsightsScreen({child,onBack}:{child:FamilyChild;onBack:()=>void}){
  const compare=comparison(stats);
  const notes=observations(stats,period);
  const windows=useMemo(()=>all.map(s=>sessionInterval(s)).filter((w):w is [number,number]=>!!w&&w[1]>range.start.getTime()&&w[0]<range.end.getTime()).map(([a,b])=>[a/1000,b/1000] as [number,number]),[all,range.start.getTime()]);
- const peak=Math.max(1,...stats.buckets.map(b=>b.seconds));
  const startOfTimes=periodRange(period,new Date()).start;
  return <View style={{gap:14}}>
   <Back label={child.name} onPress={onBack}/>
@@ -422,16 +422,65 @@ function InsightsScreen({child,onBack}:{child:FamilyChild;onBack:()=>void}){
   </View>
   <View style={st.card}>
    <Text style={st.kicker}>{({day:'Sessions by hour',week:'Sessions by day',month:'Sessions by week',year:'Sessions by month'} as const)[period]}</Text>
-   {stats.hasData?<View style={st.chart} accessibilityLabel={'Screen Break time chart, total '+formatDuration(stats.seconds)}>
-    {stats.buckets.map((b,i)=><View key={i} style={{flex:1,alignItems:'center',gap:4}}>
-     <View style={{height:90,justifyContent:'flex-end',width:'100%',alignItems:'center'}}><View style={{width:period==='day'?6:'70%',maxWidth:26,height:Math.max(3,b.seconds/peak*90),borderRadius:4,backgroundColor:b.seconds>0?T.primary:T.primarySoft}}/></View>
-     <Text style={st.axis} numberOfLines={1}>{b.label}</Text>
-    </View>)}
-   </View>:<Text style={st.body}>No Screen Break sessions for {child.name} in this period.</Text>}
+   {stats.hasData?<SessionLineChart period={period} buckets={stats.buckets}/>:<Text style={st.body}>No Screen Break sessions for {child.name} in this period.</Text>}
    {stats.highest&&period!=='day'?<Text style={st.sub}>Longest: {period==='week'?stats.highest.start.toLocaleDateString(undefined,{weekday:'long'}):period==='month'?'Week '+stats.highest.label.replace('Wk ',''):stats.highest.start.toLocaleDateString(undefined,{month:'long'})} · {formatDuration(stats.highest.seconds)}</Text>:null}
   </View>
   {allowed&&notes.length?<View style={st.card}>{notes.map(n=><Text key={n} style={st.body}>• {n}</Text>)}</View>:null}
   <Text style={st.sub}>Screen Break Time is the time inside {child.name}'s sessions, from start until the session ended, was canceled or reached its time. Time Granted is what you allowed. Neither is measured phone use. Apple's Total Screen Usage is device activity on this iPhone for anyone using it.</Text>
+ </View>;
+}
+
+function bucketName(period:BreakPeriod,b:Bucket){
+ if(period==='day')return b.start.toLocaleTimeString(undefined,{hour:'numeric'});
+ if(period==='week')return b.start.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+ if(period==='month')return b.label.replace('Wk','Week')+' · from '+b.start.toLocaleDateString(undefined,{month:'short',day:'numeric'});
+ return b.start.toLocaleDateString(undefined,{month:'long'});
+}
+
+// Line graph of recorded Screen Break time. Press and drag along it to read the time at each point.
+function SessionLineChart({period,buckets}:{period:BreakPeriod;buckets:Bucket[]}){
+ const [width,setWidth]=useState(0),[picked,setPicked]=useState<number|null>(null);
+ const H=120,pad=8,n=buckets.length;
+ const peak=Math.max(60,...buckets.map(b=>b.seconds));
+ const x=(i:number)=>pad+(n>1?i*(width-pad*2)/(n-1):(width-pad*2)/2);
+ const y=(sec:number)=>pad+(H-pad*2)*(1-sec/peak);
+ const pick=(px:number)=>{if(width&&n)setPicked(Math.max(0,Math.min(n-1,Math.round((px-pad)/((width-pad*2)/Math.max(1,n-1))))))};
+ const pan=useMemo(()=>PanResponder.create({
+  onStartShouldSetPanResponder:()=>true,
+  onMoveShouldSetPanResponder:()=>true,
+  onPanResponderTerminationRequest:()=>false,
+  onPanResponderGrant:e=>pick(e.nativeEvent.locationX),
+  onPanResponderMove:e=>pick(e.nativeEvent.locationX),
+ }),[width,n]);
+ const line=buckets.map((b,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(b.seconds).toFixed(1)).join(' ');
+ const area=line+' L'+x(n-1).toFixed(1)+' '+(H-pad)+' L'+x(0).toFixed(1)+' '+(H-pad)+' Z';
+ const sel=picked!==null?buckets[picked]:null;
+ const total=buckets.reduce((t,b)=>t+b.seconds,0);
+ return <View style={{gap:6}}>
+  <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'flex-end',minHeight:38}}>
+   <View>
+    <Text style={st.statValue}>{formatDuration(sel?sel.seconds:total)}</Text>
+    <Text style={st.sub}>{sel?bucketName(period,sel):'Total · press and drag the line'}</Text>
+   </View>
+   <Text style={st.axis}>max {formatDuration(peak)}</Text>
+  </View>
+  <View onLayout={e=>setWidth(e.nativeEvent.layout.width)} style={{height:H}} {...pan.panHandlers} accessible accessibilityRole="adjustable" accessibilityLabel={'Screen Break time chart, total '+formatDuration(total)}
+   accessibilityValue={{text:sel?bucketName(period,sel)+', '+formatDuration(sel.seconds):'Total '+formatDuration(total)}}
+   accessibilityActions={[{name:'increment'},{name:'decrement'}]} onAccessibilityAction={e=>setPicked(p=>Math.max(0,Math.min(n-1,(p??-1)+(e.nativeEvent.actionName==='increment'?1:-1))))}>
+   {width?<Svg width={width} height={H}>
+    <Defs><LinearGradient id="sbArea" x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor={T.primary} stopOpacity={0.28}/><Stop offset="1" stopColor={T.primary} stopOpacity={0.02}/></LinearGradient></Defs>
+    <Line x1={pad} x2={width-pad} y1={H-pad} y2={H-pad} stroke={T.border} strokeWidth={1}/>
+    <Path d={area} fill="url(#sbArea)"/>
+    <Path d={line} fill="none" stroke={T.primary} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round"/>
+    {sel&&picked!==null?<>
+     <Line x1={x(picked)} x2={x(picked)} y1={pad} y2={H-pad} stroke={T.muted} strokeWidth={1} strokeDasharray="3 3"/>
+     <Circle cx={x(picked)} cy={y(sel.seconds)} r={5.5} fill="#fff" stroke={T.primary} strokeWidth={2.5}/>
+    </>:null}
+   </Svg>:null}
+  </View>
+  <View style={{flexDirection:'row',justifyContent:'space-between',paddingHorizontal:2}}>
+   {(period==='day'?buckets.filter((_,i)=>i%6===0):buckets).map((b,i)=><Text key={i} style={[st.axis,{textAlign:'center'}]} numberOfLines={1}>{b.label}</Text>)}
+  </View>
  </View>;
 }
 
