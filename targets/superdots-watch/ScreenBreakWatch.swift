@@ -206,7 +206,7 @@ struct ScreenBreakControlView: View {
                         VStack(spacing: 2) {
                             if context.date < session.deadline {
                                 Text("Screen time left").font(.caption2).foregroundStyle(.secondary)
-                                Text(timerInterval: Date()...session.deadline, countsDown: true)
+                                Text(timerInterval: min(Date(), session.deadline)...session.deadline, countsDown: true)
                                     .font(.system(size: 30, weight: .bold)).monospacedDigit()
                             } else {
                                 Text("Time's up").font(.title3.bold())
