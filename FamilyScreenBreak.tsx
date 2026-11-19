@@ -252,38 +252,47 @@ function StatusRow({done,title,detail,action,onPress,busy,disabled}:{done:boolea
  </View>;
 }
 
-function DurationStepper({label,value,display,onMinus,onPlus,minusDisabled,plusDisabled}:{label:string;value:number;display:string;onMinus:()=>void;onPlus:()=>void;minusDisabled:boolean;plusDisabled:boolean}){
- return <View style={st.stepper} accessible accessibilityRole="adjustable" accessibilityLabel={label} accessibilityValue={{text:display}}
-  accessibilityActions={[{name:'increment'},{name:'decrement'}]} onAccessibilityAction={e=>{if(e.nativeEvent.actionName==='increment'&&!plusDisabled)onPlus();if(e.nativeEvent.actionName==='decrement'&&!minusDisabled)onMinus()}}>
-  <Text style={st.kicker}>{label}</Text>
-  <View style={{flexDirection:'row',alignItems:'center',gap:14}}>
-   <TouchableOpacity disabled={minusDisabled} onPress={onMinus} hitSlop={8} style={[st.stepBtn,minusDisabled&&{opacity:0.35}]}><Ionicons name="remove" size={22} color={T.primary}/></TouchableOpacity>
-   <Text style={st.stepValue}>{value}</Text>
-   <TouchableOpacity disabled={plusDisabled} onPress={onPlus} hitSlop={8} style={[st.stepBtn,plusDisabled&&{opacity:0.35}]}><Ionicons name="add" size={22} color={T.primary}/></TouchableOpacity>
-  </View>
+const WHEEL_ROW=44;
+// Snapping wheel: the highlighted middle row is the value. Explicit width and height so the rows always draw.
+function DurationWheel({values,value,onChange,format,label}:{values:number[];value:number;onChange:(n:number)=>void;format:(n:number)=>string;label:string}){
+ const ref=useRef<ScrollView>(null);
+ const index=Math.max(0,values.indexOf(value));
+ useEffect(()=>{const t=setTimeout(()=>ref.current?.scrollTo({y:index*WHEEL_ROW,animated:false}),0);return()=>clearTimeout(t)},[]);
+ const at=(y:number)=>values[Math.max(0,Math.min(values.length-1,Math.round(y/WHEEL_ROW)))];
+ return <View style={{alignSelf:'stretch',height:WHEEL_ROW*3,overflow:'hidden'}} accessible accessibilityRole="adjustable" accessibilityLabel={label} accessibilityValue={{text:format(value)}}
+  accessibilityActions={[{name:'increment'},{name:'decrement'}]} onAccessibilityAction={e=>{const i=index+(e.nativeEvent.actionName==='increment'?1:-1);if(i>=0&&i<values.length){onChange(values[i]);ref.current?.scrollTo({y:i*WHEEL_ROW,animated:true})}}}>
+  <View pointerEvents="none" style={{position:'absolute',top:WHEEL_ROW,left:0,right:0,height:WHEEL_ROW,borderRadius:12,backgroundColor:T.primarySoft}}/>
+  <ScrollView ref={ref} style={{flex:1}} showsVerticalScrollIndicator={false} nestedScrollEnabled snapToInterval={WHEEL_ROW} decelerationRate="fast"
+   contentContainerStyle={{paddingVertical:WHEEL_ROW}} scrollEventThrottle={16}
+   onScroll={e=>{const v=at(e.nativeEvent.contentOffset.y);if(v!==value)onChange(v)}}
+   onMomentumScrollEnd={e=>onChange(at(e.nativeEvent.contentOffset.y))}>
+   {values.map((n,i)=><TouchableOpacity key={n} activeOpacity={0.6} onPress={()=>{onChange(n);ref.current?.scrollTo({y:i*WHEEL_ROW,animated:true})}} style={{height:WHEEL_ROW,alignItems:'center',justifyContent:'center'}}>
+    <Text style={n===value?st.wheelOn:st.wheelOff}>{format(n)}</Text>
+   </TouchableOpacity>)}
+  </ScrollView>
  </View>;
 }
 
-const QUICK_CUSTOM=[20,90,120,180];
+const WHEEL_HOURS=Array.from({length:13},(_,i)=>i),WHEEL_MINUTES=[0,15,30,45];
 
 function CustomDurationSheet({visible,initialMinutes,onClose,onChoose}:{visible:boolean;initialMinutes:number;onClose:()=>void;onChoose:(n:number)=>void}){
- const [total,setTotal]=useState(initialMinutes);
- useEffect(()=>{if(visible)setTotal(initialMinutes)},[visible,initialMinutes]);
- const hours=Math.floor(total/60),mins=total%60;
- const clamp=(n:number)=>Math.max(1,Math.min(720,n));
+ const snap=(m:number)=>({h:Math.min(12,Math.floor(m/60)),m:Math.min(45,Math.round((m%60)/15)*15)});
+ const [hours,setHours]=useState(snap(initialMinutes).h),[mins,setMins]=useState(snap(initialMinutes).m);
+ useEffect(()=>{if(visible){const x=snap(initialMinutes);setHours(x.h);setMins(x.m)}},[visible,initialMinutes]);
+ const total=hours*60+mins,valid=total>=1&&total<=720;
+ const fmt=(h:number,m:number)=>[h?h+' hr':'',m?m+' min':''].filter(Boolean).join(' ')||'0 min';
  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
   <View style={{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(29,43,51,0.25)'}}>
    <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close custom time" accessibilityRole="button"/>
    <View style={st.durationSheet}>
     <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'}}/>
-    <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={st.heading}>Custom time</Text><TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={23} color={T.muted}/></TouchableOpacity></View>
+    <Text style={[st.heading,{textAlign:'center'}]}>Set Custom Duration</Text>
     <View style={{flexDirection:'row',gap:12}}>
-     <DurationStepper label="Hours" value={hours} display={hours+' hours'} onMinus={()=>setTotal(t=>clamp(t-60))} onPlus={()=>setTotal(t=>clamp(t+60))} minusDisabled={total<=60} plusDisabled={total+60>720}/>
-     <DurationStepper label="Minutes" value={mins} display={mins+' minutes'} onMinus={()=>setTotal(t=>clamp(t-5))} onPlus={()=>setTotal(t=>clamp(t+5))} minusDisabled={total<=5} plusDisabled={total+5>720}/>
+     <View style={{flex:1,gap:6}}><Text style={st.wheelLabel}>Hours</Text>{visible?<DurationWheel label="Hours" values={WHEEL_HOURS} value={hours} onChange={setHours} format={n=>n+' hr'}/>:null}</View>
+     <View style={{flex:1,gap:6}}><Text style={st.wheelLabel}>Minutes</Text>{visible?<DurationWheel label="Minutes" values={WHEEL_MINUTES} value={mins} onChange={setMins} format={n=>n+' min'}/>:null}</View>
     </View>
-    <View style={st.chips}>{QUICK_CUSTOM.map(m=><Chip key={m} label={formatDuration(m*60)} on={total===m} onPress={()=>setTotal(m)}/>)}</View>
-    <Text style={[st.sub,{textAlign:'center'}]}>Up to 12 hours.</Text>
-    <TouchableOpacity accessibilityRole="button" onPress={()=>onChoose(total)} style={st.cta}><Text style={st.ctaText}>Use {formatDuration(total*60)}</Text></TouchableOpacity>
+    {hours===12&&mins>0?<Text style={[st.sub,{textAlign:'center',color:red}]}>Up to 12 hours.</Text>:null}
+    <TouchableOpacity accessibilityRole="button" disabled={!valid} onPress={()=>onChoose(total)} style={[st.cta,!valid&&{opacity:0.5}]}><Text style={st.ctaText}>{valid?'Use '+fmt(hours,mins):'Choose a time'}</Text></TouchableOpacity>
    </View>
   </View>
  </Modal>;
@@ -467,9 +476,9 @@ const st=StyleSheet.create({
  durationUnit:{fontSize:10,fontWeight:'700',color:T.primary},
  customRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,borderRadius:16,minHeight:52,paddingHorizontal:16,backgroundColor:T.primarySoft},
  customText:{fontSize:16,fontWeight:'900',color:T.primary},
- stepper:{flex:1,alignItems:'center',gap:8,backgroundColor:T.background,borderRadius:18,paddingVertical:14},
- stepBtn:{width:40,height:40,borderRadius:20,backgroundColor:T.primarySoft,alignItems:'center',justifyContent:'center'},
- stepValue:{fontSize:30,fontWeight:'900',color:T.ink,minWidth:44,textAlign:'center',fontVariant:['tabular-nums']},
+ wheelLabel:{fontSize:13,fontWeight:'700',color:T.muted,textAlign:'center'},
+ wheelOn:{fontSize:20,fontWeight:'900',color:T.ink},
+ wheelOff:{fontSize:16,fontWeight:'500',color:'#9AA7A0'},
  durationSheet:{backgroundColor:T.surface,borderTopLeftRadius:28,borderTopRightRadius:28,paddingHorizontal:20,paddingTop:16,paddingBottom:38,gap:16,borderWidth:1,borderColor:T.border},
 
  small:{borderRadius:14,paddingHorizontal:12,paddingVertical:8,backgroundColor:T.primarySoft,alignItems:'center'},
