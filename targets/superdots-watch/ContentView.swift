@@ -12,6 +12,9 @@ struct ContentView: View {
     @ObservedObject private var circle = WatchCircleStore.shared
     @State private var showingCircle = false
     @State private var showingDrinks = false
+    @ObservedObject private var screenBreak = WatchScreenBreakStore.shared
+    @State private var showingFamily = false
+    @State private var familyPath: [WatchBreakChild] = []
 
     private var purple: Color { store.theme.accent }
     /// The stress bar only shows with a fresh reading; without it the pal grows into that space.
@@ -120,6 +123,16 @@ struct ContentView: View {
                             if sync.connected {
                                 CircleButton(unread: circle.unread.count, accent: purple) { showingCircle = true }
                             }
+                            if !sync.moodOnly {
+                                Button { showingFamily = true } label: {
+                                    Image(systemName: "figure.and.child.holdinghands")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .frame(width: 26, height: 26)
+                                        .background(Circle().fill(purple.opacity(0.35)))
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Family Screen Break")
+                            }
                         }
                     }
                 }
@@ -169,9 +182,21 @@ struct ContentView: View {
         .sheet(isPresented: $showingCircle, onDismiss: { circle.path = [] }) {
             NavigationStack(path: $circle.path) { WatchCircleList() }
         }
+        .sheet(isPresented: $showingFamily, onDismiss: { familyPath = [] }) {
+            NavigationStack(path: $familyPath) { WatchFamilyView(path: $familyPath) }
+        }
+        // A Screen Break reminder opens the running session's controls.
+        .onChange(of: screenBreak.openRequest) { _, request in
+            guard request > 0, !sync.moodOnly else { return }
+            choosingMood = false; measuring = false; choosingTheme = false; showingDrinks = false; showingCircle = false
+            if let session = screenBreak.session, session.isRunning {
+                familyPath = [screenBreak.children.first { $0.id == session.childId } ?? WatchBreakChild(id: session.childId, name: session.childName)]
+            }
+            showingFamily = true
+        }
         .onChange(of: circle.openRequest, initial: true) { _, request in
             guard request > 0 else { return }
-            choosingMood = false; measuring = false; choosingTheme = false; showingDrinks = false
+            choosingMood = false; measuring = false; choosingTheme = false; showingDrinks = false; showingFamily = false
             showingCircle = true
         }
         .overlay {
@@ -192,7 +217,7 @@ struct ContentView: View {
         .onChange(of: scenePhase == .active && sync.connected && !sync.pairingActive, initial: true) { _, isActive in
             circle.setActive(isActive)
         }
-        .onChange(of: choosingMood || measuring || choosingTheme || showingCircle || showingDrinks || store.applyingTheme != nil, initial: true) { _, covered in
+        .onChange(of: choosingMood || measuring || choosingTheme || showingCircle || showingDrinks || showingFamily || store.applyingTheme != nil, initial: true) { _, covered in
             circle.hold = covered
         }
         .task {

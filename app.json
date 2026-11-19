@@ -20,7 +20,8 @@
       "entitlements": {
         "com.apple.security.application-groups": [
           "group.com.superdotspals.wellnest"
-        ]
+        ],
+        "com.apple.developer.family-controls": true
       },
       "usesAppleSignIn": true
     },

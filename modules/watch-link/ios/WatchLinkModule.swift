@@ -47,6 +47,8 @@ final class WatchLinkSession: NSObject, WCSessionDelegate {
   var onStatus: (([String: Bool]) -> Void)?
   /// Latest mood waiting for the session to activate.
   private var pendingMood: [String: Any]?
+  /// Latest Screen Break state waiting for the session to activate.
+  private var pendingScreenBreak: [String: Any]?
 
   func activate() {
     guard WCSession.isSupported() else { return }
@@ -114,6 +116,30 @@ final class WatchLinkSession: NSObject, WCSessionDelegate {
     return true
   }
 
+  /// Screen Break state for the parent's Watch: application context (latest wins, read on next launch),
+  /// a live message while the Watch app is open, otherwise a background transfer that lets the Watch
+  /// schedule its own five-minute reminder.
+  func pushScreenBreak(_ state: [String: Any]) {
+    guard WCSession.isSupported() else { return }
+    let session = WCSession.default
+    guard session.activationState == .activated else {
+      pendingScreenBreak = state
+      activate()
+      return
+    }
+    pendingScreenBreak = nil
+    guard session.isPaired, session.isWatchAppInstalled else { return }
+    var context = session.applicationContext
+    context["screenBreak"] = state
+    try? session.updateApplicationContext(context)
+    if session.isReachable {
+      session.sendMessage(["screenBreak": state], replyHandler: nil, errorHandler: nil)
+    } else {
+      session.outstandingUserInfoTransfers.filter { $0.userInfo["screenBreak"] != nil }.forEach { $0.cancel() }
+      session.transferUserInfo(["screenBreak": state])
+    }
+  }
+
   private static func pairing(from payload: [String: Any]) -> [String: String]? {
     guard let id = payload["pairId"] as? String, let secret = payload["pairSecret"] as? String else { return nil }
     return ["id": id, "secret": secret]
@@ -127,7 +153,10 @@ final class WatchLinkSession: NSObject, WCSessionDelegate {
   func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
     if activationState == .activated {
       deliver(session.receivedApplicationContext)
-      DispatchQueue.main.async { if let mood = self.pendingMood { _ = self.sendMood(mood) } }
+      DispatchQueue.main.async {
+        if let mood = self.pendingMood { _ = self.sendMood(mood) }
+        if let state = self.pendingScreenBreak { self.pushScreenBreak(state) }
+      }
     }
     statusChanged()
   }
@@ -137,4 +166,14 @@ final class WatchLinkSession: NSObject, WCSessionDelegate {
   func sessionDidDeactivate(_ session: WCSession) { session.activate() }
   func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) { deliver(applicationContext) }
   func session(_ session: WCSession, didReceiveMessage message: [String: Any]) { deliver(message) }
+  /// Screen Break commands from the parent's Watch. The reply is the confirmation the Watch waits for;
+  /// iOS launches MoodPals in the background to answer when it isn't running.
+  func session(_ session: WCSession, didReceiveMessage message: [String: Any], replyHandler: @escaping ([String: Any]) -> Void) {
+    if let command = message["screenBreakCommand"] as? [String: Any] {
+      replyHandler(["screenBreakReply": ScreenBreakEngine.shared.handle(command)])
+      return
+    }
+    deliver(message)
+    replyHandler([:])
+  }
 }

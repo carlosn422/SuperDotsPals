@@ -50,7 +50,10 @@ final class WatchPhoneLink: NSObject, WCSessionDelegate {
 
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
         // The latest mood context from the iPhone, in case it arrived while the app was not running.
-        if activationState == .activated { handleMood(session.receivedApplicationContext) }
+        if activationState == .activated {
+            handleMood(session.receivedApplicationContext)
+            handleScreenBreak(session.receivedApplicationContext)
+        }
         DispatchQueue.main.async {
             self.send()
             self.finishBackgroundTasksIfIdle()
@@ -60,15 +63,18 @@ final class WatchPhoneLink: NSObject, WCSessionDelegate {
     func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
         handleRequest(message)
         handleMood(message)
+        handleScreenBreak(message)
     }
 
     func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
         handleRequest(applicationContext)
         handleMood(applicationContext)
+        handleScreenBreak(applicationContext)
     }
 
     func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
         handleMood(userInfo)
+        handleScreenBreak(userInfo)
     }
 
     func handle(_ task: WKWatchConnectivityRefreshBackgroundTask) {
@@ -120,6 +126,15 @@ final class WatchPhoneLink: NSObject, WCSessionDelegate {
             } else {
                 NSLog("[WatchSync] Mood from iPhone ignored (not newer): %@", mood)
             }
+        }
+    }
+
+    /// Screen Break state confirmed by the iPhone (`["screenBreak": state]`).
+    private func handleScreenBreak(_ payload: [String: Any]) {
+        guard let state = payload["screenBreak"] as? [String: Any] else { return }
+        Task { @MainActor in
+            WatchScreenBreakStore.shared.apply(state)
+            self.finishBackgroundTasksIfIdle()
         }
     }
 
