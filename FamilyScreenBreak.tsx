@@ -346,7 +346,15 @@ function InsightsScreen({child,onBack}:{child:FamilyChild;onBack:()=>void}){
   </View>
   {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
   {loading?<ActivityIndicator color={T.primary}/>:null}
-  {allowed&&ScreenTimeReport&&state?.authorized?<ScreenTimeReport style={{height:period==='day'?330:310,borderRadius:20,overflow:'hidden'}} request={{period,start:range.start.getTime()/1000,end:range.end.getTime()/1000,prevStart:previous.start.getTime()/1000,windows,childName:child.name}}/>
+  {allowed&&ScreenTimeReport&&state?.authorized?<View style={[st.card,{height:period==='day'?330:310,padding:0,overflow:'hidden'}]}>
+   {/* Shown until Apple's report draws over it; the report never draws in the Simulator or without Screen Time data. */}
+   <View style={{padding:16,gap:6}} accessibilityElementsHidden>
+    <Text style={st.kicker}>Total Screen Usage</Text>
+    <Text style={st.body}>Loading Apple Screen Time…</Text>
+    <Text style={st.sub}>Apple's device usage for this iPhone appears here. It isn't available in the Simulator or before iOS has recorded Screen Time on this iPhone.</Text>
+   </View>
+   <ScreenTimeReport style={StyleSheet.absoluteFill} request={{period,start:range.start.getTime()/1000,end:range.end.getTime()/1000,prevStart:previous.start.getTime()/1000,windows,childName:child.name}}/>
+  </View>
    :<View style={st.card}><Text style={st.kicker}>Total Screen Usage</Text><Text style={st.body}>{!allowed?'Apple Screen Time usage is part of Screen Break with MoodPals Plus.':ScreenTimeReport?'Allow Screen Time access in Screen Break to see the usage Apple reports for this iPhone.':'Apple Screen Time usage needs the latest MoodPals build.'}</Text>
     {!allowed?<TouchableOpacity onPress={()=>showPaywall('screenBreak')}><Text style={st.link}>See MoodPals Plus</Text></TouchableOpacity>:null}</View>}
   <View style={st.grid}>
