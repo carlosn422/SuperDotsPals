@@ -391,11 +391,7 @@ function InsightsScreen({child,onBack}:{child:FamilyChild;onBack:()=>void}){
   <Back label={child.name} onPress={onBack}/>
   <Text style={st.title}>Screen Time Insights</Text>
   <View style={st.segment}>{PERIODS.map(p=><TouchableOpacity key={p.key} accessibilityRole="tab" accessibilityState={{selected:period===p.key}} onPress={()=>{setPeriod(p.key);setAnchor(new Date())}} style={[st.segBtn,period===p.key&&st.segOn]}><Text style={[st.segText,period===p.key&&{color:'#fff'}]}>{p.label}</Text></TouchableOpacity>)}</View>
-  <View style={st.navRow}>
-   <TouchableOpacity accessibilityLabel="Previous period" onPress={()=>setAnchor(a=>shift(period,a,-1))} style={st.navBtn}><Ionicons name="chevron-back" size={18} color={T.ink}/></TouchableOpacity>
-   <Text style={st.rowTitle}>{periodTitle(period,anchor)}</Text>
-   <TouchableOpacity accessibilityLabel="Next period" disabled={range.start>=startOfTimes} onPress={()=>setAnchor(a=>shift(period,a,1))} style={[st.navBtn,range.start>=startOfTimes&&{opacity:0.3}]}><Ionicons name="chevron-forward" size={18} color={T.ink}/></TouchableOpacity>
-  </View>
+  <PeriodPicker period={period} anchor={anchor} onPick={setAnchor}/>
   {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
   {loading?<ActivityIndicator color={T.primary}/>:null}
   {allowed&&ScreenTimeReport&&state?.authorized?<View style={[st.card,{height:period==='day'?330:310,padding:0,overflow:'hidden'}]}>
@@ -484,6 +480,45 @@ function SessionLineChart({period,buckets}:{period:BreakPeriod;buckets:Bucket[]}
  </View>;
 }
 
+// Calendar strip like the app's other date screens: tap a day, week, month or year; the title opens a month grid.
+function PeriodPicker({period,anchor,onPick}:{period:BreakPeriod;anchor:Date;onPick:(d:Date)=>void}){
+ const [open,setOpen]=useState(false),[month,setMonth]=useState(()=>new Date(anchor.getFullYear(),anchor.getMonth(),1));
+ const today=new Date(),current=periodRange(period,anchor);
+ const items:{key:string;top:string;bottom:string;date:Date}[]=[];
+ if(period==='day'){const r=periodRange('week',anchor);for(let i=0;i<7;i++){const d=new Date(r.start.getFullYear(),r.start.getMonth(),r.start.getDate()+i);items.push({key:'d'+i,top:d.toLocaleDateString(undefined,{weekday:'narrow'}),bottom:String(d.getDate()),date:d})}}
+ else if(period==='week'){for(let i=-5;i<=0;i++){const d=periodRange('week',today,i).start;items.push({key:'w'+i,top:'Week',bottom:d.toLocaleDateString(undefined,{month:'short',day:'numeric'}),date:d})}}
+ else if(period==='month'){for(let i=-5;i<=0;i++){const d=new Date(today.getFullYear(),today.getMonth()+i,1);items.push({key:'m'+i,top:String(d.getFullYear()),bottom:d.toLocaleDateString(undefined,{month:'short'}),date:d})}}
+ else{for(let i=-3;i<=0;i++){const d=new Date(today.getFullYear()+i,0,1);items.push({key:'y'+i,top:'Year',bottom:String(d.getFullYear()),date:d})}}
+ const sel=(d:Date)=>periodRange(period,d).start.getTime()===current.start.getTime();
+ const future=(d:Date)=>periodRange(period,d).start>today;
+ const first=month.getDay(),offset=(first+6)%7,days=new Date(month.getFullYear(),month.getMonth()+1,0).getDate();
+ const cells=[...Array(offset).fill(null),...Array.from({length:days},(_,i)=>new Date(month.getFullYear(),month.getMonth(),i+1))];
+ return <View style={{gap:8}}>
+  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open calendar" onPress={()=>{setMonth(new Date(anchor.getFullYear(),anchor.getMonth(),1));setOpen(true)}} style={st.calTitle}>
+   <Ionicons name="calendar-outline" size={18} color={T.primary}/><Text style={st.rowTitle}>{periodTitle(period,anchor)}</Text><Ionicons name="chevron-down" size={16} color={T.muted}/>
+  </TouchableOpacity>
+  <View style={st.calStrip}>{items.map(it=>{const on=sel(it.date),off=future(it.date);return <TouchableOpacity key={it.key} disabled={off} accessibilityRole="button" accessibilityState={{selected:on,disabled:off}} onPress={()=>onPick(it.date)} style={[st.calItem,on&&{backgroundColor:T.primary},off&&{opacity:0.35}]}>
+   <Text style={[st.axis,on&&{color:'#fff'}]}>{it.top}</Text><Text style={[st.calNum,on&&{color:'#fff'}]}>{it.bottom}</Text>
+  </TouchableOpacity>})}</View>
+  <Modal visible={open} transparent animationType="fade" onRequestClose={()=>setOpen(false)}>
+   <View style={{flex:1,justifyContent:'center',padding:20,backgroundColor:'rgba(29,43,51,0.3)'}}>
+    <TouchableOpacity style={StyleSheet.absoluteFill} onPress={()=>setOpen(false)} accessibilityLabel="Close calendar"/>
+    <View style={[st.card,{gap:12}]}>
+     <View style={st.navRow}>
+      <TouchableOpacity accessibilityLabel="Previous month" onPress={()=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()-1,1))} style={st.navBtn}><Ionicons name="chevron-back" size={18} color={T.ink}/></TouchableOpacity>
+      <Text style={st.heading}>{month.toLocaleDateString(undefined,{month:'long',year:'numeric'})}</Text>
+      <TouchableOpacity accessibilityLabel="Next month" disabled={new Date(month.getFullYear(),month.getMonth()+1,1)>today} onPress={()=>setMonth(m=>new Date(m.getFullYear(),m.getMonth()+1,1))} style={[st.navBtn,new Date(month.getFullYear(),month.getMonth()+1,1)>today&&{opacity:0.3}]}><Ionicons name="chevron-forward" size={18} color={T.ink}/></TouchableOpacity>
+     </View>
+     <View style={{flexDirection:'row'}}>{['M','T','W','T','F','S','S'].map((d,i)=><Text key={i} style={[st.axis,{flex:1,textAlign:'center'}]}>{d}</Text>)}</View>
+     <View style={{flexDirection:'row',flexWrap:'wrap'}}>{cells.map((d,i)=>{if(!d)return <View key={i} style={{width:'14.28%',height:40}}/>;const on=sel(d),off=d>today;return <TouchableOpacity key={i} disabled={off} onPress={()=>{onPick(d);setOpen(false)}} style={{width:'14.28%',height:40,alignItems:'center',justifyContent:'center'}}>
+      <View style={[st.calDay,on&&{backgroundColor:T.primary}]}><Text style={[st.body,{fontWeight:'800'},on&&{color:'#fff'},off&&{color:'#C3CDC8'}]}>{d.getDate()}</Text></View>
+     </TouchableOpacity>})}</View>
+    </View>
+   </View>
+  </Modal>
+ </View>;
+}
+
 function Stat({label,value,sub}:{label:string;value:string;sub:string}){
  return <View style={st.stat}><Text style={st.statLabel}>{label}</Text><Text style={st.statValue}>{value}</Text><Text style={st.sub}>{sub}</Text></View>;
 }
@@ -539,6 +574,11 @@ const st=StyleSheet.create({
  segBtn:{flex:1,alignItems:'center',paddingVertical:9,borderRadius:14},
  segOn:{backgroundColor:T.primary},
  segText:{fontSize:14,fontWeight:'800',color:T.ink},
+ calTitle:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,paddingVertical:4},
+ calStrip:{flexDirection:'row',gap:6},
+ calItem:{flex:1,alignItems:'center',gap:2,paddingVertical:8,borderRadius:14,backgroundColor:T.surface,borderWidth:1,borderColor:T.border},
+ calNum:{fontSize:15,fontWeight:'900',color:T.ink},
+ calDay:{width:34,height:34,borderRadius:17,alignItems:'center',justifyContent:'center'},
  navRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between'},
  navBtn:{width:36,height:36,borderRadius:18,backgroundColor:T.surface,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:T.border},
  grid:{flexDirection:'row',flexWrap:'wrap',gap:10},
