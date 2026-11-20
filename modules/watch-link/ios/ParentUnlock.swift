@@ -16,16 +16,23 @@ enum ParentUnlock {
   static var failures: Int { defaults.integer(forKey: failuresKey) }
 
   static func state() -> [String: Any] {
-    ["method": method, "hasCode": readCode() != nil, "faceIdOnly": method == "code" && failures >= maxCodeTries, "biometry": biometry()]
+    let (kind, ready) = biometry()
+    return ["method": method, "hasCode": readCode() != nil, "faceIdOnly": method == "code" && failures >= maxCodeTries,
+            "biometry": kind, "biometryReady": ready]
   }
 
-  static func biometry() -> String {
+  /// The hardware kind, read even when Face ID is off for MoodPals, not enrolled or locked out, so turning
+  /// it off in Settings never falls back to the passcode. `ready` is false when Face ID can't be used right now.
+  static func biometry() -> (String, Bool) {
     let context = LAContext()
     var error: NSError?
-    // A locked-out Face ID still counts, so failing Face ID on purpose never falls back to the passcode.
-    guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
-      || error?.code == LAError.biometryLockout.rawValue else { return "none" }
-    switch context.biometryType {
+    let ok = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
+    let ready = ok || error?.code == LAError.biometryLockout.rawValue
+    return (kind(context.biometryType), ready)
+  }
+
+  private static func kind(_ type: LABiometryType) -> String {
+    switch type {
     case .faceID: return "faceID"
     case .touchID: return "touchID"
     default: return "none"
@@ -58,11 +65,11 @@ enum ParentUnlock {
   }
 
   /// Face ID only: the "Enter Passcode" fallback is hidden, so knowing the phone passcode doesn't help.
-  /// Phones without Face ID or Touch ID fall back to the device passcode so the parent is never locked out.
+  /// Only phones with no Face ID or Touch ID hardware fall back to the device passcode.
   static func faceID(reason: String) async -> Bool {
     let context = LAContext()
     context.localizedFallbackTitle = ""
-    let policy: LAPolicy = biometry() == "none" ? .deviceOwnerAuthentication : .deviceOwnerAuthenticationWithBiometrics
+    let policy: LAPolicy = biometry().0 == "none" ? .deviceOwnerAuthentication : .deviceOwnerAuthenticationWithBiometrics
     guard (try? await context.evaluatePolicy(policy, localizedReason: reason)) == true else { return false }
     defaults.set(0, forKey: failuresKey)
     return true

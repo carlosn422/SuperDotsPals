@@ -17,6 +17,11 @@ export function useParentGate(){
   const s=parentUnlockState();
   if(!s)return true;
   if(s.method==='code'&&s.hasCode&&!s.faceIdOnly)return new Promise<boolean>(resolve=>{pending.current=resolve;setNote('');setCode('');setAsk({reason})});
+  if(s.biometry!=='none'&&!s.biometryReady){
+   const name=s.biometry==='touchID'?'Touch ID':'Face ID';
+   Alert.alert(name+' is off for MoodPals','Turn on '+name+' for MoodPals in Settings, or unlock from your Apple Watch.');
+   return false;
+  }
   return parentFaceID(reason);
  },[]);
  function enter(next:string){
@@ -28,7 +33,7 @@ export function useParentGate(){
   void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
   if(result==='wrong'){setCode('');setNote('Wrong code. One more try, then Face ID is required.');return}
   const reason=ask.reason,resolve=pending.current;pending.current=null;setAsk(null);setCode('');
-  setTimeout(()=>{void parentFaceID(reason).then(ok=>resolve?.(ok))},350);
+  setTimeout(()=>{void gate(reason).then(ok=>resolve?.(ok))},350);
  }
  const element=<Modal visible={!!ask} transparent animationType="fade" onRequestClose={()=>finish(false)}>
   <View style={g.backdrop}>
