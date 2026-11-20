@@ -205,7 +205,7 @@ struct ContentView: View {
                         .transition(.asymmetric(insertion: .identity, removal: .opacity))
                 }
                 if let summary = circle.summary {
-                    FloatingSummaryView(summary: summary) { showingCircle = true }
+                    FloatingSummaryView(summary: summary)
                         .transition(.asymmetric(insertion: .identity, removal: .opacity))
                 }
             }
