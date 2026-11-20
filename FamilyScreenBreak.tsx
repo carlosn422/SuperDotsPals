@@ -276,7 +276,8 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
 
 // Circular duration dial, same as the Apple Watch: drag around the ring in 5-minute steps.
 function DurationRing({minutes,onChange,min,max,step=5,prefix=''}:{minutes:number;onChange:(n:number)=>void;min:number;max:number;step?:number;prefix?:string}){
- const SIZE=220,LINE=18,R=(SIZE-LINE)/2,C=SIZE/2,CIRC=2*Math.PI*R;
+ // The knob is wider than the ring, so the ring is inset by the knob's radius to keep it inside the view.
+ const SIZE=230,LINE=18,KNOB=LINE*0.75,R=SIZE/2-KNOB-3,C=SIZE/2,CIRC=2*Math.PI*R;
  const frac=(minutes-min)/(max-min);
  const last=useRef(minutes);last.current=minutes;
  // Holding the ring locks the page (and the tab pager) so dragging only changes the time.
@@ -305,13 +306,13 @@ function DurationRing({minutes,onChange,min,max,step=5,prefix=''}:{minutes:numbe
  }),[min,max,step,setScrubbing]);
  const angle=frac*2*Math.PI,kx=C+R*Math.sin(angle),ky=C-R*Math.cos(angle);
  const h=Math.floor(minutes/60),m=minutes%60;
- return <View style={{width:SIZE,height:SIZE,alignSelf:'center'}} {...pan.panHandlers}
+ return <View style={{width:SIZE,height:SIZE,alignSelf:'center',marginVertical:6}} {...pan.panHandlers}
   accessible accessibilityRole="adjustable" accessibilityLabel="Duration" accessibilityValue={{text:prefix+formatDuration(minutes*60)}}
   accessibilityActions={[{name:'increment'},{name:'decrement'}]} onAccessibilityAction={e=>set(minutes+(e.nativeEvent.actionName==='increment'?step:-step))}>
   <Svg width={SIZE} height={SIZE} pointerEvents="none">
    <Circle cx={C} cy={C} r={R} stroke={T.primarySoft} strokeWidth={LINE} fill="none"/>
    <Circle cx={C} cy={C} r={R} stroke={T.primary} strokeWidth={LINE} fill="none" strokeLinecap="round" strokeDasharray={CIRC+' '+CIRC} strokeDashoffset={CIRC*(1-Math.max(0.002,frac))} transform={'rotate(-90 '+C+' '+C+')'}/>
-   <Circle cx={kx} cy={ky} r={LINE*0.75} fill="#fff" stroke={T.primary} strokeWidth={3}/>
+   <Circle cx={kx} cy={ky} r={KNOB} fill="#fff" stroke={T.primary} strokeWidth={3}/>
   </Svg>
   <View pointerEvents="none" style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center'}]}>
    <Text style={{fontSize:52,fontWeight:'900',color:T.ink}}>{prefix}{minutes}</Text>
