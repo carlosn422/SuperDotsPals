@@ -1,4 +1,5 @@
-import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
+import React,{useCallback,useContext,useEffect,useMemo,useRef,useState} from 'react';
+import {ChartScrubContext} from './StressDashboard';
 import {ActivityIndicator,Alert,AppState,Modal,PanResponder,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import Svg,{Circle,Defs,Line,LinearGradient,Path,Stop} from 'react-native-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -278,6 +279,8 @@ function DurationRing({minutes,onChange,min,max,step=5,prefix=''}:{minutes:numbe
  const SIZE=220,LINE=18,R=(SIZE-LINE)/2,C=SIZE/2,CIRC=2*Math.PI*R;
  const frac=(minutes-min)/(max-min);
  const last=useRef(minutes);last.current=minutes;
+ // Holding the ring locks the page (and the tab pager) so dragging only changes the time.
+ const setScrubbing=useContext(ChartScrubContext);
  const set=(v:number)=>{
   const snapped=Math.min(max,Math.max(min,Math.round(v/step)*step));
   if(snapped===last.current)return;
@@ -295,9 +298,11 @@ function DurationRing({minutes,onChange,min,max,step=5,prefix=''}:{minutes:numbe
   onStartShouldSetPanResponder:()=>true,
   onMoveShouldSetPanResponder:()=>true,
   onPanResponderTerminationRequest:()=>false,
-  onPanResponderGrant:e=>fromTouch(e.nativeEvent.locationX,e.nativeEvent.locationY),
+  onPanResponderGrant:e=>{setScrubbing(true);fromTouch(e.nativeEvent.locationX,e.nativeEvent.locationY)},
   onPanResponderMove:e=>fromTouch(e.nativeEvent.locationX,e.nativeEvent.locationY),
- }),[min,max,step]);
+  onPanResponderRelease:()=>setScrubbing(false),
+  onPanResponderTerminate:()=>setScrubbing(false),
+ }),[min,max,step,setScrubbing]);
  const angle=frac*2*Math.PI,kx=C+R*Math.sin(angle),ky=C-R*Math.cos(angle);
  const h=Math.floor(minutes/60),m=minutes%60;
  return <View style={{width:SIZE,height:SIZE,alignSelf:'center'}} {...pan.panHandlers}
@@ -629,14 +634,17 @@ function SessionLineChart({period,buckets}:{period:BreakPeriod;buckets:Bucket[]}
  const x=(i:number)=>pad+(n>1?i*(width-pad*2)/(n-1):(width-pad*2)/2);
  const y=(sec:number)=>pad+(H-pad*2)*(1-sec/peak);
  const pick=(px:number)=>{if(width&&n)setPicked(Math.max(0,Math.min(n-1,Math.round((px-pad)/((width-pad*2)/Math.max(1,n-1))))))};
+ const setScrubbing=useContext(ChartScrubContext);
  const pan=useMemo(()=>PanResponder.create({
   // A tap shows that point; a horizontal drag scrubs; a vertical swipe is left to the page so it scrolls.
   onStartShouldSetPanResponder:()=>true,
   onMoveShouldSetPanResponder:(_e,g)=>Math.abs(g.dx)>Math.abs(g.dy)*1.2,
   onPanResponderTerminationRequest:(_e,g)=>Math.abs(g.dy)>Math.abs(g.dx),
   onPanResponderGrant:e=>pick(e.nativeEvent.locationX),
-  onPanResponderMove:e=>pick(e.nativeEvent.locationX),
- }),[width,n]);
+  onPanResponderMove:(e,g)=>{if(Math.abs(g.dx)>Math.abs(g.dy))setScrubbing(true);pick(e.nativeEvent.locationX)},
+  onPanResponderRelease:()=>setScrubbing(false),
+  onPanResponderTerminate:()=>setScrubbing(false),
+ }),[width,n,setScrubbing]);
  const line=buckets.map((b,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(b.seconds).toFixed(1)).join(' ');
  const area=line+' L'+x(n-1).toFixed(1)+' '+(H-pad)+' L'+x(0).toFixed(1)+' '+(H-pad)+' Z';
  const sel=picked!==null?buckets[picked]:null;
