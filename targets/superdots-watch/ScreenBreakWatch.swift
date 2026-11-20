@@ -226,13 +226,19 @@ private struct LockPage: View {
                     // Tapping the lock itself locks or unlocks; it animates closed (red) or open (green).
                     Button { run(locked ? "unlock" : "lock") } label: {
                         BreakLock(locked: locked, size: 80)
+                            .opacity(store.pending != nil ? 0.3 : 1)
                             .frame(width: 136, height: 136)
                             .background(Circle().fill((locked ? BreakStyle.red : BreakStyle.green).opacity(0.16)))
+                            // While the iPhone confirms, a spinner sits on top of the lock (no text).
+                            .overlay { if store.pending != nil { ProgressView().scaleEffect(1.6).tint(.white) } }
                             .animation(.easeInOut(duration: 0.35), value: locked)
+                            .animation(.easeInOut(duration: 0.2), value: store.pending != nil)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(locked ? "Apps locked. Unlock" : "Apps unlocked. Lock")
-                    StatusLine()
+                    .accessibilityLabel(store.pending != nil ? "Waiting for iPhone" : locked ? "Apps locked. Unlock" : "Apps unlocked. Lock")
+                    if let error = store.error, store.pending == nil {
+                        Text(error).font(.caption2).foregroundStyle(BreakStyle.red).multilineTextAlignment(.center)
+                    }
                 }
                 .disabled(store.pending != nil)
             }
