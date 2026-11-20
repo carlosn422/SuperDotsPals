@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {usePlus} from './PlusStore';
 import {supabase} from './supabase';
+import {onFamilyChildrenChanged} from './FamilyScreenBreak';
 import SuperdotMascot from './SuperdotMascot';
 import {requireOptionalNativeModule} from 'expo';
 import {SectionHeader,WatchColorSheet,WatchImage,WatchRow,colorName,isWatchColor} from './WatchArt';
@@ -153,7 +154,7 @@ function ProfileSelector({focused,profiles,selected,lastLinked,onPick,open,setOp
  return <>
   <View ref={anchor} collapsable={false} {...(many?swipe.panHandlers:{})} style={sel.bar}>
    {seg(null,'You','You, my profile')}
-   {seg(linked.id,shortProfileName(linked.name),shortProfileName(linked.name)+', mood-only family watch')}
+   {seg(linked.id,shortProfileName(linked.name),shortProfileName(linked.name)+(linked.id.startsWith('m:')?', family member':', mood-only family watch'))}
    {many?<TouchableOpacity onPress={show} accessibilityRole="button" accessibilityLabel="Show all profiles" hitSlop={{top:8,bottom:8,left:4,right:8}} style={sel.arrow}>
     <Ionicons name="chevron-down" size={18} color="#271C49"/>
    </TouchableOpacity>:null}
@@ -250,13 +251,24 @@ export function FamilySwitcher({children,disabled=false,onAdd,focused=true,onCha
  const {isPlus,showPaywall}=usePlus();
  const [selected,setSelectedState]=useState<string|null>(null),[moods,setMoods]=useState<MoodRow[]>([]),[reactions,setReactions]=useState<ReactionRow[]>([]),[tick,setTick]=useState(0),[loading,setLoading]=useState(false),[error,setError]=useState('');
  const [saved,setSaved]=useState<string|null|undefined>(undefined),[lastLinked,setLastLinked]=useState<string|null>(null),[listOpen,setListOpen]=useState(false);
- const profile=profiles.find(p=>p.id===selected)||null;
+ const [members,setMembers]=useState<{id:string;name:string}[]>([]);
+ useEffect(()=>{
+  if(disabled)return;
+  // Members without a watch appear in the switcher too; their entries are prefixed with "m:".
+  const fetch=()=>{void supabase.from('family_children').select('id,name').is('profile_user_id',null).order('created_at').then(({data})=>{if(data)setMembers(data as {id:string;name:string}[])})};
+  fetch();
+  const off=onFamilyChildrenChanged(fetch);
+  const sub=AppState.addEventListener('change',st=>{if(st==='active')fetch()});
+  return()=>{off();sub.remove()};
+ },[disabled]);
+ const entries:FamilyProfile[]=[...profiles,...members.map(m=>({id:'m:'+m.id,name:m.name,createdAt:'',lastSeenAt:null,connected:false,mood:null,moodAt:null}))];
+ const profile=entries.find(p=>p.id===selected)||null;
  const setSelected=(id:string|null)=>{setSelectedState(id);if(id)setLastLinked(id);void (id?AsyncStorage.setItem(SELECTED_KEY,id):AsyncStorage.removeItem(SELECTED_KEY))};
  useEffect(()=>{void AsyncStorage.getItem(SELECTED_KEY).then(v=>setSaved(v))},[]);
- useEffect(()=>{if(saved&&profiles.some(p=>p.id===saved)){setSelectedState(saved);setLastLinked(saved);setSaved(null)}},[profiles,saved]);
- useEffect(()=>{if(loaded&&selected&&!profiles.some(p=>p.id===selected))setSelected(null)},[profiles,selected,loaded]);
+ useEffect(()=>{if(saved&&entries.some(p=>p.id===saved)){setSelectedState(saved);setLastLinked(saved);setSaved(null)}},[profiles,members,saved]);
+ useEffect(()=>{if(loaded&&selected&&!entries.some(p=>p.id===selected))setSelected(null)},[profiles,members,selected,loaded]);
  useEffect(()=>{
-  if(!selected)return;
+  if(!selected||selected.startsWith('m:'))return;
   let live=true;setLoading(true);setError('');
   void Promise.all([
    supabase.rpc('family_profile_moods',{p_profile:selected,p_limit:200}),
@@ -269,14 +281,21 @@ export function FamilySwitcher({children,disabled=false,onAdd,focused=true,onCha
   return()=>{live=false};
  },[selected,tick]);
  useEffect(()=>{const sub=AppState.addEventListener('change',st=>{if(st==='active')setTick(t=>t+1)});return()=>sub.remove()},[]);
- if(disabled||profiles.length===0)return <>{children}</>;
+ if(disabled||entries.length===0)return <>{children}</>;
  const latest=moods[0];
  const pick=(id:string|null)=>{setSelected(id);if(id)void load()};
  const plus=isPlus||slots>1,full=profiles.length>=slots;
  const add=onAdd?()=>{setListOpen(false);if(full){if(!plus)showPaywall('family')}else onAdd()}:undefined;
  return <View style={{gap:14}}>
-  <ProfileSelector focused={focused} profiles={profiles} selected={selected} lastLinked={lastLinked} onPick={pick} open={listOpen} setOpen={setListOpen} onAdd={add} full={full&&plus}/>
-  {!profile?children:<View style={{gap:12}}>
+  <ProfileSelector focused={focused} profiles={entries} selected={selected} lastLinked={lastLinked} onPick={pick} open={listOpen} setOpen={setListOpen} onAdd={add} full={full&&plus}/>
+  {!profile?children:profile.id.startsWith('m:')?<View style={{gap:12}}>
+   <View style={[styles.card,{alignItems:'center',gap:6}]}>
+    <View style={{width:84,height:84,borderRadius:42,backgroundColor:'#EEE9FB',alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:36,fontWeight:'900',color:purple}}>{profile.name.slice(0,1).toUpperCase()}</Text></View>
+    <Text style={styles.title}>{profile.name}</Text>
+    <Text style={styles.sub}>Family member · No watch assigned</Text>
+   </View>
+   {onScreenBreak?<TouchableOpacity accessibilityRole="button" onPress={()=>onScreenBreak(profile.id)} style={{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,minHeight:56,borderRadius:28,backgroundColor:purple}}><Ionicons name="hourglass-outline" size={20} color="#fff"/><Text style={{color:'#fff',fontSize:17,fontWeight:'900'}}>Screen Break</Text></TouchableOpacity>:null}
+  </View>:<View style={{gap:12}}>
    <View style={[styles.card,{alignItems:'center'}]}>
     {latest?<SuperdotMascot id={MASCOT_ID[latest.mood.toLowerCase()]||'joy'} size={130}/>:null}
     <Text style={styles.title}>{latest?latest.mood:'No mood yet'}</Text>

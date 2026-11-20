@@ -19,6 +19,7 @@ const red='#D65B79';
 
 const listeners=new Set<()=>void>();
 export function familyChildrenChanged(){listeners.forEach(l=>l())}
+export function onFamilyChildrenChanged(l:()=>void){listeners.add(l);return()=>{listeners.delete(l)}}
 
 async function loadChildren():Promise<FamilyChild[]>{
  const {data,error}=await supabase.from('family_children').select('id,name,profile_user_id').order('created_at');
@@ -113,7 +114,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
   {guest?<View style={st.card}><Text style={st.body}>Create a free account to add family members and use Screen Break.</Text></View>:<>
    {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
    {loading?<ActivityIndicator color={T.primary}/>:null}
-   {adding||(!loading&&!error&&!children.length)?<AddChild onAdded={()=>{setAdding(false);void load();familyChildrenChanged()}}/>:null}
+   {adding||(!loading&&!error&&!children.length)?<AddChild onAdded={id=>{setAdding(false);void load().then(()=>{if(id)setRoute({name:'child',id})});familyChildrenChanged()}}/>:null}
    {children.length?<View style={[st.card,{paddingVertical:4,gap:0}]}>
     {children.map((c,i)=><TouchableOpacity key={c.id} accessibilityRole="button" accessibilityLabel={'Open '+c.name} onPress={()=>setRoute({name:'child',id:c.id})} style={[st.row,i>0&&st.rowLine]}>
      <View style={st.avatar}><Text style={st.avatarText}>{c.name.slice(0,1).toUpperCase()}</Text></View>
@@ -130,20 +131,22 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
 function ActiveBadge({childId}:{childId:string}){
  const [state]=useBreakState();
  const s=state?.session;
+ const now=useNow(!!s&&s.childId===childId&&s.status==='active');
  if(!s||s.childId!==childId||(s.status!=='active'&&s.status!=='restricted'))return null;
- return <View style={st.badge}><Text style={st.badgeText}>{s.status==='active'?'Screen time':'Break on'}</Text></View>;
+ const left=Math.max(1,Math.ceil((s.deadline*1000-now)/60000));
+ return <View style={st.badge}><Text style={st.badgeText}>{s.status==='active'?left+' min left':'Break on'}</Text></View>;
 }
 
-function AddChild({onAdded}:{onAdded:()=>void}){
+function AddChild({onAdded}:{onAdded:(id?:string)=>void}){
  const [name,setName]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
  async function add(){
   const clean=name.replace(/\s+/g,' ').trim();
   if(!clean||busy)return;
   setBusy(true);setError('');
-  const {error:e}=await supabase.rpc('family_add_child',{p_name:clean});
+  const {data,error:e}=await supabase.rpc('family_add_child',{p_name:clean});
   setBusy(false);
   if(e){setError(e.code==='P0001'?e.message:'Unable to add. Check your connection and try again.');return}
-  setName('');onAdded();
+  setName('');onAdded((data as {id?:string}|null)?.id);
  }
  return <View style={st.card}>
   <Text style={st.heading}>Add a member</Text>
@@ -157,6 +160,7 @@ function AddChild({onAdded}:{onAdded:()=>void}){
 function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAddWatch}:{child:FamilyChild;children:FamilyChild[];onBack:()=>void;onInsights:()=>void;onChanged:()=>void;onRemoved:()=>void;onAddWatch?:()=>void}){
  const [state,setState]=useBreakState();
  const {isPlus,showPaywall}=usePlus();
+ const [editing,setEditing]=useState(false);
  const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState(''),[minutes,setMinutes]=useState(30),[useCustom,setUseCustom]=useState(false),[customOpen,setCustomOpen]=useState(false);
  const session=state?.session;
  const mine=session&&session.childId===child.id&&(session.status==='active'||session.status==='restricted')?session:null;
@@ -192,7 +196,12 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
 
  return <View style={{gap:14}}>
   <Back label="Family" onPress={onBack}/>
-  <Text style={st.title}>{child.name}</Text>
+  <View style={{flexDirection:'row',alignItems:'center',gap:12}}>
+   <View style={[st.avatar,{width:52,height:52,borderRadius:26}]}><Text style={[st.avatarText,{fontSize:22}]}>{child.name.slice(0,1).toUpperCase()}</Text></View>
+   <Text style={[st.title,{flex:1}]} numberOfLines={1}>{child.name}</Text>
+   <TouchableOpacity accessibilityRole="button" accessibilityLabel={editing?'Done editing':'Edit '+child.name} onPress={()=>setEditing(e=>!e)} style={st.editBtn}><Text style={st.editBtnText}>{editing?'Done':'Edit'}</Text></TouchableOpacity>
+  </View>
+  {editing?<ChildManage section="edit" child={child} children={children} onChanged={()=>{setEditing(false);onChanged()}} onRemoved={onRemoved} onAddWatch={onAddWatch} locked={!!mine}/>:null}
   {!screenBreakSupported?<View style={st.card}><Text style={st.body}>Screen Break needs the latest MoodPals build on this iPhone.</Text></View>:<>
    {state&&!state.hasPlus&&!isPlus?<PlanNote state={state} daysLeft={trialDaysLeft} onUpgrade={()=>showPaywall('screenBreak')}/>:null}
    {mine?.status==='active'?<View style={[st.card,{alignItems:'center'}]}>
@@ -214,11 +223,22 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
    </View>:<View style={st.card}>
     <Text style={st.heading}>Screen Break</Text>
     {other?<Text style={st.body}>{other.childName}'s Screen Break is running on this iPhone. One session runs at a time.</Text>:null}
-    <View style={st.setupStatus}>
-     <StatusRow done={!!state?.authorized} title={state?.authorized?'Screen Time Ready':'Screen Time Access Needed'} detail={state?.authorized?'Approved on this iPhone':'Allow Screen Time access to pause selected apps'} action={state?.authorized?undefined:'Allow'} onPress={()=>void authorize()} busy={busy==='auth'}/>
-     <View style={{height:1,backgroundColor:T.border,marginLeft:34}}/>
-     <StatusRow done={(state?.selectionCount||0)>0} title="Apps to pause" detail={(state?.selectionCount||0)>0?state!.selectionCount+' selected':'Choose apps, categories or websites'} action={(state?.selectionCount||0)>0?'Change':'Choose'} onPress={()=>void pick()} busy={busy==='pick'} disabled={!state?.authorized}/>
-    </View>
+    {!state?.authorized?<View style={{gap:10}}>
+     <Text style={st.kicker}>Step 1 of 2</Text>
+     <Text style={st.rowTitle}>Allow Screen Time access</Text>
+     <Text style={st.sub}>Lets MoodPals pause the apps you choose when time is up.</Text>
+     <TouchableOpacity accessibilityRole="button" disabled={busy==='auth'} onPress={()=>void authorize()} style={st.cta}>{busy==='auth'?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>Allow Screen Time Access</Text>}</TouchableOpacity>
+    </View>:!(state?.selectionCount||0)?<View style={{gap:10}}>
+     <Text style={st.kicker}>Step 2 of 2</Text>
+     <Text style={st.rowTitle}>Choose apps to pause</Text>
+     <Text style={st.sub}>Pick the apps, categories or websites to pause when time is up.</Text>
+     <TouchableOpacity accessibilityRole="button" disabled={busy==='pick'} onPress={()=>void pick()} style={st.cta}>{busy==='pick'?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>Choose Apps to Pause</Text>}</TouchableOpacity>
+    </View>:<TouchableOpacity accessibilityRole="button" accessibilityLabel={'Setup complete, '+state.selectionCount+' selected. Edit apps'} onPress={()=>void pick()} style={st.setupDone}>
+     <Ionicons name="checkmark-circle" size={22} color={T.primary}/>
+     <Text style={[st.body,{flex:1}]}>Setup complete · {state.selectionCount} to pause</Text>
+     <Text style={st.link}>Edit apps</Text>
+    </TouchableOpacity>}
+    {ready?<>
     <Text style={[st.rowTitle,{marginTop:8}]}>How long can {child.name} use the phone?</Text>
     <View style={st.durationRow}>
      {DURATIONS.map(m=><TouchableOpacity key={m} accessibilityRole="button" accessibilityState={{selected:!useCustom&&minutes===m}} onPress={()=>{setUseCustom(false);setMinutes(m)}} style={[st.durationPreset,!useCustom&&minutes===m&&{backgroundColor:T.primary}]}>
@@ -230,7 +250,8 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
      <Text style={[st.customText,useCustom&&{color:'#fff'}]}>{useCustom?'Custom · '+formatDuration(minutes*60):'Custom time'}</Text>
     </TouchableOpacity>
     <TouchableOpacity accessibilityRole="button" disabled={!ready||!validMinutes||!!busy||!!other} onPress={()=>run('start',{minutes:chosen})} style={[st.cta,(!ready||!validMinutes||!!busy||!!other)&&{opacity:0.5}]}><Text style={st.ctaText}>Start Screen Break</Text></TouchableOpacity>
-    <Text style={[st.sub,{textAlign:'center'}]}>Chosen apps pause when time is up. You'll get a reminder 5 minutes before. You can manage the session from your Apple Watch.</Text>
+    <Text style={[st.sub,{textAlign:'center'}]}>Reminder 5 minutes before. You can also control it from your Apple Watch.</Text>
+    </>:null}
     <CustomDurationSheet visible={customOpen} initialMinutes={minutes} onClose={()=>setCustomOpen(false)} onChoose={m=>{setMinutes(m);setUseCustom(true);setCustomOpen(false)}}/>
    </View>}
    {busy&&busy!=='auth'&&busy!=='pick'?<ActivityIndicator color={T.primary}/>:null}
@@ -238,7 +259,7 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
    {state&&!state.authorized&&mine?<Text style={[st.sub,{color:red}]}>Screen Time access was turned off, so apps can't be paused. Allow access again to restore the break.</Text>:null}
   </>}
   <TouchableOpacity accessibilityRole="button" onPress={onInsights} style={st.linkRow}><Ionicons name="bar-chart-outline" size={20} color={T.primary}/><Text style={[st.rowTitle,{flex:1}]}>Screen Time Insights</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>
-  <ChildManage child={child} children={children} onChanged={onChanged} onRemoved={onRemoved} onAddWatch={onAddWatch} locked={!!mine}/>
+  <ChildManage section="watch" child={child} children={children} onChanged={onChanged} onRemoved={onRemoved} onAddWatch={onAddWatch} locked={!!mine}/>
  </View>;
 }
 
@@ -309,20 +330,20 @@ function Chip({label,on,onPress,disabled}:{label:string;on?:boolean;onPress:()=>
  return <TouchableOpacity accessibilityRole="button" accessibilityState={{selected:!!on}} disabled={disabled} onPress={onPress} style={[st.chip,on&&st.chipOn,disabled&&{opacity:0.5}]}><Text style={[st.chipText,on&&{color:'#fff'}]}>{label}</Text></TouchableOpacity>;
 }
 
-function ChildManage({child,children,onChanged,onRemoved,onAddWatch,locked}:{child:FamilyChild;children:FamilyChild[];onChanged:()=>void;onRemoved:()=>void;onAddWatch?:()=>void;locked:boolean}){
- const [renaming,setRenaming]=useState(false),[draft,setDraft]=useState(child.name),[linking,setLinking]=useState(false),[error,setError]=useState('');
- // Family watches linked through the watch code flow, not yet merged with this child.
+function ChildManage({child,children,onChanged,onRemoved,onAddWatch,locked,section}:{child:FamilyChild;children:FamilyChild[];onChanged:()=>void;onRemoved:()=>void;onAddWatch?:()=>void;locked:boolean;section:'edit'|'watch'}){
+ const [draft,setDraft]=useState(child.name),[linking,setLinking]=useState(false),[error,setError]=useState('');
+ // Family watches added with the watch code flow that aren't assigned to another member yet.
  const watches=children.filter(c=>c.id!==child.id&&c.profile_user_id);
  async function save(){
   const name=draft.replace(/\s+/g,' ').trim();
   if(!name)return;
   const {error:e}=await supabase.from('family_children').update({name,updated_at:new Date().toISOString()}).eq('id',child.id);
   if(e){setError('Unable to save the name.');return}
-  setRenaming(false);onChanged();
+  onChanged();
  }
  async function link(profile:string){
   const {error:e}=await supabase.rpc('family_link_child_watch',{p_child:child.id,p_profile:profile});
-  if(e){setError(e.code==='P0001'?e.message:'Unable to link the watch.');return}
+  if(e){setError(e.code==='P0001'?e.message:'Unable to assign the watch.');return}
   setLinking(false);onChanged();
  }
  function remove(){
@@ -331,19 +352,27 @@ function ChildManage({child,children,onChanged,onRemoved,onAddWatch,locked}:{chi
    if(e)setError('Unable to remove.');else onRemoved();
   }}]);
  }
- return <View style={[st.card,{gap:10}]}>
-  {renaming?<>
-   <TextInput value={draft} onChangeText={setDraft} maxLength={40} autoFocus autoCapitalize="words" style={st.input} accessibilityLabel="Member's name" onSubmitEditing={()=>void save()}/>
-   <View style={{flexDirection:'row',gap:10}}><TouchableOpacity onPress={()=>void save()} style={[st.cta,{flex:1}]}><Text style={st.ctaText}>Save</Text></TouchableOpacity><TouchableOpacity onPress={()=>setRenaming(false)} style={[st.ghost,{flex:1}]}><Text style={st.ghostText}>Cancel</Text></TouchableOpacity></View>
-  </>:child.profile_user_id?<Text style={st.sub}>Name follows the linked family watch. Rename or remove it under Watches in Family.</Text>:<TouchableOpacity onPress={()=>{setDraft(child.name);setRenaming(true)}}><Text style={st.link}>Rename</Text></TouchableOpacity>}
-  {!child.profile_user_id?<>
-   {linking?<View style={{gap:6}}>
-    <Text style={st.sub}>Assign one of your family watches to {child.name}. Their history is combined.</Text>
-    {watches.map(w=><TouchableOpacity key={w.id} onPress={()=>void link(w.profile_user_id!)} style={st.small}><Text style={st.smallText}>{w.name}</Text></TouchableOpacity>)}
-    {onAddWatch?<TouchableOpacity onPress={onAddWatch}><Text style={st.link}>Add a family watch</Text></TouchableOpacity>:null}
-   </View>:<TouchableOpacity onPress={()=>setLinking(true)}><Text style={st.link}>Assign a watch (optional)</Text></TouchableOpacity>}
-   <TouchableOpacity disabled={locked} onPress={remove}><Text style={[st.link,{color:red},locked&&{opacity:0.5}]}>Remove member</Text></TouchableOpacity>
-  </>:null}
+ if(section==='edit')return <View style={[st.card,{gap:12}]}>
+  <Text style={st.heading}>Edit member</Text>
+  {child.profile_user_id?<Text style={st.sub}>The name follows the assigned watch. Rename it under Watches on the Family screen.</Text>:<>
+   <TextInput value={draft} onChangeText={setDraft} maxLength={40} autoCapitalize="words" style={st.input} accessibilityLabel="Member's name" onSubmitEditing={()=>void save()}/>
+   <TouchableOpacity accessibilityRole="button" disabled={!draft.trim()||draft.trim()===child.name} onPress={()=>void save()} style={[st.cta,(!draft.trim()||draft.trim()===child.name)&&{opacity:0.5}]}><Text style={st.ctaText}>Save Name</Text></TouchableOpacity>
+   <TouchableOpacity accessibilityRole="button" disabled={locked} onPress={remove} style={[st.ghost,locked&&{opacity:0.5}]}><Text style={[st.ghostText,{color:red}]}>Remove Member</Text></TouchableOpacity>
+   {locked?<Text style={[st.sub,{textAlign:'center'}]}>End the Screen Break before removing {child.name}.</Text>:null}
+  </>}
+  {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
+ </View>;
+ return <View style={[st.card,{gap:12}]}>
+  <View style={{flexDirection:'row',alignItems:'center',gap:12}}>
+   <Ionicons name="watch-outline" size={24} color={T.primary}/>
+   <View style={{flex:1}}><Text style={st.rowTitle}>Apple Watch</Text><Text style={st.sub}>{child.profile_user_id?'Assigned · mood-only family watch':'Optional · none assigned'}</Text></View>
+  </View>
+  {child.profile_user_id?null:linking?<>
+   {watches.length?<Text style={st.sub}>Choose a family watch for {child.name}.</Text>:<Text style={st.sub}>No unassigned family watches yet. Add one first.</Text>}
+   {watches.map(w=><TouchableOpacity key={w.id} accessibilityRole="button" onPress={()=>void link(w.profile_user_id!)} style={st.option}><Ionicons name="watch" size={20} color={T.primary}/><Text style={[st.rowTitle,{flex:1}]}>{w.name}</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>)}
+   {onAddWatch?<TouchableOpacity accessibilityRole="button" onPress={onAddWatch} style={st.ghost}><Text style={st.ghostText}>Add a New Family Watch</Text></TouchableOpacity>:null}
+   <TouchableOpacity accessibilityRole="button" onPress={()=>setLinking(false)} style={{alignItems:'center',minHeight:44,justifyContent:'center'}}><Text style={st.link}>Not now</Text></TouchableOpacity>
+  </>:<TouchableOpacity accessibilityRole="button" onPress={()=>setLinking(true)} style={st.ghost}><Text style={st.ghostText}>Assign a Watch</Text></TouchableOpacity>}
   {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
  </View>;
 }
@@ -539,10 +568,10 @@ const st=StyleSheet.create({
  badge:{backgroundColor:T.primarySoft,borderRadius:10,paddingHorizontal:8,paddingVertical:3},
  badgeText:{fontSize:11,fontWeight:'800',color:T.primary},
  input:{borderWidth:1,borderColor:T.border,borderRadius:14,padding:12,fontSize:15,fontWeight:'700',color:T.ink,backgroundColor:'#fff'},
- cta:{backgroundColor:T.primary,borderRadius:24,paddingVertical:14,alignItems:'center',justifyContent:'center'},
- ctaText:{color:'#fff',fontSize:15,fontWeight:'900'},
- ghost:{borderRadius:24,paddingVertical:14,alignItems:'center',borderWidth:1.5,borderColor:T.border,backgroundColor:'#fff'},
- ghostText:{fontSize:15,fontWeight:'800',color:T.ink},
+ cta:{backgroundColor:T.primary,borderRadius:26,minHeight:54,paddingVertical:15,paddingHorizontal:18,alignItems:'center',justifyContent:'center'},
+ ctaText:{color:'#fff',fontSize:17,fontWeight:'900'},
+ ghost:{borderRadius:26,minHeight:54,paddingVertical:15,alignItems:'center',justifyContent:'center',borderWidth:1.5,borderColor:T.border,backgroundColor:'#fff'},
+ ghostText:{fontSize:17,fontWeight:'800',color:T.ink},
  timer:{fontSize:52,fontWeight:'900',color:T.ink,fontVariant:['tabular-nums']},
  chips:{flexDirection:'row',flexWrap:'wrap',gap:8,justifyContent:'center'},
  chip:{borderRadius:18,paddingHorizontal:14,paddingVertical:9,backgroundColor:T.primarySoft},
@@ -561,7 +590,7 @@ const st=StyleSheet.create({
  wheelOff:{fontSize:16,fontWeight:'500',color:'#9AA7A0'},
  durationSheet:{backgroundColor:T.surface,borderTopLeftRadius:28,borderTopRightRadius:28,paddingHorizontal:20,paddingTop:16,paddingBottom:38,gap:16,borderWidth:1,borderColor:T.border},
 
- small:{borderRadius:14,paddingHorizontal:12,paddingVertical:8,backgroundColor:T.primarySoft,alignItems:'center'},
+ small:{borderRadius:14,paddingHorizontal:16,paddingVertical:10,minHeight:44,justifyContent:'center',backgroundColor:T.primarySoft,alignItems:'center'},
  smallText:{fontSize:13,fontWeight:'800',color:T.primary},
  note:{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:T.primarySoft,borderRadius:16,padding:12},
  link:{color:T.primary,fontWeight:'800',fontSize:14},
@@ -579,8 +608,12 @@ const st=StyleSheet.create({
  calItem:{flex:1,alignItems:'center',gap:2,paddingVertical:8,borderRadius:14,backgroundColor:T.surface,borderWidth:1,borderColor:T.border},
  calNum:{fontSize:15,fontWeight:'900',color:T.ink},
  calDay:{width:34,height:34,borderRadius:17,alignItems:'center',justifyContent:'center'},
- addBtn:{flexDirection:'row',alignItems:'center',gap:4,backgroundColor:T.primary,paddingHorizontal:14,paddingVertical:8,borderRadius:18},
- addBtnText:{color:'#fff',fontWeight:'800',fontSize:14},
+ addBtn:{flexDirection:'row',alignItems:'center',gap:6,backgroundColor:T.primary,paddingHorizontal:18,minHeight:44,borderRadius:22},
+ addBtnText:{color:'#fff',fontWeight:'900',fontSize:15},
+ editBtn:{minHeight:44,paddingHorizontal:18,borderRadius:22,justifyContent:'center',backgroundColor:T.primarySoft},
+ editBtnText:{color:T.primary,fontWeight:'900',fontSize:15},
+ setupDone:{flexDirection:'row',alignItems:'center',gap:10,minHeight:52,paddingHorizontal:14,borderRadius:16,backgroundColor:T.primarySoft},
+ option:{flexDirection:'row',alignItems:'center',gap:12,minHeight:56,paddingHorizontal:14,borderRadius:16,borderWidth:1.5,borderColor:T.border,backgroundColor:'#fff'},
  navRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between'},
  navBtn:{width:36,height:36,borderRadius:18,backgroundColor:T.surface,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:T.border},
  grid:{flexDirection:'row',flexWrap:'wrap',gap:10},
