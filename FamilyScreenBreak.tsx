@@ -13,6 +13,7 @@ import {useIsGuest} from './Account';
 import {ManageFamilyProfile,familyProfilesChanged,shortProfileName,useFamilyProfiles} from './FamilyWatches';
 import {WatchColorGrid,WatchImage,isWatchColor,type WatchColor} from './WatchArt';
 import {ScreenTimeReport,ackBreakSync,getBreakState,onBreakState,pendingBreakSync,pickBreakApps,requestScreenTimeAccess,screenBreakSupported,sendBreakCommand,setBreakChildren,setBreakEntitlement,type BreakAction,type BreakSession,type BreakState,type BreakSyncRow} from './modules/watch-link/screenBreak';
+import {ParentUnlockSettings,useParentGate} from './ParentGate';
 import {comparison,formatDuration,observations,periodRange,periodStats,sessionInterval,type BreakPeriod,type Bucket,type SessionRow} from './ScreenBreakInsights';
 
 export type FamilyChild={id:string;name:string;profile_user_id:string|null;watch_only?:boolean};
@@ -114,6 +115,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
   {!embedded&&onBack?<Back label={backLabel} onPress={onBack}/>:null}
   <Text style={st.title} accessibilityRole="header">Family</Text>
   <Text style={st.sub}>Lend your iPhone with a Screen Break timer you control from MoodPals or your Apple Watch. Members don't need an account or a watch.</Text>
+  {screenBreakSupported&&!guest?<ManualLockCard/>:null}
   <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
    <Text style={st.heading}>Members</Text>
    {guest?null:<TouchableOpacity accessibilityRole="button" accessibilityLabel={adding?'Close add member':'Add member'} onPress={()=>setAdding(a=>!a)} style={st.addBtn}><Ionicons name={adding?'close':'add'} size={18} color="#fff"/><Text style={st.addBtnText}>{adding?'Close':'Add member'}</Text></TouchableOpacity>}
@@ -131,7 +133,35 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
     </TouchableOpacity>)}
    </View>:null}
   </>}
+  {screenBreakSupported&&!guest&&members.length?<ParentUnlockSettings/>:null}
   {footer?<View style={{marginTop:10}}>{footer}</View>:null}
+ </View>;
+}
+
+// A lock started from the Apple Watch (no timer). Reopening the apps needs the parent check.
+function ManualLockCard(){
+ const [state,setState]=useBreakState();
+ const {gate,element}=useParentGate();
+ const [busy,setBusy]=useState(false),[error,setError]=useState('');
+ const timer=state?.session&&(state.session.status==='active'||state.session.status==='restricted');
+ if(!state?.manualLock||timer)return null;
+ async function unlock(){
+  if(busy)return;
+  setError('');
+  if(!await gate('Unlock the apps paused by Screen Break'))return;
+  setBusy(true);
+  const reply=sendBreakCommand('unlock');
+  if(reply.state)setState(reply.state);
+  if(!reply.ok)setError(reply.error||'Unable to unlock. Please try again.');
+  setBusy(false);
+ }
+ return <View style={[st.card,{alignItems:'center'}]}>
+  <Ionicons name="lock-closed" size={40} color={red}/>
+  <Text style={[st.heading,{textAlign:'center'}]}>Apps locked</Text>
+  <Text style={[st.sub,{textAlign:'center'}]}>Locked from your Apple Watch. Paused apps show the Joy break screen.</Text>
+  <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>void unlock()} style={[st.cta,{alignSelf:'stretch'}]}>{busy?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>Unlock Apps</Text>}</TouchableOpacity>
+  {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
+  {element}
  </View>;
 }
 
@@ -167,6 +197,7 @@ function AddChild({onAdded}:{onAdded:(id?:string)=>void}){
 function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAddWatch,onOpen}:{child:FamilyChild;children:FamilyChild[];onBack:()=>void;onInsights:()=>void;onChanged:()=>void;onRemoved:()=>void;onAddWatch?:()=>void;onOpen?:(id:string)=>void}){
  const [state,setState]=useBreakState();
  const {isPlus,showPaywall}=usePlus();
+ const {gate,element:gateUI}=useParentGate();
  const [editing,setEditing]=useState(false);
  const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState(''),[minutes,setMinutes]=useState(30),[adding,setAdding]=useState(false),[extra,setExtra]=useState(15);
  useEffect(()=>{void AsyncStorage.getItem(LAST_MINUTES_KEY).then(v=>{const n=Number(v);if(n>=5&&n<=180)setMinutes(Math.round(n/5)*5)})},[]);
@@ -218,7 +249,7 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
     <Text style={st.kicker}>Screen time left</Text>
     <Text style={st.timer} accessibilityRole="timer">{countdown(mine.deadline*1000-now)}</Text>
     <Text style={st.sub}>Ends at {clock(mine.deadline)} · {formatDuration(mine.grantedSeconds)} granted</Text>
-    <TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={()=>{setExtra(15);setAdding(true)}} style={[st.cta,{alignSelf:'stretch',marginTop:6}]}><Text style={st.ctaText}>Add Time</Text></TouchableOpacity>
+    <TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={()=>void gate('Add time for '+child.name).then(ok=>{if(ok){setExtra(15);setAdding(true)}})} style={[st.cta,{alignSelf:'stretch',marginTop:6}]}><Text style={st.ctaText}>Add Time</Text></TouchableOpacity>
     <Modal visible={adding} transparent animationType="slide" onRequestClose={()=>setAdding(false)}>
      <View style={{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(29,43,51,0.3)'}}>
       <TouchableOpacity style={StyleSheet.absoluteFill} onPress={()=>setAdding(false)} accessibilityLabel="Close"/>
@@ -232,14 +263,14 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
     </Modal>
     <View style={{flexDirection:'row',gap:10,alignSelf:'stretch',marginTop:6}}>
      <TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={()=>run('endNow')} style={[st.cta,{flex:1,backgroundColor:'#F4A570'}]}><Text style={st.ctaText}>End Now</Text></TouchableOpacity>
-     <TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={()=>Alert.alert('Cancel Screen Break?','This stops the timer and keeps apps open.',[{text:'Keep'},{text:'Cancel Session',style:'destructive',onPress:()=>run('cancel')}])} style={[st.ghost,{flex:1}]}><Text style={[st.ghostText,{color:red}]}>Cancel</Text></TouchableOpacity>
+     <TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={()=>Alert.alert('Cancel Screen Break?','This stops the timer and keeps apps open.',[{text:'Keep'},{text:'Cancel Session',style:'destructive',onPress:()=>void gate('Cancel '+child.name+"'s Screen Break").then(ok=>{if(ok)run('cancel')})}])} style={[st.ghost,{flex:1}]}><Text style={[st.ghostText,{color:red}]}>Cancel</Text></TouchableOpacity>
     </View>
    </View>:mine?.status==='restricted'?<View style={[st.card,{alignItems:'center'}]}>
     <SuperdotMascot id="joy" size={130}/>
     <Text style={[st.title,{fontSize:22,textAlign:'center'}]}>Time for a break!</Text>
     <Text style={[st.body,{textAlign:'center'}]}>Great job! Let's take a little break from the screen.</Text>
     <Text style={st.sub}>Break on since {clock(mine.endedAt||mine.deadline)}. Paused apps show the Joy break screen.</Text>
-    <TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={()=>run('release')} style={[st.cta,{alignSelf:'stretch'}]}><Text style={st.ctaText}>Release Break</Text></TouchableOpacity>
+    <TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={()=>void gate('Release '+child.name+"'s break").then(ok=>{if(ok)run('release')})} style={[st.cta,{alignSelf:'stretch'}]}><Text style={st.ctaText}>Release Break</Text></TouchableOpacity>
    </View>:<View style={st.card}>
     <Text style={st.heading}>Screen Break</Text>
     {other?<View style={[st.setupDone,{flexDirection:'column',alignItems:'stretch',gap:10,paddingVertical:14}]}>
@@ -270,6 +301,8 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
    </View>}
    {busy&&busy!=='auth'&&busy!=='pick'?<ActivityIndicator color={T.primary}/>:null}
    {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
+   {!mine?<ManualLockCard/>:null}
+   {gateUI}
    {state&&!state.authorized&&mine?<Text style={[st.sub,{color:red}]}>Screen Time access was turned off, so apps can't be paused. Allow access again to restore the break.</Text>:null}
   </>}
   <TouchableOpacity accessibilityRole="button" onPress={onInsights} style={st.linkRow}><Ionicons name="bar-chart-outline" size={20} color={T.primary}/><Text style={[st.rowTitle,{flex:1}]}>Screen Time Insights</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>
