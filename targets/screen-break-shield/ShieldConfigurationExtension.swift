@@ -29,8 +29,35 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
       secondaryButtonLabel: nil)
   }
 
-  override func configuration(shielding application: Application) -> ShieldConfiguration { joyBreak }
-  override func configuration(shielding application: Application, in category: ActivityCategory) -> ShieldConfiguration { joyBreak }
-  override func configuration(shielding webDomain: WebDomain) -> ShieldConfiguration { joyBreak }
-  override func configuration(shielding webDomain: WebDomain, in category: ActivityCategory) -> ShieldConfiguration { joyBreak }
+  private static let group = UserDefaults(suiteName: "group.com.superdotspals.wellnest")
+
+  /// A Screen Break (timer ended or locked from the Watch) wins over the owner's own daily limit.
+  private var screenBreakOn: Bool {
+    guard let group = Self.group else { return true }
+    if group.bool(forKey: "screenBreak.manualLock") { return true }
+    guard let data = group.data(forKey: "screenBreak.session"),
+          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
+    return json["status"] as? String == "restricted"
+  }
+
+  private var dailyLimit: ShieldConfiguration {
+    let minutes = Self.group?.integer(forKey: "socialTrack.limitMinutes") ?? 0
+    let limit = minutes % 60 == 0 ? "\(minutes / 60)h" : minutes > 60 ? "\(minutes / 60)h \(minutes % 60)m" : "\(minutes) min"
+    return ShieldConfiguration(
+      backgroundBlurStyle: nil,
+      backgroundColor: Self.background,
+      icon: UIImage(named: "joy_break"),
+      title: .init(text: "Daily limit reached", color: Self.ink),
+      subtitle: .init(text: "You've used your \(limit) on these apps today. How are you feeling? You can log it in MoodPals.", color: Self.body),
+      primaryButtonLabel: .init(text: "Close app", color: .white),
+      primaryButtonBackgroundColor: Self.green,
+      secondaryButtonLabel: .init(text: "Ignore limit today", color: Self.body))
+  }
+
+  private var current: ShieldConfiguration { screenBreakOn ? joyBreak : dailyLimit }
+
+  override func configuration(shielding application: Application) -> ShieldConfiguration { current }
+  override func configuration(shielding application: Application, in category: ActivityCategory) -> ShieldConfiguration { current }
+  override func configuration(shielding webDomain: WebDomain) -> ShieldConfiguration { current }
+  override func configuration(shielding webDomain: WebDomain, in category: ActivityCategory) -> ShieldConfiguration { current }
 }

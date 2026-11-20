@@ -8,5 +8,6 @@ module.exports = (config) => ({
   frameworks: ['ManagedSettings'],
   entitlements: {
     'com.apple.developer.family-controls': true,
+    'com.apple.security.application-groups': config.ios.entitlements['com.apple.security.application-groups'],
   },
 });
