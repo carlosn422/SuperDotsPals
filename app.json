@@ -58,6 +58,7 @@
       "@bacons/apple-targets",
       "./scripts/with-watch-widget-embed.cjs",
       "./scripts/with-health-privacy.cjs",
+      "./scripts/with-scene-lifecycle.cjs",
       "expo-sharing",
       "expo-apple-authentication",
       "expo-maps"
