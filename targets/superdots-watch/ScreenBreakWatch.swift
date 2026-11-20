@@ -97,7 +97,8 @@ final class WatchScreenBreakStore: ObservableObject {
         // Commands on a session carry the version the parent saw, so a stale tap can't change a newer session.
         if !["start", "lock", "unlock"].contains(action), let session {
             command["sessionId"] = session.id
-            command["expectedVersion"] = session.version
+            // Stop always stops the current session, even if time was added or it ran out since the watch last heard.
+            if !["cancel", "release"].contains(action) { command["expectedVersion"] = session.version }
         }
         pending = action
         defer { pending = nil }
@@ -236,9 +237,6 @@ private struct LockPage: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(store.pending != nil ? "Waiting for iPhone" : locked ? "Apps locked. Unlock" : "Apps unlocked. Lock")
-                    if let error = store.error, store.pending == nil {
-                        Text(error).font(.caption2).foregroundStyle(BreakStyle.red).multilineTextAlignment(.center)
-                    }
                 }
                 .disabled(store.pending != nil)
             }
@@ -246,8 +244,11 @@ private struct LockPage: View {
         .navigationTitle("Lock")
     }
 
+    /// No text under the lock: a failed lock or unlock gets a failure tap instead.
     private func run(_ action: String) {
-        Task { @MainActor in await store.command(action) }
+        Task { @MainActor in
+            if await store.command(action) == false { WKInterfaceDevice.current().play(.failure) }
+        }
     }
 }
 
