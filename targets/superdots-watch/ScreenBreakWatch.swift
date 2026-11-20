@@ -163,6 +163,7 @@ struct WatchBreakHomeView: View {
     @ObservedObject private var store = WatchScreenBreakStore.shared
     @Binding var path: [WatchBreakChild]
     @State private var managing = false
+    @State private var reveal = 1.0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var running: WatchBreakSession? {
@@ -191,11 +192,16 @@ struct WatchBreakHomeView: View {
         }
         // Starting fades the dial out and the running countdown in; stopping fades back to the Lock page.
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.45), value: running == nil)
+        .opacity(reveal)
         .containerBackground(Color.black, for: .navigation)
         .onChange(of: store.navReset) { _, _ in
             var instant = Transaction()
             instant.disablesAnimations = true
-            withTransaction(instant) { path = []; managing = false }
+            withTransaction(instant) { path = []; managing = false; reveal = reduceMotion ? 1 : 0 }
+            // Fade the new screen in after the instant pop, so Start and Stop read as a change of screen.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                withAnimation(.easeInOut(duration: 0.4)) { reveal = 1 }
+            }
         }
         .navigationDestination(for: WatchBreakChild.self) { ScreenBreakControlView(child: $0) }
         .onChange(of: running == nil) { _, gone in if gone { managing = false } }
@@ -459,6 +465,7 @@ struct ScreenBreakControlView: View {
     @State private var minutes = 30
     @State private var managing = false
     @State private var justEnded = false
+    @State private var leaving = false
     @Environment(\.dismiss) private var dismiss
 
     private var mine: WatchBreakSession? {
@@ -495,6 +502,7 @@ struct ScreenBreakControlView: View {
                 .disabled(store.pending != nil)
             }
         }
+        .opacity(leaving ? 0 : 1)
         .navigationTitle(child.name)
         .containerBackground(Color.black, for: .navigation)
         .navigationDestination(isPresented: $managing) {
@@ -517,7 +525,11 @@ struct ScreenBreakControlView: View {
     private func start() {
         let chosen = minutes
         Task { @MainActor in
-            if await store.command("start", childId: child.id, minutes: chosen) { lastMinutes = chosen; store.navReset += 1 }
+            if await store.command("start", childId: child.id, minutes: chosen) {
+                lastMinutes = chosen
+                withAnimation(.easeOut(duration: 0.25)) { leaving = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { store.navReset += 1 }
+            }
         }
     }
 
