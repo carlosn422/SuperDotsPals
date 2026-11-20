@@ -31,6 +31,8 @@ final class WatchScreenBreakStore: ObservableObject {
     @Published private(set) var allowed = false
     @Published private(set) var authorized = false
     @Published private(set) var selectionCount = 0
+    /// Apps paused from the watch's Lock button (no timer).
+    @Published private(set) var manualLock = false
     @Published private(set) var addTimeOptions = [5, 10, 15, 30]
     @Published private(set) var confirmedAt: Date?
     /// The command waiting for the iPhone's confirmation.
@@ -59,6 +61,7 @@ final class WatchScreenBreakStore: ObservableObject {
         allowed = state["allowed"] as? Bool ?? false
         authorized = state["authorized"] as? Bool ?? false
         selectionCount = (state["selectionCount"] as? NSNumber)?.intValue ?? 0
+        manualLock = state["manualLock"] as? Bool ?? false
         if let options = state["addTimeOptions"] as? [NSNumber], !options.isEmpty { addTimeOptions = options.map(\.intValue) }
         if let s = state["session"] as? [String: Any], let id = s["id"] as? String, let childId = s["childId"] as? String,
            let started = (s["startedAt"] as? NSNumber)?.doubleValue, let deadline = (s["deadline"] as? NSNumber)?.doubleValue {
@@ -90,7 +93,7 @@ final class WatchScreenBreakStore: ObservableObject {
         if let childId { command["childId"] = childId }
         if let minutes { command["minutes"] = minutes }
         // Commands on a session carry the version the parent saw, so a stale tap can't change a newer session.
-        if action != "start", let session {
+        if !["start", "lock", "unlock"].contains(action), let session {
             command["sessionId"] = session.id
             command["expectedVersion"] = session.version
         }
@@ -152,10 +155,84 @@ final class WatchScreenBreakStore: ObservableObject {
     }
 }
 
-/// Family → members. Opened from the home screen.
-struct WatchFamilyView: View {
+/// Screen Break home (watch home screen lock icon). A running timer shows its countdown; otherwise the
+/// Lock page, with the timer's member list one swipe to the right.
+struct WatchBreakHomeView: View {
     @ObservedObject private var store = WatchScreenBreakStore.shared
     @Binding var path: [WatchBreakChild]
+    @State private var managing = false
+
+    private var running: WatchBreakSession? {
+        guard let session = store.session, session.status == "active" else { return nil }
+        return session
+    }
+
+    var body: some View {
+        Group {
+            if let session = running {
+                ActiveBreakView(session: session) { managing = true }
+                    .navigationTitle(session.childName)
+                    .navigationDestination(isPresented: $managing) {
+                        ManageBreakView(child: WatchBreakChild(id: session.childId, name: session.childName),
+                                        close: { managing = false }, ended: { managing = false })
+                    }
+            } else {
+                TabView {
+                    LockPage()
+                    WatchFamilyView()
+                }
+                .tabViewStyle(.page)
+            }
+        }
+        .containerBackground(Color.black, for: .navigation)
+        .navigationDestination(for: WatchBreakChild.self) { ScreenBreakControlView(child: $0) }
+        .onChange(of: running == nil) { _, gone in if gone { managing = false } }
+        .task { await store.refresh() }
+    }
+}
+
+/// Lock / Unlock pauses or opens the chosen iPhone apps right away. Nothing is logged.
+private struct LockPage: View {
+    @ObservedObject private var store = WatchScreenBreakStore.shared
+
+    private var locked: Bool { store.manualLock || store.session?.status == "restricted" }
+
+    var body: some View {
+        Group {
+            if !store.authorized || store.selectionCount == 0 {
+                ScrollView {
+                    Text("Finish Screen Break setup in MoodPals on your iPhone.")
+                        .font(.footnote).multilineTextAlignment(.center)
+                }
+            } else {
+                VStack(spacing: 6) {
+                    BreakLock(locked: locked, size: 34)
+                    Text(locked ? "Apps locked" : "Apps unlocked").font(.footnote.weight(.semibold))
+                    HStack(spacing: 6) {
+                        Button("Lock") { run("lock") }
+                            .buttonStyle(BreakButtonStyle(kind: locked ? .secondary : .primary))
+                            .disabled(locked)
+                        Button("Unlock") { run("unlock") }
+                            .buttonStyle(BreakButtonStyle(kind: locked ? .primary : .secondary))
+                            .disabled(!locked)
+                    }
+                    StatusLine()
+                    Text("Swipe for timer ›").font(.caption2).foregroundStyle(.secondary)
+                }
+                .disabled(store.pending != nil)
+            }
+        }
+        .navigationTitle("Lock")
+    }
+
+    private func run(_ action: String) {
+        Task { @MainActor in await store.command(action) }
+    }
+}
+
+/// Timer → choose the member the time is for.
+struct WatchFamilyView: View {
+    @ObservedObject private var store = WatchScreenBreakStore.shared
 
     var body: some View {
         List {
@@ -168,19 +245,16 @@ struct WatchFamilyView: View {
                 NavigationLink(value: child) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(child.name).font(.headline)
-                        if let session = store.session, session.childId == child.id, session.isRunning {
-                            Text(session.status == "active" && session.deadline > Date() ? "Screen Break active" : "Time's up")
-                                .font(.caption2).foregroundStyle(session.status == "active" ? BreakStyle.green : BreakStyle.amber)
+                        if let session = store.session, session.status == "active" {
+                            Text(session.childId == child.id ? "Timer running" : "Timer running for \(session.childName)")
+                                .font(.caption2).foregroundStyle(BreakStyle.green)
                         }
                     }
                 }
             }
         }
         .tint(BreakStyle.green)
-        .containerBackground(Color.black, for: .navigation)
-        .navigationTitle("Family")
-        .navigationDestination(for: WatchBreakChild.self) { ScreenBreakControlView(child: $0) }
-        .task { await store.refresh() }
+        .navigationTitle("Timer")
     }
 }
 
@@ -309,6 +383,32 @@ struct DurationDial: View {
     }
 }
 
+// MARK: - Lock
+
+struct BreakLock: View {
+    let locked: Bool
+    var size: CGFloat = 30
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var breathe = false
+
+    var body: some View {
+        Image(systemName: locked ? "lock.fill" : "lock.open.fill")
+            .font(.system(size: size, weight: .semibold))
+            .foregroundStyle(locked ? BreakStyle.amber : BreakStyle.green)
+            .contentTransition(.symbolEffect(.replace))
+            .scaleEffect(breathe ? 1.06 : 1)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: locked)
+            .onAppear { startBreathing() }
+            .onChange(of: locked) { _, _ in startBreathing() }
+            .accessibilityHidden(true)
+    }
+
+    private func startBreathing() {
+        guard !reduceMotion, locked else { breathe = false; return }
+        withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) { breathe = true }
+    }
+}
+
 // MARK: - Countdown ring
 
 private struct BreakRing<Content: View>: View {
@@ -343,13 +443,14 @@ struct ScreenBreakControlView: View {
     @State private var minutes = 30
     @State private var managing = false
     @State private var justEnded = false
+    @Environment(\.dismiss) private var dismiss
 
     private var mine: WatchBreakSession? {
         guard let session = store.session, session.childId == child.id, session.isRunning else { return nil }
         return session
     }
     private var other: WatchBreakSession? {
-        guard let session = store.session, session.childId != child.id, session.isRunning else { return nil }
+        guard let session = store.session, session.childId != child.id, session.status == "active" else { return nil }
         return session
     }
 
@@ -360,7 +461,10 @@ struct ScreenBreakControlView: View {
             } else if let session = mine {
                 ActiveBreakView(session: session) { managing = true }
             } else if let other {
-                note("\(other.childName)'s Screen Break is running. One Screen Break runs at a time.")
+                VStack(spacing: 8) {
+                    Text("A timer is running for \(other.childName).").font(.footnote).multilineTextAlignment(.center)
+                    Button("Go to \(other.childName)") { dismiss() }.buttonStyle(BreakButtonStyle(kind: .primary))
+                }
             } else if !store.authorized || store.selectionCount == 0 {
                 note("Finish Screen Break setup in MoodPals on your iPhone.")
             } else if !store.allowed {
@@ -368,7 +472,7 @@ struct ScreenBreakControlView: View {
             } else {
                 VStack(spacing: 6) {
                     DurationDial(minutes: $minutes, range: 5...180)
-                    Button(store.pending == "start" ? "Starting…" : "Start Break") { start() }
+                    Button(store.pending == "start" ? "Starting…" : "Start") { start() }
                         .buttonStyle(BreakButtonStyle(kind: .primary))
                     StatusLine()
                 }
@@ -397,7 +501,7 @@ struct ScreenBreakControlView: View {
     private func start() {
         let chosen = minutes
         Task { @MainActor in
-            if await store.command("start", childId: child.id, minutes: chosen) { lastMinutes = chosen }
+            if await store.command("start", childId: child.id, minutes: chosen) { lastMinutes = chosen; dismiss() }
         }
     }
 
@@ -502,18 +606,18 @@ private struct ManageBreakView: View {
     var body: some View {
         VStack(spacing: 8) {
             Button("Add Time") { adding = true }.buttonStyle(BreakButtonStyle(kind: .primary))
-            Button("End Break") { confirming = true }.buttonStyle(BreakButtonStyle(kind: .destructive))
+            Button("Stop") { confirming = true }.buttonStyle(BreakButtonStyle(kind: .destructive))
             StatusLine()
         }
         .disabled(store.pending != nil)
         .navigationTitle("Manage")
         .containerBackground(Color.black, for: .navigation)
         .navigationDestination(isPresented: $adding) { AddTimeView(child: child, done: close) }
-        .confirmationDialog("End \(child.name)'s Screen Break?", isPresented: $confirming, titleVisibility: .visible) {
-            Button("End Break", role: .destructive) { end() }
+        .confirmationDialog("Stop \(child.name)'s timer?", isPresented: $confirming, titleVisibility: .visible) {
+            Button("Stop", role: .destructive) { end() }
             Button("Keep Going", role: .cancel) {}
         } message: {
-            Text("Paused apps open again on your iPhone.")
+            Text("The timer ends and the iPhone apps stay open.")
         }
     }
 

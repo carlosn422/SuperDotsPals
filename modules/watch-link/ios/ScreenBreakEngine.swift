@@ -57,6 +57,12 @@ final class ScreenBreakEngine {
   static let maxMinutes = 720
   static let addTimeOptions = [5, 10, 15, 30]
   static let remindOnPhone = false
+  /// Lock/Unlock from the watch: pauses the chosen apps right away with no timer. Not logged anywhere.
+  static let manualLockKey = "screenBreak.manualLock"
+  private var manualLock: Bool {
+    get { ScreenBreakShared.defaults.bool(forKey: Self.manualLockKey) }
+    set { ScreenBreakShared.defaults.set(newValue, forKey: Self.manualLockKey) }
+  }
 
   private var defaults: UserDefaults { ScreenBreakShared.defaults }
 
@@ -121,7 +127,7 @@ final class ScreenBreakEngine {
   func selectionChanged() {
     queue.async {
       // A running break picks up the new app list immediately.
-      if ScreenBreakShared.loadSession()?.isRestricted == true { ScreenBreakShared.applyShield() }
+      if ScreenBreakShared.loadSession()?.isRestricted == true || self.manualLock { ScreenBreakShared.applyShield() }
       self.notifyLocked()
     }
   }
@@ -177,6 +183,8 @@ final class ScreenBreakEngine {
       case "endNow": try endNow(command)
       case "cancel": try cancel(command)
       case "release": try release(command)
+      case "lock": try lock()
+      case "unlock": try unlock()
       default: throw ScreenBreakError(code: "invalid", message: "Unknown command.")
       }
     } catch let error as ScreenBreakError {
@@ -249,6 +257,7 @@ final class ScreenBreakEngine {
       ScreenBreakShared.enqueueSync(previous)
     }
     ScreenBreakShared.clearShield()
+    manualLock = false
     session.updatedAt = now
     ScreenBreakShared.saveSession(session)
     ScreenBreakShared.enqueueSync(session)
@@ -342,12 +351,44 @@ final class ScreenBreakEngine {
       throw ScreenBreakError(code: "stale", message: "There's no break to release.")
     }
     ScreenBreakShared.clearShield()
+    manualLock = false
     session.status = "released"
     session.version += 1
     session.updatedAt = Date()
     ScreenBreakShared.saveSession(session)
     ScreenBreakShared.enqueueSync(session)
     scheduleNotifications(session)
+  }
+
+  private func lock() throws {
+    guard authorized else {
+      throw ScreenBreakError(code: "permission", message: "Allow Screen Time access in MoodPals on your iPhone first.")
+    }
+    guard ScreenBreakShared.selectionCount(ScreenBreakShared.loadSelection()) > 0 else {
+      throw ScreenBreakError(code: "noSelection", message: "Choose the apps to pause in MoodPals on your iPhone first.")
+    }
+    guard let entitlement = loadEntitlement(), entitlement.allows(at: Date()) else {
+      throw ScreenBreakError(code: "plus", message: "Your 14-day Screen Break trial has ended. MoodPals Plus keeps Screen Break on.")
+    }
+    if ScreenBreakShared.loadSession()?.isActive == true {
+      throw ScreenBreakError(code: "busy", message: "A timer is running. Stop it first.")
+    }
+    manualLock = true
+    ScreenBreakShared.applyShield()
+  }
+
+  /// Opens the apps: ends a manual lock and releases a finished timer's break.
+  private func unlock() throws {
+    manualLock = false
+    if var session = ScreenBreakShared.loadSession(), session.isRestricted {
+      session.status = "released"
+      session.version += 1
+      session.updatedAt = Date()
+      ScreenBreakShared.saveSession(session)
+      ScreenBreakShared.enqueueSync(session)
+      scheduleNotifications(session)
+    }
+    if ScreenBreakShared.loadSession()?.isActive != true { ScreenBreakShared.clearShield() }
   }
 
   // MARK: Enforcement
@@ -380,7 +421,9 @@ final class ScreenBreakEngine {
       notifyLocked()
       return
     }
-    guard let session = ScreenBreakShared.loadSession() else { return }
+    let session = ScreenBreakShared.loadSession()
+    if manualLock && session?.isActive != true { ScreenBreakShared.applyShield() }
+    guard let session else { return }
     if session.isRestricted {
       ScreenBreakShared.applyShield()
     } else if session.isActive {
@@ -455,6 +498,7 @@ final class ScreenBreakEngine {
       "trialAvailable": entitlement?.trialAvailable ?? false,
       "children": loadChildren().map { ["id": $0.id, "name": $0.name] },
       "addTimeOptions": Self.addTimeOptions,
+      "manualLock": manualLock,
       "updatedAt": now.timeIntervalSince1970,
     ]
     if let ends = entitlement?.trialEndsAt { state["trialEndsAt"] = ends.timeIntervalSince1970 }

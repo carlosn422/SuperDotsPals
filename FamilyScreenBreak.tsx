@@ -109,7 +109,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  const child=route.name!=='list'?children.find(c=>c.id===route.id):undefined;
  const members=children.filter(c=>!c.watch_only);
  if(route.name==='insights'&&child)return <InsightsScreen child={child} onBack={()=>setRoute({name:'child',id:child.id})}/>;
- if(route.name==='child'&&child)return <ChildScreen child={child} children={children} onBack={()=>setRoute({name:'list'})} onInsights={()=>setRoute({name:'insights',id:child.id})} onChanged={()=>{void load();familyChildrenChanged()}} onRemoved={()=>{setRoute({name:'list'});void load()}} onAddWatch={onAddWatch}/>;
+ if(route.name==='child'&&child)return <ChildScreen child={child} children={children} onBack={()=>setRoute({name:'list'})} onInsights={()=>setRoute({name:'insights',id:child.id})} onChanged={()=>{void load();familyChildrenChanged()}} onRemoved={()=>{setRoute({name:'list'});void load()}} onAddWatch={onAddWatch} onOpen={id=>setRoute({name:'child',id})}/>;
  return <View style={{gap:14}}>
   {!embedded&&onBack?<Back label={backLabel} onPress={onBack}/>:null}
   <Text style={st.title} accessibilityRole="header">Family</Text>
@@ -164,7 +164,7 @@ function AddChild({onAdded}:{onAdded:(id?:string)=>void}){
  </View>;
 }
 
-function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAddWatch}:{child:FamilyChild;children:FamilyChild[];onBack:()=>void;onInsights:()=>void;onChanged:()=>void;onRemoved:()=>void;onAddWatch?:()=>void}){
+function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAddWatch,onOpen}:{child:FamilyChild;children:FamilyChild[];onBack:()=>void;onInsights:()=>void;onChanged:()=>void;onRemoved:()=>void;onAddWatch?:()=>void;onOpen?:(id:string)=>void}){
  const [state,setState]=useBreakState();
  const {isPlus,showPaywall}=usePlus();
  const [editing,setEditing]=useState(false);
@@ -175,7 +175,7 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
  const orphan=!!session&&!children.some(c=>c.id===session.childId)&&session.childName===child.name;
  const mine=session&&(session.childId===child.id||orphan)&&(session.status==='active'||session.status==='restricted')?session:null;
  const other=session&&session.childId!==child.id&&!orphan&&session.status==='active'?session:null;
- const now=useNow(!!mine&&mine.status==='active');
+ const now=useNow((!!mine&&mine.status==='active')||!!other);
  const lock=useRef(false);
  const refresh=()=>setState(getBreakState());
  useEffect(()=>{void syncScreenBreak(isPlus).then(refresh)},[child.id]);
@@ -242,7 +242,10 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
     <TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={()=>run('release')} style={[st.cta,{alignSelf:'stretch'}]}><Text style={st.ctaText}>Release Break</Text></TouchableOpacity>
    </View>:<View style={st.card}>
     <Text style={st.heading}>Screen Break</Text>
-    {other?<Text style={st.body}>{other.childName}'s Screen Break is running on this iPhone. One session runs at a time.</Text>:null}
+    {other?<View style={[st.setupDone,{flexDirection:'column',alignItems:'stretch',gap:10,paddingVertical:14}]}>
+     <Text style={[st.body,{textAlign:'center'}]}>A timer is running for {other.childName} · {Math.max(1,Math.ceil((other.deadline*1000-now)/60000))} min left</Text>
+     {children.some(c=>c.id===other.childId)&&onOpen?<TouchableOpacity accessibilityRole="button" onPress={()=>onOpen(other.childId)} style={st.cta}><Text style={st.ctaText}>Go to {other.childName}</Text></TouchableOpacity>:null}
+    </View>:null}
     {!state?.authorized?<View style={{gap:10}}>
      <Text style={st.kicker}>Step 1 of 2</Text>
      <Text style={st.rowTitle}>Allow Screen Time access</Text>
@@ -258,7 +261,7 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
      <Text style={[st.body,{flex:1}]}>Setup complete · {state.selectionCount} to pause</Text>
      <Text style={st.link}>Edit apps</Text>
     </TouchableOpacity>}
-    {ready?<>
+    {ready&&!other?<>
     <Text style={[st.rowTitle,{marginTop:8,textAlign:'center'}]}>How long can {child.name} use the phone?</Text>
     <DurationRing minutes={minutes} onChange={setMinutes} min={5} max={180}/>
     <TouchableOpacity accessibilityRole="button" disabled={!ready||!validMinutes||!!busy||!!other} onPress={()=>{void AsyncStorage.setItem(LAST_MINUTES_KEY,String(chosen));run('start',{minutes:chosen})}} style={[st.cta,(!ready||!validMinutes||!!busy||!!other)&&{opacity:0.5}]}><Text style={st.ctaText}>Start</Text></TouchableOpacity>

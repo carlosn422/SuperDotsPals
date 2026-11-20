@@ -125,13 +125,13 @@ struct ContentView: View {
                             }
                             if !sync.moodOnly {
                                 Button { showingFamily = true } label: {
-                                    Image(systemName: "figure.and.child.holdinghands")
+                                    Image(systemName: "lock.fill")
                                         .font(.system(size: 10, weight: .semibold))
                                         .frame(width: 26, height: 26)
                                         .background(Circle().fill(purple.opacity(0.35)))
                                 }
                                 .buttonStyle(.plain)
-                                .accessibilityLabel("Family Screen Break")
+                                .accessibilityLabel("Screen Break: lock apps or start a timer")
                             }
                         }
                     }
@@ -183,15 +183,14 @@ struct ContentView: View {
             NavigationStack(path: $circle.path) { WatchCircleList() }
         }
         .sheet(isPresented: $showingFamily, onDismiss: { familyPath = [] }) {
-            NavigationStack(path: $familyPath) { WatchFamilyView(path: $familyPath) }
+            NavigationStack(path: $familyPath) { WatchBreakHomeView(path: $familyPath) }
         }
         // A Screen Break reminder opens the running session's controls.
         .onChange(of: screenBreak.openRequest) { _, request in
             guard request > 0, !sync.moodOnly else { return }
             choosingMood = false; measuring = false; choosingTheme = false; showingDrinks = false; showingCircle = false
-            if let session = screenBreak.session, session.isRunning {
-                familyPath = [screenBreak.children.first { $0.id == session.childId } ?? WatchBreakChild(id: session.childId, name: session.childName)]
-            }
+            // The Screen Break home shows a running timer's countdown itself.
+            familyPath = []
             showingFamily = true
         }
         .onChange(of: circle.openRequest, initial: true) { _, request in
