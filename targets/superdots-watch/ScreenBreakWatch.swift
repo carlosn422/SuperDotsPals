@@ -406,6 +406,20 @@ struct DurationDial: View {
     }
 }
 
+/// Member the timer is for, shown just left of the corner Start / Stop button.
+struct BreakMemberName: View {
+    let name: String
+
+    var body: some View {
+        Text(name)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .accessibilityHidden(true)
+    }
+}
+
 /// Round button for the bottom corner of the dial and running-timer screens (Start / Stop).
 struct BreakCornerButton: View {
     let systemImage: String
@@ -527,8 +541,11 @@ struct ScreenBreakControlView: View {
                 .toolbar {
                     ToolbarItemGroup(placement: .bottomBar) {
                         Spacer()
-                        BreakCornerButton(systemImage: "play.fill", color: BreakStyle.green, busy: store.pending == "start", label: "Start") { start() }
-                            .disabled(store.pending != nil)
+                        HStack(spacing: 8) {
+                            BreakMemberName(name: child.name)
+                            BreakCornerButton(systemImage: "play.fill", color: BreakStyle.green, busy: store.pending == "start", label: "Start for \(child.name)") { start() }
+                                .disabled(store.pending != nil)
+                        }
                     }
                 }
             }
@@ -659,7 +676,10 @@ private struct ActiveBreakView: View {
             ToolbarItemGroup(placement: .bottomBar) {
                 Spacer()
                 if !dimmed {
-                    BreakCornerButton(systemImage: "stop.fill", color: BreakStyle.stop, label: "Stop timer") { stop() }
+                    HStack(spacing: 8) {
+                        BreakMemberName(name: session.childName)
+                        BreakCornerButton(systemImage: "stop.fill", color: BreakStyle.stop, label: "Stop timer for \(session.childName)") { stop() }
+                    }
                 }
             }
         }
