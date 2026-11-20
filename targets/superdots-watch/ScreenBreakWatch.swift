@@ -175,7 +175,6 @@ struct WatchBreakHomeView: View {
         Group {
             if let session = running {
                 ActiveBreakView(session: session) { managing = true }
-                    .navigationTitle(session.childName)
                     .navigationDestination(isPresented: $managing) {
                         ManageBreakView(child: WatchBreakChild(id: session.childId, name: session.childName),
                                         close: { managing = false }, ended: { managing = false; store.navReset += 1 })
@@ -226,20 +225,14 @@ private struct LockPage: View {
                 VStack(spacing: 6) {
                     // Tapping the lock itself locks or unlocks; it animates closed (red) or open (green).
                     Button { run(locked ? "unlock" : "lock") } label: {
-                        BreakLock(locked: locked, size: 58)
-                            .frame(width: 96, height: 96)
+                        BreakLock(locked: locked, size: 80)
+                            .frame(width: 136, height: 136)
                             .background(Circle().fill((locked ? BreakStyle.red : BreakStyle.green).opacity(0.16)))
                             .animation(.easeInOut(duration: 0.35), value: locked)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(locked ? "Apps locked. Unlock" : "Apps unlocked. Lock")
-                    Text(locked ? "Apps locked" : "Apps unlocked")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(locked ? BreakStyle.red : BreakStyle.green)
-                    Text(locked ? "Tap the lock to unlock" : "Tap the lock to lock")
-                        .font(.caption2).foregroundStyle(.secondary)
                     StatusLine()
-                    Text("Swipe for timer ›").font(.caption2).foregroundStyle(.secondary)
                 }
                 .disabled(store.pending != nil)
             }
@@ -286,9 +279,11 @@ enum BreakStyle {
     static let green = Color(red: 0.30, green: 0.73, blue: 0.50)
     static let amber = Color(red: 0.95, green: 0.65, blue: 0.44)
     static let red = Color(red: 0.84, green: 0.36, blue: 0.47)
+    /// Same orange as the iPhone's End Now button.
+    static let stop = Color(red: 0xF4 / 255, green: 0xA5 / 255, blue: 0x70 / 255)
     static let fill = Color.white.opacity(0.14)
     /// One size for the time dial and the running timer ring.
-    static var ring: CGFloat { WKInterfaceDevice.current().screenBounds.width * 0.62 }
+    static var ring: CGFloat { WKInterfaceDevice.current().screenBounds.width * 0.6 }
 }
 
 struct BreakButtonStyle: ButtonStyle {
@@ -499,7 +494,7 @@ struct ScreenBreakControlView: View {
             } else if !store.allowed {
                 note("Your free trial has ended. Get MoodPals Plus on your iPhone to start a Screen Break.")
             } else {
-                VStack(spacing: 12) {
+                VStack(spacing: 20) {
                     DurationDial(minutes: $minutes, range: 5...180)
                         .frame(width: BreakStyle.ring, height: BreakStyle.ring)
                     Button(store.pending == "start" ? "Starting…" : "Start") { start() }
@@ -510,7 +505,6 @@ struct ScreenBreakControlView: View {
             }
         }
         .opacity(leaving ? 0 : 1)
-        .navigationTitle(child.name)
         .containerBackground(Color.black, for: .navigation)
         .navigationDestination(isPresented: $managing) {
             ManageBreakView(child: child, close: { managing = false }, ended: finishEnd)
@@ -583,7 +577,7 @@ private struct ActiveBreakView: View {
             let passed = timeUp ? 1 : min(1, max(0, 1 - left / total))
             let size = BreakStyle.ring
             let line = max(6, size * 0.075)
-            VStack(spacing: 12) {
+            VStack(spacing: 20) {
                 ZStack {
                     Circle().stroke(BreakStyle.fill, lineWidth: line)
                     // Time already passed is faded; the time left stays solid.
@@ -625,7 +619,7 @@ private struct ActiveBreakView: View {
                     Button { stop() } label: {
                         RoundedRectangle(cornerRadius: 4).fill(Color.white).frame(width: 15, height: 15)
                             .frame(width: 44, height: 44)
-                            .background(Circle().fill(BreakStyle.red))
+                            .background(Circle().fill(BreakStyle.stop))
                     }
                     .buttonStyle(.plain)
                     .disabled(store.pending != nil)
@@ -761,7 +755,7 @@ private struct AddTimeView: View {
     @State private var minutes = 15
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 20) {
             DurationDial(minutes: $minutes, range: 5...120, prefix: "+")
                 .frame(width: BreakStyle.ring, height: BreakStyle.ring)
             Button(store.pending == "addTime" ? "Adding…" : "Add Time") { add() }
