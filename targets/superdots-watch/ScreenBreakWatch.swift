@@ -177,6 +177,7 @@ struct WatchFamilyView: View {
             }
         }
         .tint(BreakStyle.green)
+        .containerBackground(Color.black, for: .navigation)
         .navigationTitle("Family")
         .navigationDestination(for: WatchBreakChild.self) { ScreenBreakControlView(child: $0) }
         .task { await store.refresh() }
@@ -308,30 +309,28 @@ struct DurationDial: View {
     }
 }
 
-// MARK: - Lock
+// MARK: - Countdown ring
 
-struct BreakLock: View {
-    let locked: Bool
-    var tint: Color = BreakStyle.green
-    var size: CGFloat = 30
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var breathe = false
+private struct BreakRing<Content: View>: View {
+    let fraction: Double
+    let tint: Color
+    @ViewBuilder let content: () -> Content
 
     var body: some View {
-        Image(systemName: locked ? "lock.fill" : "lock.open.fill")
-            .font(.system(size: size, weight: .semibold))
-            .foregroundStyle(tint)
-            .contentTransition(.symbolEffect(.replace))
-            .scaleEffect(breathe ? 1.06 : 1)
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: locked)
-            .onAppear { startBreathing() }
-            .onChange(of: locked) { _, _ in startBreathing() }
-            .accessibilityHidden(true)
-    }
-
-    private func startBreathing() {
-        guard !reduceMotion, locked else { breathe = false; return }
-        withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) { breathe = true }
+        GeometryReader { geo in
+            let size = min(geo.size.width, geo.size.height)
+            let line = max(6, size * 0.075)
+            ZStack {
+                Circle().stroke(BreakStyle.fill, lineWidth: line)
+                Circle()
+                    .trim(from: 0, to: max(0.001, min(1, fraction)))
+                    .stroke(tint, style: StrokeStyle(lineWidth: line, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                content().padding(.horizontal, line * 2)
+            }
+            .frame(width: size, height: size)
+            .position(x: geo.size.width / 2, y: geo.size.height / 2)
+        }
     }
 }
 
@@ -377,6 +376,7 @@ struct ScreenBreakControlView: View {
             }
         }
         .navigationTitle(child.name)
+        .containerBackground(Color.black, for: .navigation)
         .navigationDestination(isPresented: $managing) {
             ManageBreakView(child: child, close: { managing = false }, ended: finishEnd)
         }
@@ -425,53 +425,64 @@ private struct StatusLine: View {
 }
 
 /// Countdown from the iPhone's deadline: correct after the app is closed and reopened, with no running timer.
+/// With the wrist down (always-on) it shows whole minutes only.
 private struct ActiveBreakView: View {
     let session: WatchBreakSession
     let onManage: () -> Void
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var closed = false
+    @Environment(\.isLuminanceReduced) private var dimmed
 
     var body: some View {
-        TimelineView(.explicit([session.deadline])) { context in
-            let timeUp = session.status == "restricted" || context.date >= session.deadline
-            VStack(spacing: 4) {
-                BreakLock(locked: closed, tint: timeUp ? BreakStyle.amber : BreakStyle.green)
-                if timeUp {
-                    Text("Time's Up").font(.title2.bold())
-                    Text("Apps are paused on your iPhone.")
-                        .font(.caption2).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                } else {
-                    Text(timerInterval: min(context.date, session.deadline)...session.deadline, countsDown: true)
-                        .font(.system(size: 34, weight: .bold))
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                        .multilineTextAlignment(.center)
-                    Text("Screen Break Active").font(.caption2).foregroundStyle(BreakStyle.green)
+        TimelineView(.periodic(from: .now, by: dimmed ? 60 : 1)) { context in
+            let left = max(0, session.deadline.timeIntervalSince(context.date))
+            let total = max(1, session.deadline.timeIntervalSince(session.startedAt))
+            let timeUp = session.status == "restricted" || left <= 0
+            VStack(spacing: 6) {
+                BreakRing(fraction: timeUp ? 0 : left / total, tint: BreakStyle.green) {
+                    VStack(spacing: 0) {
+                        Text(timeUp ? "0:00" : Self.text(left, seconds: !dimmed))
+                            .font(.system(size: 30, weight: .bold))
+                            .monospacedDigit()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                        Text(timeUp ? "Apps paused" : "left")
+                            .font(.caption2)
+                            .foregroundStyle(timeUp ? BreakStyle.amber : .secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
                 }
-                Spacer(minLength: 2)
-                Button("Manage", action: onManage).buttonStyle(BreakButtonStyle(kind: .secondary))
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(timeUp ? "Time is up. Apps are paused on your iPhone." : "\(Self.spoken(left)) left")
+                if !dimmed {
+                    Button("Manage", action: onManage).buttonStyle(BreakButtonStyle(kind: .secondary))
+                }
             }
         }
-        .onAppear {
-            if reduceMotion { closed = true } else { DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { closed = true } }
+    }
+
+    static func text(_ seconds: TimeInterval, seconds showSeconds: Bool) -> String {
+        let s = Int(seconds.rounded(.up)), h = s / 3600, m = s % 3600 / 60, r = s % 60
+        if !showSeconds {
+            let minutes = Int((seconds / 60).rounded(.up))
+            return minutes >= 60 ? "\(minutes / 60)h \(minutes % 60)m" : "\(minutes) min"
         }
+        return h > 0 ? String(format: "%d:%02d:%02d", h, m, r) : String(format: "%d:%02d", m, r)
+    }
+
+    static func spoken(_ seconds: TimeInterval) -> String {
+        let minutes = Int((seconds / 60).rounded(.up))
+        return minutes >= 60 ? "\(minutes / 60) hours \(minutes % 60) minutes" : "\(minutes) minutes"
     }
 }
 
 private struct BreakEndedView: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var open = false
-
     var body: some View {
         VStack(spacing: 6) {
-            BreakLock(locked: !open, size: 36)
+            Image(systemName: "checkmark.circle.fill").font(.system(size: 36)).foregroundStyle(BreakStyle.green)
             Text("Break Ended").font(.headline)
             Text("Apps are open again.").font(.caption2).foregroundStyle(.secondary)
         }
-        .onAppear {
-            if reduceMotion { open = true } else { DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { open = true } }
-        }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -496,6 +507,7 @@ private struct ManageBreakView: View {
         }
         .disabled(store.pending != nil)
         .navigationTitle("Manage")
+        .containerBackground(Color.black, for: .navigation)
         .navigationDestination(isPresented: $adding) { AddTimeView(child: child, done: close) }
         .confirmationDialog("End \(child.name)'s Screen Break?", isPresented: $confirming, titleVisibility: .visible) {
             Button("End Break", role: .destructive) { end() }
@@ -535,6 +547,7 @@ private struct AddTimeView: View {
         }
         .disabled(store.pending != nil)
         .navigationTitle("Add Time")
+        .containerBackground(Color.black, for: .navigation)
     }
 
     private func add() {

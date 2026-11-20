@@ -106,6 +106,7 @@ struct ScreenTimeReportScene: DeviceActivityReportScene {
 
 struct ScreenTimeSummaryView: View {
   let summary: ScreenTimeSummary
+  @State private var selected: Int?
   private let ink = Color(red: 0x1D / 255, green: 0x2B / 255, blue: 0x33 / 255)
   private let muted = Color(red: 0x6E / 255, green: 0x7D / 255, blue: 0x86 / 255)
   private let green = Color(red: 0x34 / 255, green: 0xB3 / 255, blue: 0x7E / 255)
@@ -133,7 +134,9 @@ struct ScreenTimeSummaryView: View {
             .font(.system(size: 13, weight: .semibold)).foregroundColor(muted)
         }
         chart
-        if let top = summary.buckets.max(by: { $0.seconds < $1.seconds }), top.seconds > 0, summary.period != "day" {
+        if let id = selected, let bucket = summary.buckets.first(where: { $0.id == id }) {
+          Text("\(Self.bucketName(summary.period, bucket)) · \(Self.format(bucket.seconds))").font(.system(size: 13, weight: .heavy)).foregroundColor(green)
+        } else if let top = summary.buckets.max(by: { $0.seconds < $1.seconds }), top.seconds > 0, summary.period != "day" {
           Text("Highest: \(Self.bucketName(summary.period, top)) · \(Self.format(top.seconds))").font(.system(size: 12, weight: .semibold)).foregroundColor(ink)
         }
         if let hours = summary.sessionHours {
@@ -159,11 +162,13 @@ struct ScreenTimeSummaryView: View {
       ForEach(summary.buckets) { bucket in
         VStack(spacing: 3) {
           RoundedRectangle(cornerRadius: 3)
-            .fill(bucket.seconds > 0 ? green : soft)
+            .fill(bucket.seconds > 0 ? (selected == nil || selected == bucket.id ? green : green.opacity(0.35)) : soft)
             .frame(height: max(3, CGFloat(bucket.seconds / peak) * 70))
           Text(bucket.label).font(.system(size: 9, weight: .bold)).foregroundColor(muted).lineLimit(1).fixedSize()
         }
         .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture { selected = selected == bucket.id ? nil : bucket.id }
       }
     }
     .frame(height: 90, alignment: .bottom)

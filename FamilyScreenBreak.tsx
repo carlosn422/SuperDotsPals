@@ -584,9 +584,10 @@ function SessionLineChart({period,buckets}:{period:BreakPeriod;buckets:Bucket[]}
  const y=(sec:number)=>pad+(H-pad*2)*(1-sec/peak);
  const pick=(px:number)=>{if(width&&n)setPicked(Math.max(0,Math.min(n-1,Math.round((px-pad)/((width-pad*2)/Math.max(1,n-1))))))};
  const pan=useMemo(()=>PanResponder.create({
+  // A tap shows that point; a horizontal drag scrubs; a vertical swipe is left to the page so it scrolls.
   onStartShouldSetPanResponder:()=>true,
-  onMoveShouldSetPanResponder:()=>true,
-  onPanResponderTerminationRequest:()=>false,
+  onMoveShouldSetPanResponder:(_e,g)=>Math.abs(g.dx)>Math.abs(g.dy)*1.2,
+  onPanResponderTerminationRequest:(_e,g)=>Math.abs(g.dy)>Math.abs(g.dx),
   onPanResponderGrant:e=>pick(e.nativeEvent.locationX),
   onPanResponderMove:e=>pick(e.nativeEvent.locationX),
  }),[width,n]);
