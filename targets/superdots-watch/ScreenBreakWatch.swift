@@ -615,7 +615,7 @@ private struct ActiveBreakView: View {
                 }
                 .frame(width: size, height: size)
                 .contentShape(Circle())
-                .gesture(timeUp || dimmed ? nil : drag(size: size))
+                .gesture(drag(size: size), including: timeUp || dimmed ? .none : .all)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(timeUp ? "Time is up. Apps are paused on your iPhone." : "\(Self.spoken(left)) left")
                 .accessibilityAdjustableAction { direction in
