@@ -396,15 +396,22 @@ struct FloatingEmojiBurst: View {
         .allowsHitTesting(false)
         .onAppear {
             start = Date()
-            let count = max(6, min(9, emojis.count * 3))
-            particles = (0..<count).map { i in
-                Particle(emoji: emojis[i % max(1, emojis.count)],
-                         x: CGFloat(0.18 + 0.64 * Double(i) / Double(max(1, count - 1))) + CGFloat.random(in: -0.06...0.06),
-                         delay: Double(i) * 0.12 + Double.random(in: 0...0.1),
-                         size: CGFloat.random(in: 26...44),
-                         sway: CGFloat.random(in: 6...14),
-                         phase: Double.random(in: 0...(2 * .pi)))
-            }.shuffled()
+            // Three fixed lanes, a new emoji every 0.3 s cycling through them, so copies never overlap:
+            // neighbours are a third of the screen apart and the same lane only repeats 0.9 s later.
+            let lanes: [CGFloat] = [0.22, 0.5, 0.78]
+            var order = lanes.shuffled()
+            particles = (0..<6).map { i in
+                if i > 0 && i % lanes.count == 0 {
+                    let last = order.last
+                    repeat { order.shuffle() } while order.first == last
+                }
+                return Particle(emoji: emojis[i % max(1, emojis.count)],
+                                x: order[i % lanes.count],
+                                delay: Double(i) * 0.3,
+                                size: CGFloat.random(in: 26...34),
+                                sway: 4,
+                                phase: Double.random(in: 0...(2 * .pi)))
+            }
         }
     }
 }
