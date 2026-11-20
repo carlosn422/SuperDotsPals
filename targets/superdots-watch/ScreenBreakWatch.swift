@@ -38,6 +38,8 @@ final class WatchScreenBreakStore: ObservableObject {
     /// The command waiting for the iPhone's confirmation.
     @Published private(set) var pending: String?
     @Published var error: String?
+    /// Bumped to send the Screen Break home back to its root (after Start or Stop).
+    @Published var navReset = 0
     @Published private(set) var openRequest = 0
     private var stateAt: Double = 0
     private let storageKey = "screenBreak.lastState"
@@ -161,6 +163,7 @@ struct WatchBreakHomeView: View {
     @ObservedObject private var store = WatchScreenBreakStore.shared
     @Binding var path: [WatchBreakChild]
     @State private var managing = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var running: WatchBreakSession? {
         guard let session = store.session, session.status == "active" else { return nil }
@@ -174,17 +177,26 @@ struct WatchBreakHomeView: View {
                     .navigationTitle(session.childName)
                     .navigationDestination(isPresented: $managing) {
                         ManageBreakView(child: WatchBreakChild(id: session.childId, name: session.childName),
-                                        close: { managing = false }, ended: { managing = false })
+                                        close: { managing = false }, ended: { managing = false; store.navReset += 1 })
                     }
+                    .transition(.opacity)
             } else {
                 TabView {
                     LockPage()
                     WatchFamilyView()
                 }
                 .tabViewStyle(.page)
+                .transition(.opacity)
             }
         }
+        // Starting fades the dial out and the running countdown in; stopping fades back to the Lock page.
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.45), value: running == nil)
         .containerBackground(Color.black, for: .navigation)
+        .onChange(of: store.navReset) { _, _ in
+            var instant = Transaction()
+            instant.disablesAnimations = true
+            withTransaction(instant) { path = []; managing = false }
+        }
         .navigationDestination(for: WatchBreakChild.self) { ScreenBreakControlView(child: $0) }
         .onChange(of: running == nil) { _, gone in if gone { managing = false } }
         .task { await store.refresh() }
@@ -210,7 +222,7 @@ private struct LockPage: View {
                     Text(locked ? "Apps locked" : "Apps unlocked").font(.footnote.weight(.semibold))
                     HStack(spacing: 6) {
                         Button("Lock") { run("lock") }
-                            .buttonStyle(BreakButtonStyle(kind: locked ? .secondary : .primary))
+                            .buttonStyle(BreakButtonStyle(kind: locked ? .secondary : .destructive))
                             .disabled(locked)
                         Button("Unlock") { run("unlock") }
                             .buttonStyle(BreakButtonStyle(kind: locked ? .primary : .secondary))
@@ -270,14 +282,17 @@ enum BreakStyle {
 struct BreakButtonStyle: ButtonStyle {
     enum Kind { case primary, secondary, destructive }
     var kind: Kind
+    /// A smaller capsule sized to its label, for secondary steps.
+    var compact = false
 
     func makeBody(configuration: Configuration) -> some View {
-        StyledLabel(configuration: configuration, kind: kind)
+        StyledLabel(configuration: configuration, kind: kind, compact: compact)
     }
 
     private struct StyledLabel: View {
         let configuration: ButtonStyleConfiguration
         let kind: Kind
+        let compact: Bool
         @Environment(\.isEnabled) private var isEnabled
 
         var body: some View {
@@ -286,7 +301,8 @@ struct BreakButtonStyle: ButtonStyle {
                 .foregroundStyle(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
-                .frame(maxWidth: .infinity, minHeight: 44)
+                .padding(.horizontal, compact ? 18 : 0)
+                .frame(maxWidth: compact ? nil : .infinity, minHeight: compact ? 36 : 44)
                 .background(Capsule().fill(fill))
                 .opacity(!isEnabled ? 0.45 : configuration.isPressed ? 0.75 : 1)
                 .contentShape(Capsule())
@@ -394,7 +410,7 @@ struct BreakLock: View {
     var body: some View {
         Image(systemName: locked ? "lock.fill" : "lock.open.fill")
             .font(.system(size: size, weight: .semibold))
-            .foregroundStyle(locked ? BreakStyle.amber : BreakStyle.green)
+            .foregroundStyle(locked ? BreakStyle.red : BreakStyle.green)
             .contentTransition(.symbolEffect(.replace))
             .scaleEffect(breathe ? 1.06 : 1)
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: locked)
@@ -473,7 +489,7 @@ struct ScreenBreakControlView: View {
                 VStack(spacing: 6) {
                     DurationDial(minutes: $minutes, range: 5...180)
                     Button(store.pending == "start" ? "Starting…" : "Start") { start() }
-                        .buttonStyle(BreakButtonStyle(kind: .primary))
+                        .buttonStyle(BreakButtonStyle(kind: .primary, compact: true))
                     StatusLine()
                 }
                 .disabled(store.pending != nil)
@@ -501,14 +517,13 @@ struct ScreenBreakControlView: View {
     private func start() {
         let chosen = minutes
         Task { @MainActor in
-            if await store.command("start", childId: child.id, minutes: chosen) { lastMinutes = chosen; dismiss() }
+            if await store.command("start", childId: child.id, minutes: chosen) { lastMinutes = chosen; store.navReset += 1 }
         }
     }
 
     private func finishEnd() {
         managing = false
-        justEnded = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) { justEnded = false }
+        store.navReset += 1
     }
 }
 
@@ -558,7 +573,7 @@ private struct ActiveBreakView: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(timeUp ? "Time is up. Apps are paused on your iPhone." : "\(Self.spoken(left)) left")
                 if !dimmed {
-                    Button("Manage", action: onManage).buttonStyle(BreakButtonStyle(kind: .secondary))
+                    Button("Manage", action: onManage).buttonStyle(BreakButtonStyle(kind: .secondary, compact: true))
                 }
             }
         }
