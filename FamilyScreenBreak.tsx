@@ -12,7 +12,7 @@ import {WatchColorGrid,WatchImage,isWatchColor,type WatchColor} from './WatchArt
 import {ScreenTimeReport,ackBreakSync,getBreakState,onBreakState,pendingBreakSync,pickBreakApps,requestScreenTimeAccess,screenBreakSupported,sendBreakCommand,setBreakChildren,setBreakEntitlement,type BreakAction,type BreakSession,type BreakState,type BreakSyncRow} from './modules/watch-link/screenBreak';
 import {comparison,formatDuration,observations,periodRange,periodStats,sessionInterval,type BreakPeriod,type Bucket,type SessionRow} from './ScreenBreakInsights';
 
-export type FamilyChild={id:string;name:string;profile_user_id:string|null};
+export type FamilyChild={id:string;name:string;profile_user_id:string|null;watch_only?:boolean};
 type Entitlement={has_plus:boolean;trial_started_at:string|null;trial_ends_at:string|null;trial_available:boolean;allowed:boolean};
 const DURATIONS=[15,30,45,60];
 const red='#D65B79';
@@ -24,7 +24,7 @@ export function familyChildrenChanged(){listeners.forEach(l=>l())}
 export function onFamilyChildrenChanged(l:()=>void){listeners.add(l);return()=>{listeners.delete(l)}}
 
 async function loadChildren():Promise<FamilyChild[]>{
- const {data,error}=await supabase.from('family_children').select('id,name,profile_user_id').order('created_at');
+ const {data,error}=await supabase.from('family_children').select('id,name,profile_user_id,watch_only').order('created_at');
  if(error)throw error;
  return (data as FamilyChild[])||[];
 }
@@ -92,7 +92,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  const [children,setChildren]=useState<FamilyChild[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const [route,setRoute]=useState<Route>({name:'list'}),[adding,setAdding]=useState(false);
  const load=useCallback(async()=>{
-  try{const list=await loadChildren();setChildren(list);setError('');if(screenBreakSupported)setBreakChildren(list.map(c=>({id:c.id,name:c.name})))}
+  try{const list=await loadChildren();setChildren(list);setError('');if(screenBreakSupported)setBreakChildren(list.filter(c=>!c.watch_only).map(c=>({id:c.id,name:c.name})))}
   catch{setError('Unable to load your family members. Check your connection.')}
   finally{setLoading(false)}
  },[]);
@@ -104,6 +104,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
   if(child)setRoute({name:'child',id:child.id});
  },[target,loading,children]);
  const child=route.name!=='list'?children.find(c=>c.id===route.id):undefined;
+ const members=children.filter(c=>!c.watch_only);
  if(route.name==='insights'&&child)return <InsightsScreen child={child} onBack={()=>setRoute({name:'child',id:child.id})}/>;
  if(route.name==='child'&&child)return <ChildScreen child={child} children={children} onBack={()=>setRoute({name:'list'})} onInsights={()=>setRoute({name:'insights',id:child.id})} onChanged={()=>{void load();familyChildrenChanged()}} onRemoved={()=>{setRoute({name:'list'});void load()}} onAddWatch={onAddWatch}/>;
  return <View style={{gap:14}}>
@@ -117,9 +118,9 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
   {guest?<View style={st.card}><Text style={st.body}>Create a free account to add family members and use Screen Break.</Text></View>:<>
    {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
    {loading?<ActivityIndicator color={T.primary}/>:null}
-   {adding||(!loading&&!error&&!children.length)?<AddChild onAdded={id=>{setAdding(false);void load().then(()=>{if(id)setRoute({name:'child',id})});familyChildrenChanged()}}/>:null}
-   {children.length?<View style={[st.card,{paddingVertical:4,gap:0}]}>
-    {children.map((c,i)=><TouchableOpacity key={c.id} accessibilityRole="button" accessibilityLabel={'Open '+c.name} onPress={()=>setRoute({name:'child',id:c.id})} style={[st.row,i>0&&st.rowLine]}>
+   {adding||(!loading&&!error&&!members.length)?<AddChild onAdded={id=>{setAdding(false);void load().then(()=>{if(id)setRoute({name:'child',id})});familyChildrenChanged()}}/>:null}
+   {members.length?<View style={[st.card,{paddingVertical:4,gap:0}]}>
+    {members.map((c,i)=><TouchableOpacity key={c.id} accessibilityRole="button" accessibilityLabel={'Open '+c.name} onPress={()=>setRoute({name:'child',id:c.id})} style={[st.row,i>0&&st.rowLine]}>
      <View style={st.avatar}><Text style={st.avatarText}>{c.name.slice(0,1).toUpperCase()}</Text></View>
      <View style={{flex:1}}><Text style={st.rowTitle}>{c.name}</Text><Text style={st.sub}>{c.profile_user_id?'Watch assigned':'No watch assigned'}</Text></View>
      <ActiveBadge childId={c.id}/>
@@ -336,7 +337,7 @@ function Chip({label,on,onPress,disabled}:{label:string;on?:boolean;onPress:()=>
 function ChildManage({child,children,onChanged,onRemoved,onAddWatch,locked,section}:{child:FamilyChild;children:FamilyChild[];onChanged:()=>void;onRemoved:()=>void;onAddWatch?:()=>void;locked:boolean;section:'edit'|'watch'}){
  const [draft,setDraft]=useState(child.name),[linking,setLinking]=useState(false),[error,setError]=useState('');
  // Family watches added with the watch code flow that aren't assigned to another member yet.
- const watches=children.filter(c=>c.id!==child.id&&c.profile_user_id);
+ const watches=children.filter(c=>c.watch_only&&c.profile_user_id);
  async function save(){
   const name=draft.replace(/\s+/g,' ').trim();
   if(!name)return;
@@ -370,7 +371,15 @@ function ChildManage({child,children,onChanged,onRemoved,onAddWatch,locked,secti
 
 function MemberWatch({child,spare,onChanged,link,error}:{child:FamilyChild;spare:FamilyChild[];onChanged:()=>void;link:(profile:string)=>Promise<void>;error:string}){
  const {profiles,load}=useFamilyProfiles(!!child.profile_user_id);
- const [sheet,setSheet]=useState(false),[managing,setManaging]=useState(false);
+ const [sheet,setSheet]=useState(false),[managing,setManaging]=useState(false),[unassigning,setUnassigning]=useState(false),[unError,setUnError]=useState('');
+ function unassign(){
+  Alert.alert('Unassign this watch?',child.name+' stays in Family. The watch keeps working and can be assigned to another member.',[{text:'Keep'},{text:'Unassign',style:'destructive',onPress:async()=>{
+   setUnassigning(true);setUnError('');
+   const {error:e}=await supabase.rpc('family_unassign_child_watch',{p_child:child.id});
+   setUnassigning(false);
+   if(e)setUnError('Unable to unassign the watch. Try again.');else{familyProfilesChanged();onChanged()}
+  }}]);
+ }
  const watch=child.profile_user_id?profiles.find(p=>p.id===child.profile_user_id):undefined;
  const color=watch&&isWatchColor(watch.watchColor)?watch.watchColor:null;
  return <View style={[st.card,{gap:12}]}>
@@ -380,6 +389,8 @@ function MemberWatch({child,spare,onChanged,link,error}:{child:FamilyChild;spare
     <View style={{flex:1,gap:2}}><Text style={st.rowTitle}>{child.name}'s Apple Watch</Text><Text style={st.sub}>Mood-only watch{watch?(watch.connected?' · Linked':' · Not linked'):''}</Text></View>
    </View>
    <TouchableOpacity accessibilityRole="button" disabled={!watch} onPress={()=>setManaging(true)} style={[st.ghost,!watch&&{opacity:0.5}]}><Text style={st.ghostText}>Manage Watch</Text></TouchableOpacity>
+   <TouchableOpacity accessibilityRole="button" disabled={unassigning} onPress={unassign} style={{alignItems:'center',justifyContent:'center',minHeight:44}}>{unassigning?<ActivityIndicator color={T.primary}/>:<Text style={[st.link,{color:red}]}>Unassign Watch</Text>}</TouchableOpacity>
+   {unError?<Text style={[st.sub,{color:red}]}>{unError}</Text>:null}
    {managing&&watch?<ManageFamilyProfile profile={watch} onClose={()=>{setManaging(false);void load()}} onDeleted={async()=>{setManaging(false);familyProfilesChanged();onChanged()}}/>:null}
   </>:<>
    <View style={{flexDirection:'row',alignItems:'center',gap:12}}>
@@ -416,7 +427,13 @@ function AssignWatchSheet({visible,child,spare,link,onClose,onAssigned}:{visible
    else{setError(m);if(/code/i.test(m))setStep('code')}
   }finally{setBusy(false)}
  }
- async function useExisting(profile:string){setBusy(true);setError('');await link(profile);setBusy(false);onAssigned();setStep('done')}
+ async function useExisting(profile:string){
+  setBusy(true);setError('');
+  const {error:e}=await supabase.rpc('family_link_child_watch',{p_child:child.id,p_profile:profile});
+  setBusy(false);
+  if(e){setError(e.code==='P0001'?e.message:'Unable to assign the watch.');return}
+  onAssigned();setStep('done');
+ }
  const digits=code.replace(/\D/g,'');
  return <Modal visible={visible} transparent animationType="slide" onRequestClose={busy?undefined:onClose}>
   <View style={{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(29,43,51,0.3)'}}>
@@ -425,7 +442,7 @@ function AssignWatchSheet({visible,child,spare,link,onClose,onAssigned}:{visible
     <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'}}/>
     {step==='start'?<>
      <Text style={st.sheetTitle}>Assign a watch to {name}</Text>
-     <Text style={st.sub}>Use a family watch you already added, or set up a new one.</Text>
+     <Text style={st.sub}>Use a watch that isn't assigned to anyone, or set up a new one.</Text>
      {spare.map(w=><TouchableOpacity key={w.id} accessibilityRole="button" disabled={busy} onPress={()=>void useExisting(w.profile_user_id!)} style={st.option}><Ionicons name="watch" size={22} color={T.primary}/><Text style={[st.rowTitle,{flex:1}]}>{w.name}</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>)}
      <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>setStep('code')} style={st.cta}><Text style={st.ctaText}>Set Up a New Watch</Text></TouchableOpacity>
     </>:step==='code'?<>
