@@ -509,7 +509,10 @@ struct WatchCircleList: View {
                     if !replies.moods.isEmpty {
                         Section("Moods") {
                             ForEach(replies.moods) { mood in
-                                NavigationLink(value: mood) {
+                                // The stack's path is typed [WatchReaction], so a value link for a mood would be ignored.
+                                NavigationLink {
+                                    WatchMoodReplyView(mood: mood)
+                                } label: {
                                     HStack(spacing: 6) {
                                         VStack(alignment: .leading, spacing: 1) {
                                             Text(mood.name)
@@ -537,7 +540,6 @@ struct WatchCircleList: View {
         }
         .navigationTitle("Circle")
         .navigationDestination(for: WatchReaction.self) { WatchReactionDetail(reaction: $0) }
-        .navigationDestination(for: WatchFriendMood.self) { WatchMoodReplyView(mood: $0) }
         .task { await replies.refresh() }
     }
 
