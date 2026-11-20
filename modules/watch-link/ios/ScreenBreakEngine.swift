@@ -56,6 +56,7 @@ final class ScreenBreakEngine {
   static let minMinutes = 1
   static let maxMinutes = 720
   static let addTimeOptions = [5, 10, 15, 30]
+  static let remindOnPhone = false
 
   private var defaults: UserDefaults { ScreenBreakShared.defaults }
 
@@ -407,10 +408,13 @@ final class ScreenBreakEngine {
 
   // MARK: Notifications
 
+  /// Screen Break reminders go to the parent's Apple Watch only (the watch schedules its own from the synced state).
+  /// The iPhone is usually in a child's hands, so it never shows them; this only clears ones left from older builds.
   private func scheduleNotifications(_ session: ScreenBreakSession) {
     let center = UNUserNotificationCenter.current()
     center.removePendingNotificationRequests(withIdentifiers: [warnId, endId])
-    guard session.isActive else { return }
+    center.removeDeliveredNotifications(withIdentifiers: [warnId, endId])
+    guard Self.remindOnPhone, session.isActive else { return }
     let data: [String: Any] = ["action": "screenBreak", "sessionId": session.id, "childId": session.childId]
     let warnAt = session.deadline.addingTimeInterval(-300)
     // Sessions of 5 minutes or less only get the "time is up" notification.
