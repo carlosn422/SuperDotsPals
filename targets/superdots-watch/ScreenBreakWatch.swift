@@ -567,12 +567,17 @@ private struct ActiveBreakView: View {
     @State private var dragMinutes = 0
     @State private var lastAngle: Double?
     @State private var turned: Double = 0
+    /// Deadline the drag preview is based on. Once the iPhone confirms a new deadline the preview no longer applies,
+    /// so the change is never counted twice.
+    @State private var dragBase: Date?
+
+    private var preview: Int { dragBase == session.deadline ? dragMinutes : 0 }
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: dimmed ? 60 : 1)) { context in
             let rawLeft = max(0, session.deadline.timeIntervalSince(context.date))
-            let left = max(0, rawLeft + Double(dragMinutes * 60))
-            let total = max(1, session.deadline.timeIntervalSince(session.startedAt) + Double(dragMinutes * 60))
+            let left = max(0, rawLeft + Double(preview * 60))
+            let total = max(1, session.deadline.timeIntervalSince(session.startedAt) + Double(preview * 60))
             let timeUp = session.status == "restricted" || rawLeft <= 0
             let passed = timeUp ? 1 : min(1, max(0, 1 - left / total))
             let size = BreakStyle.ring
@@ -594,14 +599,14 @@ private struct ActiveBreakView: View {
                             .rotationEffect(.degrees(360 * passed))
                     }
                     VStack(spacing: 0) {
-                        Text(timeUp ? "0:00" : Self.text(left, seconds: !dimmed && dragMinutes == 0))
+                        Text(timeUp ? "0:00" : Self.text(left, seconds: !dimmed))
                             .font(.system(size: 30, weight: .bold))
                             .monospacedDigit()
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
-                        Text(dragMinutes != 0 ? (dragMinutes > 0 ? "+\(dragMinutes) min" : "−\(-dragMinutes) min") : (timeUp ? "Apps paused" : "left"))
+                        Text(preview != 0 ? (preview > 0 ? "+\(preview) min" : "−\(-preview) min") : (timeUp ? "Apps paused" : "left"))
                             .font(.caption2)
-                            .foregroundStyle(dragMinutes != 0 ? BreakStyle.green : timeUp ? BreakStyle.amber : .secondary)
+                            .foregroundStyle(preview != 0 ? BreakStyle.green : timeUp ? BreakStyle.amber : .secondary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
                     }
@@ -622,7 +627,6 @@ private struct ActiveBreakView: View {
                             .background(Circle().fill(BreakStyle.stop))
                     }
                     .buttonStyle(.plain)
-                    .disabled(store.pending != nil)
                     .accessibilityLabel("Stop timer")
                 }
             }
@@ -633,6 +637,7 @@ private struct ActiveBreakView: View {
     private func drag(size: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 2)
             .onChanged { value in
+                if dragBase != session.deadline { dragBase = session.deadline; dragMinutes = 0; turned = 0; lastAngle = nil }
                 let angle = atan2(value.location.x - size / 2, size / 2 - value.location.y)
                 if let lastAngle {
                     var delta = angle - lastAngle
@@ -652,16 +657,18 @@ private struct ActiveBreakView: View {
                 let change = dragMinutes
                 lastAngle = nil
                 turned = 0
-                guard change != 0 else { return }
+                guard change != 0 else { dragBase = nil; return }
                 Task { @MainActor in
                     _ = await store.command("adjust", childId: session.childId, minutes: change)
                     dragMinutes = 0
+                    dragBase = nil
                 }
             }
     }
 
     /// Stops right away (no confirmation); the Screen Break home then fades back to the Lock screen.
     private func stop() {
+        guard store.pending == nil else { return }
         Task { @MainActor in
             let action = session.status == "restricted" ? "release" : "cancel"
             if await store.command(action, childId: session.childId) { store.navReset += 1 }
