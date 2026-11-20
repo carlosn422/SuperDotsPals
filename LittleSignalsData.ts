@@ -31,11 +31,30 @@ export const MOOD_REACTIONS:Record<CircleMood,string[]>={
  Tired:['🌙','🫂','❤️','🫶'],
 };
 
+// Plus: 12 per mood, the free four first. Plus reactions can be any emoji server-side (circle_reaction_ok);
+// labels mirror public.circle_reaction_label so pushes read "{name}: Sending peace 🕊️".
+export const PLUS_MOOD_REACTIONS:Record<CircleMood,string[]>={
+ Joyful:[...MOOD_REACTIONS.Joyful,'🤩','🥳','🎉','🔥','🌟','🙌','💃','🌈'],
+ Calm:[...MOOD_REACTIONS.Calm,'🪷','🧘','🌊','🍃','🕊️','☁️','🌸','😌'],
+ Sad:[...MOOD_REACTIONS.Sad,'💙','🤗','🧸','🌻','🌈','🕯️','💐','☕'],
+ Angry:[...MOOD_REACTIONS.Angry,'🧊','🌬️','🫧','🤝','🧘','🌊','🦾','🕊️'],
+ Anxious:[...MOOD_REACTIONS.Anxious,'🦋','🌬️','🫧','🤝','🧘','☁️','🐢','🍵'],
+ Tired:[...MOOD_REACTIONS.Tired,'😴','💤','🛌','🦥','☕','🍵','🌌','⭐'],
+};
+
 // Historical reactions still use their original glyphs and descriptions.
 export const REACTION_LABELS:Record<string,string>={
  '🎉':'So happy for you','🙌':'Love this','✨':'Keep shining','❤️':'Thinking of you','💜':'Thinking of you',
  '🌿':'Take a breath','☀️':'Sending sunshine','💚':'Glad you’re feeling good','🫂':'Sending a hug',
  '🫶':'Here for you','🤗':'Sending a hug','💙':'You’re not alone','💪':'You’ve got this','🌙':'Rest well','☕':'Coffee’s on me',
+ '🥳':'Celebrating with you','🌟':'Proud of you','😊':'You made me smile','🧘':'Stay centered','☁️':'Take it easy',
+ '🍃':'Peace to you','🌊':'Go with the flow','🕊️':'Sending peace','😌':'Love this calm','🌧️':'It’s okay to feel this',
+ '🌈':'Better days ahead','🕯️':'Holding space for you','🧸':'Sending comfort','💐':'Flowers for you','🧊':'Cool down',
+ '🌬️':'Breathe it out','🤝':'I’ve got your back','🍵':'Tea time','😴':'Get some sleep','🛌':'Rest up','💤':'Sweet dreams',
+ '⭐':'You did enough today',
+ '🤩':'You’re amazing','🔥':'You’re on fire','💃':'Dance it out','🪷':'Inner peace','🌸':'So peaceful',
+ '🌻':'Brighter days ahead','🫧':'Let it go','🦾':'Stronger than this','🦋':'You’ll get through this',
+ '🐢':'One step at a time','🦥':'Slow down','🌌':'Peaceful night',
 };
 
 // Retain the full catalogue for previously sent signals, notifications and history.

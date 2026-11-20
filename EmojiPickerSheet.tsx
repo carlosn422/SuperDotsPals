@@ -6,13 +6,13 @@ import {usePlus} from './PlusStore';
 import {PlusPaywallSheet} from './PlusPaywall';
 import {CT} from './CircleComponents';
 
-// Circle-specific Plus picker: support reactions only, not an unrelated emoji keyboard.
+// Circle-specific Plus picker: reactions that fit the mood being answered, not an unrelated emoji keyboard.
 // Keep 3D artwork as a Plus benefit while showing older reactions unchanged in chat.
-import {SUPPORT_REACTIONS,REACTION_LABELS} from './LittleSignalsData';
+import {CircleMood,PLUS_MOOD_REACTIONS,REACTION_LABELS} from './LittleSignalsData';
 
-export default function EmojiPickerSheet({visible,title,onClose,onPick}:{visible:boolean;title:string;onClose:()=>void;onPick:(e:string,style:EmojiStyle)=>void}){
+export default function EmojiPickerSheet({visible,title,mood,onClose,onPick}:{visible:boolean;title:string;mood:CircleMood;onClose:()=>void;onPick:(e:string,style:EmojiStyle)=>void}){
  const {isPlus,showPaywall}=usePlus();
- const [style,setStyle]=useState<EmojiStyle>('standard');
+ const [style,setStyle]=useState<EmojiStyle>('3d');
  const select=(e:string)=>{
   if(!isPlus){showPaywall('circles');return;}
   onPick(e,style);
@@ -30,9 +30,9 @@ export default function EmojiPickerSheet({visible,title,onClose,onPick}:{visible
     {(['standard','3d'] as EmojiStyle[]).map(t=><TouchableOpacity key={t} onPress={()=>setStyle(t)} accessibilityRole="button" accessibilityState={{selected:style===t}} style={{paddingHorizontal:18,paddingVertical:9,borderRadius:11,backgroundColor:style===t?'#fff':'transparent'}}><Text style={{fontWeight:'800',color:style===t?CT.primary:CT.muted}}>{t==='3d'?'3D':'Standard'}</Text></TouchableOpacity>)}
    </View>
    <View style={{flexDirection:'row',flexWrap:'wrap',gap:10}}>
-    {SUPPORT_REACTIONS.map(e=><TouchableOpacity key={e} onPress={()=>select(e)} accessibilityRole="button" accessibilityLabel={REACTION_LABELS[e]+(isPlus?'':', Plus')} style={{width:'30%',minWidth:88,flexGrow:1,borderRadius:16,backgroundColor:'#F5F8F6',paddingVertical:14,alignItems:'center',gap:6,opacity:isPlus?1:.55}}><Emoji e={e} style={style} size={30}/><Text style={{fontSize:11,color:CT.ink,fontWeight:'700',textAlign:'center'}}>{REACTION_LABELS[e]}</Text></TouchableOpacity>)}
+    {PLUS_MOOD_REACTIONS[mood].map(e=><TouchableOpacity key={e} onPress={()=>select(e)} accessibilityRole="button" accessibilityLabel={REACTION_LABELS[e]+(isPlus?'':', Plus')} style={{width:'22%',minWidth:72,flexGrow:1,borderRadius:16,backgroundColor:'#F5F8F6',paddingVertical:10,paddingHorizontal:4,alignItems:'center',gap:4,opacity:isPlus?1:.55}}><Emoji e={e} style={style} size={26}/><Text style={{fontSize:10,color:CT.ink,fontWeight:'700',textAlign:'center'}} numberOfLines={2}>{REACTION_LABELS[e]}</Text></TouchableOpacity>)}
    </View>
-   {!isPlus?<TouchableOpacity onPress={()=>showPaywall('circles')} style={{padding:12,borderRadius:12,backgroundColor:CT.primarySoft,flexDirection:'row',gap:8,alignItems:'center'}}><Ionicons name="lock-closed" color={CT.primary} size={16}/><Text style={{flex:1,color:CT.ink,fontWeight:'700'}}>Unlock more reaction styles with Plus</Text></TouchableOpacity>:null}
+   {!isPlus?<TouchableOpacity onPress={()=>showPaywall('circles')} style={{padding:12,borderRadius:12,backgroundColor:CT.primarySoft,flexDirection:'row',gap:8,alignItems:'center'}}><Ionicons name="lock-closed" color={CT.primary} size={16}/><Text style={{flex:1,color:CT.ink,fontWeight:'700'}}>Unlock 12 emojis for every mood with Plus</Text></TouchableOpacity>:null}
   </View>
   {visible?<PlusPaywallSheet nested/>:null}
  </Modal>;
