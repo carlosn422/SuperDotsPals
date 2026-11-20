@@ -7,7 +7,8 @@ import type {ViewProps} from 'react-native';
 export type BreakStatus='active'|'restricted'|'released'|'canceled';
 export type BreakSession={id:string;childId:string;childName:string;status:BreakStatus;startedAt:number;deadline:number;grantedSeconds:number;version:number;updatedAt:number;endedAt?:number;endReason?:'deadline'|'end_now'|'canceled'};
 export type BreakState={deviceId:string;authorized:boolean;selectionCount:number;entitlementKnown:boolean;allowed:boolean;hasPlus:boolean;trialAvailable:boolean;trialEndsAt?:number;children:{id:string;name:string}[];addTimeOptions:number[];updatedAt:number;manualLock?:boolean;session?:BreakSession};
-export type BreakAction='start'|'addTime'|'endNow'|'cancel'|'release';
+export type BreakAction='start'|'addTime'|'endNow'|'cancel'|'release'|'lock'|'unlock';
+export type ParentUnlockState={method:'faceID'|'code';hasCode:boolean;faceIdOnly:boolean;biometry:'faceID'|'touchID'|'none';biometryReady:boolean};
 export type BreakReply={ok:boolean;error?:string;code?:string;commandId:string;state:BreakState};
 export type BreakSyncRow={id:string;child_id:string;device_id:string;started_at:string;deadline_at:string;ended_at?:string;granted_seconds:number;status:BreakStatus;end_reason?:string;version:number};
 export type ReportRequest={period:'day'|'week'|'month'|'year';start:number;end:number;prevStart:number;windows:[number,number][];childName:string};
@@ -21,6 +22,10 @@ type Native={
  ackSync(saved:Record<string,number>):void;
  requestAuthorization():Promise<boolean>;
  pickApps():Promise<number|null>;
+ parentUnlockState():ParentUnlockState;
+ setParentUnlock(method:'faceID'|'code',code:string|null):boolean;
+ checkParentCode(code:string):'ok'|'wrong'|'faceID';
+ parentFaceID(reason:string):Promise<boolean>;
  addListener(event:'onState',listener:(state:BreakState)=>void):{remove():void};
 };
 
@@ -45,6 +50,11 @@ export const pendingBreakSync=():BreakSyncRow[]=>native?.pendingSync()??[];
 export const ackBreakSync=(saved:Record<string,number>)=>native?.ackSync(saved);
 export const requestScreenTimeAccess=async()=>native?native.requestAuthorization():false;
 export const pickBreakApps=async()=>native?native.pickApps():null;
+// Older native builds have no parent check; callers then skip it.
+export const parentUnlockState=():ParentUnlockState|null=>native?.parentUnlockState?native.parentUnlockState():null;
+export const setParentUnlock=(method:'faceID'|'code',code?:string)=>!!native?.setParentUnlock?.(method,code??null);
+export const checkParentCode=(code:string)=>native?native.checkParentCode(code):'faceID';
+export const parentFaceID=async(reason:string)=>native?native.parentFaceID(reason):false;
 
 // Apple's DeviceActivityReport, drawn by the MoodPals report extension.
 export const ScreenTimeReport:ComponentType<ViewProps&{request:ReportRequest}>|null=native?requireNativeView('ScreenBreak'):null;

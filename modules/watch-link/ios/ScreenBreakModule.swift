@@ -39,6 +39,22 @@ public class ScreenBreakModule: Module {
       ScreenBreakEngine.shared.ackSync(saved)
     }
 
+    Function("parentUnlockState") { () -> [String: Any] in
+      ParentUnlock.state()
+    }
+
+    Function("setParentUnlock") { (method: String, code: String?) -> Bool in
+      ParentUnlock.setMethod(method, code: code)
+    }
+
+    Function("checkParentCode") { (code: String) -> String in
+      ParentUnlock.checkCode(code)
+    }
+
+    AsyncFunction("parentFaceID") { (reason: String) async -> Bool in
+      await ParentUnlock.faceID(reason: reason)
+    }
+
     /// Individual authorization: the parent approves with Face ID or the passcode of their own iPhone.
     AsyncFunction("requestAuthorization") { () async throws -> Bool in
       try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
