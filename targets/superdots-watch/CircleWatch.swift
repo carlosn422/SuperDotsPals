@@ -470,77 +470,128 @@ struct CircleButton: View {
 struct WatchCircleList: View {
     @ObservedObject private var circle = WatchCircleStore.shared
     @ObservedObject private var replies = WatchMoodReplies.shared
+    @ObservedObject private var sync = WatchThemeSync.shared
+    @State private var page = 0
+    @State private var pageChosen = false
+
+    /// Unanswered moods first, then newest.
+    private var sortedMoods: [WatchFriendMood] {
+        replies.moods.sorted { a, b in
+            (a.myEmoji == nil) != (b.myEmoji == nil) ? a.myEmoji == nil : a.sharedAt > b.sharedAt
+        }
+    }
 
     var body: some View {
         Group {
-            if circle.openingFromNotification {
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if circle.unread.isEmpty && replies.moods.isEmpty {
-                VStack(spacing: 4) {
-                    Text("All caught up! 💚").font(.headline)
-                    Text("No new signals or responses.").font(.caption2).foregroundStyle(.secondary)
-                }
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if sync.moodOnly {
+                // Family watches only receive; they never get the Moods page.
+                inbox
             } else {
-                List {
-                    if !circle.unread.isEmpty {
-                        Section("New") {
-                            ForEach(circle.unread) { reaction in
-                                NavigationLink(value: reaction) {
-                                    HStack(spacing: 6) {
-                                        VStack(alignment: .leading, spacing: 1) {
-                                            Text(reaction.name)
-                                                .font(.system(size: 15, weight: .semibold))
-                                                .lineLimit(1)
-                                            Text("\(reaction.subtitle) · \(Self.ago(reaction.at))")
-                                                .font(.system(size: 11))
-                                                .foregroundStyle(.secondary)
-                                                .lineLimit(1)
-                                        }
-                                        Spacer(minLength: 2)
-                                        Text(reaction.emoji).font(.system(size: 22))
-                                    }
-                                }
-                                .accessibilityLabel("\(reaction.name) \(reaction.emoji), \(reaction.subtitle), \(Self.ago(reaction.at))")
-                            }
-                        }
-                    }
-                    if !replies.moods.isEmpty {
-                        Section("Moods") {
-                            ForEach(replies.moods) { mood in
-                                // The stack's path is typed [WatchReaction], so a value link for a mood would be ignored.
-                                NavigationLink {
-                                    WatchMoodReplyView(mood: mood)
-                                } label: {
-                                    HStack(spacing: 6) {
-                                        VStack(alignment: .leading, spacing: 1) {
-                                            Text(mood.name)
-                                                .font(.system(size: 15, weight: .semibold))
-                                                .lineLimit(1)
-                                            Text("\(MoodLabel.display(mood.mood)) · \(Self.ago(mood.sharedAt))")
-                                                .font(.system(size: 11))
-                                                .foregroundStyle(.secondary)
-                                                .lineLimit(1)
-                                        }
-                                        Spacer(minLength: 2)
-                                        if let mine = mood.myEmoji {
-                                            Text(mine).font(.system(size: 22))
-                                        } else {
-                                            Image(systemName: "face.smiling").foregroundStyle(.secondary)
-                                        }
-                                    }
-                                }
-                                .accessibilityLabel("\(mood.name) is feeling \(MoodLabel.display(mood.mood)). \(mood.myEmoji == nil ? "Respond" : "You responded \(mood.myEmoji!)")")
-                            }
-                        }
-                    }
+                TabView(selection: $page) {
+                    inbox.tag(0)
+                    moodsPage.tag(1)
                 }
+                .tabViewStyle(.page)
             }
         }
         .navigationTitle("Circle")
         .navigationDestination(for: WatchReaction.self) { WatchReactionDetail(reaction: $0) }
-        .task { await replies.refresh() }
+        .task {
+            await replies.refresh()
+            // With nothing new but moods waiting, open straight on Moods (once, never after the user swipes).
+            if !pageChosen && !circle.openingFromNotification && circle.unread.isEmpty && !replies.moods.isEmpty {
+                page = 1
+            }
+            pageChosen = true
+        }
+        .onChange(of: page) { _, _ in pageChosen = true }
+    }
+
+    @ViewBuilder private var inbox: some View {
+        if circle.openingFromNotification {
+            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if circle.unread.isEmpty {
+            VStack(spacing: 6) {
+                Text("All caught up! 💚").font(.headline)
+                Text("No new signals or responses.").font(.caption2).foregroundStyle(.secondary)
+                if !sync.moodOnly {
+                    Button { withAnimation { page = 1 } } label: {
+                        Text("Moods ›").font(.footnote.weight(.semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color(red: 0.62, green: 0.52, blue: 1))
+                    .padding(.top, 4)
+                }
+            }
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            List {
+                Section("New") {
+                    ForEach(circle.unread) { reaction in
+                        NavigationLink(value: reaction) {
+                            HStack(spacing: 6) {
+                                Text(reaction.emoji).font(.system(size: 22))
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(reaction.name)
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .lineLimit(1)
+                                    Text("\(reaction.subtitle) · \(Self.ago(reaction.at))")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                                Spacer(minLength: 0)
+                            }
+                        }
+                        .accessibilityLabel("\(reaction.name) \(reaction.emoji), \(reaction.subtitle), \(Self.ago(reaction.at))")
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var moodsPage: some View {
+        if replies.moods.isEmpty {
+            VStack(spacing: 4) {
+                Text("No moods yet").font(.headline)
+                Text("Moods your friends and family share show here.").font(.caption2).foregroundStyle(.secondary)
+            }
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            List {
+                Section("Moods") {
+                    ForEach(sortedMoods) { mood in
+                        // The stack's path is typed [WatchReaction], so a value link for a mood would be ignored.
+                        NavigationLink {
+                            WatchMoodReplyView(mood: mood)
+                        } label: {
+                            HStack(spacing: 6) {
+                                AnimatedMoodMascot(mood: mood.mood, size: 30, isActive: false)
+                                    .frame(width: 30, height: 30)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(mood.name)
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .lineLimit(1)
+                                    Text("\(MoodLabel.display(mood.mood)) · \(Self.ago(mood.sharedAt))")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                                Spacer(minLength: 2)
+                                if let mine = mood.myEmoji {
+                                    Text(mine).font(.system(size: 22))
+                                } else {
+                                    Image(systemName: "face.smiling").foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .accessibilityLabel("\(mood.name) is feeling \(MoodLabel.display(mood.mood)). \(mood.myEmoji.map { "You responded \($0)" } ?? "Respond")")
+                    }
+                }
+            }
+        }
     }
 
     static func ago(_ date: Date, now: Date = Date()) -> String {
