@@ -295,7 +295,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
     {navWidth>0?<Animated.View pointerEvents="none" style={[s.slidingPill,{backgroundColor:NAV_PILL,width:(navWidth-8)/NAV_ITEMS,transform:[{translateX:activePosition.interpolate({inputRange:[0,NAV_ITEMS-1],outputRange:[0,(NAV_ITEMS-1)*(navWidth-8)/NAV_ITEMS]})}]}]}/>:null}
     {[...tabs.map(t=>t.name as string),'More'].map(name=>{
     const active=name==='More'?!!moreScreen:!moreScreen&&tab===name;
-    const icon=name==='Circle'?'people':name==='Watches'?'people-circle':name==='Actions'?'play-circle':name==='More'?'ellipsis-horizontal':'calendar';
+    const icon=name==='Circle'?'people-circle':name==='Watches'?'people':name==='Actions'?'play-circle':name==='More'?'ellipsis-horizontal':'calendar';
     return <TouchableOpacity key={name} accessibilityRole="tab" accessibilityLabel={name==='Circle'&&circleUnread>0?`Circle, ${circleUnread} unread`:name==='More'?'More: Settings, Health, Trends and more':name==='Watches'?'Family':name}
       accessibilityState={{selected:active}} activeOpacity={0.8}
       style={s.tab} onPress={()=>name==='More'?setMoreOpen(true):!moreScreen&&tab===name?resetTab(name as Tab):go(name as Tab)}>
