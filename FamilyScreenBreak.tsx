@@ -167,8 +167,10 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
  const [editing,setEditing]=useState(false);
  const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState(''),[minutes,setMinutes]=useState(30),[useCustom,setUseCustom]=useState(false),[customOpen,setCustomOpen]=useState(false);
  const session=state?.session;
- const mine=session&&session.childId===child.id&&(session.status==='active'||session.status==='restricted')?session:null;
- const other=session&&session.childId!==child.id&&session.status==='active'?session:null;
+ // A session whose member record was replaced (same name, old id) is still controllable from that member.
+ const orphan=!!session&&!children.some(c=>c.id===session.childId)&&session.childName===child.name;
+ const mine=session&&(session.childId===child.id||orphan)&&(session.status==='active'||session.status==='restricted')?session:null;
+ const other=session&&session.childId!==child.id&&!orphan&&session.status==='active'?session:null;
  const now=useNow(!!mine&&mine.status==='active');
  const lock=useRef(false);
  const refresh=()=>setState(getBreakState());
