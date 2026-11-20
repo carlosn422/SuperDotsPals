@@ -261,7 +261,7 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
     {ready?<>
     <Text style={[st.rowTitle,{marginTop:8,textAlign:'center'}]}>How long can {child.name} use the phone?</Text>
     <DurationRing minutes={minutes} onChange={setMinutes} min={5} max={180}/>
-    <TouchableOpacity accessibilityRole="button" disabled={!ready||!validMinutes||!!busy||!!other} onPress={()=>{void AsyncStorage.setItem(LAST_MINUTES_KEY,String(chosen));run('start',{minutes:chosen})}} style={[st.cta,(!ready||!validMinutes||!!busy||!!other)&&{opacity:0.5}]}><Text style={st.ctaText}>Start Screen Break</Text></TouchableOpacity>
+    <TouchableOpacity accessibilityRole="button" disabled={!ready||!validMinutes||!!busy||!!other} onPress={()=>{void AsyncStorage.setItem(LAST_MINUTES_KEY,String(chosen));run('start',{minutes:chosen})}} style={[st.cta,(!ready||!validMinutes||!!busy||!!other)&&{opacity:0.5}]}><Text style={st.ctaText}>Start</Text></TouchableOpacity>
     <Text style={[st.sub,{textAlign:'center'}]}>Your Apple Watch reminds you 5 minutes before and lets you manage it.</Text>
     </>:null}
    </View>}
