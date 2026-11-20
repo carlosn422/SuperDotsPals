@@ -264,7 +264,8 @@ final class ScreenBreakEngine {
 
   private func addTime(_ command: [String: Any]) throws {
     var session = try requireCurrent(command)
-    guard session.isActive else {
+    // Time can be added while running, or after time is up (the pause lifts until the new deadline).
+    guard session.isActive || session.isRestricted else {
       throw ScreenBreakError(code: "stale", message: "Screen time already ended. Start a new session to give more time.")
     }
     let minutes = (command["minutes"] as? NSNumber)?.intValue ?? 0
@@ -277,11 +278,18 @@ final class ScreenBreakEngine {
       throw ScreenBreakError(code: "invalid", message: "A session can last up to 24 hours.")
     }
     var next = session
+    if session.isRestricted {
+      next.status = "active"
+      next.endReason = nil
+      next.endedAt = nil
+    }
     next.deadline = deadline
     next.grantedSeconds = Int(deadline.timeIntervalSince(session.startedAt).rounded())
     next.version += 1
     next.updatedAt = now
     try schedule(next)
+    // Lift the pause only once the new deadline is scheduled.
+    if session.isRestricted { ScreenBreakShared.clearShield() }
     session = next
     ScreenBreakShared.saveSession(session)
     ScreenBreakShared.enqueueSync(session)
