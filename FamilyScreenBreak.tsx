@@ -85,7 +85,7 @@ function countdown(ms:number){
 
 type Route={name:'list'}|{name:'child';id:string}|{name:'insights';id:string};
 
-export default function FamilyScreenBreak({onBack,backLabel='Settings',target,onAddWatch,embedded,footer}:{onBack?:()=>void;backLabel?:string;target?:{childId?:string;profileId?:string;at:number}|null;onAddWatch?:()=>void;embedded?:boolean;footer?:React.ReactNode}){
+export default function FamilyScreenBreak({onBack,backLabel='Settings',target,onAddWatch,embedded,footer}:{onBack?:()=>void;backLabel?:string;target?:{childId?:string;profileId?:string;add?:boolean;at:number}|null;onAddWatch?:()=>void;embedded?:boolean;footer?:React.ReactNode}){
  const guest=useIsGuest();
  const [children,setChildren]=useState<FamilyChild[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const [route,setRoute]=useState<Route>({name:'list'}),[adding,setAdding]=useState(false);
@@ -97,6 +97,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  useEffect(()=>{if(guest){setLoading(false);return}void load();listeners.add(load);return()=>{listeners.delete(load)}},[load,guest]);
  useEffect(()=>{
   if(!target||loading)return;
+  if(target.add){setRoute({name:'list'});setAdding(true);return}
   const child=children.find(c=>c.id===target.childId||(!!target.profileId&&c.profile_user_id===target.profileId));
   if(child)setRoute({name:'child',id:child.id});
  },[target,loading,children]);

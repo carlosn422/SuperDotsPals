@@ -203,7 +203,7 @@ function ProfileList({visible,top,profiles,selected,onClose,onPick,onAdd,full}:{
   onPanResponderRelease:(_e,g)=>{if(g.dy<-40||g.vy<-0.6)dismissRef.current();else Animated.spring(y,{toValue:0,bounciness:0,useNativeDriver:true}).start()},
   onPanResponderTerminate:()=>{if(!closing.current)Animated.spring(y,{toValue:0,bounciness:0,useNativeDriver:true}).start()},
  })).current;
- const rows=[{id:null as string|null,name:'You',sub:'My Profile'},...profiles.map(p=>({id:p.id as string|null,name:shortProfileName(p.name),sub:'Mood only · '+p.name}))];
+ const rows=profiles.map(p=>({id:p.id as string|null,name:shortProfileName(p.name),sub:p.id.startsWith('m:')?'Family member · No watch':'Family member · Mood-only watch'}));
  return <Modal visible={mounted} transparent animationType="none" onRequestClose={()=>dismiss()}>
   <Animated.View style={[StyleSheet.absoluteFill,{backgroundColor:'rgba(22,16,44,0.25)',opacity:fade}]}>
    <Pressable style={{flex:1}} accessibilityRole="button" accessibilityLabel="Close profile list" onPress={()=>dismiss()}/>
@@ -216,7 +216,7 @@ function ProfileList({visible,top,profiles,selected,onClose,onPick,onAdd,full}:{
      {on?<Ionicons name="checkmark-circle" size={22} color={purple}/>:null}
     </TouchableOpacity>})}
     {onAdd?<TouchableOpacity onPress={()=>dismiss(onAdd)} disabled={full} accessibilityRole="button" style={[sel.add,full&&{opacity:0.5}]}>
-     <Text style={{color:purple,fontWeight:'800'}}>{full?'All family watch slots used':'+ Add a Family Watch'}</Text>
+     <Text style={{color:purple,fontWeight:'800'}}>+ Add a Family Member</Text>
     </TouchableOpacity>:null}
    </ScrollView>
   </Animated.View>
@@ -285,9 +285,9 @@ export function FamilySwitcher({children,disabled=false,onAdd,focused=true,onCha
  const latest=moods[0];
  const pick=(id:string|null)=>{setSelected(id);if(id)void load()};
  const plus=isPlus||slots>1,full=profiles.length>=slots;
- const add=onAdd?()=>{setListOpen(false);if(full){if(!plus)showPaywall('family')}else onAdd()}:undefined;
+ const add=onAdd?()=>{setListOpen(false);onAdd()}:undefined;
  return <View style={{gap:14}}>
-  <ProfileSelector focused={focused} profiles={entries} selected={selected} lastLinked={lastLinked} onPick={pick} open={listOpen} setOpen={setListOpen} onAdd={add} full={full&&plus}/>
+  <ProfileSelector focused={focused} profiles={entries} selected={selected} lastLinked={lastLinked} onPick={pick} open={listOpen} setOpen={setListOpen} onAdd={add} full={false}/>
   {!profile?children:profile.id.startsWith('m:')?<View style={{gap:12}}>
    <View style={[styles.card,{alignItems:'center',gap:6}]}>
     <View style={{width:84,height:84,borderRadius:42,backgroundColor:'#EEE9FB',alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:36,fontWeight:'900',color:purple}}>{profile.name.slice(0,1).toUpperCase()}</Text></View>
