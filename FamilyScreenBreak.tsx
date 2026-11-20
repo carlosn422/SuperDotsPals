@@ -84,13 +84,13 @@ function countdown(ms:number){
 
 type Route={name:'list'}|{name:'child';id:string}|{name:'insights';id:string};
 
-export default function FamilyScreenBreak({onBack,backLabel='Settings',target,onAddWatch}:{onBack:()=>void;backLabel?:string;target?:{childId?:string;profileId?:string;at:number}|null;onAddWatch?:()=>void}){
+export default function FamilyScreenBreak({onBack,backLabel='Settings',target,onAddWatch,embedded,footer}:{onBack?:()=>void;backLabel?:string;target?:{childId?:string;profileId?:string;at:number}|null;onAddWatch?:()=>void;embedded?:boolean;footer?:React.ReactNode}){
  const guest=useIsGuest();
  const [children,setChildren]=useState<FamilyChild[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
- const [route,setRoute]=useState<Route>({name:'list'});
+ const [route,setRoute]=useState<Route>({name:'list'}),[adding,setAdding]=useState(false);
  const load=useCallback(async()=>{
   try{const list=await loadChildren();setChildren(list);setError('');if(screenBreakSupported)setBreakChildren(list.map(c=>({id:c.id,name:c.name})))}
-  catch{setError('Unable to load your children. Check your connection.')}
+  catch{setError('Unable to load your family members. Check your connection.')}
   finally{setLoading(false)}
  },[]);
  useEffect(()=>{if(guest){setLoading(false);return}void load();listeners.add(load);return()=>{listeners.delete(load)}},[load,guest]);
@@ -103,22 +103,27 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  if(route.name==='insights'&&child)return <InsightsScreen child={child} onBack={()=>setRoute({name:'child',id:child.id})}/>;
  if(route.name==='child'&&child)return <ChildScreen child={child} children={children} onBack={()=>setRoute({name:'list'})} onInsights={()=>setRoute({name:'insights',id:child.id})} onChanged={()=>{void load();familyChildrenChanged()}} onRemoved={()=>{setRoute({name:'list'});void load()}} onAddWatch={onAddWatch}/>;
  return <View style={{gap:14}}>
-  <Back label={backLabel} onPress={onBack}/>
-  <Text style={st.title}>Family</Text>
-  <Text style={st.sub}>Lend your iPhone with a Screen Break timer you control from MoodPals or your Apple Watch. Children don't need an account, a watch or any health data.</Text>
-  {guest?<View style={st.card}><Text style={st.body}>Create a free account to add children and use Screen Break.</Text></View>:<>
+  {!embedded&&onBack?<Back label={backLabel} onPress={onBack}/>:null}
+  <Text style={st.title} accessibilityRole="header">Family</Text>
+  <Text style={st.sub}>Lend your iPhone with a Screen Break timer you control from MoodPals or your Apple Watch. Members don't need an account or a watch.</Text>
+  <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
+   <Text style={st.heading}>Members</Text>
+   {guest?null:<TouchableOpacity accessibilityRole="button" accessibilityLabel={adding?'Close add member':'Add member'} onPress={()=>setAdding(a=>!a)} style={st.addBtn}><Ionicons name={adding?'close':'add'} size={18} color="#fff"/><Text style={st.addBtnText}>{adding?'Close':'Add member'}</Text></TouchableOpacity>}
+  </View>
+  {guest?<View style={st.card}><Text style={st.body}>Create a free account to add family members and use Screen Break.</Text></View>:<>
    {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
    {loading?<ActivityIndicator color={T.primary}/>:null}
+   {adding||(!loading&&!error&&!children.length)?<AddChild onAdded={()=>{setAdding(false);void load();familyChildrenChanged()}}/>:null}
    {children.length?<View style={[st.card,{paddingVertical:4,gap:0}]}>
     {children.map((c,i)=><TouchableOpacity key={c.id} accessibilityRole="button" accessibilityLabel={'Open '+c.name} onPress={()=>setRoute({name:'child',id:c.id})} style={[st.row,i>0&&st.rowLine]}>
      <View style={st.avatar}><Text style={st.avatarText}>{c.name.slice(0,1).toUpperCase()}</Text></View>
-     <View style={{flex:1}}><Text style={st.rowTitle}>{c.name}</Text><Text style={st.sub}>{c.profile_user_id?'Family watch linked':'No watch needed'}</Text></View>
+     <View style={{flex:1}}><Text style={st.rowTitle}>{c.name}</Text><Text style={st.sub}>{c.profile_user_id?'Watch assigned':'No watch assigned'}</Text></View>
      <ActiveBadge childId={c.id}/>
      <Ionicons name="chevron-forward" size={18} color={T.muted}/>
     </TouchableOpacity>)}
-   </View>:!loading&&!error?<View style={[st.card,{alignItems:'center'}]}><Text style={st.body}>No children yet. Add one to start a Screen Break.</Text></View>:null}
-   <AddChild onAdded={()=>{void load();familyChildrenChanged()}}/>
+   </View>:null}
   </>}
+  {footer?<View style={{marginTop:10}}>{footer}</View>:null}
  </View>;
 }
 
@@ -141,10 +146,11 @@ function AddChild({onAdded}:{onAdded:()=>void}){
   setName('');onAdded();
  }
  return <View style={st.card}>
-  <Text style={st.heading}>Add a child</Text>
-  <TextInput value={name} onChangeText={setName} placeholder="Child's name" maxLength={40} autoCapitalize="words" returnKeyType="done" onSubmitEditing={()=>void add()} editable={!busy} style={st.input} accessibilityLabel="Child's name"/>
+  <Text style={st.heading}>Add a member</Text>
+  <Text style={st.sub}>Just a name. You can assign a watch later.</Text>
+  <TextInput value={name} onChangeText={setName} placeholder="Name" maxLength={40} autoCapitalize="words" returnKeyType="done" onSubmitEditing={()=>void add()} editable={!busy} style={st.input} accessibilityLabel="Member's name"/>
   {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
-  <TouchableOpacity accessibilityRole="button" disabled={!name.trim()||busy} onPress={()=>void add()} style={[st.cta,(!name.trim()||busy)&&{opacity:0.5}]}>{busy?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>Add Child</Text>}</TouchableOpacity>
+  <TouchableOpacity accessibilityRole="button" disabled={!name.trim()||busy} onPress={()=>void add()} style={[st.cta,(!name.trim()||busy)&&{opacity:0.5}]}>{busy?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>Add Member</Text>}</TouchableOpacity>
  </View>;
 }
 
@@ -327,16 +333,16 @@ function ChildManage({child,children,onChanged,onRemoved,onAddWatch,locked}:{chi
  }
  return <View style={[st.card,{gap:10}]}>
   {renaming?<>
-   <TextInput value={draft} onChangeText={setDraft} maxLength={40} autoFocus autoCapitalize="words" style={st.input} accessibilityLabel="Child's name" onSubmitEditing={()=>void save()}/>
+   <TextInput value={draft} onChangeText={setDraft} maxLength={40} autoFocus autoCapitalize="words" style={st.input} accessibilityLabel="Member's name" onSubmitEditing={()=>void save()}/>
    <View style={{flexDirection:'row',gap:10}}><TouchableOpacity onPress={()=>void save()} style={[st.cta,{flex:1}]}><Text style={st.ctaText}>Save</Text></TouchableOpacity><TouchableOpacity onPress={()=>setRenaming(false)} style={[st.ghost,{flex:1}]}><Text style={st.ghostText}>Cancel</Text></TouchableOpacity></View>
-  </>:child.profile_user_id?<Text style={st.sub}>Name follows the linked family watch. Rename or remove it in Watches.</Text>:<TouchableOpacity onPress={()=>{setDraft(child.name);setRenaming(true)}}><Text style={st.link}>Rename</Text></TouchableOpacity>}
+  </>:child.profile_user_id?<Text style={st.sub}>Name follows the linked family watch. Rename or remove it under Watches in Family.</Text>:<TouchableOpacity onPress={()=>{setDraft(child.name);setRenaming(true)}}><Text style={st.link}>Rename</Text></TouchableOpacity>}
   {!child.profile_user_id?<>
    {linking?<View style={{gap:6}}>
-    <Text style={st.sub}>Link one of your family watches to {child.name}. Their history is combined.</Text>
+    <Text style={st.sub}>Assign one of your family watches to {child.name}. Their history is combined.</Text>
     {watches.map(w=><TouchableOpacity key={w.id} onPress={()=>void link(w.profile_user_id!)} style={st.small}><Text style={st.smallText}>{w.name}</Text></TouchableOpacity>)}
-    {onAddWatch?<TouchableOpacity onPress={onAddWatch}><Text style={st.link}>Add a family watch first</Text></TouchableOpacity>:null}
-   </View>:<TouchableOpacity onPress={()=>setLinking(true)}><Text style={st.link}>Link an Apple Watch</Text></TouchableOpacity>}
-   <TouchableOpacity disabled={locked} onPress={remove}><Text style={[st.link,{color:red},locked&&{opacity:0.5}]}>Remove child</Text></TouchableOpacity>
+    {onAddWatch?<TouchableOpacity onPress={onAddWatch}><Text style={st.link}>Add a family watch</Text></TouchableOpacity>:null}
+   </View>:<TouchableOpacity onPress={()=>setLinking(true)}><Text style={st.link}>Assign a watch (optional)</Text></TouchableOpacity>}
+   <TouchableOpacity disabled={locked} onPress={remove}><Text style={[st.link,{color:red},locked&&{opacity:0.5}]}>Remove member</Text></TouchableOpacity>
   </>:null}
   {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
  </View>;
@@ -573,6 +579,8 @@ const st=StyleSheet.create({
  calItem:{flex:1,alignItems:'center',gap:2,paddingVertical:8,borderRadius:14,backgroundColor:T.surface,borderWidth:1,borderColor:T.border},
  calNum:{fontSize:15,fontWeight:'900',color:T.ink},
  calDay:{width:34,height:34,borderRadius:17,alignItems:'center',justifyContent:'center'},
+ addBtn:{flexDirection:'row',alignItems:'center',gap:4,backgroundColor:T.primary,paddingHorizontal:14,paddingVertical:8,borderRadius:18},
+ addBtnText:{color:'#fff',fontWeight:'800',fontSize:14},
  navRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between'},
  navBtn:{width:36,height:36,borderRadius:18,backgroundColor:T.surface,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:T.border},
  grid:{flexDirection:'row',flexWrap:'wrap',gap:10},
