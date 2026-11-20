@@ -72,9 +72,10 @@ export const LITTLE_SIGNALS=[
  {id:'calm',emoji:'🌿',label:'Sending calm',notify:(n:string)=>n+' sent you some calm 🌿'},
  {id:'highfive',emoji:'🙌',label:'High five',notify:(n:string)=>n+' sent you a high five 🙌'},
 ] as const;
-// The new signal picker is intentionally smaller; legacy IDs stay readable.
-export const SELECTABLE_LITTLE_SIGNALS=LITTLE_SIGNALS.filter(s=>
- (['thinking','hug','here','gotthis','calm'] as string[]).includes(s.id));
+// All 12 signals are shown: the first six are free, the rest need Plus (enforced in circle_send_signal).
+export const FREE_SIGNAL_IDS=['thinking','hug','here','gotthis','calm','sunshine'] as string[];
+export const isPlusSignal=(id:string)=>!FREE_SIGNAL_IDS.includes(id);
+export const SELECTABLE_LITTLE_SIGNALS=[...LITTLE_SIGNALS].sort((a,b)=>Number(isPlusSignal(a.id))-Number(isPlusSignal(b.id)));
 export type SignalId=typeof LITTLE_SIGNALS[number]['id'];
 export const signalById=(id:SignalId)=>LITTLE_SIGNALS.find(x=>x.id===id)!;
 

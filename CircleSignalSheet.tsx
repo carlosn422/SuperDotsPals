@@ -2,7 +2,9 @@ import React,{useEffect,useRef,useState} from 'react';
 import {Animated,Easing,Modal,ScrollView,StyleSheet,Text,TouchableOpacity,View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import {SELECTABLE_LITTLE_SIGNALS,SignalId,isToday,signalById} from './LittleSignalsData';
+import {SELECTABLE_LITTLE_SIGNALS,SignalId,isPlusSignal,isToday,signalById} from './LittleSignalsData';
+import {usePlus} from './PlusStore';
+import {PlusPaywallSheet} from './PlusPaywall';
 import {familyFriend,useCircle} from './CircleStore';
 import {CT,EmptyState,PrimaryButton,cs,useReduceMotion} from './CircleComponents';
 import {PersonAvatar,firstName,personName} from './CircleConversations';
@@ -11,6 +13,7 @@ import {PersonAvatar,firstName,personName} from './CircleConversations';
 // `locked` hides the Friends/Groups picker when the recipient is already chosen (a family watch).
 export function SignalPicker({initial=[],locked,onSent,onInvite}:{initial?:string[];locked?:boolean;onSent:(signal:SignalId,friendIds:string[],skipped:string[])=>void;onInvite?:()=>void}){
  const store=useCircle();
+ const {isPlus,showPaywall}=usePlus();
  const [tab,setTab]=useState<'friends'|'groups'>('friends');
  const [people,setPeople]=useState<string[]>(initial);
  const [groups,setGroups]=useState<string[]>([]);
@@ -55,9 +58,9 @@ export function SignalPicker({initial=[],locked,onSent,onInvite}:{initial?:strin
    </TouchableOpacity>})}
   </View>}</>}
   <Text style={{fontSize:16,fontWeight:'900',color:CT.ink,marginTop:2}}>Signal</Text>
-  <View style={{flexDirection:'row',flexWrap:'wrap',gap:9}}>{SELECTABLE_LITTLE_SIGNALS.map(s=>{const on=sig===s.id;return <TouchableOpacity key={s.id} onPress={()=>setSig(s.id)} accessibilityRole="radio" accessibilityState={{selected:on}}
+  <View style={{flexDirection:'row',flexWrap:'wrap',gap:9}}>{SELECTABLE_LITTLE_SIGNALS.map(s=>{const on=sig===s.id,locked=!isPlus&&isPlusSignal(s.id);return <TouchableOpacity key={s.id} onPress={()=>locked?showPaywall('circles'):setSig(s.id)} accessibilityRole="radio" accessibilityState={{selected:on}} accessibilityLabel={s.label+(locked?', Plus':'')}
    style={{width:'48%',flexGrow:1,flexDirection:'row',alignItems:'center',gap:9,padding:12,borderRadius:16,borderWidth:1.5,borderColor:on?CT.primary:CT.border,backgroundColor:on?CT.primarySoft:'#fff'}}>
-   <Text style={{fontSize:24}}>{s.emoji}</Text><Text style={{flex:1,fontWeight:'800',fontSize:13,color:CT.ink}}>{s.label}</Text></TouchableOpacity>})}</View>
+   <Text style={{fontSize:24,opacity:locked?.5:1}}>{s.emoji}</Text><Text style={{flex:1,fontWeight:'800',fontSize:13,color:locked?CT.muted:CT.ink}}>{s.label}</Text>{locked?<Ionicons name="lock-closed" size={14} color={CT.primary}/>:null}</TouchableOpacity>})}</View>
   {sentToday>=20?<Text style={[cs.muted,{textAlign:'center'}]}>You’ve sent a lot of signals today. Try again tomorrow.</Text>:null}
   {limited.length?<View accessibilityLiveRegion="polite" style={{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:'#FFF6E5',borderRadius:14,padding:12,borderWidth:1,borderColor:'#F3D9A4'}}><Ionicons name="time-outline" size={20} color="#9A6A00"/><Text style={{flex:1,fontSize:13,fontWeight:'700',color:'#6B4A00'}}>{limitNote}</Text></View>:null}
   <PrimaryButton label={!to.length?'Choose who to send to':!ready.length?'Try again later':ready.length>1?'Send to '+ready.length+' friends':'Send to '+first(ready[0])} icon="heart" disabled={!ready.length||!sig||sentToday>=20} onPress={send}/>
@@ -102,5 +105,6 @@ export default function CircleSignalSheet({visible,initial,onClose,onInvite}:{vi
    </ScrollView>
    {sent?<SentBubble signal={sent.signal} skipped={sent.skipped} onDone={onClose}/>:null}
   </View>
+ {visible?<PlusPaywallSheet nested/>:null}
  </Modal>;
 }

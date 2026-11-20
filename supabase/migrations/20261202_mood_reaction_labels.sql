@@ -21,3 +21,23 @@ language sql immutable set search_path=public as $$
     when '🦋' then 'You''ll get through this' when '🐢' then 'One step at a time' when '🦥' then 'Slow down'
     when '🌌' then 'Peaceful night'
   end $$;
+
+-- Little Signals: six are free, the other six need Plus.
+create or replace function public.circle_send_signal(p_recipients uuid[], p_signal text)
+returns integer language plpgsql security definer set search_path to 'public' as $function$
+declare me uuid:=circle_uid(); r uuid; n int:=0;
+begin
+  if not exists(select 1 from circle_signal_info(p_signal)) then raise exception 'Invalid signal'; end if;
+  if p_signal not in ('thinking','hug','here','gotthis','calm','sunshine') and not public.has_plus(me) then
+    raise exception 'This Little Signal needs MoodPals Plus';
+  end if;
+  foreach r in array (select array(select distinct unnest(coalesce(p_recipients,'{}')))) loop
+    continue when not (circle_are_friends(me,r) or circle_family_pair(me,r));
+    continue when (select count(*) from circle_signals where sender_id=me and recipient_id=r and sent_at>now()-interval '1 hour')>=3;
+    exit when circle_rate_limited('signal',30,interval '1 day');
+    insert into circle_signals(sender_id,recipient_id,signal) values(me,r,p_signal);
+    insert into circle_rate_events(user_id,kind) values(me,'signal');
+    n:=n+1;
+  end loop;
+  return n;
+end $function$;
