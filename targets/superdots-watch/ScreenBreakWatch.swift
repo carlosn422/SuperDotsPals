@@ -406,6 +406,31 @@ struct DurationDial: View {
     }
 }
 
+/// Round button for the bottom corner of the dial and running-timer screens (Start / Stop).
+struct BreakCornerButton: View {
+    let systemImage: String
+    let color: Color
+    var busy = false
+    let label: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                Circle().fill(color)
+                if busy {
+                    ProgressView().tint(.white)
+                } else {
+                    Image(systemName: systemImage).font(.system(size: 18, weight: .bold)).foregroundStyle(.white)
+                }
+            }
+            .frame(width: 44, height: 44)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+}
+
 // MARK: - Lock
 
 struct BreakLock: View {
@@ -494,14 +519,18 @@ struct ScreenBreakControlView: View {
             } else if !store.allowed {
                 note("Your free trial has ended. Get MoodPals Plus on your iPhone to start a Screen Break.")
             } else {
-                VStack(spacing: 20) {
+                VStack(spacing: 4) {
                     DurationDial(minutes: $minutes, range: 5...180)
-                        .frame(width: BreakStyle.ring, height: BreakStyle.ring)
-                    Button(store.pending == "start" ? "Starting…" : "Start") { start() }
-                        .buttonStyle(BreakButtonStyle(kind: .primary, compact: true))
-                    StatusLine()
+                    if store.error != nil { StatusLine() }
                 }
                 .disabled(store.pending != nil)
+                .toolbar {
+                    ToolbarItemGroup(placement: .bottomBar) {
+                        Spacer()
+                        BreakCornerButton(systemImage: "play.fill", color: BreakStyle.green, busy: store.pending == "start", label: "Start") { start() }
+                            .disabled(store.pending != nil)
+                    }
+                }
             }
         }
         .opacity(leaving ? 0 : 1)
@@ -563,15 +592,19 @@ private struct ActiveBreakView: View {
     let onManage: () -> Void
     @ObservedObject private var store = WatchScreenBreakStore.shared
     @Environment(\.isLuminanceReduced) private var dimmed
-    /// Minutes being added (positive) or removed (negative) while the knob is dragged.
+    /// Digital Crown turn: minutes to add (positive) or remove (negative), applied shortly after turning stops.
+    @State private var crown: Double = 0
     @State private var dragMinutes = 0
-    @State private var lastAngle: Double?
-    @State private var turned: Double = 0
-    /// Deadline the drag preview is based on. Once the iPhone confirms a new deadline the preview no longer applies,
+    /// Deadline the crown preview is based on. Once the iPhone confirms a new deadline the preview no longer applies,
     /// so the change is never counted twice.
     @State private var dragBase: Date?
+    @State private var commit: Task<Void, Never>?
+    @FocusState private var focused: Bool
 
     private var preview: Int { dragBase == session.deadline ? dragMinutes : 0 }
+    private var canAdjust: Bool { session.status == "active" && !dimmed }
+    /// At least 1 minute has to stay on the timer.
+    private var lowest: Int { -max(0, (Int(session.deadline.timeIntervalSinceNow / 60) - 1) / 5 * 5) }
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: dimmed ? 60 : 1)) { context in
@@ -580,9 +613,9 @@ private struct ActiveBreakView: View {
             let total = max(1, session.deadline.timeIntervalSince(session.startedAt) + Double(preview * 60))
             let timeUp = session.status == "restricted" || rawLeft <= 0
             let passed = timeUp ? 1 : min(1, max(0, 1 - left / total))
-            let size = BreakStyle.ring
-            let line = max(6, size * 0.075)
-            VStack(spacing: 20) {
+            GeometryReader { geo in
+                let size = min(geo.size.width, geo.size.height)
+                let line = max(6, size * 0.075)
                 ZStack {
                     Circle().stroke(BreakStyle.fill, lineWidth: line)
                     // Time already passed is faded; the time left stays solid.
@@ -592,20 +625,14 @@ private struct ActiveBreakView: View {
                     Circle().trim(from: passed, to: 1)
                         .stroke(timeUp ? BreakStyle.amber : BreakStyle.green, style: StrokeStyle(lineWidth: line, lineCap: .round))
                         .rotationEffect(.degrees(-90))
-                    if !timeUp && !dimmed {
-                        Circle().fill(Color.white)
-                            .frame(width: line * 1.7, height: line * 1.7)
-                            .offset(y: -(size - line) / 2)
-                            .rotationEffect(.degrees(360 * passed))
-                    }
                     VStack(spacing: 0) {
                         Text(timeUp ? "0:00" : Self.text(left, seconds: !dimmed))
-                            .font(.system(size: 30, weight: .bold))
+                            .font(.system(size: size * 0.24, weight: .bold))
                             .monospacedDigit()
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
                         Text(preview != 0 ? (preview > 0 ? "+\(preview) min" : "−\(-preview) min") : (timeUp ? "Apps paused" : "left"))
-                            .font(.caption2)
+                            .font(.footnote)
                             .foregroundStyle(preview != 0 ? BreakStyle.green : timeUp ? BreakStyle.amber : .secondary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
@@ -613,57 +640,47 @@ private struct ActiveBreakView: View {
                     .padding(.horizontal, line * 2)
                 }
                 .frame(width: size, height: size)
-                .contentShape(Circle())
-                .gesture(drag(size: size), including: timeUp || dimmed ? .none : .all)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(timeUp ? "Time is up. Apps are paused on your iPhone." : "\(Self.spoken(left)) left")
-                .accessibilityAdjustableAction { direction in
-                    Task { @MainActor in _ = await store.command("adjust", childId: session.childId, minutes: direction == .increment ? 5 : -5) }
-                }
+                .position(x: geo.size.width / 2, y: geo.size.height / 2)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(timeUp ? "Time is up. Apps are paused on your iPhone." : "\(Self.spoken(left)) left")
+            .accessibilityHint(canAdjust ? "Turn the Digital Crown to add or remove time." : "")
+            .accessibilityAdjustableAction { direction in
+                Task { @MainActor in _ = await store.command("adjust", childId: session.childId, minutes: direction == .increment ? 5 : -5) }
+            }
+        }
+        .focusable(canAdjust)
+        .focused($focused)
+        .digitalCrownRotation($crown, from: Double(min(0, lowest)), through: 120, by: 5,
+                              sensitivity: .medium, isContinuous: false, isHapticFeedbackEnabled: true)
+        .onAppear { focused = true }
+        .onChange(of: crown) { _, value in turned(value) }
+        .toolbar {
+            ToolbarItemGroup(placement: .bottomBar) {
+                Spacer()
                 if !dimmed {
-                    Button { stop() } label: {
-                        RoundedRectangle(cornerRadius: 4).fill(Color.white).frame(width: 15, height: 15)
-                            .frame(width: 44, height: 44)
-                            .background(Circle().fill(BreakStyle.stop))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Stop timer")
+                    BreakCornerButton(systemImage: "stop.fill", color: BreakStyle.stop, label: "Stop timer") { stop() }
                 }
             }
         }
     }
 
-    /// Turning the knob clockwise adds time and counter-clockwise removes it (one full turn = 60 minutes, 5-minute steps).
-    private func drag(size: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 2)
-            .onChanged { value in
-                if dragBase != session.deadline { dragBase = session.deadline; dragMinutes = 0; turned = 0; lastAngle = nil }
-                let angle = atan2(value.location.x - size / 2, size / 2 - value.location.y)
-                if let lastAngle {
-                    var delta = angle - lastAngle
-                    if delta > .pi { delta -= 2 * .pi } else if delta < -.pi { delta += 2 * .pi }
-                    turned += delta
-                }
-                lastAngle = angle
-                let leftMinutes = Int(session.deadline.timeIntervalSinceNow / 60)
-                let lowest = -max(0, (leftMinutes - 1) / 5 * 5)
-                let minutes = min(120, max(lowest, Int((turned / (2 * .pi) * 12).rounded()) * 5))
-                if minutes != dragMinutes {
-                    dragMinutes = minutes
-                    WKInterfaceDevice.current().play(.click)
-                }
-            }
-            .onEnded { _ in
-                let change = dragMinutes
-                lastAngle = nil
-                turned = 0
-                guard change != 0 else { dragBase = nil; return }
-                Task { @MainActor in
-                    _ = await store.command("adjust", childId: session.childId, minutes: change)
-                    dragMinutes = 0
-                    dragBase = nil
-                }
-            }
+    /// Turning the crown up adds time and down removes it, in 5-minute steps; it is sent to the iPhone after a short pause.
+    private func turned(_ value: Double) {
+        let minutes = min(120, max(lowest, Int((value / 5).rounded()) * 5))
+        guard canAdjust, store.pending == nil, minutes != 0 || dragBase != nil else { return }
+        dragBase = session.deadline
+        dragMinutes = minutes
+        commit?.cancel()
+        commit = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.2))
+            guard !Task.isCancelled else { return }
+            let change = dragMinutes
+            if change != 0 { _ = await store.command("adjust", childId: session.childId, minutes: change) }
+            dragMinutes = 0
+            dragBase = nil
+            crown = 0
+        }
     }
 
     /// Stops right away (no confirmation); the Screen Break home then fades back to the Lock screen.
