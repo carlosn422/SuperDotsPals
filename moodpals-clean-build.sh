@@ -50,7 +50,13 @@ echo "[2/5] Clean installing npm dependencies..."
 npm ci --include=dev
 
 echo "[3/5] Checking Expo dependency compatibility..."
-npx expo install --check
+# --check exits non-zero for patch-level drift; update those packages instead of stopping the build.
+if ! npx expo install --check; then
+  echo "Updating Expo packages to the versions this SDK expects..."
+  npx expo install --fix
+  npx expo install --check
+  echo "NOTE: package.json and package-lock.json changed. Commit them so EAS builds the same versions."
+fi
 
 echo "[4/5] Reinstalling iOS CocoaPods..."
 if [[ ! -d ios || ! -f ios/Podfile ]]; then
@@ -78,4 +84,6 @@ echo "SUCCESS: Local iOS build finished. Build log: $LOG_FILE"
 # npx eas-cli submit --platform ios --latest
 #
 # Or build on Expo AND auto-submit to TestFlight in one command:
- npx eas-cli build --platform ios --profile production --auto-submit --clear-cache
+# Family Controls can't be enabled through Apple's API, so EAS must not sync capabilities;
+# enable Family Controls and App Groups on the bundle IDs in the Apple Developer portal instead.
+EXPO_NO_CAPABILITY_SYNC=1 npx eas-cli build --platform ios --profile production --auto-submit --clear-cache

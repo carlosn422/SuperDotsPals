@@ -1,4 +1,5 @@
 import SwiftUI
+import WatchKit
 
 /// One unread Circle item from `circle_watch_inbox`: a response to my shared mood or a Little Signal sent to me.
 struct WatchReaction: Identifiable, Hashable {
@@ -55,7 +56,7 @@ final class WatchCircleStore: ObservableObject {
     }
 
     static let fadeInDuration: TimeInterval = 0.25
-    static let visibleDuration: TimeInterval = 2.0
+    static let visibleDuration: TimeInterval = 2.6
     /// Time from appearing until the fade-out starts.
     static let floatDuration: TimeInterval = fadeInDuration + visibleDuration
     static let fadeDuration: TimeInterval = 0.35
@@ -323,65 +324,95 @@ final class WatchCircleStore: ObservableObject {
     }
 }
 
-/// Round glass bubble with the sender's name and emoji, floating briefly over the home screen. Never takes touches.
+/// The emoji alone floats up the screen in a few swaying copies: no bubble and no name.
+/// Who sent it and what it means are in Circle. Never takes touches.
 struct FloatingReactionView: View {
     let reaction: WatchReaction
 
     var body: some View {
-        VStack(spacing: 1) {
-            Text(reaction.name)
-                .font(.system(size: 16, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-                .frame(maxWidth: GlassBubble.size - 22)
-            Text(reaction.emoji)
-                .font(.system(size: 44))
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-        }
-        .frame(width: GlassBubble.size, height: GlassBubble.size)
-        .background(GlassBubble())
-        .modifier(FloatIn(duration: WatchCircleStore.floatDuration + WatchCircleStore.fadeDuration))
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-        .offset(y: -34)
-        .allowsHitTesting(false)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(reaction.name): \(reaction.subtitle) \(reaction.emoji)")
+        FloatingEmojiBurst(emojis: [reaction.emoji], duration: WatchCircleStore.floatDuration + WatchCircleStore.fadeDuration)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(reaction.name): \(reaction.subtitle) \(reaction.emoji)")
     }
 }
 
-/// Same bubble for the rest of a large batch; tapping it opens Circle.
+/// The rest of a large batch floats up together the same way; it stays unread in Circle.
 struct FloatingSummaryView: View {
     let summary: WatchReactionSummary
-    let open: () -> Void
 
     var body: some View {
-        Button(action: open) {
-            VStack(spacing: 1) {
-                Text(summary.emojis.joined(separator: " "))
-                    .font(.system(size: 17))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                    .frame(maxWidth: GlassBubble.size - 18)
-                Text("+\(summary.count) more")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                Text("Open Circle")
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.75))
-                    .lineLimit(1)
+        FloatingEmojiBurst(emojis: summary.emojis,
+                           duration: WatchCircleStore.fadeInDuration + WatchCircleStore.summaryVisibleDuration + WatchCircleStore.fadeDuration)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(summary.count) more from your Circle")
+    }
+}
+
+struct FloatingEmojiBurst: View {
+    let emojis: [String]
+    let duration: TimeInterval
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var start = Date()
+    @State private var particles: [Particle] = []
+
+    private struct Particle {
+        let emoji: String
+        let x: CGFloat
+        let delay: Double
+        let size: CGFloat
+        let sway: CGFloat
+        let phase: Double
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            if reduceMotion {
+                Text(emojis.first ?? "")
+                    .font(.system(size: 56))
+                    .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                    .modifier(FloatIn(duration: duration))
+            } else {
+                TimelineView(.animation) { context in
+                    let t = context.date.timeIntervalSince(start)
+                    ZStack {
+                        ForEach(particles.indices, id: \.self) { i in
+                            let p = particles[i]
+                            let local = max(0, t - p.delay)
+                            let progress = CGFloat(min(1, local / max(0.5, duration - p.delay)))
+                            let travel = geo.size.height + p.size * 2
+                            let fade: CGFloat = local <= 0 ? 0 : progress < 0.12 ? progress / 0.12 : progress > 0.7 ? max(0, (1 - progress) / 0.3) : 1
+                            Text(p.emoji)
+                                .font(.system(size: p.size))
+                                .scaleEffect(0.7 + 0.3 * min(1, progress * 4))
+                                .position(x: geo.size.width * p.x + CGFloat(sin(local * 2.6 + p.phase)) * p.sway,
+                                          y: geo.size.height + p.size - progress * travel)
+                                .opacity(Double(fade))
+                        }
+                    }
+                }
             }
-            .frame(width: GlassBubble.size, height: GlassBubble.size)
-            .background(GlassBubble())
-            .contentShape(Circle())
         }
-        .buttonStyle(.plain)
-        .modifier(FloatIn(duration: WatchCircleStore.fadeInDuration + WatchCircleStore.summaryVisibleDuration + WatchCircleStore.fadeDuration))
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-        .offset(y: -34)
-        .accessibilityLabel("\(summary.count) more from your Circle. Open Circle.")
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .onAppear {
+            start = Date()
+            // Three fixed lanes, a new emoji every 0.3 s cycling through them, so copies never overlap:
+            // neighbours are a third of the screen apart and the same lane only repeats 0.9 s later.
+            let lanes: [CGFloat] = [0.22, 0.5, 0.78]
+            var order = lanes.shuffled()
+            particles = (0..<6).map { i in
+                if i > 0 && i % lanes.count == 0 {
+                    let last = order.last
+                    repeat { order.shuffle() } while order.first == last
+                }
+                return Particle(emoji: emojis[i % max(1, emojis.count)],
+                                x: order[i % lanes.count],
+                                delay: Double(i) * 0.3,
+                                size: CGFloat.random(in: 26...34),
+                                sway: 4,
+                                phase: Double.random(in: 0...(2 * .pi)))
+            }
+        }
     }
 }
 
@@ -402,31 +433,6 @@ private struct FloatIn: ViewModifier {
                 guard !reduceMotion else { return }
                 withAnimation(.easeOut(duration: duration)) { risen = true }
             }
-    }
-}
-
-private struct GlassBubble: View {
-    static let tint = Color(red: 0.56, green: 0.40, blue: 1.0)
-    static let size: CGFloat = 100
-
-    var body: some View {
-        ZStack {
-            Circle().fill(.ultraThinMaterial)
-            Circle().fill(RadialGradient(colors: [Self.tint.opacity(0.22), Self.tint.opacity(0.5)],
-                                         center: .center, startRadius: 0, endRadius: Self.size / 2))
-            // Soft glass highlight in the upper left.
-            Ellipse()
-                .fill(LinearGradient(colors: [.white.opacity(0.35), .white.opacity(0)], startPoint: .top, endPoint: .bottom))
-                .frame(width: Self.size * 0.42, height: Self.size * 0.24)
-                .rotationEffect(.degrees(-30))
-                .offset(x: -Self.size * 0.18, y: -Self.size * 0.27)
-            Circle().strokeBorder(LinearGradient(colors: [.white.opacity(0.85), Self.tint.opacity(0.9)],
-                                                 startPoint: .topLeading, endPoint: .bottomTrailing),
-                                  lineWidth: 1.5)
-        }
-        .compositingGroup()
-        .shadow(color: Self.tint.opacity(0.75), radius: 9)
-        .shadow(color: Self.tint.opacity(0.35), radius: 18)
     }
 }
 
@@ -459,44 +465,133 @@ struct CircleButton: View {
     }
 }
 
-/// Unread responses and Little Signals; opened or floated ones drop out. Read-only: no replies on Apple Watch.
+/// Unread responses and Little Signals (opened or floated ones drop out), plus friends' moods to respond to.
+/// Family watches only read: they get no Moods section.
 struct WatchCircleList: View {
     @ObservedObject private var circle = WatchCircleStore.shared
+    @ObservedObject private var replies = WatchMoodReplies.shared
+    @ObservedObject private var sync = WatchThemeSync.shared
+    @State private var page = 0
+    @State private var pageChosen = false
+
+    /// Unanswered moods first, then newest.
+    private var sortedMoods: [WatchFriendMood] {
+        replies.moods.sorted { a, b in
+            (a.myEmoji == nil) != (b.myEmoji == nil) ? a.myEmoji == nil : a.sharedAt > b.sharedAt
+        }
+    }
 
     var body: some View {
         Group {
-            if circle.openingFromNotification {
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if circle.unread.isEmpty {
-                VStack(spacing: 4) {
-                    Text("All caught up! 💚").font(.headline)
-                    Text("No new signals or responses.").font(.caption2).foregroundStyle(.secondary)
-                }
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if sync.moodOnly {
+                // Family watches only receive; they never get the Moods page.
+                inbox
             } else {
-                List(circle.unread) { reaction in
-                    NavigationLink(value: reaction) {
-                        HStack(spacing: 6) {
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(reaction.name)
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .lineLimit(1)
-                                Text("\(reaction.subtitle) · \(Self.ago(reaction.at))")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                            Spacer(minLength: 2)
-                            Text(reaction.emoji).font(.system(size: 22))
-                        }
-                    }
-                    .accessibilityLabel("\(reaction.name) \(reaction.emoji), \(reaction.subtitle), \(Self.ago(reaction.at))")
+                TabView(selection: $page) {
+                    inbox.tag(0)
+                    moodsPage.tag(1)
                 }
+                .tabViewStyle(.page)
             }
         }
         .navigationTitle("Circle")
         .navigationDestination(for: WatchReaction.self) { WatchReactionDetail(reaction: $0) }
+        .task {
+            await replies.refresh()
+            // With nothing new but moods waiting, open straight on Moods (once, never after the user swipes).
+            if !pageChosen && !circle.openingFromNotification && circle.unread.isEmpty && !replies.moods.isEmpty {
+                page = 1
+            }
+            pageChosen = true
+        }
+        .onChange(of: page) { _, _ in pageChosen = true }
+    }
+
+    @ViewBuilder private var inbox: some View {
+        if circle.openingFromNotification {
+            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if circle.unread.isEmpty {
+            VStack(spacing: 6) {
+                Text("All caught up! 💚").font(.headline)
+                Text("No new signals or responses.").font(.caption2).foregroundStyle(.secondary)
+                if !sync.moodOnly {
+                    Button { withAnimation { page = 1 } } label: {
+                        Text("Moods ›").font(.footnote.weight(.semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color(red: 0.62, green: 0.52, blue: 1))
+                    .padding(.top, 4)
+                }
+            }
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            List {
+                Section("New") {
+                    ForEach(circle.unread) { reaction in
+                        NavigationLink(value: reaction) {
+                            HStack(spacing: 6) {
+                                Text(reaction.emoji).font(.system(size: 22))
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(reaction.name)
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .lineLimit(1)
+                                    Text("\(reaction.subtitle) · \(Self.ago(reaction.at))")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                                Spacer(minLength: 0)
+                            }
+                        }
+                        .accessibilityLabel("\(reaction.name) \(reaction.emoji), \(reaction.subtitle), \(Self.ago(reaction.at))")
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var moodsPage: some View {
+        if replies.moods.isEmpty {
+            VStack(spacing: 4) {
+                Text("No moods yet").font(.headline)
+                Text("Moods your friends and family share show here.").font(.caption2).foregroundStyle(.secondary)
+            }
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            List {
+                Section("Moods") {
+                    ForEach(sortedMoods) { mood in
+                        // The stack's path is typed [WatchReaction], so a value link for a mood would be ignored.
+                        NavigationLink {
+                            WatchMoodReplyView(mood: mood)
+                        } label: {
+                            HStack(spacing: 6) {
+                                AnimatedMoodMascot(mood: mood.mood, size: 30, isActive: false)
+                                    .frame(width: 30, height: 30)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(mood.name)
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .lineLimit(1)
+                                    Text("\(MoodLabel.display(mood.mood)) · \(Self.ago(mood.sharedAt))")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                                Spacer(minLength: 2)
+                                if let mine = mood.myEmoji {
+                                    Text(mine).font(.system(size: 22))
+                                } else {
+                                    Image(systemName: "face.smiling").foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .accessibilityLabel("\(mood.name) is feeling \(MoodLabel.display(mood.mood)). \(mood.myEmoji.map { "You responded \($0)" } ?? "Respond")")
+                    }
+                }
+            }
+        }
     }
 
     static func ago(_ date: Date, now: Date = Date()) -> String {
@@ -532,5 +627,178 @@ struct WatchReactionDetail: View {
             .frame(maxWidth: .infinity)
         }
         .onAppear { WatchCircleStore.shared.markRead(reaction) }
+    }
+}
+
+
+// MARK: - Respond to a friend's mood (own watch only; family watches can't respond)
+
+struct WatchFriendMood: Identifiable, Hashable {
+    let id: String
+    let name: String
+    let mood: String
+    let sharedAt: Date
+    var myEmoji: String?
+}
+
+/// Mirrors MOOD_REACTIONS / PLUS_MOOD_REACTIONS / REACTION_LABELS in LittleSignalsData.ts.
+enum WatchMoodReactions {
+    static let free: [String: [String]] = [
+        "Joyful": ["❤️", "🫶", "💪", "🫂"], "Calm": ["❤️", "🫶", "🌿", "🫂"], "Sad": ["❤️", "🫂", "🫶", "🌿"],
+        "Angry": ["🫂", "🫶", "🌿", "❤️"], "Anxious": ["🫂", "🌿", "🫶", "❤️"], "Tired": ["🌙", "🫂", "❤️", "🫶"],
+    ]
+    static let plusExtra: [String: [String]] = [
+        "Joyful": ["🤩", "🥳", "🎉", "🔥", "🌟", "🙌", "💃", "🌈"],
+        "Calm": ["🪷", "🧘", "🌊", "🍃", "🕊️", "☁️", "🌸", "😌"],
+        "Sad": ["💙", "🤗", "🧸", "🌻", "🌈", "🕯️", "💐", "☕"],
+        "Angry": ["🧊", "🌬️", "🫧", "🤝", "🧘", "🌊", "🦾", "🕊️"],
+        "Anxious": ["🦋", "🌬️", "🫧", "🤝", "🧘", "☁️", "🐢", "🍵"],
+        "Tired": ["😴", "💤", "🛌", "🦥", "☕", "🍵", "🌌", "⭐"],
+    ]
+    static let labels: [String: String] = [
+        "❤️": "Thinking of you", "🫶": "Here for you", "💪": "You've got this", "🫂": "Sending a hug", "🌿": "Take a breath",
+        "🌙": "Rest well", "🤩": "You're amazing", "🥳": "Celebrating with you", "🎉": "So happy for you", "🔥": "You're on fire",
+        "🌟": "Proud of you", "🙌": "Love this", "💃": "Dance it out", "🌈": "Better days ahead", "🪷": "Inner peace",
+        "🧘": "Stay centered", "🌊": "Go with the flow", "🍃": "Peace to you", "🕊️": "Sending peace", "☁️": "Take it easy",
+        "🌸": "So peaceful", "😌": "Love this calm", "💙": "You're not alone", "🤗": "Sending a hug", "🧸": "Sending comfort",
+        "🌻": "Brighter days ahead", "🕯️": "Holding space for you", "💐": "Flowers for you", "☕": "Coffee's on me",
+        "🧊": "Cool down", "🌬️": "Breathe it out", "🫧": "Let it go", "🤝": "I've got your back", "🦾": "Stronger than this",
+        "🦋": "You'll get through this", "🐢": "One step at a time", "🍵": "Tea time", "😴": "Get some sleep", "💤": "Sweet dreams",
+        "🛌": "Rest up", "🦥": "Slow down", "🌌": "Peaceful night", "⭐": "You did enough today",
+    ]
+    static func free(for mood: String) -> [String] { free[mood] ?? free["Calm"]! }
+    static func plus(for mood: String) -> [String] { plusExtra[mood] ?? plusExtra["Calm"]! }
+}
+
+@MainActor
+final class WatchMoodReplies: ObservableObject {
+    static let shared = WatchMoodReplies()
+    @Published private(set) var moods: [WatchFriendMood] = []
+    @Published private(set) var plus = false
+    @Published private(set) var sending: String?
+    private var sync: WatchThemeSync { .shared }
+
+    func refresh() async {
+        guard !sync.moodOnly, sync.connected, !sync.accountId.isEmpty else { moods = []; return }
+        let uid = sync.accountId
+        let now = ISO8601DateFormatter().string(from: Date())
+        do {
+            async let shared = sync.restRequest("/rest/v1/circle_shared_moods?select=id,owner_id,mood,shared_at&owner_id=neq.\(uid)&stopped_at=is.null&expires_at=gt.\(now)&order=shared_at.desc&limit=30", method: "GET")
+            async let mine = sync.restRequest("/rest/v1/circle_reactions?select=shared_mood_id,emoji&reactor_id=eq.\(uid)", method: "GET")
+            async let friends = sync.rpc("circle_friends", [:])
+            async let family = sync.rpc("circle_family_names", [:])
+            async let entitlement = sync.restRequest("/rest/v1/plus_entitlements?select=is_active,expires_at&user_id=eq.\(uid)&limit=1", method: "GET")
+            let (sharedData, mineData, friendData, familyData, plusData) = try await (shared, mine, friends, family, entitlement)
+            var names: [String: String] = [:]
+            for row in Self.rows(familyData) { if let id = row["profile_id"] as? String, let n = row["display_name"] as? String { names[id] = n } }
+            for row in Self.rows(friendData) { if let id = row["friend_id"] as? String, let n = row["display_name"] as? String { names[id] = n } }
+            var reacted: [String: String] = [:]
+            for row in Self.rows(mineData) { if let id = row["shared_mood_id"] as? String, let e = row["emoji"] as? String { reacted[id] = e } }
+            moods = Self.rows(sharedData).compactMap { row in
+                guard let id = row["id"] as? String, let mood = row["mood"] as? String else { return nil }
+                let owner = row["owner_id"] as? String ?? ""
+                return WatchFriendMood(id: id, name: names[owner] ?? "A friend", mood: mood,
+                                       sharedAt: WatchThemeSync.parseTimestamp(row["shared_at"] as? String) ?? Date(),
+                                       myEmoji: reacted[id])
+            }
+            plus = Self.rows(plusData).contains { row in
+                guard row["is_active"] as? Bool == true else { return false }
+                guard let expires = WatchThemeSync.parseTimestamp(row["expires_at"] as? String) else { return true }
+                return expires > Date()
+            }
+        } catch {
+            NSLog("[WatchCircle] Moods failed: %@", error.localizedDescription)
+        }
+    }
+
+    /// Same upsert as the iPhone; the server checks the emoji is allowed for this account (free list or Plus).
+    func react(_ mood: WatchFriendMood, emoji: String) async -> Bool {
+        guard sending == nil, !sync.moodOnly else { return false }
+        sending = mood.id
+        defer { sending = nil }
+        let row: [String: Any] = ["shared_mood_id": mood.id, "reactor_id": sync.accountId, "emoji": emoji, "style": "standard",
+                                  "updated_at": ISO8601DateFormatter().string(from: Date())]
+        do {
+            let body = try JSONSerialization.data(withJSONObject: [row])
+            _ = try await sync.restRequest("/rest/v1/circle_reactions?on_conflict=shared_mood_id,reactor_id", method: "POST", body: body,
+                                           headers: ["Prefer": "resolution=merge-duplicates,return=minimal"])
+            if let i = moods.firstIndex(where: { $0.id == mood.id }) { moods[i].myEmoji = emoji }
+            return true
+        } catch {
+            NSLog("[WatchCircle] Reaction failed: %@", error.localizedDescription)
+            return false
+        }
+    }
+
+    private static func rows(_ data: Data) -> [[String: Any]] {
+        (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] ?? []
+    }
+}
+
+struct WatchMoodReplyView: View {
+    let mood: WatchFriendMood
+    @ObservedObject private var replies = WatchMoodReplies.shared
+    @Environment(\.dismiss) private var dismiss
+    @State private var note: String?
+
+    private var current: String? { replies.moods.first { $0.id == mood.id }?.myEmoji ?? mood.myEmoji }
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 3)
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 8) {
+                AnimatedMoodMascot(mood: mood.mood, size: 54).frame(width: 54, height: 54)
+                Text("\(mood.name) · \(MoodLabel.display(mood.mood))")
+                    .font(.footnote.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                LazyVGrid(columns: columns, spacing: 6) {
+                    ForEach(WatchMoodReactions.free(for: mood.mood), id: \.self) { cell($0, locked: false) }
+                    ForEach(WatchMoodReactions.plus(for: mood.mood), id: \.self) { cell($0, locked: !replies.plus) }
+                }
+                if let note {
+                    Text(note).font(.caption2).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                }
+            }
+        }
+        .navigationTitle("Respond")
+    }
+
+    private func cell(_ emoji: String, locked: Bool) -> some View {
+        Button { send(emoji, locked: locked) } label: {
+            Text(emoji)
+                .font(.system(size: 26))
+                .opacity(locked ? 0.4 : 1)
+                .frame(maxWidth: .infinity, minHeight: 42)
+                .background(RoundedRectangle(cornerRadius: 12)
+                    .fill(current == emoji ? Color(red: 0.30, green: 0.73, blue: 0.50).opacity(0.4) : Color.white.opacity(0.12)))
+                .overlay(alignment: .topTrailing) {
+                    if locked {
+                        Image(systemName: "lock.fill").font(.system(size: 8, weight: .bold)).padding(4).foregroundStyle(.white.opacity(0.8))
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .disabled(replies.sending != nil)
+        .accessibilityLabel((WatchMoodReactions.labels[emoji] ?? emoji) + (locked ? ", Plus" : ""))
+    }
+
+    private func send(_ emoji: String, locked: Bool) {
+        if locked {
+            WKInterfaceDevice.current().play(.failure)
+            note = "Get MoodPals Plus on your iPhone for 12 emojis for every mood."
+            return
+        }
+        Task { @MainActor in
+            if await replies.react(mood, emoji: emoji) {
+                WKInterfaceDevice.current().play(.success)
+                note = "Sent \(emoji)"
+                try? await Task.sleep(for: .seconds(0.8))
+                dismiss()
+            } else {
+                WKInterfaceDevice.current().play(.failure)
+                note = "Couldn't send. Check your connection and try again."
+            }
+        }
     }
 }

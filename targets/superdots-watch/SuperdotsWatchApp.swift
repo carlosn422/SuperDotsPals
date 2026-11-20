@@ -17,6 +17,11 @@ final class WatchAppDelegate: NSObject, WKApplicationDelegate, UNUserNotificatio
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
         let info = response.notification.request.content.userInfo
         let data = (info["body"] as? [String: Any]) ?? (info as? [String: Any]) ?? [:]
+        // Screen Break reminders (from this watch or forwarded from the iPhone) open the Screen Break controls.
+        if data["action"] as? String == "screenBreak" || info["action"] as? String == "screenBreak" {
+            await MainActor.run { WatchScreenBreakStore.shared.openFromNotification() }
+            return
+        }
         guard data["action"] as? String == "circle" else { return }
         let ref = data["ref"] as? String
         await MainActor.run { WatchCircleStore.shared.openFromNotification(ref: ref) }

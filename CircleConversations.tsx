@@ -337,7 +337,7 @@ export function ConversationScreen({id,focus,onBack,onInfo,onSend,fill,padding=2
      {!isPlus?<View style={{position:'absolute',top:4,right:6,backgroundColor:CT.primary,borderRadius:8,width:16,height:16,alignItems:'center',justifyContent:'center'}}><Ionicons name="lock-closed" size={9} color="#fff"/></View>:null}
     </TouchableOpacity>
    </View>}
-   <EmojiPickerSheet visible={sheet} title={'React to '+first+'’s '+moodLabel(m.mood)+' mood'} onClose={()=>setSheet(false)} onPick={(e,st)=>{setSheet(false);react(m,e,st)}}/>
+   <EmojiPickerSheet visible={sheet} mood={m.mood} title={'React to '+first+'’s '+moodLabel(m.mood)+' mood'} onClose={()=>setSheet(false)} onPick={(e,st)=>{setSheet(false);react(m,e,st)}}/>
   </>})()
 :<View style={{flexDirection:'row',alignItems:'center',gap:10}}>
    <Text style={[cs.rowSub,{flex:1,fontSize:12}]}>You can react when {first} shares a mood.</Text>

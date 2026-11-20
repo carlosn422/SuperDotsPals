@@ -31,11 +31,30 @@ export const MOOD_REACTIONS:Record<CircleMood,string[]>={
  Tired:['🌙','🫂','❤️','🫶'],
 };
 
+// Plus: 12 per mood, the free four first. Plus reactions can be any emoji server-side (circle_reaction_ok);
+// labels mirror public.circle_reaction_label so pushes read "{name}: Sending peace 🕊️".
+export const PLUS_MOOD_REACTIONS:Record<CircleMood,string[]>={
+ Joyful:[...MOOD_REACTIONS.Joyful,'🤩','🥳','🎉','🔥','🌟','🙌','💃','🌈'],
+ Calm:[...MOOD_REACTIONS.Calm,'🪷','🧘','🌊','🍃','🕊️','☁️','🌸','😌'],
+ Sad:[...MOOD_REACTIONS.Sad,'💙','🤗','🧸','🌻','🌈','🕯️','💐','☕'],
+ Angry:[...MOOD_REACTIONS.Angry,'🧊','🌬️','🫧','🤝','🧘','🌊','🦾','🕊️'],
+ Anxious:[...MOOD_REACTIONS.Anxious,'🦋','🌬️','🫧','🤝','🧘','☁️','🐢','🍵'],
+ Tired:[...MOOD_REACTIONS.Tired,'😴','💤','🛌','🦥','☕','🍵','🌌','⭐'],
+};
+
 // Historical reactions still use their original glyphs and descriptions.
 export const REACTION_LABELS:Record<string,string>={
  '🎉':'So happy for you','🙌':'Love this','✨':'Keep shining','❤️':'Thinking of you','💜':'Thinking of you',
  '🌿':'Take a breath','☀️':'Sending sunshine','💚':'Glad you’re feeling good','🫂':'Sending a hug',
  '🫶':'Here for you','🤗':'Sending a hug','💙':'You’re not alone','💪':'You’ve got this','🌙':'Rest well','☕':'Coffee’s on me',
+ '🥳':'Celebrating with you','🌟':'Proud of you','😊':'You made me smile','🧘':'Stay centered','☁️':'Take it easy',
+ '🍃':'Peace to you','🌊':'Go with the flow','🕊️':'Sending peace','😌':'Love this calm','🌧️':'It’s okay to feel this',
+ '🌈':'Better days ahead','🕯️':'Holding space for you','🧸':'Sending comfort','💐':'Flowers for you','🧊':'Cool down',
+ '🌬️':'Breathe it out','🤝':'I’ve got your back','🍵':'Tea time','😴':'Get some sleep','🛌':'Rest up','💤':'Sweet dreams',
+ '⭐':'You did enough today',
+ '🤩':'You’re amazing','🔥':'You’re on fire','💃':'Dance it out','🪷':'Inner peace','🌸':'So peaceful',
+ '🌻':'Brighter days ahead','🫧':'Let it go','🦾':'Stronger than this','🦋':'You’ll get through this',
+ '🐢':'One step at a time','🦥':'Slow down','🌌':'Peaceful night',
 };
 
 // Retain the full catalogue for previously sent signals, notifications and history.
@@ -53,9 +72,10 @@ export const LITTLE_SIGNALS=[
  {id:'calm',emoji:'🌿',label:'Sending calm',notify:(n:string)=>n+' sent you some calm 🌿'},
  {id:'highfive',emoji:'🙌',label:'High five',notify:(n:string)=>n+' sent you a high five 🙌'},
 ] as const;
-// The new signal picker is intentionally smaller; legacy IDs stay readable.
-export const SELECTABLE_LITTLE_SIGNALS=LITTLE_SIGNALS.filter(s=>
- (['thinking','hug','here','gotthis','calm'] as string[]).includes(s.id));
+// All 12 signals are shown: the first six are free, the rest need Plus (enforced in circle_send_signal).
+export const FREE_SIGNAL_IDS=['thinking','hug','here','gotthis','calm','sunshine'] as string[];
+export const isPlusSignal=(id:string)=>!FREE_SIGNAL_IDS.includes(id);
+export const SELECTABLE_LITTLE_SIGNALS=[...LITTLE_SIGNALS].sort((a,b)=>Number(isPlusSignal(a.id))-Number(isPlusSignal(b.id)));
 export type SignalId=typeof LITTLE_SIGNALS[number]['id'];
 export const signalById=(id:SignalId)=>LITTLE_SIGNALS.find(x=>x.id===id)!;
 

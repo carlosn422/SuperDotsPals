@@ -88,7 +88,7 @@ export default function ConnectedDevices({focused=true,onOpenThemes,onCreateAcco
  async function remove(device:Device){Alert.alert('Remove device?',deviceName(device)+' will be permanently removed from your connected devices. It will need a new code to link again. Existing access tokens may remain valid until they expire.',[{text:'Cancel',style:'cancel'},{text:'Remove Device',style:'destructive',onPress:()=>{void (async()=>{setLoading(true);try{await call('remove',{deviceId:device.id});setDetails(null);setDevices(current=>current.filter(d=>d.id!==device.id));await load()}catch(e:any){Alert.alert('Removal failed',e.message)}finally{setLoading(false)}})()}}])}
  const previewName=adding==='family'?'Family Watch':shortProfileName(watches[0]?.name||'Apple Watch');
  return <View style={{gap:13}}>
-  <Text style={[styles.title,{fontSize:28}]} accessibilityRole="header">Watches</Text>
+  <Text style={[styles.title,{fontSize:22}]} accessibilityRole="header">Watches</Text>
   <WatchSetupCard setup={setup} linked={isGuest?null:loaded?ownWatchLinked:null} onCheckAgain={checkAgain}
    onLink={isGuest?undefined:()=>{setMessage('');setAdding('mine');setPending({action:'self'});setStep('color')}}/>
   {isGuest?<View style={[styles.card,{paddingVertical:14}]}>
@@ -106,7 +106,6 @@ export default function ConnectedDevices({focused=true,onOpenThemes,onCreateAcco
     lines={[deviceStatus(d),isWatchColor(d.watch_color)?'':'Choose Watch Color in details']} onPress={()=>setDetails(d)}/>)}
   </View>
   {onOpenThemes?<SettingsItem title="Watch Theme" subtitle="Choose your Apple Watch colour" status="Syncs to your watch automatically" icon="watch-outline" accent={purple} onPress={onOpenThemes}/>:null}
-  <FamilyWatches reloadKey={familyReload} onAdd={()=>{setMessage('');setAdding('family')}}/>
   </>:null}
 
   <Modal visible={!!adding} animationType="slide" presentationStyle="pageSheet" onRequestClose={connecting?undefined:closeAdd}>

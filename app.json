@@ -4,7 +4,7 @@
     "icon": "./assets/branding/app-icon.png",
     "slug": "superdotspals",
     "scheme": "wellnest",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "ios": {
@@ -20,7 +20,8 @@
       "entitlements": {
         "com.apple.security.application-groups": [
           "group.com.superdotspals.wellnest"
-        ]
+        ],
+        "com.apple.developer.family-controls": true
       },
       "usesAppleSignIn": true
     },
@@ -57,6 +58,7 @@
       "@bacons/apple-targets",
       "./scripts/with-watch-widget-embed.cjs",
       "./scripts/with-health-privacy.cjs",
+      "./scripts/with-scene-lifecycle.cjs",
       "expo-sharing",
       "expo-apple-authentication",
       "expo-maps"
