@@ -183,6 +183,7 @@ final class ScreenBreakEngine {
       case "endNow": try endNow(command)
       case "cancel": try cancel(command)
       case "release": try release(command)
+      case "adjust": try adjust(command)
       case "lock": try lock()
       case "unlock": try unlock()
       default: throw ScreenBreakError(code: "invalid", message: "Unknown command.")
@@ -300,6 +301,33 @@ final class ScreenBreakEngine {
     try schedule(next)
     // Lift the pause only once the new deadline is scheduled.
     if session.isRestricted { ScreenBreakShared.clearShield() }
+    session = next
+    ScreenBreakShared.saveSession(session)
+    ScreenBreakShared.enqueueSync(session)
+    scheduleNotifications(session)
+    armTimer(session)
+  }
+
+  /// Moves the deadline of a running timer by `minutes` (negative removes time); used by the watch ring drag.
+  private func adjust(_ command: [String: Any]) throws {
+    var session = try requireCurrent(command)
+    guard session.isActive else { throw ScreenBreakError(code: "stale", message: "The timer already ended.") }
+    let minutes = (command["minutes"] as? NSNumber)?.intValue ?? 0
+    guard minutes != 0, abs(minutes) <= 120 else { throw ScreenBreakError(code: "invalid", message: "Choose how much time to change.") }
+    let now = Date()
+    let deadline = session.deadline.addingTimeInterval(TimeInterval(minutes * 60))
+    guard deadline.timeIntervalSince(now) >= 60 else {
+      throw ScreenBreakError(code: "invalid", message: "At least 1 minute has to be left. Tap Stop to end now.")
+    }
+    guard deadline.timeIntervalSince(session.startedAt) <= TimeInterval(24 * 3600) else {
+      throw ScreenBreakError(code: "invalid", message: "A session can last up to 24 hours.")
+    }
+    var next = session
+    next.deadline = deadline
+    next.grantedSeconds = Int(deadline.timeIntervalSince(session.startedAt).rounded())
+    next.version += 1
+    next.updatedAt = now
+    try schedule(next)
     session = next
     ScreenBreakShared.saveSession(session)
     ScreenBreakShared.enqueueSync(session)

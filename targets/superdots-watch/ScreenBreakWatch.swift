@@ -287,6 +287,8 @@ enum BreakStyle {
     static let amber = Color(red: 0.95, green: 0.65, blue: 0.44)
     static let red = Color(red: 0.84, green: 0.36, blue: 0.47)
     static let fill = Color.white.opacity(0.14)
+    /// One size for the time dial and the running timer ring.
+    static var ring: CGFloat { WKInterfaceDevice.current().screenBounds.width * 0.62 }
 }
 
 struct BreakButtonStyle: ButtonStyle {
@@ -497,8 +499,9 @@ struct ScreenBreakControlView: View {
             } else if !store.allowed {
                 note("Your free trial has ended. Get MoodPals Plus on your iPhone to start a Screen Break.")
             } else {
-                VStack(spacing: 6) {
+                VStack(spacing: 12) {
                     DurationDial(minutes: $minutes, range: 5...180)
+                        .frame(width: BreakStyle.ring, height: BreakStyle.ring)
                     Button(store.pending == "start" ? "Starting…" : "Start") { start() }
                         .buttonStyle(BreakButtonStyle(kind: .primary, compact: true))
                     StatusLine()
@@ -564,34 +567,110 @@ private struct StatusLine: View {
 private struct ActiveBreakView: View {
     let session: WatchBreakSession
     let onManage: () -> Void
+    @ObservedObject private var store = WatchScreenBreakStore.shared
     @Environment(\.isLuminanceReduced) private var dimmed
+    /// Minutes being added (positive) or removed (negative) while the knob is dragged.
+    @State private var dragMinutes = 0
+    @State private var lastAngle: Double?
+    @State private var turned: Double = 0
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: dimmed ? 60 : 1)) { context in
-            let left = max(0, session.deadline.timeIntervalSince(context.date))
-            let total = max(1, session.deadline.timeIntervalSince(session.startedAt))
-            let timeUp = session.status == "restricted" || left <= 0
-            VStack(spacing: 6) {
-                BreakRing(fraction: timeUp ? 0 : left / total, tint: BreakStyle.green) {
+            let rawLeft = max(0, session.deadline.timeIntervalSince(context.date))
+            let left = max(0, rawLeft + Double(dragMinutes * 60))
+            let total = max(1, session.deadline.timeIntervalSince(session.startedAt) + Double(dragMinutes * 60))
+            let timeUp = session.status == "restricted" || rawLeft <= 0
+            let passed = timeUp ? 1 : min(1, max(0, 1 - left / total))
+            let size = BreakStyle.ring
+            let line = max(6, size * 0.075)
+            VStack(spacing: 12) {
+                ZStack {
+                    Circle().stroke(BreakStyle.fill, lineWidth: line)
+                    // Time already passed is faded; the time left stays solid.
+                    Circle().trim(from: 0, to: max(0.001, passed))
+                        .stroke(BreakStyle.green.opacity(0.3), style: StrokeStyle(lineWidth: line, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    Circle().trim(from: passed, to: 1)
+                        .stroke(timeUp ? BreakStyle.amber : BreakStyle.green, style: StrokeStyle(lineWidth: line, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    if !timeUp && !dimmed {
+                        Circle().fill(Color.white)
+                            .frame(width: line * 1.7, height: line * 1.7)
+                            .offset(y: -(size - line) / 2)
+                            .rotationEffect(.degrees(360 * passed))
+                    }
                     VStack(spacing: 0) {
-                        Text(timeUp ? "0:00" : Self.text(left, seconds: !dimmed))
+                        Text(timeUp ? "0:00" : Self.text(left, seconds: !dimmed && dragMinutes == 0))
                             .font(.system(size: 30, weight: .bold))
                             .monospacedDigit()
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
-                        Text(timeUp ? "Apps paused" : "left")
+                        Text(dragMinutes != 0 ? (dragMinutes > 0 ? "+\(dragMinutes) min" : "−\(-dragMinutes) min") : (timeUp ? "Apps paused" : "left"))
                             .font(.caption2)
-                            .foregroundStyle(timeUp ? BreakStyle.amber : .secondary)
+                            .foregroundStyle(dragMinutes != 0 ? BreakStyle.green : timeUp ? BreakStyle.amber : .secondary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
                     }
+                    .padding(.horizontal, line * 2)
                 }
+                .frame(width: size, height: size)
+                .contentShape(Circle())
+                .gesture(timeUp || dimmed ? nil : drag(size: size))
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(timeUp ? "Time is up. Apps are paused on your iPhone." : "\(Self.spoken(left)) left")
+                .accessibilityAdjustableAction { direction in
+                    Task { @MainActor in _ = await store.command("adjust", childId: session.childId, minutes: direction == .increment ? 5 : -5) }
+                }
                 if !dimmed {
-                    Button("Manage", action: onManage).buttonStyle(BreakButtonStyle(kind: .secondary, compact: true))
+                    Button { stop() } label: {
+                        RoundedRectangle(cornerRadius: 4).fill(Color.white).frame(width: 15, height: 15)
+                            .frame(width: 44, height: 44)
+                            .background(Circle().fill(BreakStyle.red))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(store.pending != nil)
+                    .accessibilityLabel("Stop timer")
                 }
             }
+        }
+    }
+
+    /// Turning the knob clockwise adds time and counter-clockwise removes it (one full turn = 60 minutes, 5-minute steps).
+    private func drag(size: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 2)
+            .onChanged { value in
+                let angle = atan2(value.location.x - size / 2, size / 2 - value.location.y)
+                if let lastAngle {
+                    var delta = angle - lastAngle
+                    if delta > .pi { delta -= 2 * .pi } else if delta < -.pi { delta += 2 * .pi }
+                    turned += delta
+                }
+                lastAngle = angle
+                let leftMinutes = Int(session.deadline.timeIntervalSinceNow / 60)
+                let lowest = -max(0, (leftMinutes - 1) / 5 * 5)
+                let minutes = min(120, max(lowest, Int((turned / (2 * .pi) * 12).rounded()) * 5))
+                if minutes != dragMinutes {
+                    dragMinutes = minutes
+                    WKInterfaceDevice.current().play(.click)
+                }
+            }
+            .onEnded { _ in
+                let change = dragMinutes
+                lastAngle = nil
+                turned = 0
+                guard change != 0 else { return }
+                Task { @MainActor in
+                    _ = await store.command("adjust", childId: session.childId, minutes: change)
+                    dragMinutes = 0
+                }
+            }
+    }
+
+    /// Stops right away (no confirmation); the Screen Break home then fades back to the Lock screen.
+    private func stop() {
+        Task { @MainActor in
+            let action = session.status == "restricted" ? "release" : "cancel"
+            if await store.command(action, childId: session.childId) { store.navReset += 1 }
         }
     }
 
@@ -682,8 +761,9 @@ private struct AddTimeView: View {
     @State private var minutes = 15
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 12) {
             DurationDial(minutes: $minutes, range: 5...120, prefix: "+")
+                .frame(width: BreakStyle.ring, height: BreakStyle.ring)
             Button(store.pending == "addTime" ? "Adding…" : "Add Time") { add() }
                 .buttonStyle(BreakButtonStyle(kind: .primary))
             StatusLine()
