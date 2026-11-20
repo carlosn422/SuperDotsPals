@@ -2,6 +2,8 @@ import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {ActivityIndicator,Alert,AppState,Modal,PanResponder,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import Svg,{Circle,Defs,Line,LinearGradient,Path,Stop} from 'react-native-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import {supabase} from './supabase';
 import {APP_THEME as T} from './MoodMascot';
 import SuperdotMascot from './SuperdotMascot';
@@ -14,7 +16,7 @@ import {comparison,formatDuration,observations,periodRange,periodStats,sessionIn
 
 export type FamilyChild={id:string;name:string;profile_user_id:string|null;watch_only?:boolean};
 type Entitlement={has_plus:boolean;trial_started_at:string|null;trial_ends_at:string|null;trial_available:boolean;allowed:boolean};
-const DURATIONS=[15,30,45,60];
+const LAST_MINUTES_KEY='screenBreak.lastMinutes';
 const red='#D65B79';
 
 // ---------- Sync: children, sessions and the trial (runs whenever MoodPals is open) ----------
@@ -165,7 +167,8 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
  const [state,setState]=useBreakState();
  const {isPlus,showPaywall}=usePlus();
  const [editing,setEditing]=useState(false);
- const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState(''),[minutes,setMinutes]=useState(30),[useCustom,setUseCustom]=useState(false),[customOpen,setCustomOpen]=useState(false);
+ const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState(''),[minutes,setMinutes]=useState(30),[adding,setAdding]=useState(false),[extra,setExtra]=useState(15);
+ useEffect(()=>{void AsyncStorage.getItem(LAST_MINUTES_KEY).then(v=>{const n=Number(v);if(n>=5&&n<=180)setMinutes(Math.round(n/5)*5)})},[]);
  const session=state?.session;
  // A session whose member record was replaced (same name, old id) is still controllable from that member.
  const orphan=!!session&&!children.some(c=>c.id===session.childId)&&session.childName===child.name;
@@ -214,8 +217,18 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
     <Text style={st.kicker}>Screen time left</Text>
     <Text style={st.timer} accessibilityRole="timer">{countdown(mine.deadline*1000-now)}</Text>
     <Text style={st.sub}>Ends at {clock(mine.deadline)} · {formatDuration(mine.grantedSeconds)} granted</Text>
-    <Text style={[st.sub,{marginTop:6}]}>Add time</Text>
-    <View style={st.chips}>{(state?.addTimeOptions||[5,10,15,30]).map(m=><Chip key={m} label={'+'+m+' min'} onPress={()=>run('addTime',{minutes:m})} disabled={!!busy}/>)}</View>
+    <TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={()=>{setExtra(15);setAdding(true)}} style={[st.cta,{alignSelf:'stretch',marginTop:6}]}><Text style={st.ctaText}>Add Time</Text></TouchableOpacity>
+    <Modal visible={adding} transparent animationType="slide" onRequestClose={()=>setAdding(false)}>
+     <View style={{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(29,43,51,0.3)'}}>
+      <TouchableOpacity style={StyleSheet.absoluteFill} onPress={()=>setAdding(false)} accessibilityLabel="Close"/>
+      <View style={[st.sheet,{alignItems:'center'}]}>
+       <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6'}}/>
+       <Text style={st.sheetTitle}>Add time for {child.name}</Text>
+       <DurationRing minutes={extra} onChange={setExtra} min={5} max={120} prefix="+"/>
+       <TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={()=>{setAdding(false);run('addTime',{minutes:extra})}} style={[st.cta,{alignSelf:'stretch'}]}><Text style={st.ctaText}>Add {formatDuration(extra*60)}</Text></TouchableOpacity>
+      </View>
+     </View>
+    </Modal>
     <View style={{flexDirection:'row',gap:10,alignSelf:'stretch',marginTop:6}}>
      <TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={()=>run('endNow')} style={[st.cta,{flex:1,backgroundColor:'#F4A570'}]}><Text style={st.ctaText}>End Now</Text></TouchableOpacity>
      <TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={()=>Alert.alert('Cancel Screen Break?','This stops the timer and keeps apps open.',[{text:'Keep'},{text:'Cancel Session',style:'destructive',onPress:()=>run('cancel')}])} style={[st.ghost,{flex:1}]}><Text style={[st.ghostText,{color:red}]}>Cancel</Text></TouchableOpacity>
@@ -245,20 +258,11 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
      <Text style={st.link}>Edit apps</Text>
     </TouchableOpacity>}
     {ready?<>
-    <Text style={[st.rowTitle,{marginTop:8}]}>How long can {child.name} use the phone?</Text>
-    <View style={st.durationRow}>
-     {DURATIONS.map(m=><TouchableOpacity key={m} accessibilityRole="button" accessibilityState={{selected:!useCustom&&minutes===m}} onPress={()=>{setUseCustom(false);setMinutes(m)}} style={[st.durationPreset,!useCustom&&minutes===m&&{backgroundColor:T.primary}]}>
-      <Text style={[st.durationText,!useCustom&&minutes===m&&{color:'#fff'}]}>{m}</Text><Text style={[st.durationUnit,!useCustom&&minutes===m&&{color:'#fff'}]}>min</Text>
-     </TouchableOpacity>)}
-    </View>
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel={useCustom?'Custom time, '+formatDuration(minutes*60)+' selected. Change':'Choose a custom time'} accessibilityState={{selected:useCustom}} onPress={()=>setCustomOpen(true)} style={[st.customRow,useCustom&&{backgroundColor:T.primary}]}>
-     <Ionicons name="time-outline" size={20} color={useCustom?'#fff':T.primary}/>
-     <Text style={[st.customText,useCustom&&{color:'#fff'}]}>{useCustom?'Custom · '+formatDuration(minutes*60):'Custom time'}</Text>
-    </TouchableOpacity>
-    <TouchableOpacity accessibilityRole="button" disabled={!ready||!validMinutes||!!busy||!!other} onPress={()=>run('start',{minutes:chosen})} style={[st.cta,(!ready||!validMinutes||!!busy||!!other)&&{opacity:0.5}]}><Text style={st.ctaText}>Start Screen Break</Text></TouchableOpacity>
-    <Text style={[st.sub,{textAlign:'center'}]}>Reminder 5 minutes before. You can also control it from your Apple Watch.</Text>
+    <Text style={[st.rowTitle,{marginTop:8,textAlign:'center'}]}>How long can {child.name} use the phone?</Text>
+    <DurationRing minutes={minutes} onChange={setMinutes} min={5} max={180}/>
+    <TouchableOpacity accessibilityRole="button" disabled={!ready||!validMinutes||!!busy||!!other} onPress={()=>{void AsyncStorage.setItem(LAST_MINUTES_KEY,String(chosen));run('start',{minutes:chosen})}} style={[st.cta,(!ready||!validMinutes||!!busy||!!other)&&{opacity:0.5}]}><Text style={st.ctaText}>Start Screen Break</Text></TouchableOpacity>
+    <Text style={[st.sub,{textAlign:'center'}]}>Your Apple Watch reminds you 5 minutes before and lets you manage it.</Text>
     </>:null}
-    <CustomDurationSheet visible={customOpen} initialMinutes={minutes} onClose={()=>setCustomOpen(false)} onChoose={m=>{setMinutes(m);setUseCustom(true);setCustomOpen(false)}}/>
    </View>}
    {busy&&busy!=='auth'&&busy!=='pick'?<ActivityIndicator color={T.primary}/>:null}
    {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
@@ -266,6 +270,48 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
   </>}
   <TouchableOpacity accessibilityRole="button" onPress={onInsights} style={st.linkRow}><Ionicons name="bar-chart-outline" size={20} color={T.primary}/><Text style={[st.rowTitle,{flex:1}]}>Screen Time Insights</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>
   <ChildManage section="watch" child={child} children={children} onChanged={onChanged} onRemoved={onRemoved} onAddWatch={onAddWatch} locked={!!mine}/>
+ </View>;
+}
+
+// Circular duration dial, same as the Apple Watch: drag around the ring in 5-minute steps.
+function DurationRing({minutes,onChange,min,max,step=5,prefix=''}:{minutes:number;onChange:(n:number)=>void;min:number;max:number;step?:number;prefix?:string}){
+ const SIZE=220,LINE=18,R=(SIZE-LINE)/2,C=SIZE/2,CIRC=2*Math.PI*R;
+ const frac=(minutes-min)/(max-min);
+ const last=useRef(minutes);last.current=minutes;
+ const set=(v:number)=>{
+  const snapped=Math.min(max,Math.max(min,Math.round(v/step)*step));
+  if(snapped===last.current)return;
+  last.current=snapped;onChange(snapped);void Haptics.selectionAsync();
+ };
+ const fromTouch=(x:number,y:number)=>{
+  let a=Math.atan2(x-C,C-y);if(a<0)a+=2*Math.PI;
+  let f=a/(2*Math.PI);
+  // Don't jump across the top between the shortest and longest time.
+  const cur=(last.current-min)/(max-min);
+  if(cur>0.85&&f<0.15)f=1;else if(cur<0.15&&f>0.85)f=0;
+  set(min+f*(max-min));
+ };
+ const pan=useMemo(()=>PanResponder.create({
+  onStartShouldSetPanResponder:()=>true,
+  onMoveShouldSetPanResponder:()=>true,
+  onPanResponderTerminationRequest:()=>false,
+  onPanResponderGrant:e=>fromTouch(e.nativeEvent.locationX,e.nativeEvent.locationY),
+  onPanResponderMove:e=>fromTouch(e.nativeEvent.locationX,e.nativeEvent.locationY),
+ }),[min,max,step]);
+ const angle=frac*2*Math.PI,kx=C+R*Math.sin(angle),ky=C-R*Math.cos(angle);
+ const h=Math.floor(minutes/60),m=minutes%60;
+ return <View style={{width:SIZE,height:SIZE,alignSelf:'center'}} {...pan.panHandlers}
+  accessible accessibilityRole="adjustable" accessibilityLabel="Duration" accessibilityValue={{text:prefix+formatDuration(minutes*60)}}
+  accessibilityActions={[{name:'increment'},{name:'decrement'}]} onAccessibilityAction={e=>set(minutes+(e.nativeEvent.actionName==='increment'?step:-step))}>
+  <Svg width={SIZE} height={SIZE} pointerEvents="none">
+   <Circle cx={C} cy={C} r={R} stroke={T.primarySoft} strokeWidth={LINE} fill="none"/>
+   <Circle cx={C} cy={C} r={R} stroke={T.primary} strokeWidth={LINE} fill="none" strokeLinecap="round" strokeDasharray={CIRC+' '+CIRC} strokeDashoffset={CIRC*(1-Math.max(0.002,frac))} transform={'rotate(-90 '+C+' '+C+')'}/>
+   <Circle cx={kx} cy={ky} r={LINE*0.75} fill="#fff" stroke={T.primary} strokeWidth={3}/>
+  </Svg>
+  <View pointerEvents="none" style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center'}]}>
+   <Text style={{fontSize:52,fontWeight:'900',color:T.ink}}>{prefix}{minutes}</Text>
+   <Text style={st.sub}>{h?h+' hr'+(m?' '+m+' min':''):'min'}</Text>
+  </View>
  </View>;
 }
 
