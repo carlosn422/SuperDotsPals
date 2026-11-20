@@ -7,6 +7,8 @@ import {APP_THEME as T} from './MoodMascot';
 import SuperdotMascot from './SuperdotMascot';
 import {usePlus} from './PlusStore';
 import {useIsGuest} from './Account';
+import {ManageFamilyProfile,familyProfilesChanged,shortProfileName,useFamilyProfiles} from './FamilyWatches';
+import {WatchColorGrid,WatchImage,isWatchColor,type WatchColor} from './WatchArt';
 import {ScreenTimeReport,ackBreakSync,getBreakState,onBreakState,pendingBreakSync,pickBreakApps,requestScreenTimeAccess,screenBreakSupported,sendBreakCommand,setBreakChildren,setBreakEntitlement,type BreakAction,type BreakSession,type BreakState,type BreakSyncRow} from './modules/watch-link/screenBreak';
 import {comparison,formatDuration,observations,periodRange,periodStats,sessionInterval,type BreakPeriod,type Bucket,type SessionRow} from './ScreenBreakInsights';
 
@@ -363,19 +365,93 @@ function ChildManage({child,children,onChanged,onRemoved,onAddWatch,locked,secti
   </>}
   {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
  </View>;
+ return <MemberWatch child={child} spare={watches} onChanged={onChanged} link={link} error={error}/>;
+}
+
+function MemberWatch({child,spare,onChanged,link,error}:{child:FamilyChild;spare:FamilyChild[];onChanged:()=>void;link:(profile:string)=>Promise<void>;error:string}){
+ const {profiles,load}=useFamilyProfiles(!!child.profile_user_id);
+ const [sheet,setSheet]=useState(false),[managing,setManaging]=useState(false);
+ const watch=child.profile_user_id?profiles.find(p=>p.id===child.profile_user_id):undefined;
+ const color=watch&&isWatchColor(watch.watchColor)?watch.watchColor:null;
  return <View style={[st.card,{gap:12}]}>
-  <View style={{flexDirection:'row',alignItems:'center',gap:12}}>
-   <Ionicons name="watch-outline" size={24} color={T.primary}/>
-   <View style={{flex:1}}><Text style={st.rowTitle}>Apple Watch</Text><Text style={st.sub}>{child.profile_user_id?'Assigned · mood-only family watch':'Optional · none assigned'}</Text></View>
-  </View>
-  {child.profile_user_id?null:linking?<>
-   {watches.length?<Text style={st.sub}>Choose a family watch for {child.name}.</Text>:<Text style={st.sub}>No unassigned family watches yet. Add one first.</Text>}
-   {watches.map(w=><TouchableOpacity key={w.id} accessibilityRole="button" onPress={()=>void link(w.profile_user_id!)} style={st.option}><Ionicons name="watch" size={20} color={T.primary}/><Text style={[st.rowTitle,{flex:1}]}>{w.name}</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>)}
-   {onAddWatch?<TouchableOpacity accessibilityRole="button" onPress={onAddWatch} style={st.ghost}><Text style={st.ghostText}>Add a New Family Watch</Text></TouchableOpacity>:null}
-   <TouchableOpacity accessibilityRole="button" onPress={()=>setLinking(false)} style={{alignItems:'center',minHeight:44,justifyContent:'center'}}><Text style={st.link}>Not now</Text></TouchableOpacity>
-  </>:<TouchableOpacity accessibilityRole="button" onPress={()=>setLinking(true)} style={st.ghost}><Text style={st.ghostText}>Assign a Watch</Text></TouchableOpacity>}
+  {child.profile_user_id?<>
+   <View style={{flexDirection:'row',alignItems:'center',gap:14}}>
+    <WatchImage color={color} name={shortProfileName(child.name)} width={64}/>
+    <View style={{flex:1,gap:2}}><Text style={st.rowTitle}>{child.name}'s Apple Watch</Text><Text style={st.sub}>Mood-only watch{watch?(watch.connected?' · Linked':' · Not linked'):''}</Text></View>
+   </View>
+   <TouchableOpacity accessibilityRole="button" disabled={!watch} onPress={()=>setManaging(true)} style={[st.ghost,!watch&&{opacity:0.5}]}><Text style={st.ghostText}>Manage Watch</Text></TouchableOpacity>
+   {managing&&watch?<ManageFamilyProfile profile={watch} onClose={()=>{setManaging(false);void load()}} onDeleted={async()=>{setManaging(false);familyProfilesChanged();onChanged()}}/>:null}
+  </>:<>
+   <View style={{flexDirection:'row',alignItems:'center',gap:12}}>
+    <Ionicons name="watch-outline" size={26} color={T.primary}/>
+    <View style={{flex:1}}><Text style={st.rowTitle}>Apple Watch</Text><Text style={st.sub}>Optional. {child.name} can pick moods from their own watch.</Text></View>
+   </View>
+   <TouchableOpacity accessibilityRole="button" onPress={()=>setSheet(true)} style={st.ghost}><Text style={st.ghostText}>Assign a Watch</Text></TouchableOpacity>
+   <AssignWatchSheet visible={sheet} child={child} spare={spare} link={link} onClose={()=>setSheet(false)} onAssigned={()=>{familyProfilesChanged();onChanged()}}/>
+  </>}
   {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
  </View>;
+}
+
+// Bottom sheet that walks through adding a family watch and assigning it to this member.
+function AssignWatchSheet({visible,child,spare,link,onClose,onAssigned}:{visible:boolean;child:FamilyChild;spare:FamilyChild[];link:(profile:string)=>Promise<void>;onClose:()=>void;onAssigned:()=>void}){
+ const {isPlus,showPaywall}=usePlus();
+ const [step,setStep]=useState<'start'|'code'|'color'|'done'>('start'),[code,setCode]=useState(''),[color,setColor]=useState<WatchColor|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ useEffect(()=>{if(visible){setStep(spare.length?'start':'code');setCode('');setColor(null);setError('')}},[visible]);
+ const name=child.name;
+ async function finish(){
+  if(!color||busy)return;
+  setBusy(true);setError('');
+  try{
+   const {data,error:e}=await supabase.functions.invoke('watch-pairing',{body:{action:'approve_code',code,color,family:true}});
+   let msg:string|undefined=data?.error;
+   if(e&&!msg&&'context' in e){try{msg=(await (e as any).context.json())?.error}catch{}}
+   if(e||msg||!data?.profileId)throw Error(msg||'Unable to set up the watch. Check the code and try again.');
+   const {error:le}=await supabase.rpc('family_link_child_watch',{p_child:child.id,p_profile:data.profileId});
+   if(le)throw Error(le.code==='P0001'?le.message:'The watch was added but could not be assigned. Try Assign again.');
+   onAssigned();setStep('done');
+  }catch(err:any){
+   const m=err?.message||'Something went wrong.';
+   if(/Family watch limit/.test(m)&&!isPlus){setError("MoodPals Free includes 1 family watch. Upgrade to Plus for up to 4.");showPaywall('family')}
+   else{setError(m);if(/code/i.test(m))setStep('code')}
+  }finally{setBusy(false)}
+ }
+ async function useExisting(profile:string){setBusy(true);setError('');await link(profile);setBusy(false);onAssigned();setStep('done')}
+ const digits=code.replace(/\D/g,'');
+ return <Modal visible={visible} transparent animationType="slide" onRequestClose={busy?undefined:onClose}>
+  <View style={{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(29,43,51,0.3)'}}>
+   <TouchableOpacity style={StyleSheet.absoluteFill} disabled={busy} onPress={onClose} accessibilityLabel="Close"/>
+   <ScrollView style={{maxHeight:'88%',flexGrow:0}} contentContainerStyle={st.sheet} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
+    <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'}}/>
+    {step==='start'?<>
+     <Text style={st.sheetTitle}>Assign a watch to {name}</Text>
+     <Text style={st.sub}>Use a family watch you already added, or set up a new one.</Text>
+     {spare.map(w=><TouchableOpacity key={w.id} accessibilityRole="button" disabled={busy} onPress={()=>void useExisting(w.profile_user_id!)} style={st.option}><Ionicons name="watch" size={22} color={T.primary}/><Text style={[st.rowTitle,{flex:1}]}>{w.name}</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>)}
+     <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>setStep('code')} style={st.cta}><Text style={st.ctaText}>Set Up a New Watch</Text></TouchableOpacity>
+    </>:step==='code'?<>
+     <Text style={st.kicker}>Step 1 of 2</Text>
+     <Text style={st.sheetTitle}>Enter the watch code</Text>
+     <Text style={st.body}>On {name}'s Apple Watch, open MoodPals. It shows a 6-digit code.</Text>
+     <TextInput value={code} onChangeText={t=>setCode(t.replace(/\D/g,'').slice(0,6))} placeholder="000000" placeholderTextColor="#C3CDC8" keyboardType="number-pad" textContentType="oneTimeCode" maxLength={6} autoFocus accessibilityLabel="Watch code" style={st.codeInput} onSubmitEditing={()=>{if(digits.length===6)setStep('color')}}/>
+     <TouchableOpacity accessibilityRole="button" disabled={digits.length!==6} onPress={()=>{setError('');setStep('color')}} style={[st.cta,digits.length!==6&&{opacity:0.5}]}><Text style={st.ctaText}>Next</Text></TouchableOpacity>
+    </>:step==='color'?<>
+     <Text style={st.kicker}>Step 2 of 2</Text>
+     <Text style={st.sheetTitle}>Choose a watch colour</Text>
+     <Text style={st.sub}>So you can tell {name}'s watch apart in MoodPals.</Text>
+     <View style={{alignItems:'center'}}><WatchImage color={color} name={shortProfileName(name)} width={100}/></View>
+     <WatchColorGrid value={color} onChange={setColor} name={shortProfileName(name)}/>
+     <TouchableOpacity accessibilityRole="button" disabled={!color||busy} onPress={()=>void finish()} style={[st.cta,(!color||busy)&&{opacity:0.5}]}>{busy?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>{color?'Assign Watch':'Choose a colour'}</Text>}</TouchableOpacity>
+     <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>setStep('code')} style={{alignItems:'center',minHeight:44,justifyContent:'center'}}><Text style={st.link}>Back</Text></TouchableOpacity>
+    </>:<View style={{alignItems:'center',gap:10}}>
+     <Ionicons name="checkmark-circle" size={64} color={T.primary}/>
+     <Text style={[st.sheetTitle,{textAlign:'center'}]}>{name}'s watch is set up</Text>
+     <Text style={[st.body,{textAlign:'center'}]}>{name} can pick moods on the watch. You'll see them on Today.</Text>
+     <TouchableOpacity accessibilityRole="button" onPress={onClose} style={[st.cta,{alignSelf:'stretch'}]}><Text style={st.ctaText}>Done</Text></TouchableOpacity>
+    </View>}
+    {error?<Text style={[st.sub,{color:red,textAlign:'center'}]}>{error}</Text>:null}
+   </ScrollView>
+  </View>
+ </Modal>;
 }
 
 // ---------- Insights ----------
@@ -611,6 +687,9 @@ const st=StyleSheet.create({
  calDay:{width:34,height:34,borderRadius:17,alignItems:'center',justifyContent:'center'},
  addBtn:{flexDirection:'row',alignItems:'center',gap:6,backgroundColor:T.primary,paddingHorizontal:18,minHeight:44,borderRadius:22},
  addBtnText:{color:'#fff',fontWeight:'900',fontSize:15},
+ sheet:{backgroundColor:'#fff',borderTopLeftRadius:28,borderTopRightRadius:28,padding:22,paddingBottom:40,gap:14},
+ sheetTitle:{fontSize:22,fontWeight:'900',color:T.ink},
+ codeInput:{borderWidth:1.5,borderColor:T.border,borderRadius:18,minHeight:64,fontSize:30,fontWeight:'900',letterSpacing:10,textAlign:'center',color:T.ink,backgroundColor:'#fff'},
  editBtn:{minHeight:44,paddingHorizontal:18,borderRadius:22,justifyContent:'center',backgroundColor:T.primarySoft},
  editBtnText:{color:T.primary,fontWeight:'900',fontSize:15},
  setupDone:{flexDirection:'row',alignItems:'center',gap:10,minHeight:52,paddingHorizontal:14,borderRadius:16,backgroundColor:T.primarySoft},

@@ -106,7 +106,6 @@ export default function ConnectedDevices({focused=true,onOpenThemes,onCreateAcco
     lines={[deviceStatus(d),isWatchColor(d.watch_color)?'':'Choose Watch Color in details']} onPress={()=>setDetails(d)}/>)}
   </View>
   {onOpenThemes?<SettingsItem title="Watch Theme" subtitle="Choose your Apple Watch colour" status="Syncs to your watch automatically" icon="watch-outline" accent={purple} onPress={onOpenThemes}/>:null}
-  <FamilyWatches reloadKey={familyReload} onAdd={()=>{setMessage('');setAdding('family')}}/>
   </>:null}
 
   <Modal visible={!!adding} animationType="slide" presentationStyle="pageSheet" onRequestClose={connecting?undefined:closeAdd}>
