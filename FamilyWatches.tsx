@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {usePlus} from './PlusStore';
 import {supabase} from './supabase';
-import {onFamilyChildrenChanged} from './FamilyScreenBreak';
+import {MemberWatchCard,onFamilyChildrenChanged} from './FamilyScreenBreak';
 import SuperdotMascot from './SuperdotMascot';
 import {requireOptionalNativeModule} from 'expo';
 import {SectionHeader,WatchColorSheet,WatchImage,WatchRow,colorName,isWatchColor} from './WatchArt';
@@ -295,6 +295,7 @@ export function FamilySwitcher({children,disabled=false,onAdd,focused=true,onCha
     <Text style={styles.sub}>Family member · No watch assigned</Text>
    </View>
    {onScreenBreak?<TouchableOpacity accessibilityRole="button" onPress={()=>onScreenBreak(profile.id)} style={{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,minHeight:56,borderRadius:28,backgroundColor:purple}}><Ionicons name="hourglass-outline" size={20} color="#fff"/><Text style={{color:'#fff',fontSize:17,fontWeight:'900'}}>Screen Break</Text></TouchableOpacity>:null}
+   <MemberWatchCard childId={profile.id.slice(2)}/>
   </View>:<View style={{gap:12}}>
    <View style={[styles.card,{alignItems:'center'}]}>
     {latest?<SuperdotMascot id={MASCOT_ID[latest.mood.toLowerCase()]||'joy'} size={130}/>:null}
@@ -310,6 +311,7 @@ export function FamilySwitcher({children,disabled=false,onAdd,focused=true,onCha
    </View>:null}
    {onScreenBreak?<TouchableOpacity accessibilityRole="button" onPress={()=>onScreenBreak(profile.id)} style={styles.familyAction}><Ionicons name="hourglass-outline" size={18} color={purple}/><Text style={styles.familyActionText}>Screen Break</Text></TouchableOpacity>:null}
    <FamilyLocation profileId={profile.id} name={shortProfileName(profile.name)} tick={tick}/>
+   <MemberWatchCard profileId={profile.id}/>
   </View>}
  </View>;
 }

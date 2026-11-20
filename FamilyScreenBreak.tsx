@@ -369,6 +369,17 @@ function ChildManage({child,children,onChanged,onRemoved,onAddWatch,locked,secti
  return <MemberWatch child={child} spare={watches} onChanged={onChanged} link={link} error={error}/>;
 }
 
+// Watch card for one member, used on Today; loads the member by id, or by the family watch profile id.
+export function MemberWatchCard({childId,profileId}:{childId?:string;profileId?:string}){
+ const [children,setChildren]=useState<FamilyChild[]>([]);
+ const load=useCallback(()=>{void loadChildren().then(setChildren).catch(()=>{})},[]);
+ useEffect(()=>{load();listeners.add(load);return()=>{listeners.delete(load)}},[load]);
+ const child=children.find(c=>!c.watch_only&&(childId?c.id===childId:c.profile_user_id===profileId));
+ if(!child)return null;
+ const spare=children.filter(c=>c.watch_only&&c.profile_user_id);
+ return <MemberWatch child={child} spare={spare} onChanged={familyChildrenChanged} link={async()=>{}} error=""/>;
+}
+
 function MemberWatch({child,spare,onChanged,link,error}:{child:FamilyChild;spare:FamilyChild[];onChanged:()=>void;link:(profile:string)=>Promise<void>;error:string}){
  const {profiles,load}=useFamilyProfiles(!!child.profile_user_id);
  const [sheet,setSheet]=useState(false),[managing,setManaging]=useState(false),[unassigning,setUnassigning]=useState(false),[unError,setUnError]=useState('');
