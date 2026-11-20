@@ -224,16 +224,20 @@ private struct LockPage: View {
                 }
             } else {
                 VStack(spacing: 6) {
-                    BreakLock(locked: locked, size: 34)
-                    Text(locked ? "Apps locked" : "Apps unlocked").font(.footnote.weight(.semibold))
-                    HStack(spacing: 6) {
-                        Button("Lock") { run("lock") }
-                            .buttonStyle(BreakButtonStyle(kind: locked ? .secondary : .destructive))
-                            .disabled(locked)
-                        Button("Unlock") { run("unlock") }
-                            .buttonStyle(BreakButtonStyle(kind: locked ? .primary : .secondary))
-                            .disabled(!locked)
+                    // Tapping the lock itself locks or unlocks; it animates closed (red) or open (green).
+                    Button { run(locked ? "unlock" : "lock") } label: {
+                        BreakLock(locked: locked, size: 58)
+                            .frame(width: 96, height: 96)
+                            .background(Circle().fill((locked ? BreakStyle.red : BreakStyle.green).opacity(0.16)))
+                            .animation(.easeInOut(duration: 0.35), value: locked)
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(locked ? "Apps locked. Unlock" : "Apps unlocked. Lock")
+                    Text(locked ? "Apps locked" : "Apps unlocked")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(locked ? BreakStyle.red : BreakStyle.green)
+                    Text(locked ? "Tap the lock to unlock" : "Tap the lock to lock")
+                        .font(.caption2).foregroundStyle(.secondary)
                     StatusLine()
                     Text("Swipe for timer ›").font(.caption2).foregroundStyle(.secondary)
                 }
@@ -624,6 +628,7 @@ private struct ManageBreakView: View {
     @ObservedObject private var store = WatchScreenBreakStore.shared
     @State private var adding = false
     @State private var confirming = false
+    @State private var stopping = false
 
     private var session: WatchBreakSession? {
         guard let session = store.session, session.childId == child.id, session.isRunning else { return nil }
@@ -632,8 +637,14 @@ private struct ManageBreakView: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            Button("Add Time") { adding = true }.buttonStyle(BreakButtonStyle(kind: .primary))
-            Button("Stop") { confirming = true }.buttonStyle(BreakButtonStyle(kind: .destructive))
+            // After Stop is confirmed the options never come back; the home fades to the Lock screen.
+            if stopping || session == nil {
+                ProgressView()
+                Text("Stopping…").font(.caption2).foregroundStyle(.secondary)
+            } else {
+                Button("Add Time") { adding = true }.buttonStyle(BreakButtonStyle(kind: .primary))
+                Button("Stop") { confirming = true }.buttonStyle(BreakButtonStyle(kind: .destructive))
+            }
             StatusLine()
         }
         .disabled(store.pending != nil)
@@ -641,7 +652,7 @@ private struct ManageBreakView: View {
         .containerBackground(Color.black, for: .navigation)
         .navigationDestination(isPresented: $adding) { AddTimeView(child: child, done: close) }
         .confirmationDialog("Stop \(child.name)'s timer?", isPresented: $confirming, titleVisibility: .visible) {
-            Button("Stop", role: .destructive) { end() }
+            Button("Stop", role: .destructive) { stopping = true; end() }
             Button("Keep Going", role: .cancel) {}
         } message: {
             Text("The timer ends and the iPhone apps stay open.")
@@ -656,9 +667,10 @@ private struct ManageBreakView: View {
                 let action = current.status == "restricted" ? "release" : "cancel"
                 if await store.command(action, childId: child.id) { ended(); return }
                 // The iPhone may have just reached the deadline; retry once against the state it returned.
-                guard let latest = session, latest.version != current.version || latest.status != current.status else { return }
+                guard let latest = session, latest.version != current.version || latest.status != current.status else { stopping = false; return }
                 store.error = nil
             }
+            stopping = false
         }
     }
 }
