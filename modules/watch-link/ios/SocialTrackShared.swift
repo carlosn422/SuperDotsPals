@@ -58,6 +58,16 @@ enum SocialTrackShared {
   static var enabled: Bool { defaults.bool(forKey: enabledKey) }
   static var limitMinutes: Int { defaults.integer(forKey: limitKey) }
 
+  /// Screen Time & Stress shares the 14-day Screen Break trial, cached by MoodPals under screenBreak.entitlement.
+  /// No cache yet means MoodPals hasn't synced, so tracking keeps working until it does.
+  static func trialAllows(now: Date = Date()) -> Bool {
+    guard let data = defaults.data(forKey: "screenBreak.entitlement"),
+          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return true }
+    if json["hasPlus"] as? Bool == true || json["trialAvailable"] as? Bool == true { return true }
+    guard let ends = json["trialEndsAt"] as? Double else { return false }
+    return Date(timeIntervalSinceReferenceDate: ends) > now
+  }
+
   static func today(_ date: Date = Date()) -> String {
     let c = Calendar.current.dateComponents([.year, .month, .day], from: date)
     return "\(c.year ?? 0)-\(c.month ?? 0)-\(c.day ?? 0)"
@@ -124,6 +134,8 @@ enum SocialTrackShared {
 
   /// Called by the monitor extension. Time while a family member's Screen Break timer runs isn't the owner's.
   static func record(_ event: DeviceActivityEvent.Name, now: Date = Date()) {
+    // After the trial, the next usage callback also lifts a limit screen that was already up.
+    guard trialAllows(now: now) else { clearLimit(); return }
     applyPendingLimit(now: now)
     if event.rawValue == "limit" {
       hitLimit(now: now)
@@ -144,7 +156,7 @@ enum SocialTrackShared {
   }
 
   static func hitLimit(now: Date = Date()) {
-    guard limitMinutes > 0, defaults.string(forKey: limitSkipKey) != today(now), let selection = loadSelection() else { return }
+    guard limitMinutes > 0, trialAllows(now: now), defaults.string(forKey: limitSkipKey) != today(now), let selection = loadSelection() else { return }
     // iOS sends the limit once a day; during a family timer, hold it until the timer ends.
     if memberTimerRunning() {
       defaults.set(today(now), forKey: limitPendingKey)
