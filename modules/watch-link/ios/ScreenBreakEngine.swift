@@ -243,7 +243,7 @@ final class ScreenBreakEngine {
       throw ScreenBreakError(code: "entitlement", message: "Open MoodPals on your iPhone once while online, then try again.")
     }
     guard entitlement.allows(at: now) else {
-      throw ScreenBreakError(code: "plus", message: "Your 14-day Screen Break trial has ended. MoodPals Plus keeps Screen Break on.")
+      throw ScreenBreakError(code: "plus", message: "Your 14-day free trial has ended. MoodPals Plus keeps Screen Break on.")
     }
     var session = ScreenBreakSession(
       id: UUID().uuidString.lowercased(), childId: child.id, childName: child.name, deviceId: deviceId,
@@ -396,7 +396,7 @@ final class ScreenBreakEngine {
       throw ScreenBreakError(code: "noSelection", message: "Choose the apps to pause in MoodPals on your iPhone first.")
     }
     guard let entitlement = loadEntitlement(), entitlement.allows(at: Date()) else {
-      throw ScreenBreakError(code: "plus", message: "Your 14-day Screen Break trial has ended. MoodPals Plus keeps Screen Break on.")
+      throw ScreenBreakError(code: "plus", message: "Your 14-day free trial has ended. MoodPals Plus keeps Screen Break on.")
     }
     if ScreenBreakShared.loadSession()?.isActive == true {
       throw ScreenBreakError(code: "busy", message: "A timer is running. Stop it first.")

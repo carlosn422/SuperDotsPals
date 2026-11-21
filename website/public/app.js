@@ -4,6 +4,7 @@ const NAV_ICONS = {
   Today: '<path d="M7 2v2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zm-2 7h14v10H5V9zm2 2v3h3v-3H7z"/>',
   Actions: '<path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z"/>',
   Circle: '<path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zm7.5 1a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 20c0-3.6 3.1-6.5 7-6.5s7 2.9 7 6.5H2zm15.5 0c0-2.1-.8-4-2.2-5.4.7-.2 1.4-.3 2.2-.3 2.9 0 4.5 2.3 4.5 5.7h-4.5z"/>',
+  Family: '<path d="M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM2 19c0-3 2.7-5.5 6-5.5s6 2.5 6 5.5H2zm12.5 0c0-1.9-.7-3.6-1.9-4.9.7-.3 1.6-.6 3.4-.6 3 0 6 2 6 5.5h-7.5z"/>',
   Watches: '<path d="M9 1.5h6l.8 3.2A3.5 3.5 0 0 1 18.5 8v8a3.5 3.5 0 0 1-2.7 3.3L15 22.5H9l-.8-3.2A3.5 3.5 0 0 1 5.5 16V8a3.5 3.5 0 0 1 2.7-3.3L9 1.5z"/>',
   More: '<path d="M5 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>'
 };
@@ -45,6 +46,18 @@ const SCREENS = {
       <div class="entry"><span class="av" style="background:#B79CEB">M</span><div><b>Mom</b> sent you some sunshine ☀️<div class="muted">40m ago</div></div></div></div>
     <div class="card"><h5>Send a Little Signal</h5><div class="emojis"><span>❤️</span><span>🤗</span><span>🫶</span><span>☀️</span><span>💪</span><span>🎉</span></div></div>
     <div class="card muted">Only moods you choose to share. Never your health data.</div>${tabbar('Circle')}</div>`,
+  screentime: () => `<div class="ui"><div class="top"><span>Screen Time &amp; Stress</span></div>
+    <div class="card" style="display:flex;justify-content:space-between;align-items:center"><div><h5>Daily limit <span class="chip">per app</span></h5><div class="big">15 min</div><div class="muted">Applied to 5 selected apps</div></div>${ring(.4,'#4DBB7F',58,'30')}</div>
+    <div class="row"><div class="tile"><h5>Edit Apps</h5><div class="muted">5 apps</div></div><div class="tile"><h5>Set Limit</h5><div class="muted">15 min</div></div><div class="tile"><h5>Tracking</h5><div class="muted">On</div></div></div>
+    <div class="card"><h5>This Week <span class="muted" style="float:right">Time · Stress</span></h5><div class="bars">${[20,45,30,75,60,35,30].map((h,i)=>`<i style="height:${h}%;${i===3?'background:#2E8F64':''}"></i>`).join('')}</div><div class="muted">Thu · 1h 15m in tracked apps · stress 62</div></div>
+    <div class="card"><h5>Top Apps · Last 30 Days</h5><div class="entry" style="border:0;margin:0;padding:0"><span class="av" style="background:#F2685A">▶</span><div><b>Video app</b> · 30 min today<div class="muted">Stress after use: higher than your usual</div></div></div><div class="entry"><span class="av" style="background:#B79CEB">♪</span><div><b>Social app</b> · 15 min today<div class="muted">Still learning your pattern</div></div></div></div>${tabbar('Actions')}</div>`,
+  limit: () => `<div class="ui" style="background:#F6F7F7;text-align:center;justify-content:center;gap:6px"><img src="/img/mascots/joy.webp" alt="" style="width:84px;height:84px;margin:0 auto"><h5 style="font-size:16px;margin:0">Daily limit reached</h5><div style="font-size:11px">Hey! How about a little screen break?</div><div class="muted">You've reached your screen time limit for today. Give yourself a moment away from the screen.</div><div style="margin-top:60px;background:#4DBB7F;color:#fff;font-weight:800;border-radius:14px;padding:9px">Take a break</div><div class="muted" style="font-weight:700">I need it today</div></div>`,
+  screenbreak: () => `<div class="ui"><div class="top"><span>Tristan</span><span class="chip">Screen Break</span></div>
+    <div class="card" style="text-align:center"><h5>Screen time left</h5><div class="lvl" style="color:#4DBB7F">12:48</div><div class="muted">Apps lock when time is up</div></div>
+    <div class="row"><div class="tile" style="text-align:center"><b>+15 min</b></div><div class="tile" style="text-align:center"><b>End Now</b></div><div class="tile" style="text-align:center"><b>Cancel</b></div></div>
+    <div class="card"><h5>How long can Tristan use the phone?</h5><div><span class="chip">15 min</span><span class="chip">30 min</span><span class="chip">45 min</span><span class="chip">60 min</span><span class="chip">Custom</span></div></div>
+    <div class="card"><h5>Screen Time Insights</h5><div class="muted">Day · Week · Month · Year</div><div class="muted">This week: 3h 10m on the phone · 2h 40m granted</div></div>
+    <div class="card muted">Control it from your Apple Watch, even with MoodPals closed.</div>${tabbar('Family')}</div>`,
   // How it works: real MoodPals screens captured on the two review accounts. [file, seconds into the sequence, alt, tap point (% of screen) that leads to it]
   duoAvery: () => duoFrames([
     ['a1-checkin', 0, 'Avery\'s check-in: How are you feeling today?'],
@@ -82,9 +95,21 @@ document.querySelectorAll('.phone').forEach(phone => {
   const slides = (phone.dataset.slides || '').split(',').filter(Boolean);
   if (slides.length) {
     screen.innerHTML = slides.map((s, i) => `<img class="slide${i ? '' : ' on'}" src="/img/screens/${s}.webp?v=15" alt="MoodPals ${s.replace('-', ' ')} screen">`).join('');
-    let i = 0;
+    let i = 0, hold = false;
     const imgs = screen.querySelectorAll('.slide');
-    setInterval(() => { imgs[i].classList.remove('on'); i = (i + 1) % imgs.length; imgs[i].classList.add('on'); }, 2800);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'slide-toggle';
+    const setPaused = p => { phone.classList.toggle('paused', p); btn.setAttribute('aria-pressed', String(p)); btn.setAttribute('aria-label', p ? 'Play screenshots' : 'Pause screenshots'); };
+    setPaused(matchMedia('(prefers-reduced-motion: reduce)').matches);
+    btn.addEventListener('click', () => setPaused(!phone.classList.contains('paused')));
+    phone.appendChild(btn);
+    phone.addEventListener('mouseenter', () => { hold = true; });
+    phone.addEventListener('mouseleave', () => { hold = false; });
+    setInterval(() => {
+      if (hold || phone.classList.contains('paused')) return;
+      imgs[i].classList.remove('on'); i = (i + 1) % imgs.length; imgs[i].classList.add('on');
+    }, 4000);
     return;
   }
   const img = new Image();

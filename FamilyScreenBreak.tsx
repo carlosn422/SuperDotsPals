@@ -14,10 +14,11 @@ import {ManageFamilyProfile,familyProfilesChanged,shortProfileName,useFamilyProf
 import {WatchColorGrid,WatchImage,isWatchColor,type WatchColor} from './WatchArt';
 import {ScreenTimeReport,ackBreakSync,getBreakState,onBreakState,pendingBreakSync,pickBreakApps,requestScreenTimeAccess,screenBreakSupported,sendBreakCommand,setBreakChildren,setBreakEntitlement,type BreakAction,type BreakSession,type BreakState,type BreakSyncRow} from './modules/watch-link/screenBreak';
 import {ParentUnlockSettings,useParentGate} from './ParentGate';
+import {configureSocialTrack,getSocialState} from './modules/watch-link/socialTrack';
 import {comparison,formatDuration,observations,periodRange,periodStats,sessionInterval,type BreakPeriod,type Bucket,type SessionRow} from './ScreenBreakInsights';
 
 export type FamilyChild={id:string;name:string;profile_user_id:string|null;watch_only?:boolean};
-type Entitlement={has_plus:boolean;trial_started_at:string|null;trial_ends_at:string|null;trial_available:boolean;allowed:boolean};
+export type Entitlement={has_plus:boolean;trial_started_at:string|null;trial_ends_at:string|null;trial_available:boolean;allowed:boolean};
 const LAST_MINUTES_KEY='screenBreak.lastMinutes';
 const red='#D65B79';
 
@@ -44,8 +45,27 @@ export async function syncScreenBreak(isPlus:boolean):Promise<Entitlement|null>{
  const {data,error}=rows.length?await supabase.rpc('screen_break_sync',{p_sessions:rows}):await supabase.rpc('screen_break_entitlement');
  if(error||!data)return null;
  if(rows.length)ackBreakSync(Object.fromEntries(rows.map(r=>[r.id,r.version])));
- const e=data as Entitlement;
+ let e=data as Entitlement;
+ // Screen Time & Stress shares the trial: tracking that is on counts as started, and stops when the trial ends.
+ const social=getSocialState();
+ if(social?.enabled&&!isPlus&&!e.has_plus){
+  if(e.trial_available){const r=await supabase.rpc('screen_time_trial_start');if(!r.error&&r.data)e=r.data as Entitlement}
+  else if(!e.allowed){try{configureSocialTrack(false,social.limitMinutes)}catch{}}
+ }
+ cacheEntitlement(e,isPlus);
+ return e;
+}
+
+function cacheEntitlement(e:Entitlement,isPlus:boolean){
  setBreakEntitlement({hasPlus:isPlus||e.has_plus,trialAvailable:e.trial_available,trialStartedAt:toSec(e.trial_started_at),trialEndsAt:toSec(e.trial_ends_at)});
+}
+
+/** Starts the shared 14-day trial when Screen Time & Stress tracking is turned on. Null when offline. */
+export async function startScreenTimeTrial(isPlus:boolean):Promise<Entitlement|null>{
+ const {data,error}=await supabase.rpc('screen_time_trial_start');
+ if(error||!data)return null;
+ const e=data as Entitlement;
+ cacheEntitlement(e,isPlus);
  return e;
 }
 
@@ -321,7 +341,7 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
     <TouchableOpacity accessibilityRole="button" disabled={!ready||!validMinutes||!!busy||!!other} onPress={()=>{void AsyncStorage.setItem(LAST_MINUTES_KEY,String(chosen));run('start',{minutes:chosen})}} style={[st.cta,(!ready||!validMinutes||!!busy||!!other)&&{opacity:0.5}]}><Text style={st.ctaText}>Start</Text></TouchableOpacity>
     <Text style={[st.sub,{textAlign:'center'}]}>Your Apple Watch reminds you 5 minutes before and lets you manage it.</Text>
     </>:null}
-    {state?.entitlementKnown&&!state.allowed&&!state.hasPlus&&!isPlus&&!other?<TouchableOpacity accessibilityRole="button" accessibilityLabel="Screen Break trial ended. See MoodPals Plus" onPress={()=>showPaywall('screenBreak')} style={st.gate}>
+    {state?.entitlementKnown&&!state.allowed&&!state.hasPlus&&!isPlus&&!other?<TouchableOpacity accessibilityRole="button" accessibilityLabel="Free trial ended. See MoodPals Plus" onPress={()=>showPaywall('screenBreak')} style={st.gate}>
      <View style={st.gatePill}><Ionicons name="lock-closed" size={16} color="#fff"/><Text style={st.ctaText}>Get MoodPals Plus</Text></View>
     </TouchableOpacity>:null}
    </View>}
@@ -385,7 +405,7 @@ function DurationRing({minutes,onChange,min,max,step=5,prefix=''}:{minutes:numbe
 
 function PlanNote({state,daysLeft,onUpgrade}:{state:BreakState;daysLeft:number|null;onUpgrade:()=>void}){
  if(!state.entitlementKnown)return null;
- const text=state.trialAvailable?'14 days free: your trial starts with the first Screen Break.':state.allowed?'Screen Break trial: '+daysLeft+' day'+(daysLeft===1?'':'s')+' left.':'Your 14-day Screen Break trial has ended. Your history stays here, and you can always end or release a break.';
+ const text=state.trialAvailable?'14 days free: your trial starts with the first Screen Break or when you turn on Screen Time & Stress.':state.allowed?'Free trial: '+daysLeft+' day'+(daysLeft===1?'':'s')+' left.':'Your 14-day free trial has ended. Your history stays here, and you can always end or release a break.';
  return <TouchableOpacity accessibilityRole="button" onPress={onUpgrade} style={st.note}>
   <Ionicons name="sparkles-outline" size={18} color={T.primary}/><Text style={[st.sub,{flex:1,color:T.ink}]}>{text}</Text>
   {!state.allowed||!state.trialAvailable?<Text style={{color:T.primary,fontWeight:'900',fontSize:12}}>Plus</Text>:null}

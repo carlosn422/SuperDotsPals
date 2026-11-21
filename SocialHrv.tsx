@@ -7,7 +7,8 @@ import {APP_THEME as T} from './MoodMascot';
 import {useStress} from './StressDashboard';
 import {requestScreenTimeAccess} from './modules/watch-link/screenBreak';
 import {SocialAppLabel,configureSocialTrack,getSocialState,pickTrackedApps,socialMarks,socialTrackSupported,type SocialMark,type SocialState} from './modules/watch-link/socialTrack';
-import {CustomDurationSheet} from './FamilyScreenBreak';
+import {usePlus} from './PlusStore';
+import {CustomDurationSheet,startScreenTimeTrial,syncScreenBreak,type Entitlement} from './FamilyScreenBreak';
 import {LOOKBACK_DAYS,appInsights,formatMins,insightLine,minutesByDay,weekUse,type MoodEntry} from './SocialHrvInsights';
 
 
@@ -39,16 +40,33 @@ export function SocialHrvScreen(){
  const {state,marks,refresh}=useSocialData();
  const {points}=useStress();
  const moods=useMoods();
- const [busy,setBusy]=useState(''),[limitSheet,setLimitSheet]=useState(false);
+ const {isPlus,showPaywall}=usePlus();
+ const [busy,setBusy]=useState(''),[limitSheet,setLimitSheet]=useState(false),[error,setError]=useState('');
+ const [ent,setEnt]=useState<Entitlement|null>(null);
+ useEffect(()=>{void syncScreenBreak(isPlus).then(e=>{if(e)setEnt(e);refresh()})},[isPlus]);
+ const plus=isPlus||!!ent?.has_plus;
  const insights=useMemo(()=>appInsights(marks,points,moods),[marks,points,moods]);
  const week=useMemo(()=>weekUse(marks,points),[marks,points]);
  if(!socialTrackSupported||!state)return <View style={st.card}><Text style={st.body}>Apps & stress needs the latest MoodPals build on this iPhone.</Text></View>;
  const chosen=state.apps.length+state.groupCount;
  async function allow(){setBusy('auth');try{await requestScreenTimeAccess()}catch{}setBusy('');refresh()}
- async function pick(){setBusy('pick');try{const n=await pickTrackedApps();if(n&&!state!.enabled)configureSocialTrack(true,state!.limitMinutes)}catch{}setBusy('');refresh()}
+ /** Tracking needs Plus or the 14-day trial shared with Screen Break, which starts here if it hasn't yet. */
+ async function canTrack(){
+  if(plus)return true;
+  setError('');
+  const e=await startScreenTimeTrial(isPlus);
+  if(!e){setError('Check your connection, then try again.');return false}
+  setEnt(e);
+  if(e.allowed||e.has_plus)return true;
+  showPaywall('screenTime');return false;
+ }
+ async function pick(){setBusy('pick');try{const n=await pickTrackedApps();if(n&&!state!.enabled&&await canTrack())configureSocialTrack(true,state!.limitMinutes)}catch{}setBusy('');refresh()}
+ async function resume(){setBusy('resume');try{if(await canTrack())configureSocialTrack(true,state!.limitMinutes)}catch{}setBusy('');refresh()}
  const set=(enabled:boolean,limit:number)=>{try{configureSocialTrack(enabled,limit)}catch{}refresh()};
  return <View style={{gap:14}}>
   <View><Text style={st.title}>Screen Time & Stress</Text><Text style={st.sub}>See how your apps, screen time, and stress are connected.</Text></View>
+  {!plus&&ent?<TrialNote ent={ent} onUpgrade={()=>showPaywall('screenTime')}/>:null}
+  {error?<Text style={[st.sub,{color:'#C2573F'}]}>{error}</Text>:null}
   {!state.authorized?<View style={st.card}>
    <Text style={st.rowTitle}>Allow Screen Time access</Text>
    <Text style={st.sub}>MoodPals uses Apple's Screen Time to note each 15 minutes you spend in the apps you choose. Usage stays on this iPhone.</Text>
@@ -62,7 +80,7 @@ export function SocialHrvScreen(){
    <View style={{flexDirection:'row',gap:10}}>
     <Tile icon="apps-outline" label="Edit Apps" busy={busy==='pick'} onPress={()=>void pick()}/>
     <Tile icon="time-outline" label="Set Limit" disabled={!state.enabled} onPress={()=>setLimitSheet(true)}/>
-    <Tile icon={state.enabled?'pause-circle-outline':'play-circle-outline'} label={state.enabled?'Pause':'Resume'} onPress={()=>set(!state.enabled,state.limitMinutes)}/>
+    <Tile icon={state.enabled?'pause-circle-outline':'play-circle-outline'} label={state.enabled?'Pause':'Resume'} busy={busy==='resume'} onPress={()=>state.enabled?set(false,state.limitMinutes):void resume()}/>
    </View>
    <CustomDurationSheet visible={limitSheet} title="Daily limit" initialMinutes={state.limitMinutes||60} onClose={()=>setLimitSheet(false)} onChoose={n=>{setLimitSheet(false);set(true,n)}} onOff={state.limitMinutes?()=>{setLimitSheet(false);set(true,0)}:undefined}/>
    <WeekChart week={week} marks={marks}/>
@@ -70,6 +88,16 @@ export function SocialHrvScreen(){
    <Text style={st.note}>{state.limitMinutes?`The limit is per app: ${chosen} ${chosen===1?'app':'apps'} × ${formatMins(state.limitMinutes)} = ${formatMins(state.limitMinutes*chosen)} a day in your tracked apps altogether. `:''}At the limit, Take a break closes the app, I need it today keeps them open until midnight. Patterns, not a diagnosis: HRV also changes with sleep, exercise, caffeine and illness. Use is counted in 15-minute steps, and time during a family member's Screen Break isn't counted.</Text>
   </>}
  </View>;
+}
+
+function TrialNote({ent,onUpgrade}:{ent:Entitlement;onUpgrade:()=>void}){
+ const days=ent.trial_ends_at?Math.max(0,Math.ceil((Date.parse(ent.trial_ends_at)-Date.now())/864e5)):0;
+ const ended=!ent.trial_available&&!ent.allowed;
+ const text=ent.trial_available?'14 days free: your trial starts when you turn on tracking. Screen Break uses the same trial.':ent.allowed?`Free trial: ${days} ${days===1?'day':'days'} left.`:'Your 14-day free trial has ended. Your history stays here. MoodPals Plus keeps tracking and daily limits on.';
+ return <TouchableOpacity accessibilityRole="button" onPress={onUpgrade} style={st.trial}>
+  <View style={st.row}><Ionicons name="sparkles-outline" size={18} color={T.primary}/><Text style={[st.sub,{flex:1,color:T.ink}]}>{text}</Text>{!ent.trial_available&&!ended?<Text style={st.plusTag}>Plus</Text>:null}</View>
+  {ended?<View style={st.cta}><Text style={st.ctaText}>Get MoodPals Plus</Text></View>:null}
+ </TouchableOpacity>;
 }
 
 function LimitHero({limit,used,chosen,enabled}:{limit:number;used:number;chosen:number;enabled:boolean}){
@@ -189,6 +217,8 @@ const st=StyleSheet.create({
  sub:{fontSize:12,fontWeight:'600',color:T.muted,lineHeight:17},
  note:{fontSize:11,color:T.muted,lineHeight:16,textAlign:'center',paddingHorizontal:10},
  link:{fontSize:14,fontWeight:'800',color:T.primary},
+ trial:{gap:10,backgroundColor:'#EAF7EF',borderRadius:16,padding:12,borderWidth:1,borderColor:'#D3EEDC'},
+ plusTag:{color:T.primary,fontWeight:'900',fontSize:12},
  card:{backgroundColor:T.surface,borderRadius:20,padding:16,gap:10,borderWidth:1,borderColor:T.border},
  row:{flexDirection:'row',alignItems:'center',gap:8},
  appRow:{gap:4,paddingVertical:8,borderTopWidth:1,borderTopColor:T.border},
