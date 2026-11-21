@@ -1,6 +1,5 @@
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {ActivityIndicator,AppState,StyleSheet,Switch,Text,TouchableOpacity,View} from 'react-native';
-import Svg,{Circle,Rect} from 'react-native-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {supabase} from './supabase';
 import {APP_THEME as T} from './MoodMascot';
@@ -8,7 +7,7 @@ import {useStress} from './StressDashboard';
 import {requestScreenTimeAccess} from './modules/watch-link/screenBreak';
 import {SocialAppLabel,configureSocialTrack,getSocialState,pickTrackedApps,socialMarks,socialTrackSupported,type SocialMark,type SocialState} from './modules/watch-link/socialTrack';
 import {CustomDurationSheet} from './FamilyScreenBreak';
-import {LOOKBACK_DAYS,appInsights,formatMins,insightLine,weekUse,type MoodEntry} from './SocialHrvInsights';
+import {LOOKBACK_DAYS,appInsights,formatMins,insightLine,minutesByDay,weekUse,type MoodEntry} from './SocialHrvInsights';
 
 
 function useSocialData(){
@@ -68,7 +67,7 @@ export function SocialHrvScreen(){
     <Text style={st.sub}>When you reach it, these apps show a reminder. Choose Take a break to close the app, or I need it today to keep using these apps until midnight.</Text>
     <CustomDurationSheet visible={limitSheet} title="Daily limit" initialMinutes={state.limitMinutes||60} onClose={()=>setLimitSheet(false)} onChoose={n=>{setLimitSheet(false);set(true,n)}} onOff={state.limitMinutes?()=>{setLimitSheet(false);set(true,0)}:undefined}/>
    </View>
-   <WeekChart week={week}/>
+   <WeekChart week={week} marks={marks}/>
    <View style={st.card}>
     <Text style={st.heading}>By app · last {LOOKBACK_DAYS} days</Text>
     {!insights.length?<Text style={st.sub}>Nothing yet. Marks appear after 15 minutes in a tracked app.</Text>:insights.map(i=><View key={i.app} style={st.appRow}>
@@ -82,18 +81,37 @@ export function SocialHrvScreen(){
  </View>;
 }
 
-function WeekChart({week}:{week:ReturnType<typeof weekUse>}){
- const W=300,H=120,bw=26,max=Math.max(60,...week.map(d=>d.minutes));
- const x=(i:number)=>14+i*(W-28)/6;
+// Tap or drag across a day to see its time, stress and per-app minutes. Each day is one column, so bars,
+// dots and labels always line up.
+function WeekChart({week,marks}:{week:ReturnType<typeof weekUse>;marks:SocialMark[]}){
+ const H=120,max=Math.max(60,...week.map(d=>d.minutes));
+ const [sel,setSel]=useState(6),[width,setWidth]=useState(0);
+ const byDay=useMemo(()=>minutesByDay(marks),[marks]);
+ const day=week[sel];
+ const apps=[...(byDay.get(day.start)?.entries()??[])].sort((a,b)=>b[1]-a[1]);
+ const pick=(x:number)=>{if(width>0)setSel(Math.max(0,Math.min(6,Math.floor(x/(width/7)))))};
+ const name=(start:number,long=false)=>new Date(start).toLocaleDateString(undefined,long?{weekday:'long',month:'short',day:'numeric'}:{weekday:'short'}).slice(0,long?undefined:2);
  return <View style={st.card}>
   <Text style={st.heading}>This week</Text>
   <View style={{flexDirection:'row',gap:14}}><Legend color={T.primary} label="Time in tracked apps"/><Legend color="#E08A4C" label="Avg stress score" dot/></View>
-  <Svg width="100%" height={H+8} viewBox={`0 0 ${W} ${H+8}`}>
-   {week.map((d,i)=>{const h=d.minutes/max*(H-14);return <Rect key={'b'+i} x={x(i)-bw/2} y={H-h} width={bw} height={Math.max(h,d.minutes?3:0)} rx={7} fill={T.primary} opacity={0.75}/>})}
-   {week.map((d,i)=>d.stress===null?null:<Circle key={'s'+i} cx={x(i)} cy={H-d.stress/100*(H-14)} r={5} fill="#E08A4C" stroke="#fff" strokeWidth={2}/>)}
-  </Svg>
-  <View style={{flexDirection:'row',justifyContent:'space-between',paddingHorizontal:2}}>{week.map(d=><Text key={d.start} style={st.axis}>{['Su','Mo','Tu','We','Th','Fr','Sa'][new Date(d.start).getDay()]}</Text>)}</View>
-  <Text style={st.sub}>Today {formatMins(week[6].minutes)}{week[6].stress!==null?` · stress ${week[6].stress}`:''}</Text>
+  <View onLayout={e=>setWidth(e.nativeEvent.layout.width)} onStartShouldSetResponder={()=>true} onMoveShouldSetResponder={()=>true}
+   onResponderGrant={e=>pick(e.nativeEvent.locationX)} onResponderMove={e=>pick(e.nativeEvent.locationX)}
+   accessible accessibilityRole="adjustable" accessibilityLabel="Week chart" accessibilityValue={{text:`${name(day.start,true)}, ${formatMins(day.minutes)}${day.stress!==null?`, stress ${day.stress}`:''}`}}
+   accessibilityActions={[{name:'increment'},{name:'decrement'}]} onAccessibilityAction={e=>setSel(i=>Math.max(0,Math.min(6,i+(e.nativeEvent.actionName==='increment'?1:-1))))}
+   style={{flexDirection:'row'}}>
+   {week.map((d,i)=>{const h=d.minutes?Math.max(4,d.minutes/max*(H-14)):0,on=i===sel;return <View key={d.start} pointerEvents="none" style={{flex:1,alignItems:'center'}}>
+    <View style={{height:H,width:'100%',alignItems:'center',justifyContent:'flex-end',borderRadius:10,backgroundColor:on?T.primarySoft:'transparent'}}>
+     <View style={{width:24,height:h,borderRadius:7,backgroundColor:T.primary,opacity:on?1:0.6}}/>
+     {d.stress!==null?<View style={{position:'absolute',bottom:d.stress/100*(H-14)-5,width:12,height:12,borderRadius:6,backgroundColor:'#E08A4C',borderWidth:2,borderColor:'#fff'}}/>:null}
+    </View>
+    <Text style={[st.axis,{marginTop:6},on&&{color:T.ink}]}>{name(d.start)}</Text>
+   </View>})}
+  </View>
+  <View style={st.dayDetail}>
+   <Text style={st.rowTitle}>{sel===6?'Today':name(day.start,true)}</Text>
+   <Text style={st.body}>{formatMins(day.minutes)} in tracked apps{day.stress!==null?` · avg stress ${day.stress}`:' · no HRV reading'}</Text>
+   {apps.map(([app,n])=><View key={app} style={st.row}><AppName app={app}/><Text style={st.minutes}>{formatMins(n)}</Text></View>)}
+  </View>
  </View>;
 }
 
@@ -129,6 +147,7 @@ const st=StyleSheet.create({
  appRow:{gap:4,paddingVertical:8,borderTopWidth:1,borderTopColor:T.border},
  minutes:{fontSize:13,fontWeight:'800',color:T.muted},
  axis:{fontSize:11,fontWeight:'700',color:T.muted},
+ dayDetail:{gap:6,paddingTop:10,borderTopWidth:1,borderTopColor:T.border},
  cta:{backgroundColor:T.primary,borderRadius:26,minHeight:50,alignItems:'center',justifyContent:'center',paddingHorizontal:18},
  ctaText:{color:'#fff',fontSize:16,fontWeight:'900'},
 });
