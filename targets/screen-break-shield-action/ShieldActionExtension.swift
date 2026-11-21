@@ -2,7 +2,7 @@ import Foundation
 import ManagedSettings
 
 /// Screen Break: "OK" closes the paused app; only the parent can lift the break, from MoodPals or the Watch.
-/// The owner's daily limit: "Take a Break" closes the app; "Continue" lifts only the limit (never a Screen Break).
+/// The owner's daily limit: "Take a break" closes the app; "I need it today" lifts only the limit (never a Screen Break).
 class ShieldActionExtension: ShieldActionDelegate {
   private func respond(_ action: ShieldAction, _ completionHandler: @escaping (ShieldActionResponse) -> Void) {
     guard action == .secondaryButtonPressed, let group = UserDefaults(suiteName: "group.com.superdotspals.wellnest") else {

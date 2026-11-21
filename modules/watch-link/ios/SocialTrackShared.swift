@@ -144,7 +144,7 @@ enum SocialTrackShared {
     store.shield.webDomains = selection.webDomainTokens.isEmpty ? nil : selection.webDomainTokens
   }
 
-  /// "Continue" on the limit screen.
+  /// "I need it today" on the limit screen; the limit returns at midnight.
   static func skipToday() {
     defaults.set(today(), forKey: limitSkipKey)
     ManagedSettingsStore(named: storeName).clearAllSettings()
