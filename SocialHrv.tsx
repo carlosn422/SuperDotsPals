@@ -1,6 +1,7 @@
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
-import {ActivityIndicator,AppState,StyleSheet,Switch,Text,TouchableOpacity,View} from 'react-native';
+import {ActivityIndicator,AppState,StyleSheet,Text,TouchableOpacity,View} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import Svg,{Circle} from 'react-native-svg';
 import {supabase} from './supabase';
 import {APP_THEME as T} from './MoodMascot';
 import {useStress} from './StressDashboard';
@@ -47,76 +48,121 @@ export function SocialHrvScreen(){
  async function pick(){setBusy('pick');try{const n=await pickTrackedApps();if(n&&!state!.enabled)configureSocialTrack(true,state!.limitMinutes)}catch{}setBusy('');refresh()}
  const set=(enabled:boolean,limit:number)=>{try{configureSocialTrack(enabled,limit)}catch{}refresh()};
  return <View style={{gap:14}}>
-  <View><Text style={st.title}>Apps & stress</Text><Text style={st.sub}>See how the apps you use line up with your HRV stress score and the moods you log. Usage stays on this iPhone.</Text></View>
+  <View><Text style={st.title}>Screen Time & Stress</Text><Text style={st.sub}>See how your apps, screen time, and stress are connected.</Text></View>
   {!state.authorized?<View style={st.card}>
    <Text style={st.rowTitle}>Allow Screen Time access</Text>
-   <Text style={st.sub}>MoodPals uses Apple's Screen Time to note each 15 minutes you spend in the apps you choose.</Text>
+   <Text style={st.sub}>MoodPals uses Apple's Screen Time to note each 15 minutes you spend in the apps you choose. Usage stays on this iPhone.</Text>
    <TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={()=>void allow()} style={st.cta}>{busy==='auth'?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>Allow Screen Time Access</Text>}</TouchableOpacity>
   </View>:!chosen?<View style={st.card}>
    <Text style={st.rowTitle}>Choose apps to track</Text>
    <Text style={st.sub}>For example social media, news and video apps like Instagram, TikTok, X and YouTube. Pick apps one by one to see each separately.</Text>
    <TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={()=>void pick()} style={st.cta}>{busy==='pick'?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>Choose Apps</Text>}</TouchableOpacity>
   </View>:<>
-   <View style={st.card}>
-    <View style={st.row}><Text style={[st.rowTitle,{flex:1}]}>Tracking</Text><Switch value={state.enabled} onValueChange={v=>set(v,state.limitMinutes)} trackColor={{true:T.primary,false:'#D5DED9'}}/></View>
-    <TouchableOpacity accessibilityRole="button" onPress={()=>void pick()} style={st.row}><Text style={[st.body,{flex:1}]}>{chosen} {chosen===1?'app':'apps'} chosen</Text><Text style={st.link}>Edit apps</Text></TouchableOpacity>
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Daily limit, '+(state.limitMinutes?formatMins(state.limitMinutes):'off')+'. Set time'} disabled={!state.enabled} onPress={()=>setLimitSheet(true)} style={[st.row,{marginTop:4},!state.enabled&&{opacity:0.5}]}>
-     <View style={{flex:1}}><Text style={st.rowTitle}>Daily limit</Text><Text style={st.body}>{state.limitMinutes?formatMins(state.limitMinutes)+' a day':'Off'}</Text></View>
-     <Text style={st.link}>Set time</Text>
-    </TouchableOpacity>
-    <Text style={st.sub}>When you reach it, these apps show a reminder. Choose Take a break to close the app, or I need it today to keep using these apps until midnight.</Text>
-    <CustomDurationSheet visible={limitSheet} title="Daily limit" initialMinutes={state.limitMinutes||60} onClose={()=>setLimitSheet(false)} onChoose={n=>{setLimitSheet(false);set(true,n)}} onOff={state.limitMinutes?()=>{setLimitSheet(false);set(true,0)}:undefined}/>
+   <LimitHero limit={state.limitMinutes} used={week[6].minutes} chosen={chosen} enabled={state.enabled}/>
+   <View style={{flexDirection:'row',gap:10}}>
+    <Tile icon="apps-outline" label="Edit Apps" busy={busy==='pick'} onPress={()=>void pick()}/>
+    <Tile icon="time-outline" label="Set Limit" disabled={!state.enabled} onPress={()=>setLimitSheet(true)}/>
+    <Tile icon={state.enabled?'pause-circle-outline':'play-circle-outline'} label={state.enabled?'Pause':'Resume'} onPress={()=>set(!state.enabled,state.limitMinutes)}/>
    </View>
+   <CustomDurationSheet visible={limitSheet} title="Daily limit" initialMinutes={state.limitMinutes||60} onClose={()=>setLimitSheet(false)} onChoose={n=>{setLimitSheet(false);set(true,n)}} onOff={state.limitMinutes?()=>{setLimitSheet(false);set(true,0)}:undefined}/>
    <WeekChart week={week} marks={marks}/>
-   <View style={st.card}>
-    <Text style={st.heading}>By app · last {LOOKBACK_DAYS} days</Text>
-    {!insights.length?<Text style={st.sub}>Nothing yet. Marks appear after 15 minutes in a tracked app.</Text>:insights.map(i=><View key={i.app} style={st.appRow}>
-     <View style={st.row}><AppName app={i.app}/><Text style={st.minutes}>{formatMins(i.todayMinutes)} today</Text></View>
-     <Text style={[st.body,i.delta!==undefined&&i.delta>=8&&{color:'#C2573F'}]}>{insightLine(i)}</Text>
-     <Text style={st.sub}>{formatMins(i.periodMinutes)} over {i.days} {i.days===1?'day':'days'}{i.hrvAfter&&i.hrvUsual&&!i.learning?` · HRV after ${Math.round(i.hrvAfter)} ms vs usual ${Math.round(i.hrvUsual)} ms`:''}{i.topMood?` · Mood logged after: mostly ${i.topMood} (${i.moodCount})`:''}</Text>
-    </View>)}
-   </View>
-   <Text style={st.note}>Patterns, not a diagnosis. HRV also changes with sleep, exercise, caffeine and illness. Use is counted in 15-minute steps, and time during a family member's Screen Break isn't counted.</Text>
+   <TopApps insights={insights} marks={marks}/>
+   <Text style={st.note}>At your limit, tracked apps show a reminder: Take a break closes the app, I need it today keeps them open until midnight. Patterns, not a diagnosis: HRV also changes with sleep, exercise, caffeine and illness. Use is counted in 15-minute steps, and time during a family member's Screen Break isn't counted.</Text>
   </>}
  </View>;
 }
 
-// Tap or drag across a day to see its time, stress and per-app minutes. Each day is one column, so bars,
-// dots and labels always line up.
-function WeekChart({week,marks}:{week:ReturnType<typeof weekUse>;marks:SocialMark[]}){
- const H=120,max=Math.max(60,...week.map(d=>d.minutes));
- const [sel,setSel]=useState(6),[width,setWidth]=useState(0);
- const byDay=useMemo(()=>minutesByDay(marks),[marks]);
- const day=week[sel];
- const apps=[...(byDay.get(day.start)?.entries()??[])].sort((a,b)=>b[1]-a[1]);
- const pick=(x:number)=>{if(width>0)setSel(Math.max(0,Math.min(6,Math.floor(x/(width/7)))))};
- const name=(start:number,long=false)=>new Date(start).toLocaleDateString(undefined,long?{weekday:'long',month:'short',day:'numeric'}:{weekday:'short'}).slice(0,long?undefined:2);
- return <View style={st.card}>
-  <Text style={st.heading}>This week</Text>
-  <View style={{flexDirection:'row',gap:14}}><Legend color={T.primary} label="Time in tracked apps"/><Legend color="#E08A4C" label="Avg stress score" dot/></View>
-  <View onLayout={e=>setWidth(e.nativeEvent.layout.width)} onStartShouldSetResponder={()=>true} onMoveShouldSetResponder={()=>true}
-   onResponderGrant={e=>pick(e.nativeEvent.locationX)} onResponderMove={e=>pick(e.nativeEvent.locationX)}
-   accessible accessibilityRole="adjustable" accessibilityLabel="Week chart" accessibilityValue={{text:`${name(day.start,true)}, ${formatMins(day.minutes)}${day.stress!==null?`, stress ${day.stress}`:''}`}}
-   accessibilityActions={[{name:'increment'},{name:'decrement'}]} onAccessibilityAction={e=>setSel(i=>Math.max(0,Math.min(6,i+(e.nativeEvent.actionName==='increment'?1:-1))))}
-   style={{flexDirection:'row'}}>
-   {week.map((d,i)=>{const h=d.minutes?Math.max(4,d.minutes/max*(H-14)):0,on=i===sel;return <View key={d.start} pointerEvents="none" style={{flex:1,alignItems:'center'}}>
-    <View style={{height:H,width:'100%',alignItems:'center',justifyContent:'flex-end',borderRadius:10,backgroundColor:on?T.primarySoft:'transparent'}}>
-     <View style={{width:24,height:h,borderRadius:7,backgroundColor:T.primary,opacity:on?1:0.6}}/>
-     {d.stress!==null?<View style={{position:'absolute',bottom:d.stress/100*(H-14)-5,width:12,height:12,borderRadius:6,backgroundColor:'#E08A4C',borderWidth:2,borderColor:'#fff'}}/>:null}
-    </View>
-    <Text style={[st.axis,{marginTop:6},on&&{color:T.ink}]}>{name(d.start)}</Text>
-   </View>})}
+function LimitHero({limit,used,chosen,enabled}:{limit:number;used:number;chosen:number;enabled:boolean}){
+ const size=112,r=48,c=2*Math.PI*r,p=limit?Math.min(1,used/limit):0;
+ return <View accessible accessibilityLabel={`Today's limit ${limit?formatMins(limit):'off'}, ${formatMins(used)} used, ${chosen} apps tracked`} style={st.hero}>
+  <View style={{flex:1,gap:2}}>
+   <Text style={st.heroLabel}>Today's Limit</Text>
+   <Text style={st.heroValue} numberOfLines={1} adjustsFontSizeToFit>{limit?formatMins(limit):'Off'}</Text>
+   <Text style={st.heroLabel}>{enabled?`${chosen} ${chosen===1?'app':'apps'} tracked`:'Tracking paused'}</Text>
   </View>
-  <View style={st.dayDetail}>
-   <Text style={st.rowTitle}>{sel===6?'Today':name(day.start,true)}</Text>
-   <Text style={st.body}>{formatMins(day.minutes)} in tracked apps{day.stress!==null?` · avg stress ${day.stress}`:' · no HRV reading'}</Text>
-   {apps.map(([app,n])=><View key={app} style={st.row}><AppName app={app}/><Text style={st.minutes}>{formatMins(n)}</Text></View>)}
+  <View style={{width:size,height:size,alignItems:'center',justifyContent:'center'}}>
+   <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
+    <Circle cx={size/2} cy={size/2} r={r} stroke="#DDF2E5" strokeWidth={10} fill="#fff"/>
+    {p>0?<Circle cx={size/2} cy={size/2} r={r} stroke={T.primary} strokeWidth={10} fill="none" strokeLinecap="round" strokeDasharray={`${c*p} ${c}`} transform={`rotate(-90 ${size/2} ${size/2})`}/>:null}
+   </Svg>
+   <Text style={st.ringValue}>{formatMins(used)}</Text>
+   <Text style={st.ringLabel}>used</Text>
   </View>
  </View>;
 }
 
-function Legend({color,label,dot}:{color:string;label:string;dot?:boolean}){
- return <View style={{flexDirection:'row',alignItems:'center',gap:6}}><View style={{width:10,height:10,borderRadius:dot?5:3,backgroundColor:color}}/><Text style={st.axis}>{label}</Text></View>;
+function Tile({icon,label,onPress,disabled,busy}:{icon:keyof typeof Ionicons.glyphMap;label:string;onPress:()=>void;disabled?:boolean;busy?:boolean}){
+ return <TouchableOpacity accessibilityRole="button" accessibilityLabel={label} disabled={disabled||busy} onPress={onPress} style={[st.tile,disabled&&{opacity:0.5}]}>
+  {busy?<ActivityIndicator color={T.primary}/>:<Ionicons name={icon} size={28} color={T.primary}/>}
+  <Text style={st.tileText}>{label}</Text>
+ </TouchableOpacity>;
+}
+
+function TopApps({insights,marks}:{insights:ReturnType<typeof appInsights>;marks:SocialMark[]}){
+ const [open,setOpen]=useState<number|null>(null);
+ const first=marks.reduce((m,x)=>Math.min(m,x.at),Date.now());
+ const span=Math.min(LOOKBACK_DAYS,Math.floor((Date.now()-new Date(first).setHours(0,0,0,0))/864e5)+1);
+ const rows=[...insights].sort((a,b)=>b.periodMinutes-a.periodMinutes).map(i=>({i,avg:Math.round(i.periodMinutes/span)}));
+ const top=Math.max(1,...rows.map(r=>r.avg));
+ return <View style={st.card}>
+  <Text style={st.heading}>Top Apps · Last {LOOKBACK_DAYS} Days</Text>
+  {!rows.length?<Text style={st.sub}>Nothing yet. Apps appear after 15 minutes in a tracked app.</Text>:rows.map(({i,avg},n)=>{const on=open===i.app;return <TouchableOpacity key={i.app} accessibilityRole="button" accessibilityState={{expanded:on}} onPress={()=>setOpen(on?null:i.app)} style={[st.appRow,n===0&&{borderTopWidth:0}]}>
+   <View style={st.row}><AppName app={i.app}/><Text style={st.rowTitle}>{formatMins(i.todayMinutes)}</Text><Ionicons name={on?'chevron-down':'chevron-forward'} size={18} color={T.muted}/></View>
+   <Text style={st.sub}>{formatMins(avg)} daily avg · today {formatMins(i.todayMinutes)}</Text>
+   <View style={st.track}><View style={[st.fill,{width:`${Math.max(4,avg/top*100)}%`}]}/></View>
+   {on?<View style={{gap:4,paddingTop:4}}>
+    <Text style={[st.body,i.delta!==undefined&&i.delta>=8&&{color:'#C2573F'}]}>{insightLine(i)}</Text>
+    <Text style={st.sub}>{formatMins(i.periodMinutes)} over {i.days} {i.days===1?'day':'days'}{i.hrvAfter&&i.hrvUsual&&!i.learning?` · HRV after ${Math.round(i.hrvAfter)} ms vs usual ${Math.round(i.hrvUsual)} ms`:''}{i.topMood?` · Mood logged after: mostly ${i.topMood} (${i.moodCount})`:''}</Text>
+   </View>:null}
+  </TouchableOpacity>})}
+ </View>;
+}
+
+// Tap or drag across a day to select it. Each day is one column, so bars, tooltip and labels always line up.
+function WeekChart({week,marks}:{week:ReturnType<typeof weekUse>;marks:SocialMark[]}){
+ const H=150;
+ const [sel,setSel]=useState(6),[width,setWidth]=useState(0),[mode,setMode]=useState<'time'|'stress'>('time');
+ const byDay=useMemo(()=>minutesByDay(marks),[marks]);
+ const step=Math.max(15,Math.ceil(Math.max(...week.map(d=>d.minutes))/4/15)*15);
+ const top=mode==='time'?step*4:100;
+ const ticks=[4,3,2,1,0].map(k=>k*top/4);
+ const val=(d:typeof week[number])=>mode==='time'?d.minutes:d.stress;
+ const label=(v:number|null)=>v===null?'No reading':mode==='time'?formatMins(v):String(v);
+ const tick=(v:number)=>mode==='time'?(v>=60&&v%60===0?`${v/60}h`:v>=60?`${Math.floor(v/60)}h${v%60}`:`${v}m`):String(v);
+ const day=week[sel];
+ const apps=[...(byDay.get(day.start)?.entries()??[])].sort((a,b)=>b[1]-a[1]);
+ const pick=(x:number)=>{if(width>0)setSel(Math.max(0,Math.min(6,Math.floor(x/(width/7)))))};
+ const name=(start:number,long=false)=>new Date(start).toLocaleDateString(undefined,long?{weekday:'long',month:'short',day:'numeric'}:{weekday:'short'});
+ return <View style={st.card}>
+  <View style={st.row}>
+   <Text style={[st.heading,{flex:1,fontSize:20}]}>This Week</Text>
+   <View style={st.segment}>{(['time','stress'] as const).map(m=><TouchableOpacity key={m} accessibilityRole="button" accessibilityState={{selected:mode===m}} onPress={()=>setMode(m)} style={[st.segItem,mode===m&&st.segOn]}><Text style={[st.segText,mode===m&&{color:'#fff'}]}>{m==='time'?'Time':'Stress'}</Text></TouchableOpacity>)}</View>
+  </View>
+  <View style={{flexDirection:'row',marginTop:30}}>
+   <View style={{width:34,height:H,justifyContent:'space-between'}}>{ticks.map(v=><Text key={v} style={[st.axis,{marginVertical:-7}]}>{tick(v)}</Text>)}</View>
+   <View style={{flex:1}}>
+    <View style={[StyleSheet.absoluteFill,{height:H,justifyContent:'space-between'}]} pointerEvents="none">{ticks.map(v=><View key={v} style={{height:1,backgroundColor:T.border}}/>)}</View>
+    <View onLayout={e=>setWidth(e.nativeEvent.layout.width)} onStartShouldSetResponder={()=>true} onMoveShouldSetResponder={()=>true} onResponderTerminationRequest={()=>false}
+     onResponderGrant={e=>pick(e.nativeEvent.locationX)} onResponderMove={e=>pick(e.nativeEvent.locationX)}
+     accessible accessibilityRole="adjustable" accessibilityLabel={mode==='time'?'Time in tracked apps this week':'Average stress score this week'} accessibilityValue={{text:`${name(day.start,true)}, ${label(val(day))}`}}
+     accessibilityActions={[{name:'increment'},{name:'decrement'}]} onAccessibilityAction={e=>setSel(i=>Math.max(0,Math.min(6,i+(e.nativeEvent.actionName==='increment'?1:-1))))}
+     style={{flexDirection:'row'}}>
+     {week.map((d,i)=>{const v=val(d),h=v?Math.max(4,v/top*H):0,on=i===sel;return <View key={d.start} pointerEvents="none" style={{flex:1,alignItems:'center'}}>
+      <View style={{height:H,width:'100%',alignItems:'center',justifyContent:'flex-end'}}>
+       {on?<View style={[st.tip,{bottom:h+8}]}><Text style={st.tipText}>{label(v)}</Text><View style={st.tipArrow}/></View>:null}
+       <View style={{width:'72%',maxWidth:40,height:h,borderTopLeftRadius:6,borderTopRightRadius:6,backgroundColor:on?'#2E9E5E':'#C6EBD3'}}/>
+      </View>
+      <Text style={[st.axisDay,on&&{color:T.ink}]}>{name(d.start)}</Text>
+     </View>})}
+    </View>
+   </View>
+  </View>
+  <View style={st.dayDetail}>
+   <Text style={st.rowTitle}>{sel===6?'Today':name(day.start,true)}</Text>
+   <Text style={st.sub}>{formatMins(day.minutes)} in tracked apps{day.stress!==null?` · avg stress ${day.stress}`:' · no HRV reading'}</Text>
+   {apps.map(([app,n])=><View key={app} style={st.row}><AppName app={app}/><Text style={st.minutes}>{formatMins(n)}</Text></View>)}
+  </View>
+ </View>;
 }
 
 /** Today tab summary; hidden until tracking is on. */
@@ -135,7 +181,7 @@ export function SocialHrvTodayCard({onOpen}:{onOpen:()=>void}){
 }
 
 const st=StyleSheet.create({
- title:{fontSize:26,fontWeight:'900',color:T.ink},
+ title:{fontSize:30,fontWeight:'900',color:T.ink},
  heading:{fontSize:16,fontWeight:'900',color:T.ink},
  rowTitle:{fontSize:15,fontWeight:'800',color:T.ink},
  body:{fontSize:14,fontWeight:'600',color:T.ink,lineHeight:20},
@@ -147,6 +193,23 @@ const st=StyleSheet.create({
  appRow:{gap:4,paddingVertical:8,borderTopWidth:1,borderTopColor:T.border},
  minutes:{fontSize:13,fontWeight:'800',color:T.muted},
  axis:{fontSize:11,fontWeight:'700',color:T.muted},
+ hero:{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#EAF7EF',borderRadius:24,padding:20,borderWidth:1,borderColor:'#D3EEDC'},
+ heroLabel:{fontSize:16,fontWeight:'700',color:T.muted},
+ heroValue:{fontSize:40,fontWeight:'900',color:T.ink},
+ ringValue:{fontSize:18,fontWeight:'900',color:T.ink},
+ ringLabel:{fontSize:13,fontWeight:'700',color:T.muted},
+ tile:{flex:1,alignItems:'center',justifyContent:'center',gap:8,minHeight:96,backgroundColor:T.surface,borderRadius:18,borderWidth:1,borderColor:T.border,paddingHorizontal:4},
+ tileText:{fontSize:14,fontWeight:'800',color:T.ink,textAlign:'center'},
+ segment:{flexDirection:'row',backgroundColor:'#EEF2F0',borderRadius:18,padding:3},
+ segItem:{paddingHorizontal:16,paddingVertical:7,borderRadius:15},
+ segOn:{backgroundColor:'#2E9E5E'},
+ segText:{fontSize:14,fontWeight:'800',color:T.muted},
+ axisDay:{fontSize:13,fontWeight:'700',color:T.muted,marginTop:8},
+ tip:{position:'absolute',backgroundColor:'#2E9E5E',borderRadius:10,paddingHorizontal:8,paddingVertical:5,alignItems:'center',minWidth:56,zIndex:2},
+ tipText:{color:'#fff',fontSize:12,fontWeight:'900'},
+ tipArrow:{position:'absolute',bottom:-5,width:10,height:10,backgroundColor:'#2E9E5E',transform:[{rotate:'45deg'}]},
+ track:{height:8,borderRadius:4,backgroundColor:'#EEF2F0',overflow:'hidden'},
+ fill:{height:8,borderRadius:4,backgroundColor:T.primary},
  dayDetail:{gap:6,paddingTop:10,borderTopWidth:1,borderTopColor:T.border},
  cta:{backgroundColor:T.primary,borderRadius:26,minHeight:50,alignItems:'center',justifyContent:'center',paddingHorizontal:18},
  ctaText:{color:'#fff',fontSize:16,fontWeight:'900'},
