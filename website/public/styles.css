@@ -125,6 +125,10 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 .ui .ref{color:#B07D00;font-weight:800;margin-top:8px}
 .screen .slide{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top;opacity:0;transition:opacity .7s ease}
 .screen .slide.on{opacity:1}
+.slide-toggle{position:absolute;right:22px;top:19px;z-index:4;width:30px;height:30px;border:0;border-radius:50%;background:rgba(17,17,17,.72);cursor:pointer;display:grid;place-items:center}
+.slide-toggle::before{content:"";width:9px;height:11px;border-left:3px solid #fff;border-right:3px solid #fff;box-sizing:border-box}
+.paused .slide-toggle::before{width:0;height:0;border-style:solid;border-width:6px 0 6px 10px;border-color:transparent transparent transparent #fff;margin-left:3px}
+.slide-toggle:focus-visible{outline:3px solid #fff;box-shadow:0 0 0 6px var(--ink)}
 /* Apple Watch mockup (band + case) */
 .watch{width:150px;display:flex;flex-direction:column;align-items:center;position:relative;flex:none;filter:drop-shadow(0 22px 30px rgba(43,30,69,.28))}
 .watch .band{width:66%;height:64px;background:linear-gradient(90deg,#9FDCC8,#BFEBDD 45%,#9FDCC8);position:relative}
