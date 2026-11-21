@@ -86,6 +86,29 @@ function countdown(ms:number){
  return (h?h+':'+String(m).padStart(2,'0'):String(m))+':'+String(r).padStart(2,'0');
 }
 
+// Red while apps on this iPhone are locked (watch lock or a timer that ran out), green otherwise.
+// Tap red: a manual lock unlocks; an ended timer opens that member so the parent can act.
+function HeaderLock({onOpen}:{onOpen:(childId:string)=>void}){
+ const [state,setState]=useBreakState();
+ const [busy,setBusy]=useState(false);
+ const now=useNow(state?.session?.status==='active');
+ if(!state?.authorized)return null;
+ const s=state.session;
+ const ended=s&&(s.status==='restricted'||(s.status==='active'&&s.deadline*1000<=now))?s:undefined;
+ const locked=!!ended||!!state.manualLock;
+ function tap(){
+  if(ended){onOpen(ended.childId);return}
+  setBusy(true);
+  const reply=sendBreakCommand('unlock');
+  setBusy(false);
+  if(reply.state)setState(reply.state);
+  if(!reply.ok)Alert.alert('Unable to unlock',reply.error||'Please try again.');
+ }
+ const icon=<Ionicons name={locked?'lock-closed':'lock-open'} size={22} color={locked?red:T.primary}/>;
+ return locked?<TouchableOpacity accessibilityRole="button" accessibilityLabel={ended?`Apps locked: ${ended.childName}'s time is up. Open ${ended.childName}`:'Apps locked. Unlock'} disabled={busy} onPress={tap} hitSlop={12} style={[st.headerLock,{backgroundColor:'#FBE7EC'}]}>{busy?<ActivityIndicator color={red}/>:icon}</TouchableOpacity>
+  :<View accessible accessibilityLabel="Apps unlocked" style={[st.headerLock,{backgroundColor:T.primarySoft}]}>{icon}</View>;
+}
+
 // ---------- Screens ----------
 
 type Route={name:'list'}|{name:'child';id:string}|{name:'insights';id:string};
@@ -112,7 +135,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  if(route.name==='child'&&child)return <ChildScreen child={child} children={children} onBack={()=>setRoute({name:'list'})} onInsights={()=>setRoute({name:'insights',id:child.id})} onChanged={()=>{void load();familyChildrenChanged()}} onRemoved={()=>{setRoute({name:'list'});void load()}} onAddWatch={onAddWatch} onOpen={id=>setRoute({name:'child',id})}/>;
  return <View style={{gap:14}}>
   {!embedded&&onBack?<Back label={backLabel} onPress={onBack}/>:null}
-  <Text style={st.title} accessibilityRole="header">Family</Text>
+  <View style={[st.row,{paddingVertical:0}]}><Text style={st.title} accessibilityRole="header">Family</Text>{screenBreakSupported&&!guest?<HeaderLock onOpen={id=>setRoute({name:'child',id})}/>:null}</View>
   <Text style={st.sub}>Lend your iPhone with a Screen Break timer you control from MoodPals or your Apple Watch. Members don't need an account or a watch.</Text>
   <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
    <Text style={st.heading}>Members</Text>
@@ -722,6 +745,7 @@ function Back({label,onPress}:{label:string;onPress:()=>void}){
 const st=StyleSheet.create({
  back:{flexDirection:'row',alignItems:'center',gap:4,marginBottom:4},
  title:{fontSize:28,fontWeight:'900',color:T.ink},
+ headerLock:{width:38,height:38,borderRadius:19,alignItems:'center',justifyContent:'center'},
  heading:{fontSize:17,fontWeight:'900',color:T.ink},
  kicker:{fontSize:12,fontWeight:'900',color:T.muted,letterSpacing:0.6,textTransform:'uppercase'},
  body:{fontSize:14,lineHeight:20,color:T.ink},

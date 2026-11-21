@@ -7,7 +7,7 @@ import type {ViewProps} from 'react-native';
 export type BreakStatus='active'|'restricted'|'released'|'canceled';
 export type BreakSession={id:string;childId:string;childName:string;status:BreakStatus;startedAt:number;deadline:number;grantedSeconds:number;version:number;updatedAt:number;endedAt?:number;endReason?:'deadline'|'end_now'|'canceled'};
 export type BreakState={deviceId:string;authorized:boolean;selectionCount:number;entitlementKnown:boolean;allowed:boolean;hasPlus:boolean;trialAvailable:boolean;trialEndsAt?:number;children:{id:string;name:string}[];addTimeOptions:number[];updatedAt:number;manualLock?:boolean;session?:BreakSession};
-export type BreakAction='start'|'addTime'|'endNow'|'cancel'|'release';
+export type BreakAction='start'|'addTime'|'endNow'|'cancel'|'release'|'lock'|'unlock';
 export type BreakReply={ok:boolean;error?:string;code?:string;commandId:string;state:BreakState};
 export type BreakSyncRow={id:string;child_id:string;device_id:string;started_at:string;deadline_at:string;ended_at?:string;granted_seconds:number;status:BreakStatus;end_reason?:string;version:number};
 export type ReportRequest={period:'day'|'week'|'month'|'year';start:number;end:number;prevStart:number;windows:[number,number][];childName:string};
