@@ -334,7 +334,7 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 .promo .phone{width:min(41vw,200px);border-radius:28px;padding:6px}
 .promo .phone::before{width:30%;height:14px;top:11px}
 .promo .screen{border-radius:23px}
-.promo .slide-toggle{width:24px;height:24px;right:10px;top:auto;bottom:10px}
+.promo .slide-toggle{width:24px;height:24px;right:10px;top:10px}
 .v-flow.you{margin-right:0}.v-flow.kids{margin-left:2vw;margin-top:26px}
 .flow-tag{font-size:14px;padding:6px 14px;margin-bottom:12px}
 .v-watch{width:84px;right:-14px;bottom:-56px}
