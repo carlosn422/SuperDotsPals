@@ -61,7 +61,7 @@ export function MeetYourMoods({onCheckin}:{onCheckin:()=>void}){
    </TouchableOpacity>
  </View>;
 }
-export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,onHealthMood,onChat,onBreathing,onActions,onCaffeine,onJournal,onAddWater,onAddCaffeine,addingWater,addingCaffeine,socialCard,dayRow,onInvite,onPlans}:{onInvite:()=>void;onPlans:()=>void;socialCard?:React.ReactNode;dayRow?:React.ReactNode;companion:string;accent:string;water:number;caffeine:number;mood:string;onCheckin:()=>void;onChat:()=>void;onBreathing:()=>void;onActions:()=>void;onCaffeine:()=>void;onJournal:()=>void;onAddWater:()=>void;onAddCaffeine:()=>void;addingWater:boolean;addingCaffeine:boolean;onHealthMood?:()=>void}){
+export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,onHealthMood,onChat,onBreathing,onActions,onCaffeine,onJournal,onAddWater,onAddCaffeine,addingWater,addingCaffeine,socialCard,screenCard,dayRow,onInvite,onPlans}:{onInvite:()=>void;onPlans:()=>void;socialCard?:React.ReactNode;screenCard?:React.ReactNode;dayRow?:React.ReactNode;companion:string;accent:string;water:number;caffeine:number;mood:string;onCheckin:()=>void;onChat:()=>void;onBreathing:()=>void;onActions:()=>void;onCaffeine:()=>void;onJournal:()=>void;onAddWater:()=>void;onAddCaffeine:()=>void;addingWater:boolean;addingCaffeine:boolean;onHealthMood?:()=>void}){
  const today=new Date();
  const {goals:drinkGoals}=useDrinkGoals(usePlus().isPlus);
  const date=today.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
@@ -95,12 +95,13 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
    </View>
   </View>
   {socialCard}
+  {screenCard}
   <InviteFriendsCard onInvite={onInvite}/>
   <RecoveryInsights companion={companion} onChat={onChat}/>
   <PlusOfferCard onAllPlans={onPlans}/>
 </View>;
 }
-export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpiritual,onChat,onMood,onJournal,onBreathing,caffeine}:{companion:string;accent:string;water:number;caffeine:number;onWater:()=>void;onCaffeine:()=>void;onSpiritual:()=>void;onChat:()=>void;onMood:()=>void;onJournal:()=>void;onBreathing:()=>void}){
+export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpiritual,onChat,onMood,onJournal,onBreathing,onSocial,caffeine}:{onSocial?:()=>void;companion:string;accent:string;water:number;caffeine:number;onWater:()=>void;onCaffeine:()=>void;onSpiritual:()=>void;onChat:()=>void;onMood:()=>void;onJournal:()=>void;onBreathing:()=>void}){
  const [day,setDay]=React.useState(0);
  const [pastAmounts,setPastAmounts]=React.useState({water:0,caffeine:0});
  const {goals:drinkGoals}=useDrinkGoals(usePlus().isPlus);
@@ -158,6 +159,7 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpi
     </TouchableOpacity>
    </View>
   </View>
+  {onSocial?<View style={{gap:9}}><SectionHeading title="Screen time"/>{item('phone-portrait-outline','Apps & stress','How the apps you use line up with HRV and mood','#EAF1FF',onSocial)}</View>:null}
   <View style={{gap:9}}><SectionHeading title="Mind & reflection"/>
    <View style={{backgroundColor:"#FFFFFF",borderRadius:17,padding:13,borderWidth:1,borderColor:"#ECEAF2"}}><Text style={{color:INK,fontSize:13,fontWeight:"800"}}>Activities logged: {activitySummary.count}</Text><Text style={{color:MUTED,fontSize:12}}>{activitySummary.minutes} minutes recorded {day===0?"today":"on this day"}</Text></View>
    {item('book-outline','Spiritual Reading','Personalized Scripture and encouragement','#E7F5ED',onSpiritual)}

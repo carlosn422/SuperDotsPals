@@ -86,6 +86,29 @@ function countdown(ms:number){
  return (h?h+':'+String(m).padStart(2,'0'):String(m))+':'+String(r).padStart(2,'0');
 }
 
+// Red while apps on this iPhone are locked (watch lock or a timer that ran out), green otherwise.
+// Tap red: a manual lock unlocks; an ended timer opens that member so the parent can act.
+function HeaderLock({onOpen}:{onOpen:(childId:string)=>void}){
+ const [state,setState]=useBreakState();
+ const [busy,setBusy]=useState(false);
+ const now=useNow(state?.session?.status==='active');
+ if(!state?.authorized)return null;
+ const s=state.session;
+ const ended=s&&(s.status==='restricted'||(s.status==='active'&&s.deadline*1000<=now))?s:undefined;
+ const locked=!!ended||!!state.manualLock;
+ function tap(){
+  if(ended){onOpen(ended.childId);return}
+  setBusy(true);
+  const reply=sendBreakCommand('unlock');
+  setBusy(false);
+  if(reply.state)setState(reply.state);
+  if(!reply.ok)Alert.alert('Unable to unlock',reply.error||'Please try again.');
+ }
+ const icon=<Ionicons name={locked?'lock-closed':'lock-open'} size={22} color={locked?red:T.primary}/>;
+ return locked?<TouchableOpacity accessibilityRole="button" accessibilityLabel={ended?`Apps locked: ${ended.childName}'s time is up. Open ${ended.childName}`:'Apps locked. Unlock'} disabled={busy} onPress={tap} hitSlop={12} style={[st.headerLock,{backgroundColor:'#FBE7EC'}]}>{busy?<ActivityIndicator color={red}/>:icon}</TouchableOpacity>
+  :<View accessible accessibilityLabel="Apps unlocked" style={[st.headerLock,{backgroundColor:T.primarySoft}]}>{icon}</View>;
+}
+
 // ---------- Screens ----------
 
 type Route={name:'list'}|{name:'child';id:string}|{name:'insights';id:string};
@@ -112,7 +135,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  if(route.name==='child'&&child)return <ChildScreen child={child} children={children} onBack={()=>setRoute({name:'list'})} onInsights={()=>setRoute({name:'insights',id:child.id})} onChanged={()=>{void load();familyChildrenChanged()}} onRemoved={()=>{setRoute({name:'list'});void load()}} onAddWatch={onAddWatch} onOpen={id=>setRoute({name:'child',id})}/>;
  return <View style={{gap:14}}>
   {!embedded&&onBack?<Back label={backLabel} onPress={onBack}/>:null}
-  <Text style={st.title} accessibilityRole="header">Family</Text>
+  <View style={[st.row,{paddingVertical:0}]}><Text style={st.title} accessibilityRole="header">Family</Text>{screenBreakSupported&&!guest?<HeaderLock onOpen={id=>setRoute({name:'child',id})}/>:null}</View>
   <Text style={st.sub}>Lend your iPhone with a Screen Break timer you control from MoodPals or your Apple Watch. Members don't need an account or a watch.</Text>
   <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
    <Text style={st.heading}>Members</Text>
@@ -267,6 +290,9 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
     <TouchableOpacity accessibilityRole="button" disabled={!ready||!validMinutes||!!busy||!!other} onPress={()=>{void AsyncStorage.setItem(LAST_MINUTES_KEY,String(chosen));run('start',{minutes:chosen})}} style={[st.cta,(!ready||!validMinutes||!!busy||!!other)&&{opacity:0.5}]}><Text style={st.ctaText}>Start</Text></TouchableOpacity>
     <Text style={[st.sub,{textAlign:'center'}]}>Your Apple Watch reminds you 5 minutes before and lets you manage it.</Text>
     </>:null}
+    {state?.entitlementKnown&&!state.allowed&&!state.hasPlus&&!isPlus&&!other?<TouchableOpacity accessibilityRole="button" accessibilityLabel="Screen Break trial ended. See MoodPals Plus" onPress={()=>showPaywall('screenBreak')} style={st.gate}>
+     <View style={st.gatePill}><Ionicons name="lock-closed" size={16} color="#fff"/><Text style={st.ctaText}>Get MoodPals Plus</Text></View>
+    </TouchableOpacity>:null}
    </View>}
    {busy&&busy!=='auth'&&busy!=='pick'?<ActivityIndicator color={T.primary}/>:null}
    {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
@@ -364,7 +390,7 @@ function DurationWheel({values,value,onChange,format,label}:{values:number[];val
 
 const WHEEL_HOURS=Array.from({length:13},(_,i)=>i),WHEEL_MINUTES=[0,15,30,45];
 
-function CustomDurationSheet({visible,initialMinutes,onClose,onChoose}:{visible:boolean;initialMinutes:number;onClose:()=>void;onChoose:(n:number)=>void}){
+export function CustomDurationSheet({visible,initialMinutes,onClose,onChoose,title='Set Custom Duration',onOff}:{visible:boolean;initialMinutes:number;onClose:()=>void;onChoose:(n:number)=>void;title?:string;onOff?:()=>void}){
  const snap=(m:number)=>({h:Math.min(12,Math.floor(m/60)),m:Math.min(45,Math.round((m%60)/15)*15)});
  const [hours,setHours]=useState(snap(initialMinutes).h),[mins,setMins]=useState(snap(initialMinutes).m);
  useEffect(()=>{if(visible){const x=snap(initialMinutes);setHours(x.h);setMins(x.m)}},[visible,initialMinutes]);
@@ -375,13 +401,14 @@ function CustomDurationSheet({visible,initialMinutes,onClose,onChoose}:{visible:
    <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close custom time" accessibilityRole="button"/>
    <View style={st.durationSheet}>
     <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'}}/>
-    <Text style={[st.heading,{textAlign:'center'}]}>Set Custom Duration</Text>
+    <Text style={[st.heading,{textAlign:'center'}]}>{title}</Text>
     <View style={{flexDirection:'row',gap:12}}>
      <View style={{flex:1,gap:6}}><Text style={st.wheelLabel}>Hours</Text>{visible?<DurationWheel label="Hours" values={WHEEL_HOURS} value={hours} onChange={setHours} format={n=>n+' hr'}/>:null}</View>
      <View style={{flex:1,gap:6}}><Text style={st.wheelLabel}>Minutes</Text>{visible?<DurationWheel label="Minutes" values={WHEEL_MINUTES} value={mins} onChange={setMins} format={n=>n+' min'}/>:null}</View>
     </View>
     {hours===12&&mins>0?<Text style={[st.sub,{textAlign:'center',color:red}]}>Up to 12 hours.</Text>:null}
     <TouchableOpacity accessibilityRole="button" disabled={!valid} onPress={()=>onChoose(total)} style={[st.cta,!valid&&{opacity:0.5}]}><Text style={st.ctaText}>{valid?'Use '+fmt(hours,mins):'Choose a time'}</Text></TouchableOpacity>
+    {onOff?<TouchableOpacity accessibilityRole="button" onPress={onOff} style={st.ghost}><Text style={st.ghostText}>Turn Off</Text></TouchableOpacity>:null}
    </View>
   </View>
  </Modal>;
@@ -721,6 +748,9 @@ function Back({label,onPress}:{label:string;onPress:()=>void}){
 const st=StyleSheet.create({
  back:{flexDirection:'row',alignItems:'center',gap:4,marginBottom:4},
  title:{fontSize:28,fontWeight:'900',color:T.ink},
+ gate:{position:'absolute',top:0,left:0,right:0,bottom:0,borderRadius:20,backgroundColor:'rgba(244,247,245,0.72)',alignItems:'center',justifyContent:'center'},
+ gatePill:{flexDirection:'row',alignItems:'center',gap:8,backgroundColor:T.primary,borderRadius:24,paddingHorizontal:20,paddingVertical:12},
+ headerLock:{width:38,height:38,borderRadius:19,alignItems:'center',justifyContent:'center'},
  heading:{fontSize:17,fontWeight:'900',color:T.ink},
  kicker:{fontSize:12,fontWeight:'900',color:T.muted,letterSpacing:0.6,textTransform:'uppercase'},
  body:{fontSize:14,lineHeight:20,color:T.ink},
