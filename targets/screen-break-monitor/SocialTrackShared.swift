@@ -115,6 +115,7 @@ enum SocialTrackShared {
   static func stop() {
     DeviceActivityCenter().stopMonitoring([activityName])
     clearLimit()
+    defaults.removeObject(forKey: limitPendingKey)
   }
 
   static func loadMarks() -> [SocialMark] {
@@ -161,7 +162,7 @@ enum SocialTrackShared {
   /// The limit was reached during a family timer that has since ended.
   static func applyPendingLimit(now: Date = Date()) {
     guard let day = defaults.string(forKey: limitPendingKey) else { return }
-    if day != today(now) { defaults.removeObject(forKey: limitPendingKey); return }
+    if !enabled || day != today(now) { defaults.removeObject(forKey: limitPendingKey); return }
     if !memberTimerRunning() { hitLimit(now: now) }
   }
 
