@@ -7,9 +7,9 @@ import {APP_THEME as T} from './MoodMascot';
 import {useStress} from './StressDashboard';
 import {requestScreenTimeAccess} from './modules/watch-link/screenBreak';
 import {SocialAppLabel,configureSocialTrack,getSocialState,pickTrackedApps,socialMarks,socialTrackSupported,type SocialMark,type SocialState} from './modules/watch-link/socialTrack';
+import {CustomDurationSheet} from './FamilyScreenBreak';
 import {LOOKBACK_DAYS,appInsights,formatMins,insightLine,weekUse,type MoodEntry} from './SocialHrvInsights';
 
-const LIMITS=[0,30,60,90,120,180];
 
 function useSocialData(){
  const [state,setState]=useState<SocialState|null>(()=>getSocialState());
@@ -39,7 +39,7 @@ export function SocialHrvScreen(){
  const {state,marks,refresh}=useSocialData();
  const {points}=useStress();
  const moods=useMoods();
- const [busy,setBusy]=useState('');
+ const [busy,setBusy]=useState(''),[limitSheet,setLimitSheet]=useState(false);
  const insights=useMemo(()=>appInsights(marks,points,moods),[marks,points,moods]);
  const week=useMemo(()=>weekUse(marks,points),[marks,points]);
  if(!socialTrackSupported||!state)return <View style={st.card}><Text style={st.body}>Apps & stress needs the latest MoodPals build on this iPhone.</Text></View>;
@@ -61,9 +61,12 @@ export function SocialHrvScreen(){
    <View style={st.card}>
     <View style={st.row}><Text style={[st.rowTitle,{flex:1}]}>Tracking</Text><Switch value={state.enabled} onValueChange={v=>set(v,state.limitMinutes)} trackColor={{true:T.primary,false:'#D5DED9'}}/></View>
     <TouchableOpacity accessibilityRole="button" onPress={()=>void pick()} style={st.row}><Text style={[st.body,{flex:1}]}>{chosen} {chosen===1?'app':'apps'} chosen</Text><Text style={st.link}>Edit apps</Text></TouchableOpacity>
-    <Text style={[st.rowTitle,{marginTop:4}]}>Daily limit</Text>
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Daily limit, '+(state.limitMinutes?formatMins(state.limitMinutes):'off')+'. Set time'} disabled={!state.enabled} onPress={()=>setLimitSheet(true)} style={[st.row,{marginTop:4},!state.enabled&&{opacity:0.5}]}>
+     <View style={{flex:1}}><Text style={st.rowTitle}>Daily limit</Text><Text style={st.body}>{state.limitMinutes?formatMins(state.limitMinutes)+' a day':'Off'}</Text></View>
+     <Text style={st.link}>Set time</Text>
+    </TouchableOpacity>
     <Text style={st.sub}>When you reach it, these apps show a reminder. You can close the app or ignore the limit for the rest of the day.</Text>
-    <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{LIMITS.map(n=>{const on=state.limitMinutes===n;return <TouchableOpacity key={n} accessibilityRole="radio" accessibilityState={{selected:on}} disabled={!state.enabled} onPress={()=>set(true,n)} style={[st.chip,on&&st.chipOn,!state.enabled&&{opacity:0.5}]}><Text style={[st.chipText,on&&{color:'#fff'}]}>{n?formatMins(n):'Off'}</Text></TouchableOpacity>})}</View>
+    <CustomDurationSheet visible={limitSheet} title="Daily limit" initialMinutes={state.limitMinutes||60} onClose={()=>setLimitSheet(false)} onChoose={n=>{setLimitSheet(false);set(true,n)}} onOff={state.limitMinutes?()=>{setLimitSheet(false);set(true,0)}:undefined}/>
    </View>
    <WeekChart week={week}/>
    <View style={st.card}>
@@ -128,7 +131,4 @@ const st=StyleSheet.create({
  axis:{fontSize:11,fontWeight:'700',color:T.muted},
  cta:{backgroundColor:T.primary,borderRadius:26,minHeight:50,alignItems:'center',justifyContent:'center',paddingHorizontal:18},
  ctaText:{color:'#fff',fontSize:16,fontWeight:'900'},
- chip:{borderRadius:16,borderWidth:1.5,borderColor:T.border,paddingVertical:8,paddingHorizontal:14},
- chipOn:{backgroundColor:T.primary,borderColor:T.primary},
- chipText:{fontSize:13,fontWeight:'800',color:T.ink},
 });

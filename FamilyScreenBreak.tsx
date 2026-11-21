@@ -364,7 +364,7 @@ function DurationWheel({values,value,onChange,format,label}:{values:number[];val
 
 const WHEEL_HOURS=Array.from({length:13},(_,i)=>i),WHEEL_MINUTES=[0,15,30,45];
 
-function CustomDurationSheet({visible,initialMinutes,onClose,onChoose}:{visible:boolean;initialMinutes:number;onClose:()=>void;onChoose:(n:number)=>void}){
+export function CustomDurationSheet({visible,initialMinutes,onClose,onChoose,title='Set Custom Duration',onOff}:{visible:boolean;initialMinutes:number;onClose:()=>void;onChoose:(n:number)=>void;title?:string;onOff?:()=>void}){
  const snap=(m:number)=>({h:Math.min(12,Math.floor(m/60)),m:Math.min(45,Math.round((m%60)/15)*15)});
  const [hours,setHours]=useState(snap(initialMinutes).h),[mins,setMins]=useState(snap(initialMinutes).m);
  useEffect(()=>{if(visible){const x=snap(initialMinutes);setHours(x.h);setMins(x.m)}},[visible,initialMinutes]);
@@ -375,13 +375,14 @@ function CustomDurationSheet({visible,initialMinutes,onClose,onChoose}:{visible:
    <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close custom time" accessibilityRole="button"/>
    <View style={st.durationSheet}>
     <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'}}/>
-    <Text style={[st.heading,{textAlign:'center'}]}>Set Custom Duration</Text>
+    <Text style={[st.heading,{textAlign:'center'}]}>{title}</Text>
     <View style={{flexDirection:'row',gap:12}}>
      <View style={{flex:1,gap:6}}><Text style={st.wheelLabel}>Hours</Text>{visible?<DurationWheel label="Hours" values={WHEEL_HOURS} value={hours} onChange={setHours} format={n=>n+' hr'}/>:null}</View>
      <View style={{flex:1,gap:6}}><Text style={st.wheelLabel}>Minutes</Text>{visible?<DurationWheel label="Minutes" values={WHEEL_MINUTES} value={mins} onChange={setMins} format={n=>n+' min'}/>:null}</View>
     </View>
     {hours===12&&mins>0?<Text style={[st.sub,{textAlign:'center',color:red}]}>Up to 12 hours.</Text>:null}
     <TouchableOpacity accessibilityRole="button" disabled={!valid} onPress={()=>onChoose(total)} style={[st.cta,!valid&&{opacity:0.5}]}><Text style={st.ctaText}>{valid?'Use '+fmt(hours,mins):'Choose a time'}</Text></TouchableOpacity>
+    {onOff?<TouchableOpacity accessibilityRole="button" onPress={onOff} style={st.ghost}><Text style={st.ghostText}>Turn Off</Text></TouchableOpacity>:null}
    </View>
   </View>
  </Modal>;
