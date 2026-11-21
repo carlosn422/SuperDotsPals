@@ -125,6 +125,10 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 .ui .ref{color:#B07D00;font-weight:800;margin-top:8px}
 .screen .slide{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top;opacity:0;transition:opacity .7s ease}
 .screen .slide.on{opacity:1}
+.slide-toggle{position:absolute;right:22px;top:19px;z-index:4;width:30px;height:30px;border:0;border-radius:50%;background:rgba(17,17,17,.72);cursor:pointer;display:grid;place-items:center}
+.slide-toggle::before{content:"";width:9px;height:11px;border-left:3px solid #fff;border-right:3px solid #fff;box-sizing:border-box}
+.paused .slide-toggle::before{width:0;height:0;border-style:solid;border-width:6px 0 6px 10px;border-color:transparent transparent transparent #fff;margin-left:3px}
+.slide-toggle:focus-visible{outline:3px solid #fff;box-shadow:0 0 0 6px var(--ink)}
 /* Apple Watch mockup (band + case) */
 .watch{width:150px;display:flex;flex-direction:column;align-items:center;position:relative;flex:none;filter:drop-shadow(0 22px 30px rgba(43,30,69,.28))}
 .watch .band{width:66%;height:64px;background:linear-gradient(90deg,#9FDCC8,#BFEBDD 45%,#9FDCC8);position:relative}
@@ -297,3 +301,51 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 .spot-card li::before{content:"✓";position:absolute;left:0;top:0;width:20px;height:20px;border-radius:50%;background:var(--mint);color:var(--green);font-size:12px;display:grid;place-items:center}
 .spot-link{font-weight:800;color:var(--green)}.spot-card.kids .spot-link{color:#D2456A}
 @media(max-width:860px){.spot-grid{grid-template-columns:1fr}.spotlight{padding:40px 12px}.spot-card{padding:20px 16px;min-width:0}.spot-card .phone{width:min(270px,100%)}}
+.promo{position:relative;overflow:hidden;background:radial-gradient(60% 50% at 20% 45%,#CDEFD9,transparent 70%),radial-gradient(60% 50% at 80% 45%,#FFD9E3,transparent 70%),linear-gradient(180deg,#F1FBF4,#FFF6F8)}
+.new-badge{display:inline-block;background:linear-gradient(90deg,#FF6F91,#FF9A2E);color:#fff;font:700 15px Fredoka,sans-serif;letter-spacing:.14em;text-transform:uppercase;padding:7px 18px;border-radius:999px;transform:rotate(-4deg);box-shadow:0 8px 18px rgba(255,111,145,.35);margin-bottom:16px}
+.promo h2 em{font-style:normal;color:#D2456A;display:block}
+.promo .lead{margin-bottom:10px}
+.v-stage{display:flex;justify-content:center;align-items:flex-start;margin:30px auto 10px;padding:10px 0 50px;position:relative}
+.v-flow{position:relative;display:flex;flex-direction:column;align-items:center}
+.v-flow.you{transform:rotate(-6deg);margin-right:-14px;z-index:1}
+.v-flow.kids{transform:rotate(6deg);margin-left:-14px;margin-top:34px;z-index:2}
+.flow-tag{font:700 18px Fredoka,sans-serif;padding:8px 20px;border-radius:999px;margin-bottom:16px;color:#fff;background:var(--green);box-shadow:0 8px 18px rgba(52,179,126,.3)}
+.kids .flow-tag{background:#D2456A;box-shadow:0 8px 18px rgba(210,69,106,.3)}
+.promo .phone{width:280px}
+.v-watch{position:absolute;right:-78px;bottom:-34px;width:132px;transform:rotate(-14deg);z-index:5}
+.v-watch .band{height:40px}
+.v-watch .face img{width:100%;height:100%;margin:0;object-fit:cover}
+.toast{position:absolute;z-index:6;display:flex;gap:10px;align-items:center;background:rgba(255,255,255,.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:18px;padding:10px 14px 10px 10px;box-shadow:0 14px 30px rgba(43,30,69,.18);text-align:left;font-size:13px;line-height:1.3;color:var(--muted);width:max-content;max-width:250px}
+.toast strong{display:block;color:var(--ink);font-size:14px}
+.toast i{font-style:normal;display:inline-block;margin:6px 6px 0 0;padding:3px 10px;border-radius:999px;background:#EEE8FF;color:#7861E8;font-weight:800;font-size:12px}
+.toast i+i{background:#FFE3EA;color:#D2456A}
+.t-ico{width:36px;height:36px;border-radius:10px;flex:none;display:grid;place-items:center}
+.t-ico svg{width:22px;height:22px}
+.t-ico.ig{background:linear-gradient(45deg,#FEDA75,#FA7E1E,#D62976,#962FBF,#4F5BD5)}
+.t-ico.lock{background:#D2456A}
+.toast-you{left:-120px;top:46%;transform:rotate(6deg)}
+.toast-kids{right:-130px;top:22%;transform:rotate(-6deg)}
+.trial-line{font-weight:800;color:var(--ink);margin:14px 0 0}
+.spot-copy{display:grid;grid-template-columns:1fr 1fr;gap:40px;text-align:left;margin-top:48px}
+.spot-copy .spot-card{background:none;box-shadow:none;padding:0;display:block}
+@media(max-width:860px){
+.promo{padding:36px 0 32px}.promo h2,.promo .lead,.promo .trial-line,.promo .spot-copy{padding-left:16px;padding-right:16px}
+.v-stage{margin-top:18px;padding-bottom:70px}
+.promo .phone{width:min(41vw,200px);border-radius:28px;padding:6px}
+.promo .phone::before{width:30%;height:14px;top:11px}
+.promo .screen{border-radius:23px}
+.promo .slide-toggle{width:24px;height:24px;right:10px;top:10px}
+.v-flow.you{margin-right:0}.v-flow.kids{margin-left:2vw;margin-top:26px}
+.flow-tag{font-size:14px;padding:6px 14px;margin-bottom:12px}
+.v-watch{width:84px;right:-14px;bottom:-56px}
+.v-watch .case{border-radius:24px;padding:5px}.v-watch .face{border-radius:19px}.v-watch .band{height:22px}
+.v-watch .case::after{right:-5px;width:5px;height:14px}.v-watch .case::before{display:none}
+.toast{font-size:11px;padding:7px 10px 7px 7px;gap:7px;border-radius:14px;max-width:178px}
+.toast strong{font-size:12px}.toast i{font-size:10.5px;padding:2px 8px;margin-top:4px}
+.t-ico{width:28px;height:28px;border-radius:8px}.t-ico svg{width:17px;height:17px}
+.toast{max-width:172px}
+.v-flow.you{z-index:3}
+.toast-you{left:-10px;top:56%}
+.toast-kids{right:-12px;top:55%;max-width:164px}
+.spot-copy{grid-template-columns:1fr;gap:32px;margin-top:36px}}
+.promo .store-row{justify-content:center;margin:26px 0 0}

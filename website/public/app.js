@@ -95,9 +95,21 @@ document.querySelectorAll('.phone').forEach(phone => {
   const slides = (phone.dataset.slides || '').split(',').filter(Boolean);
   if (slides.length) {
     screen.innerHTML = slides.map((s, i) => `<img class="slide${i ? '' : ' on'}" src="/img/screens/${s}.webp?v=15" alt="MoodPals ${s.replace('-', ' ')} screen">`).join('');
-    let i = 0;
+    let i = 0, hold = false;
     const imgs = screen.querySelectorAll('.slide');
-    setInterval(() => { imgs[i].classList.remove('on'); i = (i + 1) % imgs.length; imgs[i].classList.add('on'); }, 2800);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'slide-toggle';
+    const setPaused = p => { phone.classList.toggle('paused', p); btn.setAttribute('aria-pressed', String(p)); btn.setAttribute('aria-label', p ? 'Play screenshots' : 'Pause screenshots'); };
+    setPaused(matchMedia('(prefers-reduced-motion: reduce)').matches);
+    btn.addEventListener('click', () => setPaused(!phone.classList.contains('paused')));
+    phone.appendChild(btn);
+    phone.addEventListener('mouseenter', () => { hold = true; });
+    phone.addEventListener('mouseleave', () => { hold = false; });
+    setInterval(() => {
+      if (hold || phone.classList.contains('paused')) return;
+      imgs[i].classList.remove('on'); i = (i + 1) % imgs.length; imgs[i].classList.add('on');
+    }, 4000);
     return;
   }
   const img = new Image();
