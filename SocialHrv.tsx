@@ -67,19 +67,20 @@ export function SocialHrvScreen(){
    <CustomDurationSheet visible={limitSheet} title="Daily limit" initialMinutes={state.limitMinutes||60} onClose={()=>setLimitSheet(false)} onChoose={n=>{setLimitSheet(false);set(true,n)}} onOff={state.limitMinutes?()=>{setLimitSheet(false);set(true,0)}:undefined}/>
    <WeekChart week={week} marks={marks}/>
    <TopApps insights={insights} marks={marks}/>
-   <Text style={st.note}>At your limit, tracked apps show a reminder: Take a break closes the app, I need it today keeps them open until midnight. Patterns, not a diagnosis: HRV also changes with sleep, exercise, caffeine and illness. Use is counted in 15-minute steps, and time during a family member's Screen Break isn't counted.</Text>
+   <Text style={st.note}>{state.limitMinutes?`The limit is per app: ${chosen} ${chosen===1?'app':'apps'} × ${formatMins(state.limitMinutes)} = ${formatMins(state.limitMinutes*chosen)} a day in your tracked apps altogether. `:''}At the limit, Take a break closes the app, I need it today keeps them open until midnight. Patterns, not a diagnosis: HRV also changes with sleep, exercise, caffeine and illness. Use is counted in 15-minute steps, and time during a family member's Screen Break isn't counted.</Text>
   </>}
  </View>;
 }
 
 function LimitHero({limit,used,chosen,enabled}:{limit:number;used:number;chosen:number;enabled:boolean}){
- const size=112,r=48,c=2*Math.PI*r,p=limit?Math.min(1,used/limit):0;
- return <View accessible accessibilityLabel={`Today's limit ${limit?formatMins(limit):'off'}, ${formatMins(used)} used, ${chosen} apps tracked`} style={st.hero}>
+ const size=112,r=48,c=2*Math.PI*r,total=limit*chosen,p=total?Math.min(1,used/total):0;
+ return <View accessible accessibilityLabel={`Daily limit ${limit?formatMins(limit)+' per app, applied to '+chosen+' selected apps':'off'}. ${formatMins(used)} used`} style={st.hero}>
   <View style={{flex:1,gap:2}}>
-   <Text style={st.heroLabel}>Today's Limit</Text>
+   <View style={st.row}><Text style={st.heroLabel}>Daily limit</Text>{limit?<View style={st.pill}><Text style={st.pillText}>per app</Text></View>:null}</View>
    <Text style={st.heroValue} numberOfLines={1} adjustsFontSizeToFit>{limit?formatMins(limit):'Off'}</Text>
-   <Text style={st.heroLabel}>{enabled?`${chosen} ${chosen===1?'app':'apps'} tracked`:'Tracking paused'}</Text>
+   <Text style={st.heroLabel}>{!enabled?'Tracking paused':limit?`Applied to ${chosen} selected ${chosen===1?'app':'apps'}`:`${chosen} ${chosen===1?'app':'apps'} tracked`}</Text>
   </View>
+  <View style={st.divider}/>
   <View style={{width:size,height:size,alignItems:'center',justifyContent:'center'}}>
    <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
     <Circle cx={size/2} cy={size/2} r={r} stroke="#DDF2E5" strokeWidth={10} fill="#fff"/>
@@ -175,7 +176,7 @@ export function SocialHrvTodayCard({onOpen}:{onOpen:()=>void}){
  const flagged=insights.find(i=>!i.learning&&i.delta!==undefined&&i.delta>=8);
  return <TouchableOpacity accessibilityRole="button" onPress={onOpen} style={st.card}>
   <View style={st.row}><Ionicons name="phone-portrait-outline" size={20} color={T.primary}/><Text style={[st.heading,{flex:1}]}>Apps & stress</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></View>
-  <Text style={st.body}>{formatMins(today.minutes)} in tracked apps today{state.limitMinutes?` of ${formatMins(state.limitMinutes)}`:''}</Text>
+  <Text style={st.body}>{formatMins(today.minutes)} in tracked apps today{state.limitMinutes?` of ${formatMins(state.limitMinutes*(state.apps.length+state.groupCount))}`:''}</Text>
   {flagged?<View style={st.row}><Text style={st.sub}>Higher stress after:</Text><AppName app={flagged.app}/></View>:<Text style={st.sub}>{insights.some(i=>!i.learning)?'No app stands out for stress right now.':'Still learning your patterns.'}</Text>}
  </TouchableOpacity>;
 }
@@ -195,6 +196,9 @@ const st=StyleSheet.create({
  axis:{fontSize:11,fontWeight:'700',color:T.muted},
  hero:{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#EAF7EF',borderRadius:24,padding:20,borderWidth:1,borderColor:'#D3EEDC'},
  heroLabel:{fontSize:16,fontWeight:'700',color:T.muted},
+ pill:{backgroundColor:'#CDEFD9',borderRadius:12,paddingHorizontal:10,paddingVertical:3},
+ pillText:{fontSize:14,fontWeight:'800',color:'#24734B'},
+ divider:{width:1,alignSelf:'stretch',backgroundColor:'#CFE5D7',marginVertical:6},
  heroValue:{fontSize:40,fontWeight:'900',color:T.ink},
  ringValue:{fontSize:18,fontWeight:'900',color:T.ink},
  ringLabel:{fontSize:13,fontWeight:'700',color:T.muted},

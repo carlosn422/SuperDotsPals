@@ -80,9 +80,11 @@ enum SocialTrackShared {
         events[.init("a.-1.\(k)")] = event(categories: selection.categoryTokens, webDomains: selection.webDomainTokens, minutes: k * step)
       }
     }
-    if limitMinutes > 0 {
+    // The limit is set per app; the shield appears when all chosen apps together reach limit × app count.
+    let chosen = selection.applicationTokens.count + selection.categoryTokens.count + selection.webDomainTokens.count
+    if limitMinutes > 0, chosen > 0 {
       events[.init("limit")] = event(apps: selection.applicationTokens, categories: selection.categoryTokens,
-                                     webDomains: selection.webDomainTokens, minutes: limitMinutes)
+                                     webDomains: selection.webDomainTokens, minutes: limitMinutes * chosen)
     }
     guard !events.isEmpty else { return }
     let day = DeviceActivitySchedule(intervalStart: DateComponents(hour: 0, minute: 0),
