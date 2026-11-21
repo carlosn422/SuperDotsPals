@@ -288,3 +288,12 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 .guides{grid-template-columns:repeat(3,1fr);margin-bottom:24px}.guides a.mini{text-decoration:none;color:inherit}.guides a.mini:hover{transform:translateY(-2px)}.guides h3{font-size:19px}@media(max-width:900px){.guides{grid-template-columns:1fr}}
 
 .ui .bars{display:flex;align-items:flex-end;gap:6px;height:58px;margin-bottom:6px}.ui .bars i{flex:1;background:#9FDDBB;border-radius:5px 5px 2px 2px}
+.spotlight{text-align:center;background:linear-gradient(180deg,#E4F6EA,#FFF4F7);border-radius:40px;padding:60px 40px;margin:30px auto}
+.spotlight h2{font-size:clamp(32px,4.5vw,52px)}.spotlight .lead{margin:0 auto 40px}
+.spot-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px;text-align:left}
+.spot-card{background:#fff;border-radius:30px;padding:30px;box-shadow:0 10px 30px rgba(45,74,62,.08);display:flex;flex-direction:column;gap:24px;align-items:center}
+.spot-card>div:last-child{width:100%}.spot-card h3{font-size:clamp(22px,2.4vw,28px)}.spot-card h3 em{font-style:normal;color:var(--green)}.spot-card.kids h3 em{color:#D2456A}
+.spot-card p{color:var(--muted)}.spot-card ul{padding:0;list-style:none}.spot-card li{padding-left:28px;position:relative;margin:8px 0;font-weight:700}
+.spot-card li::before{content:"✓";position:absolute;left:0;top:0;width:20px;height:20px;border-radius:50%;background:var(--mint);color:var(--green);font-size:12px;display:grid;place-items:center}
+.spot-link{font-weight:800;color:var(--green)}.spot-card.kids .spot-link{color:#D2456A}
+@media(max-width:860px){.spot-grid{grid-template-columns:1fr}.spotlight{padding:40px 18px}}
