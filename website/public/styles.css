@@ -296,4 +296,4 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 .spot-card p{color:var(--muted)}.spot-card ul{padding:0;list-style:none}.spot-card li{padding-left:28px;position:relative;margin:8px 0;font-weight:700}
 .spot-card li::before{content:"✓";position:absolute;left:0;top:0;width:20px;height:20px;border-radius:50%;background:var(--mint);color:var(--green);font-size:12px;display:grid;place-items:center}
 .spot-link{font-weight:800;color:var(--green)}.spot-card.kids .spot-link{color:#D2456A}
-@media(max-width:860px){.spot-grid{grid-template-columns:1fr}.spotlight{padding:40px 18px}}
+@media(max-width:860px){.spot-grid{grid-template-columns:1fr}.spotlight{padding:40px 12px}.spot-card{padding:20px 16px;min-width:0}.spot-card .phone{width:min(270px,100%)}}
