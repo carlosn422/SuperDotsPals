@@ -13,6 +13,8 @@ struct SocialMark: Codable, Equatable {
   let app: Int
   let minutes: Int
   let at: Date
+  /// Reached while a family member's Screen Break timer ran: counted as theirs, not the owner's.
+  var family: Bool? = nil
 }
 
 enum SocialTrackShared {
@@ -26,6 +28,7 @@ enum SocialTrackShared {
   static let limitHitKey = "socialTrack.limitHitDay"
   static let limitSkipKey = "socialTrack.limitSkipDay"
   static let startedKey = "socialTrack.startedAt"
+  static let limitPendingKey = "socialTrack.limitPendingDay"
   static let step = 15
   static let maxMarks = 16
   static let maxApps = 12
@@ -65,6 +68,9 @@ enum SocialTrackShared {
   static func start() throws {
     let center = DeviceActivityCenter()
     center.stopMonitoring([activityName])
+    // The shield follows the new choice: removed apps unlock; iOS 17.4+ re-sends the limit if still over.
+    let wasHit = defaults.string(forKey: limitHitKey) == today()
+    clearLimit()
     guard enabled, let selection = loadSelection() else { return }
     let order = orderedApps()
     var events: [DeviceActivityEvent.Name: DeviceActivityEvent] = [:]
@@ -85,6 +91,7 @@ enum SocialTrackShared {
     if limitMinutes > 0, chosen > 0 {
       events[.init("limit")] = event(apps: selection.applicationTokens, categories: selection.categoryTokens,
                                      webDomains: selection.webDomainTokens, minutes: limitMinutes * chosen)
+      if wasHit { if #unavailable(iOS 17.4) { hitLimit() } }
     }
     guard !events.isEmpty else { return }
     let day = DeviceActivitySchedule(intervalStart: DateComponents(hour: 0, minute: 0),
@@ -117,13 +124,13 @@ enum SocialTrackShared {
 
   /// Called by the monitor extension. Time while a family member's Screen Break timer runs isn't the owner's.
   static func record(_ event: DeviceActivityEvent.Name, now: Date = Date()) {
+    applyPendingLimit(now: now)
     if event.rawValue == "limit" {
       hitLimit(now: now)
       return
     }
     let parts = event.rawValue.split(separator: ".")
     guard parts.count == 3, parts[0] == "a", let app = Int(parts[1]), let k = Int(parts[2]) else { return }
-    if memberTimerRunning() { return }
     // iOS sometimes fires thresholds early; a mark can't be more minutes than have passed today.
     let sinceMidnight = now.timeIntervalSince(Calendar.current.startOfDay(for: now))
     guard Double(k * step * 60) <= sinceMidnight + 60 else { return }
@@ -132,18 +139,30 @@ enum SocialTrackShared {
     let dayStart = Calendar.current.startOfDay(for: now)
     if marks.contains(where: { $0.app == app && $0.minutes == k * step && $0.at >= dayStart }) { return }
     if now.timeIntervalSince1970 - defaults.double(forKey: startedKey) < 120 { return }
-    marks.append(SocialMark(app: app, minutes: k * step, at: now))
+    marks.append(SocialMark(app: app, minutes: k * step, at: now, family: memberTimerRunning() ? true : nil))
     if let data = try? JSONEncoder().encode(Array(marks.suffix(8000))) { defaults.set(data, forKey: marksKey) }
   }
 
   static func hitLimit(now: Date = Date()) {
-    guard limitMinutes > 0, defaults.string(forKey: limitSkipKey) != today(now), !memberTimerRunning(),
-          let selection = loadSelection() else { return }
+    guard limitMinutes > 0, defaults.string(forKey: limitSkipKey) != today(now), let selection = loadSelection() else { return }
+    // iOS sends the limit once a day; during a family timer, hold it until the timer ends.
+    if memberTimerRunning() {
+      defaults.set(today(now), forKey: limitPendingKey)
+      return
+    }
+    defaults.removeObject(forKey: limitPendingKey)
     defaults.set(today(now), forKey: limitHitKey)
     let store = ManagedSettingsStore(named: storeName)
     store.shield.applications = selection.applicationTokens.isEmpty ? nil : selection.applicationTokens
     store.shield.applicationCategories = selection.categoryTokens.isEmpty ? nil : .specific(selection.categoryTokens)
     store.shield.webDomains = selection.webDomainTokens.isEmpty ? nil : selection.webDomainTokens
+  }
+
+  /// The limit was reached during a family timer that has since ended.
+  static func applyPendingLimit(now: Date = Date()) {
+    guard let day = defaults.string(forKey: limitPendingKey) else { return }
+    if day != today(now) { defaults.removeObject(forKey: limitPendingKey); return }
+    if !memberTimerRunning() { hitLimit(now: now) }
   }
 
   /// "I need it today" on the limit screen; the limit returns at midnight.

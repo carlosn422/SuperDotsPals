@@ -9,6 +9,7 @@ public class SocialTrackModule: Module {
     Name("SocialTrack")
 
     Function("getState") { () -> [String: Any] in
+      SocialTrackShared.applyPendingLimit()
       let selection = SocialTrackShared.loadSelection()
       let order = SocialTrackShared.orderedApps()
       return [
@@ -30,10 +31,10 @@ public class SocialTrackModule: Module {
       if enabled { try SocialTrackShared.start() } else { SocialTrackShared.stop() }
     }
 
-    /// Marks since `since` (seconds): [{app, minutes, at}] with `at` in seconds.
+    /// Marks since `since` (seconds): [{app, minutes, at, family}] with `at` in seconds.
     Function("marks") { (since: Double) -> [[String: Any]] in
       SocialTrackShared.loadMarks().filter { $0.at.timeIntervalSince1970 >= since }.map {
-        ["app": $0.app, "minutes": $0.minutes, "at": $0.at.timeIntervalSince1970]
+        ["app": $0.app, "minutes": $0.minutes, "at": $0.at.timeIntervalSince1970, "family": $0.family == true]
       }
     }
 
