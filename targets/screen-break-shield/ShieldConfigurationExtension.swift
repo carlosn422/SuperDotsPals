@@ -49,10 +49,11 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
       backgroundColor: Self.background,
       icon: UIImage(named: "joy_break"),
       title: .init(text: "Daily limit reached", color: Self.ink),
-      subtitle: .init(text: "You've used your \(limit) on these apps today. How are you feeling? You can log it in MoodPals.", color: Self.body),
+      subtitle: .init(text: "You've used your \(limit) on these apps today. How are you feeling? You can log it in MoodPals. Continue keeps them open until midnight.", color: Self.body),
       primaryButtonLabel: .init(text: "Take a Break", color: .white),
       primaryButtonBackgroundColor: Self.breakGreen,
-      secondaryButtonLabel: .init(text: "Continue for Today", color: Self.ink))
+      // iOS draws fixed-width shield buttons; labels over ~11 characters wrap onto two lines.
+      secondaryButtonLabel: .init(text: "Continue", color: Self.ink))
   }
 
   private var current: ShieldConfiguration { screenBreakOn ? joyBreak : dailyLimit }
