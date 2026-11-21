@@ -16,6 +16,7 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
   private static let ink = dynamic(0x1D2B33, 0xFFFFFF)
   private static let body = dynamic(0x33444D, 0xE3EEE8)
   private static let green = rgb(0x2E9E6A)
+  private static let breakGreen = rgb(0x3E8E66)
 
   private var joyBreak: ShieldConfiguration {
     ShieldConfiguration(
@@ -49,9 +50,9 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
       icon: UIImage(named: "joy_break"),
       title: .init(text: "Daily limit reached", color: Self.ink),
       subtitle: .init(text: "You've used your \(limit) on these apps today. How are you feeling? You can log it in MoodPals.", color: Self.body),
-      primaryButtonLabel: .init(text: "Close app", color: .white),
-      primaryButtonBackgroundColor: Self.green,
-      secondaryButtonLabel: .init(text: "Ignore limit today", color: Self.body))
+      primaryButtonLabel: .init(text: "Take a Break", color: .white),
+      primaryButtonBackgroundColor: Self.breakGreen,
+      secondaryButtonLabel: .init(text: "Continue for Today", color: Self.ink))
   }
 
   private var current: ShieldConfiguration { screenBreakOn ? joyBreak : dailyLimit }

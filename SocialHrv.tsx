@@ -65,7 +65,7 @@ export function SocialHrvScreen(){
      <View style={{flex:1}}><Text style={st.rowTitle}>Daily limit</Text><Text style={st.body}>{state.limitMinutes?formatMins(state.limitMinutes)+' a day':'Off'}</Text></View>
      <Text style={st.link}>Set time</Text>
     </TouchableOpacity>
-    <Text style={st.sub}>When you reach it, these apps show a reminder. You can close the app or ignore the limit for the rest of the day.</Text>
+    <Text style={st.sub}>When you reach it, these apps show a reminder. Choose Take a Break to close the app, or Continue for Today to keep using it until midnight.</Text>
     <CustomDurationSheet visible={limitSheet} title="Daily limit" initialMinutes={state.limitMinutes||60} onClose={()=>setLimitSheet(false)} onChoose={n=>{setLimitSheet(false);set(true,n)}} onOff={state.limitMinutes?()=>{setLimitSheet(false);set(true,0)}:undefined}/>
    </View>
    <WeekChart week={week}/>
