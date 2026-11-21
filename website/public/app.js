@@ -97,7 +97,11 @@ document.querySelectorAll('.phone').forEach(phone => {
     screen.innerHTML = slides.map((s, i) => `<img class="slide${i ? '' : ' on'}" src="/img/screens/${s}.webp?v=15" alt="MoodPals ${s.replace('-', ' ')} screen">`).join('');
     let i = 0;
     const imgs = screen.querySelectorAll('.slide');
-    setInterval(() => { imgs[i].classList.remove('on'); i = (i + 1) % imgs.length; imgs[i].classList.add('on'); }, 2800);
+    let hold = matchMedia('(prefers-reduced-motion: reduce)').matches, hover = false;
+    phone.addEventListener('mouseenter', () => { hover = true; });
+    phone.addEventListener('mouseleave', () => { hover = false; });
+    phone.addEventListener('click', () => { hold = !hold; });
+    setInterval(() => { if (hold || hover) return; imgs[i].classList.remove('on'); i = (i + 1) % imgs.length; imgs[i].classList.add('on'); }, 2800);
     return;
   }
   const img = new Image();
@@ -144,7 +148,11 @@ document.querySelectorAll('[data-watch]').forEach(watch => {
     watch.innerHTML = `<div class="band top"></div><div class="case"><div class="face">${slides.map((s, i) => `<img class="wslide${i ? '' : ' on'}" src="/img/watch/${s}.webp?v=4" alt="MoodPals Apple Watch ${s} screen">`).join('')}</div></div><div class="band bottom"></div>`;
     let i = 0;
     const imgs = watch.querySelectorAll('.wslide');
-    setInterval(() => { imgs[i].classList.remove('on'); i = (i + 1) % imgs.length; imgs[i].classList.add('on'); }, 2800);
+    let hold = matchMedia('(prefers-reduced-motion: reduce)').matches, hover = false;
+    phone.addEventListener('mouseenter', () => { hover = true; });
+    phone.addEventListener('mouseleave', () => { hover = false; });
+    phone.addEventListener('click', () => { hold = !hold; });
+    setInterval(() => { if (hold || hover) return; imgs[i].classList.remove('on'); i = (i + 1) % imgs.length; imgs[i].classList.add('on'); }, 2800);
     return;
   }
   watch.innerHTML = '<div class="band top"></div><div class="case"><div class="face"><span class="time"></span><img src="/img/mascots/disgust.webp" alt="Calm pal on Apple Watch"><div class="mood">Calm</div><div class="hint">Tap to change mood</div></div></div><div class="band bottom"></div>';
