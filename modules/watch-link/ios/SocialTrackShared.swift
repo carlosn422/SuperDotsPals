@@ -25,6 +25,7 @@ enum SocialTrackShared {
   static let marksKey = "socialTrack.marks"
   static let limitHitKey = "socialTrack.limitHitDay"
   static let limitSkipKey = "socialTrack.limitSkipDay"
+  static let startedKey = "socialTrack.startedAt"
   static let step = 15
   static let maxMarks = 16
   static let maxApps = 12
@@ -71,23 +72,35 @@ enum SocialTrackShared {
     let tracked = order.enumerated().filter { selection.applicationTokens.contains($0.element) }.prefix(maxApps)
     for (i, token) in tracked {
       for k in 1...maxMarks {
-        events[.init("a.\(i).\(k)")] = DeviceActivityEvent(applications: [token], threshold: DateComponents(minute: k * step))
+        events[.init("a.\(i).\(k)")] = event(apps: [token], minutes: k * step)
       }
     }
     if !selection.categoryTokens.isEmpty || !selection.webDomainTokens.isEmpty {
       for k in 1...maxMarks {
-        events[.init("a.-1.\(k)")] = DeviceActivityEvent(categories: selection.categoryTokens, webDomains: selection.webDomainTokens,
-                                                         threshold: DateComponents(minute: k * step))
+        events[.init("a.-1.\(k)")] = event(categories: selection.categoryTokens, webDomains: selection.webDomainTokens, minutes: k * step)
       }
     }
     if limitMinutes > 0 {
-      events[.init("limit")] = DeviceActivityEvent(applications: selection.applicationTokens, categories: selection.categoryTokens,
-                                                   webDomains: selection.webDomainTokens, threshold: DateComponents(minute: limitMinutes))
+      events[.init("limit")] = event(apps: selection.applicationTokens, categories: selection.categoryTokens,
+                                     webDomains: selection.webDomainTokens, minutes: limitMinutes)
     }
     guard !events.isEmpty else { return }
     let day = DeviceActivitySchedule(intervalStart: DateComponents(hour: 0, minute: 0),
                                      intervalEnd: DateComponents(hour: 23, minute: 59, second: 59), repeats: true)
+    defaults.set(Date().timeIntervalSince1970, forKey: startedKey)
     try center.startMonitoring(activityName, during: day, events: events)
+  }
+
+  /// Counts today's use from before monitoring (re)started (iOS 17.4+), so editing apps, changing the limit
+  /// or reinstalling doesn't reset the day.
+  private static func event(apps: Set<ApplicationToken> = [], categories: Set<ActivityCategoryToken> = [],
+                            webDomains: Set<WebDomainToken> = [], minutes: Int) -> DeviceActivityEvent {
+    let threshold = DateComponents(minute: minutes)
+    if #available(iOS 17.4, *) {
+      return DeviceActivityEvent(applications: apps, categories: categories, webDomains: webDomains,
+                                 threshold: threshold, includesPastActivity: true)
+    }
+    return DeviceActivityEvent(applications: apps, categories: categories, webDomains: webDomains, threshold: threshold)
   }
 
   static func stop() {
@@ -113,6 +126,10 @@ enum SocialTrackShared {
     let sinceMidnight = now.timeIntervalSince(Calendar.current.startOfDay(for: now))
     guard Double(k * step * 60) <= sinceMidnight + 60 else { return }
     var marks = loadMarks()
+    // Restarting replays marks already passed today; they'd carry the wrong time, so keep only new ones.
+    let dayStart = Calendar.current.startOfDay(for: now)
+    if marks.contains(where: { $0.app == app && $0.minutes == k * step && $0.at >= dayStart }) { return }
+    if now.timeIntervalSince1970 - defaults.double(forKey: startedKey) < 120 { return }
     marks.append(SocialMark(app: app, minutes: k * step, at: now))
     if let data = try? JSONEncoder().encode(Array(marks.suffix(8000))) { defaults.set(data, forKey: marksKey) }
   }
