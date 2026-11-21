@@ -134,7 +134,8 @@ enum SocialTrackShared {
 
   /// Called by the monitor extension. Time while a family member's Screen Break timer runs isn't the owner's.
   static func record(_ event: DeviceActivityEvent.Name, now: Date = Date()) {
-    guard trialAllows(now: now) else { return }
+    // After the trial, the next usage callback also lifts a limit screen that was already up.
+    guard trialAllows(now: now) else { clearLimit(); return }
     applyPendingLimit(now: now)
     if event.rawValue == "limit" {
       hitLimit(now: now)
