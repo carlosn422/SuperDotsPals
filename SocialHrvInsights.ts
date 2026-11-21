@@ -15,23 +15,32 @@ export type AppInsight={app:number;todayMinutes:number;periodMinutes:number;days
 export type DayUse={start:number;minutes:number;stress:number|null};
 
 const dayStart=(ms:number)=>{const d=new Date(ms);d.setHours(0,0,0,0);return d.getTime()};
+/** Local midnight `n` days before `ms`'s day; calendar-based so daylight-saving days stay aligned. */
+const daysBefore=(ms:number,n:number)=>{const d=new Date(ms);d.setHours(0,0,0,0);d.setDate(d.getDate()-n);return d.getTime()};
 const avg=(v:number[])=>v.length?v.reduce((a,b)=>a+b,0)/v.length:undefined;
 
-/** Highest mark per app per day = that app's minutes that day (15-minute steps). */
+/** The owner's minutes per app per day (15-minute steps). Marks are cumulative for the day, so each owner
+ * mark adds only its step over the previous mark; steps reached during a family timer aren't counted. */
 export function minutesByDay(marks:SocialMark[]){
- const days=new Map<number,Map<number,number>>();
- for(const m of marks){const d=dayStart(m.at);const apps=days.get(d)??new Map<number,number>();apps.set(m.app,Math.max(apps.get(m.app)??0,m.minutes));days.set(d,apps)}
+ const days=new Map<number,Map<number,number>>(),last=new Map<string,number>();
+ for(const m of [...marks].sort((a,b)=>a.at-b.at)){
+  const d=dayStart(m.at),key=`${d}:${m.app}`,prev=last.get(key)??0;
+  if(m.minutes<=prev)continue;
+  last.set(key,m.minutes);
+  if(m.family)continue;
+  const apps=days.get(d)??new Map<number,number>();apps.set(m.app,(apps.get(m.app)??0)+m.minutes-prev);days.set(d,apps);
+ }
  return days;
 }
 
 export function appInsights(marks:SocialMark[],points:StressPoint[],moods:MoodEntry[],now=Date.now()):AppInsight[]{
- const since=dayStart(now)-(LOOKBACK_DAYS-1)*864e5;
- const recent=marks.filter(m=>m.at>=since);
+ const since=daysBefore(now,LOOKBACK_DAYS-1);
+ const all=marks.filter(m=>m.at>=since),recent=all.filter(m=>!m.family);
  const pts=points.map(p=>({t:Date.parse(p.at),score:p.score,hrv:p.hrv})).filter(p=>Number.isFinite(p.t)&&p.t>=since&&p.t<=now);
  const usual=median(pts.map(p=>p.score))??NaN;
  const hrvUsual=median(pts.map(p=>p.hrv).filter((h):h is number=>typeof h==='number'&&h>0))??NaN;
  const moodTimes=moods.map(m=>({t:Date.parse(m.occurred_at),mood:moodLabel(m.mood)})).filter(m=>Number.isFinite(m.t)&&m.t>=since);
- const byDay=minutesByDay(recent),today=dayStart(now);
+ const byDay=minutesByDay(all),today=dayStart(now);
  const apps=[...new Set(recent.map(m=>m.app))];
  return apps.map(app=>{
   const own=recent.filter(m=>m.app===app);
@@ -55,9 +64,9 @@ export function appInsights(marks:SocialMark[],points:StressPoint[],moods:MoodEn
 export function weekUse(marks:SocialMark[],points:StressPoint[],now=Date.now()):DayUse[]{
  const byDay=minutesByDay(marks);
  return Array.from({length:7},(_,i)=>{
-  const start=dayStart(now)-(6-i)*864e5;
+  const start=daysBefore(now,6-i),end=daysBefore(now,5-i);
   let minutes=0;byDay.get(start)?.forEach(n=>{minutes+=n});
-  const scores=points.map(p=>({t:Date.parse(p.at),s:p.score})).filter(p=>p.t>=start&&p.t<start+864e5).map(p=>p.s);
+  const scores=points.map(p=>({t:Date.parse(p.at),s:p.score})).filter(p=>p.t>=start&&p.t<end).map(p=>p.s);
   const a=avg(scores);
   return {start,minutes,stress:a===undefined?null:Math.round(a)};
  });

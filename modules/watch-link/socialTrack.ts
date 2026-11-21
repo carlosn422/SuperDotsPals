@@ -3,7 +3,7 @@ import type {ComponentType} from 'react';
 import type {ViewProps} from 'react-native';
 
 // The owner's own app tracking. iOS reports each 15 minutes of use per chosen app; the marks stay on this iPhone.
-export type SocialMark={app:number;minutes:number;at:number};
+export type SocialMark={app:number;minutes:number;at:number;family?:boolean};
 export type SocialState={authorized:boolean;enabled:boolean;limitMinutes:number;limitHitToday:boolean;apps:number[];groupCount:number};
 
 type Native={
