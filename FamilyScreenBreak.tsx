@@ -290,6 +290,9 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
     <TouchableOpacity accessibilityRole="button" disabled={!ready||!validMinutes||!!busy||!!other} onPress={()=>{void AsyncStorage.setItem(LAST_MINUTES_KEY,String(chosen));run('start',{minutes:chosen})}} style={[st.cta,(!ready||!validMinutes||!!busy||!!other)&&{opacity:0.5}]}><Text style={st.ctaText}>Start</Text></TouchableOpacity>
     <Text style={[st.sub,{textAlign:'center'}]}>Your Apple Watch reminds you 5 minutes before and lets you manage it.</Text>
     </>:null}
+    {state?.entitlementKnown&&!state.allowed&&!state.hasPlus&&!isPlus&&!other?<TouchableOpacity accessibilityRole="button" accessibilityLabel="Screen Break trial ended. See MoodPals Plus" onPress={()=>showPaywall('screenBreak')} style={st.gate}>
+     <View style={st.gatePill}><Ionicons name="lock-closed" size={16} color="#fff"/><Text style={st.ctaText}>Get MoodPals Plus</Text></View>
+    </TouchableOpacity>:null}
    </View>}
    {busy&&busy!=='auth'&&busy!=='pick'?<ActivityIndicator color={T.primary}/>:null}
    {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
@@ -745,6 +748,8 @@ function Back({label,onPress}:{label:string;onPress:()=>void}){
 const st=StyleSheet.create({
  back:{flexDirection:'row',alignItems:'center',gap:4,marginBottom:4},
  title:{fontSize:28,fontWeight:'900',color:T.ink},
+ gate:{position:'absolute',top:0,left:0,right:0,bottom:0,borderRadius:20,backgroundColor:'rgba(244,247,245,0.72)',alignItems:'center',justifyContent:'center'},
+ gatePill:{flexDirection:'row',alignItems:'center',gap:8,backgroundColor:T.primary,borderRadius:24,paddingHorizontal:20,paddingVertical:12},
  headerLock:{width:38,height:38,borderRadius:19,alignItems:'center',justifyContent:'center'},
  heading:{fontSize:17,fontWeight:'900',color:T.ink},
  kicker:{fontSize:12,fontWeight:'900',color:T.muted,letterSpacing:0.6,textTransform:'uppercase'},
