@@ -104,7 +104,7 @@ export function PlusSettingsScreen({onBack,accent}:{onBack:()=>void;accent:strin
   </View>
   {isPlus?<TouchableOpacity accessibilityRole="button" onPress={openManageSubscriptions} style={s.cta}><Text style={s.ctaText}>Manage Subscription</Text></TouchableOpacity>:<TouchableOpacity accessibilityRole="button" onPress={()=>showPaywall('general')} style={s.cta}><Text style={s.ctaText}>Upgrade to Plus</Text></TouchableOpacity>}
   <TouchableOpacity accessibilityRole="button" onPress={()=>void restore().then(ok=>Alert.alert(ok?'Purchases restored':'Nothing to restore',ok?'MoodPals Plus is active.':'We couldn\'t find a MoodPals Plus subscription for this Apple Account.'))}><Text style={s.restore}>Restore Purchases</Text></TouchableOpacity>
-  <Text style={s.terms}>Plus works without an account. You only need to sign in to sync across devices or use My Circle, and your subscription moves with you when you do.</Text>
+  <Text style={s.terms}>Subscribing needs a free MoodPals account, so Plus stays with you on every device.</Text>
   {PLUS_MOCKUP?<View style={[s.card,{gap:4}]}>
    <Text style={s.planLabel}>Preview premium moments</Text>
    <Text style={s.planSub}>Each opens the Plus sheet the way a Free user would see it.</Text>

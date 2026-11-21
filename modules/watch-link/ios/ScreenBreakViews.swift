@@ -6,9 +6,10 @@ import SwiftUI
 // SwiftUI lives here, apart from ScreenBreakModule, so its `View` doesn't clash with the Expo module DSL.
 
 enum ScreenBreakPicker {
-  static func present(from presenter: UIViewController, completion: @escaping (FamilyActivitySelection?) -> Void) {
+  static func present(from presenter: UIViewController, initial: FamilyActivitySelection? = ScreenBreakShared.loadSelection(),
+                      title: String = "Apps to pause", completion: @escaping (FamilyActivitySelection?) -> Void) {
     var controller: UIViewController?
-    let picker = ScreenBreakPickerView(selection: ScreenBreakShared.loadSelection() ?? FamilyActivitySelection()) { chosen in
+    let picker = ScreenBreakPickerView(selection: initial ?? FamilyActivitySelection(), title: title) { chosen in
       controller?.dismiss(animated: true)
       controller = nil
       completion(chosen)
@@ -22,12 +23,13 @@ enum ScreenBreakPicker {
 
 struct ScreenBreakPickerView: SwiftUI.View {
   @State var selection: FamilyActivitySelection
+  var title = "Apps to pause"
   let onDone: (FamilyActivitySelection?) -> Void
 
   var body: some SwiftUI.View {
     NavigationView {
       FamilyActivityPicker(selection: $selection)
-        .navigationTitle("Apps to pause")
+        .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
           ToolbarItem(placement: .cancellationAction) { Button("Cancel") { onDone(nil) } }
