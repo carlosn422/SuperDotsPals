@@ -17,7 +17,7 @@ private enum Routine: String, CaseIterable, Identifiable {
 }
 
 /// Rounded square traced clockwise from its top-left corner, so each side (plus the corner after it) is a quarter.
-private struct BreathSquare: Shape {
+struct BreathSquare: Shape {
     func path(in rect: CGRect) -> Path {
         let r = rect.width * 0.22
         var p = Path()
