@@ -8,7 +8,12 @@ public class SocialTrackModule: Module {
   public func definition() -> ModuleDefinition {
     Name("SocialTrack")
 
+    OnCreate {
+      SocialTrackShared.migrateIfNeeded()
+    }
+
     Function("getState") { () -> [String: Any] in
+      SocialTrackShared.migrateIfNeeded()
       SocialTrackShared.checkLimit()
       let selection = SocialTrackShared.loadSelection()
       let order = SocialTrackShared.orderedApps()

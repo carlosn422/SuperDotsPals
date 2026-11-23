@@ -33,6 +33,11 @@ enum SocialTrackShared {
   static let limitSkipKey = "socialTrack.limitSkipDay"
   static let startedKey = "socialTrack.startedAt"
   static let dailyKey = "socialTrack.daily"
+  /// "y-m-d|minutes": the last 5-minute total the current schedule reported today.
+  static let totalLastKey = "socialTrack.totalLast"
+  /// Bumped when the schedule's events change, so MoodPals restarts an older schedule on launch.
+  static let scheduleVersionKey = "socialTrack.scheduleVersion"
+  static let scheduleVersion = 2
   /// Daily totals use this key for the owner; family members use their id.
   static let ownerKey = "you"
   static let step = 15
@@ -117,7 +122,10 @@ enum SocialTrackShared {
     let day = DeviceActivitySchedule(intervalStart: DateComponents(hour: 0, minute: 0),
                                      intervalEnd: DateComponents(hour: 23, minute: 59, second: 59), repeats: true)
     defaults.set(Date().timeIntervalSince1970, forKey: startedKey)
+    // A new schedule counts its own total from zero (for the apps chosen now).
+    defaults.set("\(today())|0", forKey: totalLastKey)
     try center.startMonitoring(activityName, during: day, events: events)
+    defaults.set(scheduleVersion, forKey: scheduleVersionKey)
     checkLimit()
   }
 
@@ -131,6 +139,12 @@ enum SocialTrackShared {
                                  threshold: threshold, includesPastActivity: true)
     }
     return DeviceActivityEvent(applications: apps, categories: categories, webDomains: webDomains, threshold: threshold)
+  }
+
+  /// Restarts a schedule made by an older MoodPals (for example, one without the 5-minute totals).
+  static func migrateIfNeeded() {
+    guard enabled, defaults.integer(forKey: scheduleVersionKey) < scheduleVersion else { return }
+    try? start()
   }
 
   static func stop() {
@@ -174,15 +188,19 @@ enum SocialTrackShared {
     return (try? JSONDecoder().decode([String: [String: Int]].self, from: data)) ?? [:]
   }
 
-  /// `minutes` is today's running total for all chosen apps; the step since the last one goes to whoever is using the iPhone now.
+  /// `minutes` is today's running total for the apps chosen now; the step since the schedule's last total goes to whoever
+  /// is using the iPhone. Right after a restart iOS replays totals already counted, so those only move the baseline.
   private static func addTotal(_ minutes: Int, now: Date) {
-    var daily = loadDaily()
     let key = today(now)
+    let saved = (defaults.string(forKey: totalLastKey) ?? "").split(separator: "|")
+    let last = saved.count == 2 && saved[0] == key ? Int(saved[1]) ?? 0 : 0
+    guard minutes > last else { return }
+    defaults.set("\(key)|\(minutes)", forKey: totalLastKey)
+    if now.timeIntervalSince1970 - defaults.double(forKey: startedKey) < 120 { return }
+    var daily = loadDaily()
     var day = daily[key] ?? [:]
-    let counted = day.values.reduce(0, +)
-    guard minutes > counted else { return }
     let who = runningMember() ?? ownerKey
-    day[who, default: 0] += minutes - counted
+    day[who, default: 0] += minutes - last
     daily[key] = day
     if daily.count > keepDays {
       let cutoff = Calendar.current.date(byAdding: .day, value: -keepDays, to: now) ?? now
