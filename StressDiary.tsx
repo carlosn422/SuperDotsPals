@@ -1,5 +1,5 @@
 import React,{useMemo,useState} from 'react';
-import {View,Text,TouchableOpacity,TextInput,StyleSheet,Alert,ActivityIndicator,ActionSheetIOS,Modal,ScrollView} from 'react-native';
+import {View,Text,TouchableOpacity,TextInput,StyleSheet,Alert,ActivityIndicator,ActionSheetIOS,Modal,Platform,ScrollView} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {supabase} from './supabase';
 import {useStress} from './StressDashboard';
@@ -87,6 +87,7 @@ export default function StressDiary({entries,onChanged,onAsk}:{entries:DiaryEntr
   if(onAsk)actions.push({label:'Ask MoodPal',run:()=>onAsk(`Help me reflect on this diary entry from ${new Date(e.occurred_at).toLocaleString()}: "${e.body.slice(0,500)}"${e.mood?` (mood: ${e.mood})`:''}${p?` My stress level then was ${STRESS_LEVELS[p.level].label}.`:''}`)});
   if(!auto)actions.push({label:'Edit',run:()=>{setEditing(e.id);setEditText(e.body)}});
   actions.push({label:'Delete',run:()=>remove(e.id),destructive:true});
+  if(Platform.OS!=='ios'){Alert.alert('Entry',undefined,[...actions.map(a=>({text:a.label,style:a.destructive?'destructive' as const:'default' as const,onPress:a.run})),{text:'Cancel',style:'cancel'}]);return}
   ActionSheetIOS.showActionSheetWithOptions({options:[...actions.map(a=>a.label),'Cancel'],cancelButtonIndex:actions.length,destructiveButtonIndex:actions.findIndex(a=>a.destructive)},i=>{if(i<actions.length)actions[i].run()});
  }
 
