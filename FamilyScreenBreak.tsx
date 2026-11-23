@@ -516,8 +516,16 @@ function EditMemberSheet({visible,child,children,onClose,onChanged,onRemoved}:{v
   }}]);
  }
  function remove(){
-  Alert.alert('Remove '+child.name+'?','Their Screen Break history is deleted too.',[{text:'Keep'},{text:'Remove',style:'destructive',onPress:async()=>{
+  Alert.alert('Remove '+child.name+'?',child.profile_user_id?'Their Screen Break history is deleted too. Their watch stays in Family and can be assigned to someone else.':'Their Screen Break history is deleted too.',[{text:'Keep'},{text:'Remove',style:'destructive',onPress:async()=>{
+   setBusy('remove');setError('');
+   // Park the watch first, so it can still be assigned to another member.
+   if(child.profile_user_id){
+    const {error:ue}=await supabase.rpc('family_unassign_child_watch',{p_child:child.id});
+    if(ue){setBusy('');setError('Unable to remove. Try again.');return}
+    familyProfilesChanged();
+   }
    const {error:e}=await supabase.from('family_children').delete().eq('id',child.id);
+   setBusy('');
    if(e)setError('Unable to remove.');else onRemoved();
   }}]);
  }
