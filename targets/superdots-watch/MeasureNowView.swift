@@ -123,54 +123,85 @@ struct MeasureNowView: View {
     private let purple = WatchTheme.loadSaved().accent
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 8) {
-                switch measurement.phase {
-                case .idle:
-                    AnimatedMoodMascot(mood: "Calm", size: 80, isActive: false)
-                    Text("Measure now").font(.headline)
-                    Text("Sit still and breathe with the square for one minute.")
-                        .font(.caption2).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                    Button("Start") { Task { await measurement.start() } }
-                        .buttonStyle(.borderedProminent).tint(purple)
-                case .measuring:
-                    BreathingPacer(elapsed: measurement.elapsed)
-                    Text(measurement.heartRate.map { "\(Int($0.rounded())) bpm" } ?? "Reading heart rate…")
-                        .font(.caption).monospacedDigit()
-                    ProgressView(value: min(measurement.elapsed, StressMeasurement.duration), total: StressMeasurement.duration).tint(purple)
-                    Button("Cancel", role: .cancel) { measurement.cancel(); dismiss() }.font(.caption2)
-                case .analyzing:
-                    ProgressView().tint(purple)
-                    Text("Checking your readings…").font(.caption2)
-                case .result:
-                    if let r = measurement.result { ResultCard(result: r) }
-                    Button("Done") { dismiss() }.buttonStyle(.borderedProminent).tint(purple)
-                case .calibrating:
-                    AnimatedMoodMascot(mood: "Calm", size: 70, isActive: false)
-                    Text("Calibrating").font(.headline)
-                    Text("MoodPals needs about 3 days of HRV readings to learn your usual. Keep wearing your watch.")
-                        .font(.caption2).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                    Button("Done") { dismiss() }
-                case .failed(let message):
-                    Image(systemName: "heart.text.square").font(.title2).foregroundStyle(.secondary)
-                    Text(message).font(.caption2).multilineTextAlignment(.center)
-                    Button("Done") { dismiss() }
+        Group {
+            switch measurement.phase {
+            case .idle, .measuring:
+                // One screen, no scrolling while you breathe: Start and Stop sit inside the square.
+                VStack(spacing: 6) {
+                    if measurement.phase == .measuring {
+                        BreathingPacer(elapsed: measurement.elapsed) {
+                            centerButton("stop.fill", label: "Stop") { measurement.cancel() }
+                        }
+                        Text(measurement.heartRate.map { "\(Int($0.rounded())) bpm" } ?? "Reading heart rate…")
+                            .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                        ProgressView(value: min(measurement.elapsed, StressMeasurement.duration), total: StressMeasurement.duration)
+                            .tint(purple).padding(.horizontal, 12)
+                    } else {
+                        ZStack {
+                            BreathSquare().stroke(BreathingPacer<EmptyView>.green.opacity(0.25), lineWidth: 7)
+                            centerButton("play.fill", label: "Start") { Task { await measurement.start() } }
+                        }
+                        .frame(width: BreathingPacer<EmptyView>.size, height: BreathingPacer<EmptyView>.size)
+                        Text("Measure now").font(.caption.weight(.semibold))
+                        Text("Sit still and breathe with the square for one minute.")
+                            .font(.caption2).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.horizontal, 4)
+            default:
+                ScrollView {
+                    VStack(spacing: 8) {
+                        switch measurement.phase {
+                        case .analyzing:
+                            ProgressView().tint(purple)
+                            Text("Checking your readings…").font(.caption2)
+                        case .result:
+                            if let r = measurement.result { ResultCard(result: r) }
+                            Button("Done") { dismiss() }.buttonStyle(.borderedProminent).tint(purple)
+                        case .calibrating:
+                            AnimatedMoodMascot(mood: "Calm", size: 70, isActive: false)
+                            Text("Calibrating").font(.headline)
+                            Text("MoodPals needs about 3 days of HRV readings to learn your usual. Keep wearing your watch.")
+                                .font(.caption2).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                            Button("Done") { dismiss() }
+                        case .failed(let message):
+                            Image(systemName: "heart.text.square").font(.title2).foregroundStyle(.secondary)
+                            Text(message).font(.caption2).multilineTextAlignment(.center)
+                            Button("Done") { dismiss() }
+                        default:
+                            EmptyView()
+                        }
+                    }
+                    .padding(.horizontal, 4)
                 }
             }
-            .padding(.horizontal, 4)
         }
         .navigationTitle("Measure")
         .onDisappear { if measurement.phase == .measuring { measurement.cancel() } }
+    }
+
+    private func centerButton(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol).font(.system(size: 18, weight: .bold)).foregroundStyle(.white)
+                .frame(width: 46, height: 46).background(Circle().fill(purple))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 }
 
 /// Same look as the iPhone breathing: a short line glides around a rounded square.
 /// Six breaths a minute: 4 s in over the top and right, 6 s out over the bottom and left.
-private struct BreathingPacer: View {
+struct BreathingPacer<Center: View>: View {
+    static var size: CGFloat { 96 }
+    static var green: Color { Color(red: 0.30, green: 0.73, blue: 0.50) }
     let elapsed: TimeInterval
+    @ViewBuilder var center: () -> Center
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var start = Date()
-    private let green = Color(red: 0.30, green: 0.73, blue: 0.50)
+    private let green = Self.green
     private let trail = 0.14
 
     private func position(_ t: TimeInterval) -> Double {
@@ -192,8 +223,9 @@ private struct BreathingPacer: View {
                         BreathSquare().trim(from: 1 - (trail - p), to: 1)
                             .stroke(Color.white, style: StrokeStyle(lineWidth: 7, lineCap: .round))
                     }
+                    center()
                 }
-                .frame(width: 92, height: 92)
+                .frame(width: Self.size, height: Self.size)
                 Text(t.truncatingRemainder(dividingBy: 10) < 4 ? "Breathe in" : "Breathe out").font(.caption.weight(.semibold))
             }
         }
