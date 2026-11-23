@@ -152,14 +152,11 @@ const PERSON_COLORS=['#7C6CF2','#F4A570','#4FA3E0','#E46C8F','#C9A227'];
 const PERIODS:{key:UsagePeriod;label:string}[]=[{key:'day',label:'Day'},{key:'week',label:'Week'},{key:'month',label:'Month'},{key:'year',label:'Year'}];
 type Person={key:string;name:string;color:string};
 
-/** You plus family members, each with a colour. Members only show up once they have a timer or usage. */
-function usePeople(byDay:Map<number,Map<string,number>>):Person[]{
+/** You plus this account's family members, each with a colour. Usage tagged with any other id (a removed member,
+ * or another account that used MoodPals on this iPhone) is never shown. */
+function usePeople():Person[]{
  const children=getBreakState()?.children??[];
- const seen=new Set<string>();byDay.forEach(m=>m.forEach((_,k)=>seen.add(k)));
- const list:Person[]=[{key:OWNER,name:'You',color:T.primary}];
- children.forEach((c,i)=>list.push({key:c.id,name:c.name,color:PERSON_COLORS[i%PERSON_COLORS.length]}));
- seen.forEach(k=>{if(!list.some(p=>p.key===k))list.push({key:k,name:'Family member',color:'#A9B4AF'})});
- return list;
+ return [{key:OWNER,name:'You',color:T.primary},...children.map((c,i)=>({key:c.id,name:c.name,color:PERSON_COLORS[i%PERSON_COLORS.length]}))];
 }
 
 // One chart for everyone: a stacked bar per day (or month), a colour per person. Pick a person to see only theirs.
@@ -168,7 +165,7 @@ function UsageChart({byDay,marks,points}:{byDay:Map<number,Map<string,number>>;m
  const H=150;
  const [period,setPeriod]=useState<UsagePeriod>('week'),[who,setWho]=useState<string|undefined>(undefined);
  const [mode,setMode]=useState<'time'|'stress'>('time'),[width,setWidth]=useState(0),[picked,setPicked]=useState<number|null>(null);
- const people=usePeople(byDay);
+ const people=usePeople();
  const shown=who===undefined?people:people.filter(p=>p.key===who);
  const buckets=useMemo(()=>usageBuckets(byDay,points,period),[byDay,points,period]);
  const n=buckets.length,sel=Math.min(n-1,picked??n-1),b=buckets[sel];
