@@ -180,7 +180,7 @@ function UsageChart({byDay,marks,points}:{byDay:Map<number,Map<string,number>>;m
  const name=(x:UsageBucket,long=false)=>period==='year'?new Date(x.start).toLocaleDateString(undefined,long?{month:'long',year:'numeric'}:{month:'narrow'})
   :period==='month'&&!long?String(new Date(x.start).getDate()):new Date(x.start).toLocaleDateString(undefined,long?{weekday:'long',month:'short',day:'numeric'}:{weekday:'short'});
  const pick=(x:number)=>{if(width>0)setPicked(Math.max(0,Math.min(n-1,Math.floor(x/(width/n)))))};
- const apps=appsFor(marks,who,b.start,b.end);
+ const apps=appsFor(marks,shown.map(p=>p.key),b.start,b.end);
  const appsCovered=b.start>=Date.now()-LOOKBACK_DAYS*864e5;
  const choose=(p:UsagePeriod)=>{setPeriod(p);setPicked(null)};
  const total=minutesOf(b);

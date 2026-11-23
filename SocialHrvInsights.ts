@@ -113,16 +113,16 @@ export function usageBuckets(byDay:Map<number,Map<string,number>>,points:StressP
  return Array.from({length:n},(_,i)=>make(daysBefore(now,n-1-i),daysBefore(now,n-2-i)));
 }
 
-/** Minutes per app for one person (or everyone when `who` is undefined) between `start` and `end`, from the
- * 15-minute app marks. Each mark adds its step to whoever was using the iPhone when it was reached. */
-export function appsFor(marks:SocialMark[],who:string|undefined,start:number,end:number){
+/** Minutes per app for the people in `who` between `start` and `end`, from the 15-minute app marks.
+ * Each mark adds its step to whoever was using the iPhone when it was reached. */
+export function appsFor(marks:SocialMark[],who:string[],start:number,end:number){
  const last=new Map<string,number>(),apps=new Map<number,number>();
  for(const m of [...marks].sort((a,b)=>a.at-b.at)){
   const key=`${dayStart(m.at)}:${m.app}`,prev=last.get(key)??0;
   if(m.minutes<=prev)continue;
   last.set(key,m.minutes);
   const person=m.member||(m.family?'family':OWNER);
-  if(m.at<start||m.at>=end||(who!==undefined&&person!==who))continue;
+  if(m.at<start||m.at>=end||!who.includes(person))continue;
   apps.set(m.app,(apps.get(m.app)??0)+m.minutes-prev);
  }
  return [...apps.entries()].sort((a,b)=>b[1]-a[1]);
