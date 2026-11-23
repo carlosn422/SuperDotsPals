@@ -197,7 +197,9 @@ private struct BreathingPacer: View {
                 Text(t.truncatingRemainder(dividingBy: 10) < 4 ? "Breathe in" : "Breathe out").font(.caption.weight(.semibold))
             }
         }
+        // Follows the measurement clock, so the last breath ends with the reading.
         .onAppear { start = Date().addingTimeInterval(-elapsed) }
+        .onChange(of: elapsed) { _, e in start = Date().addingTimeInterval(-e) }
     }
 }
 
