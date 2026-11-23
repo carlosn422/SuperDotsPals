@@ -7,6 +7,7 @@ final class WatchAppDelegate: NSObject, WKApplicationDelegate, UNUserNotificatio
         super.init()
         // Set before launch finishes so a tap that launched the app is delivered here.
         UNUserNotificationCenter.current().delegate = self
+        ScreenBreakNotifications.registerCategories()
     }
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
@@ -19,7 +20,10 @@ final class WatchAppDelegate: NSObject, WKApplicationDelegate, UNUserNotificatio
         let data = (info["body"] as? [String: Any]) ?? (info as? [String: Any]) ?? [:]
         // Screen Break reminders (from this watch or forwarded from the iPhone) open the Screen Break controls.
         if data["action"] as? String == "screenBreak" || info["action"] as? String == "screenBreak" {
-            await MainActor.run { WatchScreenBreakStore.shared.openFromNotification() }
+            let unlock = response.actionIdentifier == ScreenBreakNotifications.unlockAction
+            await MainActor.run {
+                if unlock { WatchScreenBreakStore.shared.unlockFromNotification() } else { WatchScreenBreakStore.shared.openFromNotification() }
+            }
             return
         }
         guard data["action"] as? String == "circle" else { return }

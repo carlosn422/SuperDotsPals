@@ -20,7 +20,25 @@ struct WatchBreakSession: Equatable {
     let deadline: Date
     let version: Int
 
-    var isRunning: Bool { status == "active" || status == "restricted" }
+    /// A timer that ran out is no longer shown as a timer: it's the red lock on the Lock page.
+    var isRunning: Bool { status == "active" && deadline > Date() }
+    /// Apps are locked by a timer that ran out (the iPhone may not have confirmed it yet).
+    var isLocked: Bool { status == "restricted" || (status == "active" && deadline <= Date()) }
+}
+
+/// "Time is up" notification category with an Unlock button; tapping it or Unlock opens the Lock page.
+enum ScreenBreakNotifications {
+    static let endedCategory = "moodpals.screenBreak.ended"
+    static let unlockAction = "moodpals.screenBreak.unlock"
+
+    static func registerCategories() {
+        let unlock = UNNotificationAction(identifier: unlockAction, title: "Unlock", options: [.foreground])
+        let ended = UNNotificationCategory(identifier: endedCategory, actions: [unlock], intentIdentifiers: [])
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationCategories { existing in
+            center.setNotificationCategories(existing.filter { $0.identifier != endedCategory }.union([ended]))
+        }
+    }
 }
 
 @MainActor
@@ -140,18 +158,36 @@ final class WatchScreenBreakStore: ObservableObject {
         guard let session, session.status == "active" else { return }
         let warnAt = session.deadline.addingTimeInterval(-300)
         if session.deadline.timeIntervalSince(session.startedAt) > 300 && warnAt.timeIntervalSinceNow > 5 {
-            add(warnId, title: "\(session.childName)'s screen time ends in 5 minutes.", body: "Tap to add time or end now.", at: warnAt)
+            add(warnId, title: "\(session.childName)'s screen time ends in 5 minutes.", body: "Tap to add time or stop.", at: warnAt)
         }
         if session.deadline.timeIntervalSinceNow > 1 {
-            add(endId, title: "\(session.childName)'s screen time is over", body: "Screen Break is on.", at: session.deadline)
+            add(endId, title: "\(session.childName)'s screen time is over", body: "Apps are locked. Tap to unlock your iPhone.", at: session.deadline,
+                category: ScreenBreakNotifications.endedCategory)
         }
     }
 
-    private func add(_ id: String, title: String, body: String, at date: Date) {
+    /// Notification "Unlock": opens the Lock page and unlocks the iPhone (the lock turns green once it confirms).
+    func unlockFromNotification() {
+        openFromNotification()
+        Task { @MainActor in
+            for _ in 0..<3 {
+                if self.manualLock || self.session?.isLocked == true {
+                    if await self.command("unlock") { return }
+                } else {
+                    await self.refresh()
+                    if !(self.manualLock || self.session?.isLocked == true) { return }
+                }
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+
+    private func add(_ id: String, title: String, body: String, at date: Date, category: String? = nil) {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
         content.sound = .default
+        if let category { content.categoryIdentifier = category }
         content.userInfo = ["action": "screenBreak"]
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, date.timeIntervalSinceNow), repeats: false)
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: id, content: content, trigger: trigger))
@@ -164,15 +200,19 @@ struct WatchBreakHomeView: View {
     @ObservedObject private var store = WatchScreenBreakStore.shared
     @Binding var path: [WatchBreakChild]
     @State private var managing = false
+    /// 0: Lock page, 1: member list.
+    @State private var page = 0
+    @State private var tick = 0
     @State private var reveal = 1.0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var running: WatchBreakSession? {
-        guard let session = store.session, session.status == "active" else { return nil }
+        guard let session = store.session, session.isRunning else { return nil }
         return session
     }
 
     var body: some View {
+        let _ = tick
         Group {
             if let session = running {
                 ActiveBreakView(session: session) { managing = true }
@@ -182,9 +222,9 @@ struct WatchBreakHomeView: View {
                     }
                     .transition(.opacity)
             } else {
-                TabView {
-                    LockPage()
-                    WatchFamilyView()
+                TabView(selection: $page) {
+                    LockPage().tag(0)
+                    WatchFamilyView().tag(1)
                 }
                 .tabViewStyle(.page)
                 .transition(.opacity)
@@ -204,8 +244,19 @@ struct WatchBreakHomeView: View {
             }
         }
         .navigationDestination(for: WatchBreakChild.self) { ScreenBreakControlView(child: $0) }
-        .onChange(of: running == nil) { _, gone in if gone { managing = false } }
+        // When a timer ends or stops, any member screen closes and the Lock page shows the lock to tap.
+        .onChange(of: running == nil) { _, gone in if gone { managing = false; path = []; page = 0 } }
+        // The "time is up" notification opens here, on the Lock page.
+        .onChange(of: store.openRequest) { _, _ in page = 0 }
         .task { await store.refresh() }
+        // At the deadline the countdown gives way to the lock, even before the iPhone confirms.
+        .task(id: running?.deadline) {
+            guard let deadline = running?.deadline else { return }
+            try? await Task.sleep(for: .seconds(max(0, deadline.timeIntervalSinceNow) + 0.5))
+            guard !Task.isCancelled else { return }
+            tick += 1
+            await store.refresh()
+        }
     }
 }
 
@@ -213,7 +264,7 @@ struct WatchBreakHomeView: View {
 private struct LockPage: View {
     @ObservedObject private var store = WatchScreenBreakStore.shared
 
-    private var locked: Bool { store.manualLock || store.session?.status == "restricted" }
+    private var locked: Bool { store.manualLock || store.session?.isLocked == true }
 
     var body: some View {
         Group {
@@ -267,7 +318,7 @@ struct WatchFamilyView: View {
                 NavigationLink(value: child) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(child.name).font(.headline)
-                        if let session = store.session, session.status == "active" {
+                        if let session = store.session, session.isRunning {
                             Text(session.childId == child.id ? "Timer running" : "Timer running for \(session.childName)")
                                 .font(.caption2).foregroundStyle(BreakStyle.green)
                         }
@@ -520,7 +571,7 @@ struct ScreenBreakControlView: View {
         return session
     }
     private var other: WatchBreakSession? {
-        guard let session = store.session, session.childId != child.id, session.status == "active" else { return nil }
+        guard let session = store.session, session.childId != child.id, session.isRunning else { return nil }
         return session
     }
 
@@ -714,8 +765,7 @@ private struct ActiveBreakView: View {
     private func stop() {
         guard store.pending == nil else { return }
         Task { @MainActor in
-            let action = session.status == "restricted" ? "release" : "cancel"
-            if await store.command(action, childId: session.childId) { store.navReset += 1 }
+            if await store.command("cancel", childId: session.childId) { store.navReset += 1 }
         }
     }
 
@@ -783,13 +833,12 @@ private struct ManageBreakView: View {
         }
     }
 
-    /// Ends the session: stops the timer if time is left, or lifts the pause if time is up.
+    /// Stop: ends the timer, keeps only the time used and leaves the apps open.
     private func end() {
         Task { @MainActor in
             for _ in 0..<2 {
                 guard let current = session else { ended(); return }
-                let action = current.status == "restricted" ? "release" : "cancel"
-                if await store.command(action, childId: child.id) { ended(); return }
+                if await store.command("cancel", childId: child.id) { ended(); return }
                 // The iPhone may have just reached the deadline; retry once against the state it returned.
                 guard let latest = session, latest.version != current.version || latest.status != current.status else { stopping = false; return }
                 store.error = nil
