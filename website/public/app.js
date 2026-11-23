@@ -47,7 +47,7 @@ const SCREENS = {
     <div class="card"><h5>Send a Little Signal</h5><div class="emojis"><span>❤️</span><span>🤗</span><span>🫶</span><span>☀️</span><span>💪</span><span>🎉</span></div></div>
     <div class="card muted">Only moods you choose to share. Never your health data.</div>${tabbar('Circle')}</div>`,
   screentime: () => `<div class="ui"><div class="top"><span>Screen Time &amp; Stress</span></div>
-    <div class="card" style="display:flex;justify-content:space-between;align-items:center"><div><h5>Daily limit <span class="chip">per app</span></h5><div class="big">15 min</div><div class="muted">Applied to 5 selected apps</div></div>${ring(.4,'#4DBB7F',58,'30')}</div>
+    <div class="card" style="display:flex;justify-content:space-between;align-items:center"><div><h5>Daily limit <span class="chip">total</span></h5><div class="big">15 min</div><div class="muted">Shared by 5 apps</div></div>${ring(.4,'#4DBB7F',58,'30')}</div>
     <div class="row"><div class="tile"><h5>Edit Apps</h5><div class="muted">5 apps</div></div><div class="tile"><h5>Set Limit</h5><div class="muted">15 min</div></div><div class="tile"><h5>Tracking</h5><div class="muted">On</div></div></div>
     <div class="card"><h5>This Week <span class="muted" style="float:right">Time · Stress</span></h5><div class="bars">${[20,45,30,75,60,35,30].map((h,i)=>`<i style="height:${h}%;${i===3?'background:#2E8F64':''}"></i>`).join('')}</div><div class="muted">Thu · 1h 15m in tracked apps · stress 62</div></div>
     <div class="card"><h5>Top Apps · Last 30 Days</h5><div class="entry" style="border:0;margin:0;padding:0"><span class="av" style="background:#F2685A">▶</span><div><b>Video app</b> · 30 min today<div class="muted">Stress after use: higher than your usual</div></div></div><div class="entry"><span class="av" style="background:#B79CEB">♪</span><div><b>Social app</b> · 15 min today<div class="muted">Still learning your pattern</div></div></div></div>${tabbar('Actions')}</div>`,
@@ -94,7 +94,7 @@ document.querySelectorAll('.phone').forEach(phone => {
   phone.appendChild(screen);
   const slides = (phone.dataset.slides || '').split(',').filter(Boolean);
   if (slides.length) {
-    screen.innerHTML = slides.map((s, i) => `<img class="slide${i ? '' : ' on'}" src="/img/screens/${s}.webp?v=15" alt="MoodPals ${s.replace('-', ' ')} screen">`).join('');
+    screen.innerHTML = slides.map((s, i) => `<img class="slide${i ? '' : ' on'}" src="/img/screens/${s}.webp?v=16" alt="MoodPals ${s.replace('-', ' ')} screen">`).join('');
     let i = 0, hold = false;
     const imgs = screen.querySelectorAll('.slide');
     const btn = document.createElement('button');
@@ -174,3 +174,15 @@ if (duo && 'IntersectionObserver' in window && !matchMedia('(prefers-reduced-mot
   }, { threshold: [0, 0.25, 0.5, 0.75] }).observe(duo.querySelector('.duo-row'));
 }
 
+
+// Loop animations: pause/play button on each; stay still for people who prefer reduced motion.
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+document.querySelectorAll('.loop video').forEach(v => {
+  const fig = v.closest('.loop'), btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'slide-toggle';
+  const sync = () => { fig.classList.toggle('paused', v.paused); btn.setAttribute('aria-pressed', String(v.paused)); btn.setAttribute('aria-label', v.paused ? 'Play animation' : 'Pause animation'); };
+  btn.addEventListener('click', () => { if (v.paused) v.play(); else v.pause(); });
+  v.addEventListener('play', sync); v.addEventListener('pause', sync);
+  if (reduceMotion) { v.removeAttribute('autoplay'); v.pause(); }
+  fig.append(btn); sync();
+});
