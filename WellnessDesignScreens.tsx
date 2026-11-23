@@ -101,7 +101,7 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
   <PlusOfferCard onAllPlans={onPlans}/>
 </View>;
 }
-export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpiritual,onChat,onMood,onJournal,onBreathing,onSocial,caffeine}:{onSocial?:()=>void;companion:string;accent:string;water:number;caffeine:number;onWater:()=>void;onCaffeine:()=>void;onSpiritual:()=>void;onChat:()=>void;onMood:()=>void;onJournal:()=>void;onBreathing:()=>void}){
+export function WellnessActions({companion,accent,water,onWater,onCaffeine,onChat,onMood,onJournal,onBreathing,onSocial,caffeine}:{onSocial?:()=>void;companion:string;accent:string;water:number;caffeine:number;onWater:()=>void;onCaffeine:()=>void;onChat:()=>void;onMood:()=>void;onJournal:()=>void;onBreathing:()=>void}){
  const [day,setDay]=React.useState(0);
  const [pastAmounts,setPastAmounts]=React.useState({water:0,caffeine:0});
  const {goals:drinkGoals}=useDrinkGoals(usePlus().isPlus);
@@ -159,10 +159,9 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onSpi
     </TouchableOpacity>
    </View>
   </View>
-  {onSocial?<View style={{gap:9}}><SectionHeading title="Screen time"/>{item('phone-portrait-outline','Apps & stress','How the apps you use line up with HRV and mood','#EAF1FF',onSocial)}</View>:null}
   <View style={{gap:9}}><SectionHeading title="Mind & reflection"/>
    <View style={{backgroundColor:"#FFFFFF",borderRadius:17,padding:13,borderWidth:1,borderColor:"#ECEAF2"}}><Text style={{color:INK,fontSize:13,fontWeight:"800"}}>Activities logged: {activitySummary.count}</Text><Text style={{color:MUTED,fontSize:12}}>{activitySummary.minutes} minutes recorded {day===0?"today":"on this day"}</Text></View>
-   {item('book-outline','Spiritual Reading','Personalized Scripture and encouragement','#E7F5ED',onSpiritual)}
+   {onSocial?item('phone-portrait-outline','Screen Time','Your app time, daily limit and stress','#EAF1FF',onSocial):null}
    {item('book-outline','Your journal','Review your private reflections','#F4EBFF',onJournal)}
    {item('chatbubble-ellipses-outline','Ask AI about your stress','Chat with MoodPals about your readings','#EFE9FF',onChat,!plusMember)}
    {item('leaf-outline','Breathing break','Calm, box and unwind exercises','#E4F6EA',onBreathing)}

@@ -37,7 +37,7 @@ function AppName({app}:{app:number}){
  return SocialAppLabel?<SocialAppLabel app={app} style={{height:24,flex:1}}/>:<Text style={st.rowTitle}>{app<0?'Other apps & sites':'App '+(app+1)}</Text>;
 }
 
-/** Actions › Apps & stress. */
+/** Actions › Mind & reflection › Screen Time. */
 export function SocialHrvScreen(){
  const {state,marks,byDay,refresh}=useSocialData();
  const {points}=useStress();
@@ -48,7 +48,7 @@ export function SocialHrvScreen(){
  useEffect(()=>{void syncScreenBreak(isPlus).then(e=>{if(e)setEnt(e);refresh()})},[isPlus]);
  const plus=isPlus||!!ent?.has_plus;
  const insights=useMemo(()=>appInsights(marks,points,moods),[marks,points,moods]);
- if(!socialTrackSupported||!state)return <View style={st.card}><Text style={st.body}>Apps & stress needs the latest MoodPals build on this iPhone.</Text></View>;
+ if(!socialTrackSupported||!state)return <View style={st.card}><Text style={st.body}>Screen Time needs the latest MoodPals build on this iPhone.</Text></View>;
  const chosen=state.apps.length+state.groupCount;
  async function allow(){setBusy('auth');try{await requestScreenTimeAccess()}catch{}setBusy('');refresh()}
  /** Tracking needs Plus or the 14-day trial shared with Screen Break, which starts here if it hasn't yet. */
@@ -241,7 +241,7 @@ export function SocialHrvTodayCard({onOpen}:{onOpen:()=>void}){
  const used=ownerMinutesOn(byDay);
  const flagged=insights.find(i=>!i.learning&&i.delta!==undefined&&i.delta>=8);
  return <TouchableOpacity accessibilityRole="button" onPress={onOpen} style={st.card}>
-  <View style={st.row}><Ionicons name="phone-portrait-outline" size={20} color={T.primary}/><Text style={[st.heading,{flex:1}]}>Apps & stress</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></View>
+  <View style={st.row}><Ionicons name="phone-portrait-outline" size={20} color={T.primary}/><Text style={[st.heading,{flex:1}]}>Screen Time</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></View>
   <Text style={st.body}>{formatMins(used)} in tracked apps today{state.limitMinutes?` of ${formatMins(state.limitMinutes)}`:''}</Text>
   {flagged?<View style={st.row}><Text style={st.sub}>Higher stress after:</Text><AppName app={flagged.app}/></View>:<Text style={st.sub}>{insights.some(i=>!i.learning)?'No app stands out for stress right now.':'Still learning your patterns.'}</Text>}
  </TouchableOpacity>;
