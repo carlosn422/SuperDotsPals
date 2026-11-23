@@ -38,7 +38,8 @@ const toSec=(iso:string|null)=>iso?Math.floor(Date.parse(iso)/1000):undefined;
 export async function syncScreenBreak(isPlus:boolean):Promise<Entitlement|null>{
  if(!screenBreakSupported)return null;
  const children=await loadChildren().catch(()=>null);
- if(children)setBreakChildren(children.map(c=>({id:c.id,name:c.name})));
+ // Watches parked without a member (watch_only) aren't timer targets.
+ if(children)setBreakChildren(children.filter(c=>!c.watch_only).map(c=>({id:c.id,name:c.name})));
  const rows=pendingBreakSync();
  const {data,error}=rows.length?await supabase.rpc('screen_break_sync',{p_sessions:rows}):await supabase.rpc('screen_break_entitlement');
  if(error||!data)return null;
