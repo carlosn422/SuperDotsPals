@@ -4,12 +4,13 @@ import Svg,{Circle,Path} from 'react-native-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
 import {openSignInNext} from './AuthScreen';
 import {SW} from './StressTheme';
 import {Fill} from './DrinkDetail';
-import {saveDrinkGoal,saveWaterReminder,WATER_REMINDER_DEFAULT} from './Drinks';
+import {saveDrinkGoal} from './Drinks';
 import {saveHealthGoals} from './HealthDetail';
 import {healthKitAvailable,syncNativeHealth} from './HealthDataPanel';
 import {configureSocialTrack,getSocialState,socialTrackSupported} from './modules/watch-link/socialTrack';
@@ -36,7 +37,18 @@ const MOODS=[{mood:'Joyful',pal:'joy'},{mood:'Calm',pal:'calm'},{mood:'Sad',pal:
 type Targets={water:number;sleep:number;steps:number;mindfulness:number;social_now:number;social_goal:number};
 const DEFAULT_TARGETS:Targets={water:8,sleep:8,steps:8000,mindfulness:10,social_now:180,social_goal:60};
 type Step='welcome'|'goals'|'water'|'socialNow'|'socialGoal'|'sleep'|'move'|'mindful'|'feeling'|'health'|'reminders'|'plan';
-const CHECKIN_ID='checkin-reminder';
+// Same daily check-in reminder (storage key, settings columns, text) as More › Reminders, so either place can change it.
+async function setDailyCheckin(uid:string,on:boolean,hour:number){
+ const key='superdots-reminder-'+uid;
+ if(on){const p=await Notifications.getPermissionsAsync().catch(()=>null);if(!p?.granted&&!(await Notifications.requestPermissionsAsync().catch(()=>null))?.granted)return}
+ const previous=await AsyncStorage.getItem(key).catch(()=>null);
+ const id=on?await Notifications.scheduleNotificationAsync({content:{title:'A moment for you 💜',body:'How are you feeling today? Your MoodPal is here for a quick check-in.',data:{screen:'Actions'},sound:false},trigger:{type:Notifications.SchedulableTriggerInputTypes.DAILY,hour,minute:0}}).catch(()=>null):null;
+ if(on&&!id)return;
+ const {error}=await supabase.from('user_settings').update({daily_reminders_enabled:on,daily_reminder_hour:hour,daily_reminder_minute:0,onboarding_notifications_preference:on}).eq('user_id',uid);
+ if(error){if(id)await Notifications.cancelScheduledNotificationAsync(id).catch(()=>{});return}
+ if(previous)await Notifications.cancelScheduledNotificationAsync(previous).catch(()=>{});
+ if(id)await AsyncStorage.setItem(key,id).catch(()=>{});else await AsyncStorage.removeItem(key).catch(()=>{});
+}
 
 function useReduceMotion(){
  const [r,setR]=useState(false);
@@ -117,7 +129,9 @@ function GoalCard({g,on,onPress}:{g:typeof GOALS[number];on:boolean;onPress:()=>
 
 export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;editing?:boolean;onCancel?:()=>void}){
  const [i,setI]=useState(0),[goals,setGoals]=useState<GoalId[]>([]),[t,setT]=useState<Targets>(DEFAULT_TARGETS);
- const [mood,setMood]=useState<number|null>(null),[waterReminder,setWaterReminder]=useState(false),[checkinReminder,setCheckinReminder]=useState(false);
+ const [mood,setMood]=useState<number|null>(null),[checkinReminder,setCheckinReminder]=useState(false);
+ // What was saved before an edit, so only changed answers are applied and older text answers are kept.
+ const [loaded,setLoaded]=useState<{goals:GoalId[];t:Targets;checkin:boolean;hour:number;legacy:string[]}|null>(null);
  const [health,setHealth]=useState<'idle'|'busy'|'done'>('idle'),[loading,setLoading]=useState(false),[fetching,setFetching]=useState(editing),[dragging,setDragging]=useState(false);
  const reduce=useReduceMotion();const fade=useRef(new Animated.Value(1)).current;
  useEffect(()=>{if(!editing)return;let active=true;(async()=>{
@@ -125,11 +139,12 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
    const {data:{user}}=await supabase.auth.getUser();if(!user)throw new Error('Not signed in');
    const [{data:p,error:pe},{data:settings,error:se}]=await Promise.all([
     supabase.from('profiles').select('health_goals,baseline_preferences').eq('id',user.id).single(),
-    supabase.from('user_settings').select('onboarding_notifications_preference').eq('user_id',user.id).single()
+    supabase.from('user_settings').select('daily_reminders_enabled,daily_reminder_hour').eq('user_id',user.id).single()
    ]);if(pe||se)throw pe||se;if(!active)return;
-   setGoals(((p?.health_goals||[]) as string[]).filter((g):g is GoalId=>GOALS.some(x=>x.id===g)));
-   setT({...DEFAULT_TARGETS,...(p?.baseline_preferences||{})});
-   setCheckinReminder(settings?.onboarding_notifications_preference===true);
+   const raw=(p?.health_goals||[]) as string[],isGoal=(g:string):g is GoalId=>GOALS.some(x=>x.id===g);
+   const g=raw.filter(isGoal),tt={...DEFAULT_TARGETS,...(p?.baseline_preferences||{})},checkin=settings?.daily_reminders_enabled===true;
+   setGoals(g);setT(tt);setCheckinReminder(checkin);
+   setLoaded({goals:g,t:tt,checkin,hour:Number(settings?.daily_reminder_hour??9),legacy:raw.filter(x=>!isGoal(x))});
   }catch(e:any){if(active)Alert.alert('Could not load your profile',e?.message||'Please try again.');}
   finally{if(active)setFetching(false)}
  })();return()=>{active=false}},[editing]);
@@ -154,19 +169,18 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
   try{
    const {data:{user},error:authError}=await supabase.auth.getUser();if(authError||!user)throw Error('Please sign in again.');
    const labels=GOALS.filter(g=>goals.includes(g.id)).map(g=>g.label);
-   const profile={health_goals:goals,tracking_reasons:labels,habit_goals:labels,baseline_preferences:t,onboarding_version:4,...(editing?{}:{onboarding_completed_at:new Date().toISOString()})};
+   const profile=editing&&loaded
+    ?{health_goals:[...goals,...loaded.legacy],baseline_preferences:t,onboarding_version:4}
+    :{health_goals:goals,tracking_reasons:labels,habit_goals:labels,baseline_preferences:t,onboarding_version:4,...(editing?{}:{onboarding_completed_at:new Date().toISOString()})};
    const {error:e1}=await supabase.from('profiles').update(profile).eq('id',user.id);if(e1)throw e1;
-   const {error:e2}=await supabase.from('user_settings').update({onboarding_notifications_preference:checkinReminder}).eq('user_id',user.id);if(e2)throw e2;
-   // The answers become the app's settings right away.
+   // The answers become the app's settings right away. When editing, only answers that changed are applied.
    const has=(g:GoalId)=>goals.includes(g);
-   if(has('water'))await saveDrinkGoal('water',t.water*8);
-   await saveHealthGoals({...(has('sleep')?{sleep:t.sleep*60}:{}),...(has('move')?{steps:t.steps}:{}),...(has('mindful')||has('stress')?{mindfulness:t.mindfulness}:{})});
-   if(has('social')&&socialTrackSupported){try{configureSocialTrack(getSocialState()?.enabled??false,t.social_goal)}catch{}}
+   const fresh=(g:GoalId|GoalId[],k:keyof Targets)=>{const gs=Array.isArray(g)?g:[g];return gs.some(has)&&(!editing||!loaded||!gs.some(x=>loaded.goals.includes(x))||loaded.t[k]!==t[k])};
+   if(fresh('water','water'))await saveDrinkGoal('water',t.water*8);
+   await saveHealthGoals({...(fresh('sleep','sleep')?{sleep:t.sleep*60}:{}),...(fresh('move','steps')?{steps:t.steps}:{}),...(fresh(['mindful','stress'],'mindfulness')?{mindfulness:t.mindfulness}:{})});
+   if(fresh('social','social_goal')&&socialTrackSupported){try{configureSocialTrack(getSocialState()?.enabled??false,t.social_goal)}catch{}}
    if(!editing&&mood!==null){await supabase.from('wellness_journal').insert({user_id:user.id,entry_type:'reflection',body:'Mood check-in',mood:MOODS[mood].mood,reflection_answers:{},stress_factors:[]})}
-   if(waterReminder)await saveWaterReminder({...WATER_REMINDER_DEFAULT,enabled:true}).catch(()=>false);
-   await Notifications.cancelScheduledNotificationAsync(CHECKIN_ID).catch(()=>{});
-   if(checkinReminder){const p=await Notifications.getPermissionsAsync().catch(()=>null);const ok=p?.granted||(await Notifications.requestPermissionsAsync().catch(()=>null))?.granted;
-    if(ok)await Notifications.scheduleNotificationAsync({identifier:CHECKIN_ID,content:{title:'How are you feeling?',body:'Take a moment for a quick MoodPals check-in.',data:{screen:'Actions'},sound:false},trigger:{type:Notifications.SchedulableTriggerInputTypes.DAILY,hour:20,minute:0}}).catch(()=>{})}
+   if(!editing?checkinReminder:loaded&&checkinReminder!==loaded.checkin)await setDailyCheckin(user.id,checkinReminder,loaded?.hour??20);
    if(!editing)void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(()=>{});
    done();
   }catch(e:any){Alert.alert('Could not save',e?.message||'Please try again.');}
@@ -200,7 +214,8 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
   case 'water':return <>{head('How much water a day?','Turn the dial to set your daily goal.')}
    <Dial value={t.water} min={4} max={16} step={1} color="#3D9BE9" label="Water goal" format={v=>`${v} cups · ${v*8} oz`} onChange={setTarget('water')} onDrag={setDragging}>
     <View style={{transform:[{scale:0.62}]}}><Fill kind="water" progress={(t.water-4)/12} color="#3D9BE9"/></View>
-   </Dial></>;
+   </Dial>
+   <Text style={[s.hint,{textAlign:'center'}]}>Your own water goal is part of MoodPals Plus. Free uses 64 oz (8 cups).</Text></>;
   case 'socialNow':return <>{head('How much time on social media now?','A rough guess is fine.')}
    <Dial value={t.social_now} min={15} max={480} step={15} color={SW.hr} label="Social media time now" format={v=>formatMins(v)+' a day'} onChange={setTarget('social_now')} onDrag={setDragging}>
     <SuperdotMascot key={socialPal(t.social_now)} id={socialPal(t.social_now)} size={120}/>
@@ -231,8 +246,8 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
    </TouchableOpacity>:<Text style={s.hint}>You can connect Apple Health later from the Health tab on your iPhone.</Text>}
    <Text style={s.hint}>MoodPals isn't a medical device and doesn't diagnose stress.</Text></>;
   case 'reminders':return <>{head('Gentle reminders','Turn on what helps. You can change these any time.')}
-   {toggleRow('Daily check-in','A nudge at 8 PM to log how you feel.',checkinReminder,setCheckinReminder,'happy-outline')}
-   {has('water')?toggleRow('Water reminders','Every 2 hours, 9 AM to 9 PM. Part of MoodPals Plus.',waterReminder,setWaterReminder,'water-outline'):null}</>;
+   {toggleRow('Daily check-in',editing&&loaded?`A daily nudge at ${loaded.hour>12?loaded.hour-12+' PM':loaded.hour+(loaded.hour===12?' PM':' AM')} to log how you feel.`:'A nudge at 8 PM to log how you feel.',checkinReminder,setCheckinReminder,'happy-outline')}
+</>;
   case 'plan':return <>{head(editing?'Your goals':'Your plan is ready',editing?'Tap any goal to change it.':'These are now your settings. Tap one to change it.')}
    <View style={s.center}><View style={s.palStage}><SuperdotMascot id="joy" size={120}/></View></View>
    <View style={{gap:8}}>
@@ -242,7 +257,7 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
     {has('move')?planRow('walk-outline','Step goal',t.steps.toLocaleString()+' steps','move'):null}
     {has('mindful')||has('stress')?planRow('leaf-outline','Mindful minutes',t.mindfulness+' min a day','mindful'):null}
     {!editing&&mood!==null?planRow('happy-outline','First check-in',MOODS[mood].mood,'feeling'):null}
-    {planRow('notifications-outline','Reminders',[checkinReminder&&'Daily check-in',waterReminder&&has('water')&&'Water'].filter(Boolean).join(' · ')||'Off','reminders')}
+    {planRow('notifications-outline','Reminders',checkinReminder?'Daily check-in':'Off','reminders')}
     {!goals.length?planRow('sparkles-outline','Goals','None picked yet','goals'):null}
    </View>
    {has('social')?<Text style={s.hint}>Your Screen Time limit starts once you choose apps in Screen Time.</Text>:null}</>;
