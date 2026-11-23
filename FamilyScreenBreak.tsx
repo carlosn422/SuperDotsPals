@@ -7,14 +7,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import {supabase} from './supabase';
 import {APP_THEME as T} from './MoodMascot';
-import SuperdotMascot from './SuperdotMascot';
 import {usePlus} from './PlusStore';
 import {useIsGuest} from './Account';
-import {ManageFamilyProfile,familyProfilesChanged,shortProfileName,useFamilyProfiles} from './FamilyWatches';
-import {WatchColorGrid,WatchImage,isWatchColor,type WatchColor} from './WatchArt';
-import {ScreenTimeReport,ackBreakSync,getBreakState,onBreakState,pendingBreakSync,pickBreakApps,requestScreenTimeAccess,screenBreakSupported,sendBreakCommand,setBreakChildren,setBreakEntitlement,type BreakAction,type BreakSession,type BreakState,type BreakSyncRow} from './modules/watch-link/screenBreak';
+import {ManageFamilyProfile,familyCall,familyProfilesChanged,shortProfileName,useFamilyProfiles,type FamilyProfile} from './FamilyWatches';
+import {WatchColorGrid,WatchColorSheet,WatchImage,colorName,isWatchColor,type WatchColor} from './WatchArt';
+import {ackBreakSync,getBreakState,onBreakState,pendingBreakSync,pickBreakApps,requestScreenTimeAccess,screenBreakSupported,sendBreakCommand,setBreakChildren,setBreakEntitlement,type BreakAction,type BreakSession,type BreakState,type BreakSyncRow} from './modules/watch-link/screenBreak';
 import {configureSocialTrack,getSocialState} from './modules/watch-link/socialTrack';
-import {comparison,formatDuration,observations,periodRange,periodStats,sessionInterval,type BreakPeriod,type Bucket,type SessionRow} from './ScreenBreakInsights';
+import {comparison,formatDuration,observations,periodRange,periodStats,type BreakPeriod,type Bucket,type SessionRow} from './ScreenBreakInsights';
 
 export type FamilyChild={id:string;name:string;profile_user_id:string|null;watch_only?:boolean};
 export type Entitlement={has_plus:boolean;trial_started_at:string|null;trial_ends_at:string|null;trial_available:boolean;allowed:boolean};
@@ -39,7 +38,8 @@ const toSec=(iso:string|null)=>iso?Math.floor(Date.parse(iso)/1000):undefined;
 export async function syncScreenBreak(isPlus:boolean):Promise<Entitlement|null>{
  if(!screenBreakSupported)return null;
  const children=await loadChildren().catch(()=>null);
- if(children)setBreakChildren(children.map(c=>({id:c.id,name:c.name})));
+ // Watches parked without a member (watch_only) aren't timer targets.
+ if(children)setBreakChildren(children.filter(c=>!c.watch_only).map(c=>({id:c.id,name:c.name})));
  const rows=pendingBreakSync();
  const {data,error}=rows.length?await supabase.rpc('screen_break_sync',{p_sessions:rows}):await supabase.rpc('screen_break_entitlement');
  if(error||!data)return null;
@@ -107,8 +107,8 @@ function countdown(ms:number){
 }
 
 // Red while apps on this iPhone are locked (watch lock or a timer that ran out), green otherwise.
-// Tap red: a manual lock unlocks; an ended timer opens that member so the parent can act.
-function HeaderLock({onOpen}:{onOpen:(childId:string)=>void}){
+// Tap red to unlock, whether the watch locked it or a timer ran out (that timer is already in the member's history).
+function HeaderLock(){
  const [state,setState]=useBreakState();
  const [busy,setBusy]=useState(false);
  const now=useNow(state?.session?.status==='active');
@@ -117,7 +117,6 @@ function HeaderLock({onOpen}:{onOpen:(childId:string)=>void}){
  const ended=s&&(s.status==='restricted'||(s.status==='active'&&s.deadline*1000<=now))?s:undefined;
  const locked=!!ended||!!state.manualLock;
  function tap(){
-  if(ended){onOpen(ended.childId);return}
   setBusy(true);
   const reply=sendBreakCommand('unlock');
   setBusy(false);
@@ -125,7 +124,7 @@ function HeaderLock({onOpen}:{onOpen:(childId:string)=>void}){
   if(!reply.ok)Alert.alert('Unable to unlock',reply.error||'Please try again.');
  }
  const icon=<Ionicons name={locked?'lock-closed':'lock-open'} size={22} color={locked?red:T.primary}/>;
- return locked?<TouchableOpacity accessibilityRole="button" accessibilityLabel={ended?`Apps locked: ${ended.childName}'s time is up. Open ${ended.childName}`:'Apps locked. Unlock'} disabled={busy} onPress={tap} hitSlop={12} style={[st.headerLock,{backgroundColor:'#FBE7EC'}]}>{busy?<ActivityIndicator color={red}/>:icon}</TouchableOpacity>
+ return locked?<TouchableOpacity accessibilityRole="button" accessibilityLabel={ended?`Apps locked: ${ended.childName}'s time is up. Unlock`:'Apps locked. Unlock'} disabled={busy} onPress={tap} hitSlop={12} style={[st.headerLock,{backgroundColor:'#FBE7EC'}]}>{busy?<ActivityIndicator color={red}/>:icon}</TouchableOpacity>
   :<View accessible accessibilityLabel="Apps unlocked" style={[st.headerLock,{backgroundColor:T.primarySoft}]}>{icon}</View>;
 }
 
@@ -155,7 +154,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  if(route.name==='child'&&child)return <ChildScreen child={child} children={children} onBack={()=>setRoute({name:'list'})} onInsights={()=>setRoute({name:'insights',id:child.id})} onChanged={()=>{void load();familyChildrenChanged()}} onRemoved={()=>{setRoute({name:'list'});void load()}} onAddWatch={onAddWatch} onOpen={id=>setRoute({name:'child',id})}/>;
  return <View style={{gap:14}}>
   {!embedded&&onBack?<Back label={backLabel} onPress={onBack}/>:null}
-  <View style={[st.row,{paddingVertical:0}]}><Text style={st.title} accessibilityRole="header">Family</Text>{screenBreakSupported&&!guest?<HeaderLock onOpen={id=>setRoute({name:'child',id})}/>:null}</View>
+  <View style={[st.row,{paddingVertical:0}]}><Text style={st.title} accessibilityRole="header">Family</Text>{screenBreakSupported&&!guest?<HeaderLock/>:null}</View>
   <Text style={st.sub}>Lend your iPhone with a Screen Break timer you control from MoodPals or your Apple Watch. Members don't need an account or a watch.</Text>
   <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
    <Text style={st.heading}>Members</Text>
@@ -182,9 +181,9 @@ function ActiveBadge({childId}:{childId:string}){
  const [state]=useBreakState();
  const s=state?.session;
  const now=useNow(!!s&&s.childId===childId&&s.status==='active');
- if(!s||s.childId!==childId||(s.status!=='active'&&s.status!=='restricted'))return null;
+ if(!s||s.childId!==childId||s.status!=='active'||s.deadline*1000<=now)return null;
  const left=Math.max(1,Math.ceil((s.deadline*1000-now)/60000));
- return <View style={st.badge}><Text style={st.badgeText}>{s.status==='active'?left+' min left':'Break on'}</Text></View>;
+ return <View style={st.badge}><Text style={st.badgeText}>{left+' min left'}</Text></View>;
 }
 
 function AddChild({onAdded}:{onAdded:(id?:string)=>void}){
@@ -216,9 +215,11 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
  const session=state?.session;
  // A session whose member record was replaced (same name, old id) is still controllable from that member.
  const orphan=!!session&&!children.some(c=>c.id===session.childId)&&session.childName===child.name;
- const mine=session&&(session.childId===child.id||orphan)&&(session.status==='active'||session.status==='restricted')?session:null;
- const other=session&&session.childId!==child.id&&!orphan&&session.status==='active'?session:null;
- const now=useNow((!!mine&&mine.status==='active')||!!other);
+ // A timer that ran out is just a lock now (the Family header lock); the member goes back to Start.
+ const now=useNow(session?.status==='active');
+ const running=session&&session.status==='active'&&session.deadline*1000>now?session:null;
+ const mine=running&&(running.childId===child.id||orphan)?running:null;
+ const other=running&&running.childId!==child.id&&!orphan?running:null;
  const lock=useRef(false);
  const refresh=()=>setState(getBreakState());
  useEffect(()=>{void syncScreenBreak(isPlus).then(refresh)},[child.id]);
@@ -252,12 +253,12 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
   <View style={{flexDirection:'row',alignItems:'center',gap:12}}>
    <View style={[st.avatar,{width:52,height:52,borderRadius:26}]}><Text style={[st.avatarText,{fontSize:22}]}>{child.name.slice(0,1).toUpperCase()}</Text></View>
    <Text style={[st.title,{flex:1}]} numberOfLines={1}>{child.name}</Text>
-   <TouchableOpacity accessibilityRole="button" accessibilityLabel={editing?'Done editing':'Edit '+child.name} onPress={()=>setEditing(e=>!e)} style={st.editBtn}><Text style={st.editBtnText}>{editing?'Done':'Edit'}</Text></TouchableOpacity>
+   <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Edit '+child.name} onPress={()=>setEditing(true)} style={st.editBtn}><Text style={st.editBtnText}>Edit</Text></TouchableOpacity>
   </View>
-  {editing?<ChildManage section="edit" child={child} children={children} onChanged={()=>{setEditing(false);onChanged()}} onRemoved={onRemoved} onAddWatch={onAddWatch} locked={!!mine}/>:null}
+  <EditMemberSheet visible={editing} child={child} children={children} onClose={()=>setEditing(false)} onChanged={onChanged} onRemoved={()=>{setEditing(false);onRemoved()}}/>
   {!screenBreakSupported?<View style={st.card}><Text style={st.body}>Screen Break needs the latest MoodPals build on this iPhone.</Text></View>:<>
    {state&&!state.hasPlus&&!isPlus?<PlanNote state={state} daysLeft={trialDaysLeft} onUpgrade={()=>showPaywall('screenBreak')}/>:null}
-   {mine?.status==='active'?<View style={[st.card,{alignItems:'center'}]}>
+   {mine?<View style={[st.card,{alignItems:'center'}]}>
     <Text style={st.kicker}>Screen time left</Text>
     <Text style={st.timer} accessibilityRole="timer">{countdown(mine.deadline*1000-now)}</Text>
     <Text style={st.sub}>Ends at {clock(mine.deadline)} · {formatDuration(mine.grantedSeconds)} granted</Text>
@@ -273,16 +274,8 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
       </View>
      </View>
     </Modal>
-    <View style={{flexDirection:'row',gap:10,alignSelf:'stretch',marginTop:6}}>
-     <TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={()=>run('endNow')} style={[st.cta,{flex:1,backgroundColor:'#F4A570'}]}><Text style={st.ctaText}>End Now</Text></TouchableOpacity>
-     <TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={()=>Alert.alert('Cancel Screen Break?','This stops the timer and keeps apps open.',[{text:'Keep'},{text:'Cancel Session',style:'destructive',onPress:()=>run('cancel')}])} style={[st.ghost,{flex:1}]}><Text style={[st.ghostText,{color:red}]}>Cancel</Text></TouchableOpacity>
-    </View>
-   </View>:mine?.status==='restricted'?<View style={[st.card,{alignItems:'center'}]}>
-    <SuperdotMascot id="joy" size={130}/>
-    <Text style={[st.title,{fontSize:22,textAlign:'center'}]}>Time for a break!</Text>
-    <Text style={[st.body,{textAlign:'center'}]}>Great job! Let's take a little break from the screen.</Text>
-    <Text style={st.sub}>Break on since {clock(mine.endedAt||mine.deadline)}. Paused apps show the Joy break screen.</Text>
-    <TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={()=>run('release')} style={[st.cta,{alignSelf:'stretch'}]}><Text style={st.ctaText}>Release Break</Text></TouchableOpacity>
+    {/* Stop ends the timer, keeps only the time used and leaves the apps open. */}
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Stop '+child.name+"'s timer"} disabled={!!busy} onPress={()=>run('cancel')} style={[st.ghost,{alignSelf:'stretch',marginTop:6}]}><Text style={[st.ghostText,{color:red}]}>Stop</Text></TouchableOpacity>
    </View>:<View style={st.card}>
     <Text style={st.heading}>Screen Break</Text>
     {other?<View style={[st.setupDone,{flexDirection:'column',alignItems:'stretch',gap:10,paddingVertical:14}]}>
@@ -319,7 +312,7 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
    {state&&!state.authorized&&mine?<Text style={[st.sub,{color:red}]}>Screen Time access was turned off, so apps can't be paused. Allow access again to restore the break.</Text>:null}
   </>}
   <TouchableOpacity accessibilityRole="button" onPress={onInsights} style={st.linkRow}><Ionicons name="bar-chart-outline" size={20} color={T.primary}/><Text style={[st.rowTitle,{flex:1}]}>Screen Time Insights</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>
-  <ChildManage section="watch" child={child} children={children} onChanged={onChanged} onRemoved={onRemoved} onAddWatch={onAddWatch} locked={!!mine}/>
+  <MemberWatch child={child} children={children} onChanged={onChanged} onRemoved={onRemoved}/>
  </View>;
 }
 
@@ -372,7 +365,7 @@ function DurationRing({minutes,onChange,min,max,step=5,prefix=''}:{minutes:numbe
 
 function PlanNote({state,daysLeft,onUpgrade}:{state:BreakState;daysLeft:number|null;onUpgrade:()=>void}){
  if(!state.entitlementKnown)return null;
- const text=state.trialAvailable?'14 days free: your trial starts with the first Screen Break or when you turn on Screen Time & Stress.':state.allowed?'Free trial: '+daysLeft+' day'+(daysLeft===1?'':'s')+' left.':'Your 14-day free trial has ended. Your history stays here, and you can always end or release a break.';
+ const text=state.trialAvailable?'14 days free: your trial starts with the first Screen Break or when you turn on Screen Time & Stress.':state.allowed?'Free trial: '+daysLeft+' day'+(daysLeft===1?'':'s')+' left.':'Your 14-day free trial has ended. Your history stays here, and you can always stop a timer or unlock.';
  return <TouchableOpacity accessibilityRole="button" onPress={onUpgrade} style={st.note}>
   <Ionicons name="sparkles-outline" size={18} color={T.primary}/><Text style={[st.sub,{flex:1,color:T.ink}]}>{text}</Text>
   {!state.allowed||!state.trialAvailable?<Text style={{color:T.primary,fontWeight:'900',fontSize:12}}>Plus</Text>:null}
@@ -438,39 +431,9 @@ function Chip({label,on,onPress,disabled}:{label:string;on?:boolean;onPress:()=>
  return <TouchableOpacity accessibilityRole="button" accessibilityState={{selected:!!on}} disabled={disabled} onPress={onPress} style={[st.chip,on&&st.chipOn,disabled&&{opacity:0.5}]}><Text style={[st.chipText,on&&{color:'#fff'}]}>{label}</Text></TouchableOpacity>;
 }
 
-function ChildManage({child,children,onChanged,onRemoved,onAddWatch,locked,section}:{child:FamilyChild;children:FamilyChild[];onChanged:()=>void;onRemoved:()=>void;onAddWatch?:()=>void;locked:boolean;section:'edit'|'watch'}){
- const [draft,setDraft]=useState(child.name),[linking,setLinking]=useState(false),[error,setError]=useState('');
- // Family watches added with the watch code flow that aren't assigned to another member yet.
- const watches=children.filter(c=>c.watch_only&&c.profile_user_id);
- async function save(){
-  const name=draft.replace(/\s+/g,' ').trim();
-  if(!name)return;
-  const {error:e}=await supabase.from('family_children').update({name,updated_at:new Date().toISOString()}).eq('id',child.id);
-  if(e){setError('Unable to save the name.');return}
-  onChanged();
- }
- async function link(profile:string){
-  const {error:e}=await supabase.rpc('family_link_child_watch',{p_child:child.id,p_profile:profile});
-  if(e){setError(e.code==='P0001'?e.message:'Unable to assign the watch.');return}
-  setLinking(false);onChanged();
- }
- function remove(){
-  Alert.alert('Remove '+child.name+'?','Their Screen Break history is deleted too.',[{text:'Keep'},{text:'Remove',style:'destructive',onPress:async()=>{
-   const {error:e}=await supabase.from('family_children').delete().eq('id',child.id);
-   if(e)setError('Unable to remove.');else onRemoved();
-  }}]);
- }
- if(section==='edit')return <View style={[st.card,{gap:12}]}>
-  <Text style={st.heading}>Edit member</Text>
-  {child.profile_user_id?<Text style={st.sub}>The name follows the assigned watch. Rename it under Watches on the Family screen.</Text>:<>
-   <TextInput value={draft} onChangeText={setDraft} maxLength={40} autoCapitalize="words" style={st.input} accessibilityLabel="Member's name" onSubmitEditing={()=>void save()}/>
-   <TouchableOpacity accessibilityRole="button" disabled={!draft.trim()||draft.trim()===child.name} onPress={()=>void save()} style={[st.cta,(!draft.trim()||draft.trim()===child.name)&&{opacity:0.5}]}><Text style={st.ctaText}>Save Name</Text></TouchableOpacity>
-   <TouchableOpacity accessibilityRole="button" disabled={locked} onPress={remove} style={[st.ghost,locked&&{opacity:0.5}]}><Text style={[st.ghostText,{color:red}]}>Remove Member</Text></TouchableOpacity>
-   {locked?<Text style={[st.sub,{textAlign:'center'}]}>End the Screen Break before removing {child.name}.</Text>:null}
-  </>}
-  {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
- </View>;
- return <MemberWatch child={child} spare={watches} onChanged={onChanged} link={link} error={error}/>;
+async function linkWatch(child:FamilyChild,profile:string){
+ const {error:e}=await supabase.rpc('family_link_child_watch',{p_child:child.id,p_profile:profile});
+ if(e)throw Error(e.code==='P0001'?e.message:'Unable to assign the watch.');
 }
 
 // Watch card for one member, used on Today; loads the member by id, or by the family watch profile id.
@@ -480,43 +443,131 @@ export function MemberWatchCard({childId,profileId}:{childId?:string;profileId?:
  useEffect(()=>{load();listeners.add(load);return()=>{listeners.delete(load)}},[load]);
  const child=children.find(c=>!c.watch_only&&(childId?c.id===childId:c.profile_user_id===profileId));
  if(!child)return null;
- const spare=children.filter(c=>c.watch_only&&c.profile_user_id);
- return <MemberWatch child={child} spare={spare} onChanged={familyChildrenChanged} link={async()=>{}} error=""/>;
+ return <MemberWatch child={child} children={children} onChanged={familyChildrenChanged} onRemoved={familyChildrenChanged}/>;
 }
 
-function MemberWatch({child,spare,onChanged,link,error}:{child:FamilyChild;spare:FamilyChild[];onChanged:()=>void;link:(profile:string)=>Promise<void>;error:string}){
- const {profiles,load}=useFamilyProfiles(!!child.profile_user_id);
- const [sheet,setSheet]=useState(false),[managing,setManaging]=useState(false),[unassigning,setUnassigning]=useState(false),[unError,setUnError]=useState('');
- function unassign(){
-  Alert.alert('Unassign this watch?',child.name+' stays in Family. The watch keeps working and can be assigned to another member.',[{text:'Keep'},{text:'Unassign',style:'destructive',onPress:async()=>{
-   setUnassigning(true);setUnError('');
-   const {error:e}=await supabase.rpc('family_unassign_child_watch',{p_child:child.id});
-   setUnassigning(false);
-   if(e)setUnError('Unable to unassign the watch. Try again.');else{familyProfilesChanged();onChanged()}
-  }}]);
- }
+// Summary of the member's watch; editing happens in the shared Edit sheet.
+function MemberWatch({child,children,onChanged,onRemoved}:{child:FamilyChild;children:FamilyChild[];onChanged:()=>void;onRemoved:()=>void}){
+ const {profiles}=useFamilyProfiles(!!child.profile_user_id);
+ const [editing,setEditing]=useState(false),[assigning,setAssigning]=useState(false);
  const watch=child.profile_user_id?profiles.find(p=>p.id===child.profile_user_id):undefined;
  const color=watch&&isWatchColor(watch.watchColor)?watch.watchColor:null;
+ const spare=children.filter(c=>c.watch_only&&c.profile_user_id);
  return <View style={[st.card,{gap:12}]}>
-  {child.profile_user_id?<>
-   <View style={{flexDirection:'row',alignItems:'center',gap:14}}>
-    <WatchImage color={color} name={shortProfileName(child.name)} width={64}/>
-    <View style={{flex:1,gap:2}}><Text style={st.rowTitle}>{child.name}'s Apple Watch</Text><Text style={st.sub}>Mood-only watch{watch?(watch.connected?' · Linked':' · Not linked'):''}</Text></View>
-   </View>
-   <TouchableOpacity accessibilityRole="button" disabled={!watch} onPress={()=>setManaging(true)} style={[st.ghost,!watch&&{opacity:0.5}]}><Text style={st.ghostText}>Manage Watch</Text></TouchableOpacity>
-   <TouchableOpacity accessibilityRole="button" disabled={unassigning} onPress={unassign} style={{alignItems:'center',justifyContent:'center',minHeight:44}}>{unassigning?<ActivityIndicator color={T.primary}/>:<Text style={[st.link,{color:red}]}>Unassign Watch</Text>}</TouchableOpacity>
-   {unError?<Text style={[st.sub,{color:red}]}>{unError}</Text>:null}
-   {managing&&watch?<ManageFamilyProfile profile={watch} onClose={()=>{setManaging(false);void load()}} onDeleted={async()=>{setManaging(false);familyProfilesChanged();onChanged()}}/>:null}
-  </>:<>
-   <View style={{flexDirection:'row',alignItems:'center',gap:12}}>
-    <Ionicons name="watch-outline" size={26} color={T.primary}/>
-    <View style={{flex:1}}><Text style={st.rowTitle}>Apple Watch</Text><Text style={st.sub}>Optional. {child.name} can pick moods from their own watch.</Text></View>
-   </View>
-   <TouchableOpacity accessibilityRole="button" onPress={()=>setSheet(true)} style={st.ghost}><Text style={st.ghostText}>Assign a Watch</Text></TouchableOpacity>
-   <AssignWatchSheet visible={sheet} child={child} spare={spare} link={link} onClose={()=>setSheet(false)} onAssigned={()=>{familyProfilesChanged();onChanged()}}/>
-  </>}
-  {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
+  {child.profile_user_id?<View style={{flexDirection:'row',alignItems:'center',gap:14}}>
+   <WatchImage color={color} name={shortProfileName(child.name)} width={64}/>
+   <View style={{flex:1,gap:2}}><Text style={st.rowTitle}>{child.name}'s Apple Watch</Text><Text style={st.sub}>Mood-only watch{watch?(watch.connected?' · Linked':' · Not linked'):''}</Text></View>
+  </View>:<View style={{flexDirection:'row',alignItems:'center',gap:12}}>
+   <Ionicons name="watch-outline" size={26} color={T.primary}/>
+   <View style={{flex:1}}><Text style={st.rowTitle}>Apple Watch</Text><Text style={st.sub}>Optional. {child.name} can pick moods from their own watch.</Text></View>
+  </View>}
+  {child.profile_user_id?<TouchableOpacity accessibilityRole="button" accessibilityLabel={'Edit '+child.name+' and their watch'} onPress={()=>setEditing(true)} style={st.ghost}><Text style={st.ghostText}>Edit</Text></TouchableOpacity>
+   :<TouchableOpacity accessibilityRole="button" onPress={()=>setAssigning(true)} style={st.ghost}><Text style={st.ghostText}>Assign a Watch</Text></TouchableOpacity>}
+  <EditMemberSheet visible={editing} child={child} children={children} onClose={()=>setEditing(false)} onChanged={onChanged} onRemoved={()=>{setEditing(false);onRemoved()}}/>
+  <AssignWatchSheet visible={assigning} child={child} spare={spare} link={p=>linkWatch(child,p)} onClose={()=>setAssigning(false)} onAssigned={()=>{familyProfilesChanged();onChanged()}}/>
  </View>;
+}
+
+// A family watch from Family › Watches: its member's Edit sheet, or the watch's own page if no member has it.
+export function FamilyWatchEditor({profile,onClose,onDeleted}:{profile:FamilyProfile;onClose:()=>void;onDeleted:()=>void|Promise<void>}){
+ const [children,setChildren]=useState<FamilyChild[]|null>(null);
+ const load=useCallback(()=>{void loadChildren().then(setChildren).catch(()=>setChildren([]))},[]);
+ useEffect(load,[load]);
+ if(!children)return null;
+ const member=children.find(c=>!c.watch_only&&c.profile_user_id===profile.id);
+ if(!member)return <ManageFamilyProfile profile={profile} onClose={onClose} onDeleted={onDeleted}/>;
+ return <EditMemberSheet visible child={member} children={children} onClose={onClose} onChanged={()=>{load();familyChildrenChanged()}} onRemoved={()=>{familyChildrenChanged();onClose()}}/>;
+}
+
+type EditStage='edit'|'assign'|'color'|'manage';
+
+// One bottom sheet for a member and their watch, which share a name: rename both, watch colour, assign or
+// unassign the watch, and remove the member. Sub-sheets open after this one has slid away (iOS shows one at a time).
+function EditMemberSheet({visible,child,children,onClose,onChanged,onRemoved}:{visible:boolean;child:FamilyChild;children:FamilyChild[];onClose:()=>void;onChanged:()=>void;onRemoved:()=>void}){
+ const {profiles,load}=useFamilyProfiles(visible&&!!child.profile_user_id);
+ const [state]=useBreakState();
+ const [draft,setDraft]=useState(child.name),[busy,setBusy]=useState(''),[error,setError]=useState('');
+ const [stage,setStage]=useState<EditStage>('edit'),[leaving,setLeaving]=useState<EditStage|null>(null);
+ useEffect(()=>{if(visible){setDraft(child.name);setError('');setStage('edit');setLeaving(null)}},[visible]);
+ useEffect(()=>{setDraft(child.name)},[child.name]);
+ const watch=child.profile_user_id?profiles.find(p=>p.id===child.profile_user_id):undefined;
+ const color=watch&&isWatchColor(watch.watchColor)?watch.watchColor:null;
+ const s=state?.session;
+ const locked=!!s&&s.childId===child.id&&s.status==='active'&&s.deadline*1000>Date.now();
+ const spare=children.filter(c=>c.watch_only&&c.profile_user_id);
+ const name=draft.replace(/\s+/g,' ').trim();
+ const open=(next:EditStage)=>setLeaving(next);
+ async function save(){
+  if(!name||name===child.name||busy)return;
+  setBusy('name');setError('');
+  try{
+   // A watch's name is the member's name (the server copies it to the member).
+   if(child.profile_user_id){await familyCall('rename',{profileId:child.profile_user_id,name});familyProfilesChanged()}
+   else{const {error:e}=await supabase.from('family_children').update({name,updated_at:new Date().toISOString()}).eq('id',child.id);if(e)throw Error('Unable to save the name.')}
+   onChanged();
+  }catch(e:any){setError(e?.message||'Unable to save the name.')}
+  finally{setBusy('')}
+ }
+ function unassign(){
+  Alert.alert('Unassign this watch?',child.name+' stays in Family. The watch keeps working and can be assigned to another member.',[{text:'Keep'},{text:'Unassign',style:'destructive',onPress:async()=>{
+   setBusy('unassign');setError('');
+   const {error:e}=await supabase.rpc('family_unassign_child_watch',{p_child:child.id});
+   setBusy('');
+   if(e)setError('Unable to unassign the watch. Try again.');else{familyProfilesChanged();onChanged()}
+  }}]);
+ }
+ function remove(){
+  Alert.alert('Remove '+child.name+'?',child.profile_user_id?'Their Screen Break history is deleted too. Their watch stays in Family and can be assigned to someone else.':'Their Screen Break history is deleted too.',[{text:'Keep'},{text:'Remove',style:'destructive',onPress:async()=>{
+   setBusy('remove');setError('');
+   // Park the watch first, so it can still be assigned to another member.
+   if(child.profile_user_id){
+    const {error:ue}=await supabase.rpc('family_unassign_child_watch',{p_child:child.id});
+    if(ue){setBusy('');setError('Unable to remove. Try again.');return}
+    familyProfilesChanged();
+   }
+   const {error:e}=await supabase.from('family_children').delete().eq('id',child.id);
+   setBusy('');
+   if(e)setError('Unable to remove.');else onRemoved();
+  }}]);
+ }
+ const row=(icon:keyof typeof Ionicons.glyphMap,label:string,value:string,onPress:()=>void)=><TouchableOpacity accessibilityRole="button" accessibilityLabel={label+', '+value} onPress={onPress} style={st.option}>
+  <Ionicons name={icon} size={20} color={T.primary}/><Text style={[st.rowTitle,{flex:1}]}>{label}</Text><Text style={st.sub}>{value}</Text><Ionicons name="chevron-forward" size={17} color={T.muted}/>
+ </TouchableOpacity>;
+ return <>
+  <Modal visible={visible&&stage==='edit'&&!leaving} transparent animationType="slide" onRequestClose={busy?undefined:onClose} onDismiss={()=>{if(leaving){setStage(leaving);setLeaving(null)}}}>
+   <View style={{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(29,43,51,0.3)'}}>
+    <TouchableOpacity style={StyleSheet.absoluteFill} disabled={!!busy} onPress={onClose} accessibilityLabel="Close"/>
+    <ScrollView style={{maxHeight:'88%',flexGrow:0}} contentContainerStyle={st.sheet} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
+     <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'}}/>
+     <Text style={st.sheetTitle}>Edit {child.name}</Text>
+     <Text style={st.kicker}>Name</Text>
+     <TextInput value={draft} onChangeText={setDraft} maxLength={40} autoCapitalize="words" returnKeyType="done" editable={busy!=='name'} style={st.input} accessibilityLabel="Member's name" onSubmitEditing={()=>void save()}/>
+     {child.profile_user_id?<Text style={st.sub}>Also renames {child.name}'s watch, and what your Circle sees.</Text>:null}
+     <TouchableOpacity accessibilityRole="button" disabled={!name||name===child.name||!!busy} onPress={()=>void save()} style={[st.cta,(!name||name===child.name||!!busy)&&{opacity:0.5}]}>{busy==='name'?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>Save</Text>}</TouchableOpacity>
+     <Text style={[st.kicker,{marginTop:6}]}>Apple Watch</Text>
+     {child.profile_user_id?<>
+      <View style={{flexDirection:'row',alignItems:'center',gap:14}}>
+       <WatchImage color={color} name={shortProfileName(child.name)} width={56}/>
+       <View style={{flex:1,gap:2}}><Text style={st.rowTitle}>{child.name}'s Apple Watch</Text><Text style={st.sub}>Mood-only watch{watch?(watch.connected?' · Linked':' · Not linked'):''}</Text></View>
+       {!watch?<ActivityIndicator color={T.primary}/>:null}
+      </View>
+      {watch?row('color-palette-outline','Watch colour',color?colorName(color):'Choose',()=>open('color')):null}
+      {watch?row('options-outline','More watch options','Sharing, remove',()=>open('manage')):null}
+      <TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={unassign} style={{alignItems:'center',justifyContent:'center',minHeight:44}}>{busy==='unassign'?<ActivityIndicator color={T.primary}/>:<Text style={[st.link,{color:red}]}>Unassign Watch</Text>}</TouchableOpacity>
+     </>:<>
+      <Text style={st.sub}>Optional. {child.name} can pick moods from their own watch.</Text>
+      <TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={()=>open('assign')} style={st.ghost}><Text style={st.ghostText}>Assign a Watch</Text></TouchableOpacity>
+     </>}
+     <TouchableOpacity accessibilityRole="button" disabled={locked||!!busy} onPress={remove} style={[st.ghost,{marginTop:6},(locked||!!busy)&&{opacity:0.5}]}><Text style={[st.ghostText,{color:red}]}>Remove Member</Text></TouchableOpacity>
+     {locked?<Text style={[st.sub,{textAlign:'center'}]}>Stop {child.name}'s timer before removing them.</Text>:null}
+     {error?<Text style={[st.sub,{color:red,textAlign:'center'}]}>{error}</Text>:null}
+    </ScrollView>
+   </View>
+  </Modal>
+  <AssignWatchSheet visible={visible&&stage==='assign'} child={child} spare={spare} link={p=>linkWatch(child,p)} onClose={()=>setStage('edit')} onAssigned={()=>{familyProfilesChanged();onChanged()}}/>
+  {watch?<WatchColorSheet visible={visible&&stage==='color'} name={shortProfileName(child.name)} initial={color} onSave={async c=>{await familyCall('set_color',{profileId:watch.id,color:c});familyProfilesChanged();void load()}} onClose={()=>setStage('edit')}/>:null}
+  {visible&&stage==='manage'&&watch?<ManageFamilyProfile profile={watch} onClose={()=>{setStage('edit');void load()}} onDeleted={()=>{setStage('edit');familyProfilesChanged();onChanged()}}/>:null}
+ </>;
 }
 
 // Bottom sheet that walks through adding a family watch and assigning it to this member.
@@ -629,7 +680,6 @@ function InsightsScreen({child,onBack}:{child:FamilyChild;onBack:()=>void}){
  const stats=useMemo(()=>periodStats(all,period,anchor,new Date(now)),[all,period,anchor,Math.floor(now/60000)]);
  const compare=comparison(stats);
  const notes=observations(stats,period);
- const windows=useMemo(()=>all.map(s=>sessionInterval(s)).filter((w):w is [number,number]=>!!w&&w[1]>range.start.getTime()&&w[0]<range.end.getTime()).map(([a,b])=>[a/1000,b/1000] as [number,number]),[all,range.start.getTime()]);
  const startOfTimes=periodRange(period,new Date()).start;
  return <View style={{gap:14}}>
   <Back label={child.name} onPress={onBack}/>
@@ -638,17 +688,7 @@ function InsightsScreen({child,onBack}:{child:FamilyChild;onBack:()=>void}){
   <PeriodPicker period={period} anchor={anchor} onPick={setAnchor}/>
   {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
   {loading?<ActivityIndicator color={T.primary}/>:null}
-  {allowed&&ScreenTimeReport&&state?.authorized?<View style={[st.card,{height:period==='day'?330:310,padding:0,overflow:'hidden'}]}>
-   {/* Shown until Apple's report draws over it; the report never draws in the Simulator or without Screen Time data. */}
-   <View style={{padding:16,gap:6}} accessibilityElementsHidden>
-    <Text style={st.kicker}>Total Screen Usage</Text>
-    <Text style={st.body}>Loading Apple Screen Time…</Text>
-    <Text style={st.sub}>Apple's device usage for this iPhone appears here. It isn't available in the Simulator or before iOS has recorded Screen Time on this iPhone.</Text>
-   </View>
-   <ScreenTimeReport style={StyleSheet.absoluteFill} request={{period,start:range.start.getTime()/1000,end:range.end.getTime()/1000,prevStart:previous.start.getTime()/1000,windows,childName:child.name}}/>
-  </View>
-   :<View style={st.card}><Text style={st.kicker}>Total Screen Usage</Text><Text style={st.body}>{!allowed?'Apple Screen Time usage is part of Screen Break with MoodPals Plus.':ScreenTimeReport?'Allow Screen Time access in Screen Break to see the usage Apple reports for this iPhone.':'Apple Screen Time usage needs the latest MoodPals build.'}</Text>
-    {!allowed?<TouchableOpacity onPress={()=>showPaywall('screenBreak')}><Text style={st.link}>See MoodPals Plus</Text></TouchableOpacity>:null}</View>}
+  <View style={st.note}><Ionicons name="bar-chart-outline" size={18} color={T.primary}/><Text style={[st.sub,{color:T.ink,flex:1}]}>{child.name}'s time in your tracked apps is in Actions › Screen Time & Stress: choose {child.name} above the chart.</Text></View>
   <View style={st.grid}>
    <Stat label="Screen Break Time" value={formatDuration(stats.seconds)} sub={'Recorded sessions for '+child.name}/>
    <Stat label="Daily Average" value={formatDuration(stats.dailyAverage)} sub={'Over '+stats.days+' day'+(stats.days===1?'':'s')}/>
@@ -666,7 +706,7 @@ function InsightsScreen({child,onBack}:{child:FamilyChild;onBack:()=>void}){
    {stats.highest&&period!=='day'?<Text style={st.sub}>Longest: {period==='week'?stats.highest.start.toLocaleDateString(undefined,{weekday:'long'}):period==='month'?'Week '+stats.highest.label.replace('Wk ',''):stats.highest.start.toLocaleDateString(undefined,{month:'long'})} · {formatDuration(stats.highest.seconds)}</Text>:null}
   </View>
   {allowed&&notes.length?<View style={st.card}>{notes.map(n=><Text key={n} style={st.body}>• {n}</Text>)}</View>:null}
-  <Text style={st.sub}>Screen Break Time is the time inside {child.name}'s sessions, from start until the session ended, was canceled or reached its time. Time Granted is what you allowed. Neither is measured phone use. Apple's Total Screen Usage is device activity on this iPhone for anyone using it.</Text>
+  <Text style={st.sub}>Screen Break Time is the time inside {child.name}'s sessions, from start until the session ended, was canceled or reached its time. Time Granted is what you allowed. Neither is measured phone use.</Text>
  </View>;
 }
 

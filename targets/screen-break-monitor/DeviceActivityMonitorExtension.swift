@@ -10,10 +10,10 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     guard activity == ScreenBreakShared.activityName else { return }
     // iOS may call slightly before the exact second.
     ScreenBreakShared.expireIfDue(tolerance: 30)
-    SocialTrackShared.applyPendingLimit()
+    SocialTrackShared.checkLimit()
   }
 
-  /// The owner's tracked apps: a 15-minute mark or the daily limit.
+  /// The owner's tracked apps: a 15-minute app mark or a 5-minute total.
   override func eventDidReachThreshold(_ event: DeviceActivityEvent.Name, activity: DeviceActivityName) {
     super.eventDidReachThreshold(event, activity: activity)
     guard activity == SocialTrackShared.activityName else { return }

@@ -17,10 +17,14 @@ const GOALS_KEY='moodpals-drink-goals';
 let goalCache:Record<Drink,number>|null=null;
 const goalListeners=new Set<(g:Record<Drink,number>)=>void>();
 // Custom goals are Plus; Free always uses the defaults.
+export async function saveDrinkGoal(k:Drink,v:number){
+ if(!goalCache){try{const v=await AsyncStorage.getItem(GOALS_KEY);goalCache={...DRINK_GOAL_DEFAULTS,...(v?JSON.parse(v):{})}}catch{goalCache={...DRINK_GOAL_DEFAULTS}}}
+ goalCache={...(goalCache as Record<Drink,number>),[k]:v};goalListeners.forEach(l=>l(goalCache!));await AsyncStorage.setItem(GOALS_KEY,JSON.stringify(goalCache)).catch(()=>{});
+}
 export function useDrinkGoals(isPlus:boolean){
  const [saved,setSaved]=useState(goalCache||DRINK_GOAL_DEFAULTS);
  useEffect(()=>{goalListeners.add(setSaved);if(!goalCache)void AsyncStorage.getItem(GOALS_KEY).then(v=>{goalCache={...DRINK_GOAL_DEFAULTS,...(v?JSON.parse(v):{})};goalListeners.forEach(l=>l(goalCache!))}).catch(()=>{});return()=>{goalListeners.delete(setSaved)}},[]);
- const setGoal=(k:Drink,v:number)=>{goalCache={...(goalCache||DRINK_GOAL_DEFAULTS),[k]:v};goalListeners.forEach(l=>l(goalCache!));void AsyncStorage.setItem(GOALS_KEY,JSON.stringify(goalCache)).catch(()=>{})};
+ const setGoal=saveDrinkGoal;
  return {goals:isPlus?saved:DRINK_GOAL_DEFAULTS,setGoal};
 }
 

@@ -1,7 +1,8 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {View,Text,TouchableOpacity,StyleSheet,Alert,AppState,Animated,Easing,AccessibilityInfo} from 'react-native';
-import Svg,{Circle,Defs,RadialGradient,Stop} from 'react-native-svg';
+import Svg,{Path} from 'react-native-svg';
 import {Ionicons} from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
 
@@ -13,16 +14,25 @@ const exercises=[
 type Exercise=typeof exercises[number];
 type Step={kind:'in'|'hold'|'out';name:string;time:number};
 const MINT='#34B37E',MINT_DEEP='#23966A',MINT_SOFT='#E4F6EA',INK='#2E1F5E',LAVENDER='#8276A5',LAV_BORDER='#E6DDF7',CREAM='#FFFAF2';
-const SMALL=0.84,LARGE=1;
+// A rounded square traced clockwise from its top-left corner, one side per step: in, hold, out, hold. Routines without
+// holds use half the square per step (top and right to breathe in, bottom and left to breathe out).
+const BOX=236,LINE=10,PAD=LINE/2+2,SIDE=BOX-2*PAD,R=52;
+const SQUARE=`M${PAD+R},${PAD}H${PAD+SIDE-R}A${R},${R} 0 0 1 ${PAD+SIDE},${PAD+R}V${PAD+SIDE-R}A${R},${R} 0 0 1 ${PAD+SIDE-R},${PAD+SIDE}H${PAD+R}A${R},${R} 0 0 1 ${PAD},${PAD+SIDE-R}V${PAD+R}A${R},${R} 0 0 1 ${PAD+R},${PAD}Z`;
+const LENGTH=4*(SIDE-2*R)+2*Math.PI*R,TRAIL=LENGTH*0.14;
+const AnimatedPath=Animated.createAnimatedComponent(Path);
+const PAL_IN=1.08,PAL_OUT=1;
 
 export default function BreathingStudio({onDone}:{accent?:string;tint?:string;onDone?:()=>void}){
  const [selected,setSelected]=useState<Exercise>(exercises[0]),[duration,setDuration]=useState(1);
  const [remaining,setRemaining]=useState(60),[elapsed,setElapsed]=useState(0),[running,setRunning]=useState(false),[saving,setSaving]=useState(false),[completed,setCompleted]=useState(false);
- const [reduceMotion,setReduceMotion]=useState(false);
- const scale=useRef(new Animated.Value(0.92)).current;
+ const [reduceMotion,setReduceMotion]=useState(false),[intro,setIntro]=useState(0);
+ // pos: where the line is on the square (0 to 1 is one breath); pal: the pal's gentle grow and settle.
+ const pos=useRef(new Animated.Value(0)).current,pal=useRef(new Animated.Value(PAL_OUT)).current;
  useEffect(()=>{if(!running)return;const timer=setInterval(()=>{setRemaining(v=>Math.max(0,v-1));setElapsed(v=>v+1)},1000);return()=>clearInterval(timer)},[running]);
  useEffect(()=>{if(running&&remaining===0){setRunning(false);setCompleted(true);void persist(duration)}},[remaining,running]);
- useEffect(()=>{const sub=AppState.addEventListener('change',status=>{if(status!=='active')setRunning(false)});return()=>sub.remove()},[]);
+ useEffect(()=>{const sub=AppState.addEventListener('change',status=>{if(status!=='active'){setRunning(false);setIntro(0)}});return()=>sub.remove()},[]);
+ // "Get comfortable" 3, 2, 1, then the first breath.
+ useEffect(()=>{if(!intro)return;const id=setTimeout(()=>{if(intro===1){setIntro(0);setRunning(true)}else setIntro(intro-1)},1000);return()=>clearTimeout(id)},[intro]);
  useEffect(()=>{let on=true;void AccessibilityInfo.isReduceMotionEnabled().then(v=>{if(on)setReduceMotion(v)});const sub=AccessibilityInfo.addEventListener('reduceMotionChanged',setReduceMotion);return()=>{on=false;sub.remove()}},[]);
  async function persist(minutes:number){
   setSaving(true);
@@ -30,24 +40,40 @@ export default function BreathingStudio({onDone}:{accent?:string;tint?:string;on
    const {error}=await supabase.from('habit_entries').insert({user_id:user.id,habit:'mindfulness',amount:minutes,unit:'minutes'});if(error)throw error;
   }catch(e:any){Alert.alert('Session not saved',e?.message??'Check your connection and try again.')}finally{setSaving(false)}
  }
- function reset(){setRunning(false);setRemaining(duration*60);setElapsed(0);setCompleted(false)}
+ function reset(){setRunning(false);setIntro(0);setRemaining(duration*60);setElapsed(0);setCompleted(false)}
  function chooseRoutine(item:Exercise){setSelected(item);reset()}
- function chooseDuration(n:number){setDuration(n);setRemaining(n*60);setElapsed(0);setCompleted(false);setRunning(false)}
+ function chooseDuration(n:number){setDuration(n);setRemaining(n*60);setElapsed(0);setCompleted(false);setRunning(false);setIntro(0)}
  const steps:Step[]=([{kind:'in',name:'Breathe in',time:selected.inhale},{kind:'hold',name:'Hold',time:selected.hold},{kind:'out',name:'Breathe out',time:selected.exhale},{kind:'hold',name:'Hold',time:'holdAfter' in selected?selected.holdAfter:0}] as Step[]).filter(s=>s.time>0);
  const cycle=steps.reduce((n,x)=>n+x.time,0);
  let t=elapsed%cycle,stepIndex=0;
  for(let i=0;i<steps.length;i++){if(t<steps[i].time){stepIndex=i;break}t-=steps[i].time}
  const step=steps[stepIndex];
- const active=running||(elapsed>0&&!completed);
- // Inhale grows, exhale shrinks, holds stay put; one animation per phase so it stays in sync with the 1 s timer.
+ const lap=Math.floor(elapsed/cycle);
+ const active=running||intro>0||(elapsed>0&&!completed);
+ // One animation per step, started from where the step is now, so the line stays in time with the 1 s clock.
+ // Reduce Motion: the line jumps to the end of each step instead of gliding.
  useEffect(()=>{
-  if(!running){Animated.timing(scale,{toValue:0.92,duration:reduceMotion?0:400,useNativeDriver:true}).start();return;}
-  if(reduceMotion){scale.setValue(step.kind==='in'?LARGE:step.kind==='out'?SMALL:(stepIndex>0&&steps[stepIndex-1].kind==='in'?LARGE:SMALL));return;}
-  if(step.kind==='hold')return;
-  Animated.timing(scale,{toValue:step.kind==='in'?LARGE:SMALL,duration:(step.time-t)*1000,easing:Easing.inOut(Easing.sin),useNativeDriver:true}).start();
- },[running,stepIndex,elapsed===0,reduceMotion,selected.id]);
- const clock=String(Math.floor(remaining/60)).padStart(2,'0')+':'+String(remaining%60).padStart(2,'0');
- const phaseText=completed?'Great job!':running?step.name:elapsed>0?'Paused':'Ready to breathe?';
+  if(!running){
+   pos.stopAnimation();pal.stopAnimation();
+   if(elapsed===0||completed){pos.setValue(0);pal.setValue(PAL_OUT)}
+   return;
+  }
+  void Haptics.impactAsync(step.kind==='hold'?Haptics.ImpactFeedbackStyle.Soft:Haptics.ImpactFeedbackStyle.Light).catch(()=>{});
+  const share=1/steps.length,end=(stepIndex+1)*share;
+  if(reduceMotion){pos.setValue(end);return}
+  pos.setValue(stepIndex*share+t/step.time*share);
+  Animated.timing(pos,{toValue:end,duration:(step.time-t)*1000,easing:Easing.linear,useNativeDriver:false}).start();
+  if(step.kind!=='hold')Animated.timing(pal,{toValue:step.kind==='in'?PAL_IN:PAL_OUT,duration:(step.time-t)*1000,easing:Easing.inOut(Easing.sin),useNativeDriver:true}).start();
+ },[running,stepIndex,lap,reduceMotion,selected.id]);
+ const clock=Math.floor(remaining/60)+':'+String(remaining%60).padStart(2,'0');
+ const phaseText=completed?'Great job!':intro?'Get comfortable':running?step.name:elapsed>0?'Paused':'Ready to breathe?';
+ const offset=pos.interpolate({inputRange:[0,1],outputRange:[TRAIL,TRAIL-LENGTH]});
+ function toggle(){
+  if(intro){setIntro(0);return}
+  if(running){setRunning(false);return}
+  if(elapsed===0){setIntro(3);return}
+  setRunning(true);
+ }
  return <View style={s.wrap}>
   <View pointerEvents="none" style={[s.blob,{width:220,height:220,right:-70,top:-60}]}/>
   <View pointerEvents="none" style={[s.blob,{width:180,height:180,left:-80,bottom:120}]}/>
@@ -70,14 +96,16 @@ export default function BreathingStudio({onDone}:{accent?:string;tint?:string;on
    <Text style={s.label}>Session length</Text>
    <View accessibilityRole="radiogroup" style={s.lengths}>{[1,3,5].map(n=>{const on=duration===n;return <TouchableOpacity key={n} disabled={running} accessibilityRole="radio" accessibilityState={{selected:on,disabled:running}} accessibilityLabel={n+(n===1?' minute':' minutes')+' session'} onPress={()=>chooseDuration(n)} style={[s.length,on&&s.lengthOn,running&&!on&&{opacity:.55}]}><Text style={[s.lengthText,on&&{color:'#fff'}]}>{n} min</Text></TouchableOpacity>})}</View>
 
-   <View accessible accessibilityLabel={phaseText+', '+Math.floor(remaining/60)+' minutes '+remaining%60+' seconds left'} accessibilityLiveRegion="polite" style={s.visual}>
-    <View style={s.halo}/>
-    <Animated.View style={[s.orb,{transform:[{scale}]}]}>
-     <Svg width={216} height={216} viewBox="0 0 216 216" style={StyleSheet.absoluteFill}><Defs><RadialGradient id="orb" cx="50%" cy="38%" r="65%"><Stop offset="0" stopColor="#6FD3A6"/><Stop offset="1" stopColor={MINT_DEEP}/></RadialGradient></Defs><Circle cx="108" cy="108" r="100" fill="url(#orb)"/><Circle cx="108" cy="108" r="104" fill="none" stroke="#FFFFFF" strokeWidth="7"/></Svg>
-     <SuperdotMascot id="calm" size={92} animate={running&&!reduceMotion}/>
-     <Text style={s.phase}>{phaseText}</Text>
-     <Text style={s.countdown}>{completed?'00:00':clock}</Text>
-    </Animated.View>
+   <View accessible accessibilityLabel={phaseText+(intro?', '+intro:'')+', '+Math.floor(remaining/60)+' minutes '+remaining%60+' seconds left'} accessibilityLiveRegion="polite" style={s.visual}>
+    <View style={s.square}>
+     <Svg width={BOX} height={BOX} style={StyleSheet.absoluteFill}>
+      <Path d={SQUARE} fill="#FFFFFF" stroke={MINT_SOFT} strokeWidth={LINE}/>
+      {active||completed?<AnimatedPath d={SQUARE} fill="none" stroke={MINT_DEEP} strokeWidth={LINE} strokeLinecap="round" strokeDasharray={`${TRAIL} ${LENGTH-TRAIL}`} strokeDashoffset={offset}/>:null}
+     </Svg>
+     {intro?<Text style={s.introCount}>{intro}</Text>:<Animated.View style={{transform:[{scale:pal}]}}><SuperdotMascot id={selected.mascot} size={128} animate={running&&!reduceMotion}/></Animated.View>}
+    </View>
+    <Text style={s.phase}>{phaseText}</Text>
+    <Text style={s.countdown}>{completed?'0:00':clock} left</Text>
    </View>
 
    {completed?<>
@@ -85,7 +113,7 @@ export default function BreathingStudio({onDone}:{accent?:string;tint?:string;on
     <TouchableOpacity accessibilityRole="button" disabled={saving} style={s.start} onPress={()=>{reset();onDone?.()}}><Text style={s.startText}>{saving?'Saving…':'Done'}</Text></TouchableOpacity>
     <TouchableOpacity accessibilityRole="button" onPress={reset} style={s.textBtn}><Text style={s.textBtnLabel}>Breathe again</Text></TouchableOpacity>
    </>:<>
-    <TouchableOpacity accessibilityRole="button" style={s.start} onPress={()=>setRunning(v=>!v)}><Ionicons name={running?'pause':'play'} size={22} color="#fff"/><Text style={s.startText}>{running?'Pause breathing':active?'Resume breathing':'Start breathing'}</Text></TouchableOpacity>
+    <TouchableOpacity accessibilityRole="button" style={s.start} onPress={toggle}><Ionicons name={running?'pause':intro?'close':'play'} size={22} color="#fff"/><Text style={s.startText}>{running?'Pause breathing':intro?'Not yet':active?'Resume breathing':'Start breathing'}</Text></TouchableOpacity>
     {active?<TouchableOpacity accessibilityRole="button" onPress={reset} style={s.textBtn}><Text style={s.textBtnLabel}>End session</Text></TouchableOpacity>:null}
    </>}
   </View>
@@ -109,11 +137,11 @@ const s=StyleSheet.create({
  length:{flex:1,minHeight:46,alignItems:'center',justifyContent:'center',borderRadius:23,backgroundColor:'#fff',borderWidth:1,borderColor:'#F0EBF7',...shadow},
  lengthOn:{backgroundColor:MINT,borderColor:MINT},
  lengthText:{fontSize:15,color:'#5B3FA8',fontWeight:'900'},
- visual:{height:268,alignItems:'center',justifyContent:'center',marginVertical:4},
- halo:{position:'absolute',width:258,height:258,borderRadius:129,backgroundColor:MINT_SOFT,borderWidth:10,borderColor:'rgba(255,255,255,.9)'},
- orb:{width:216,height:216,borderRadius:108,alignItems:'center',justifyContent:'center',shadowColor:MINT_DEEP,shadowOpacity:.35,shadowRadius:18,shadowOffset:{width:0,height:8}},
- phase:{color:'#fff',fontSize:16,fontWeight:'900',marginTop:2,textAlign:'center'},
- countdown:{color:'#fff',fontSize:34,fontWeight:'900',fontVariant:['tabular-nums']},
+ visual:{alignItems:'center',justifyContent:'center',gap:6,marginVertical:6},
+ square:{width:BOX,height:BOX,alignItems:'center',justifyContent:'center',...shadow},
+ introCount:{color:MINT_DEEP,fontSize:72,fontWeight:'900',fontVariant:['tabular-nums']},
+ phase:{color:INK,fontSize:24,fontWeight:'900',marginTop:10,textAlign:'center'},
+ countdown:{color:LAVENDER,fontSize:14,fontWeight:'700',fontVariant:['tabular-nums']},
  doneText:{color:LAVENDER,fontSize:14,textAlign:'center',fontWeight:'600'},
  start:{flexDirection:'row',gap:10,alignItems:'center',justifyContent:'center',minHeight:58,borderRadius:29,backgroundColor:MINT,...shadow,shadowColor:MINT_DEEP,shadowOpacity:.3},
  startText:{color:'#fff',fontWeight:'900',fontSize:18},

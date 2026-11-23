@@ -198,21 +198,7 @@ struct ContentView: View {
             choosingMood = false; measuring = false; choosingTheme = false; showingDrinks = false; showingFamily = false
             showingCircle = true
         }
-        .overlay {
-            ZStack {
-                if let reaction = circle.floating {
-                    FloatingReactionView(reaction: reaction)
-                        .transition(.asymmetric(insertion: .identity, removal: .opacity))
-                }
-                if let summary = circle.summary {
-                    FloatingSummaryView(summary: summary)
-                        .transition(.asymmetric(insertion: .identity, removal: .opacity))
-                }
-            }
-            .animation(.easeIn(duration: WatchCircleStore.fadeDuration), value: circle.floating?.id)
-            .animation(.easeIn(duration: WatchCircleStore.fadeDuration), value: circle.summary?.id)
-        }
-        // Circle reactions only float while the app is open in the foreground.
+        // Circle polls for new reactions only while the app is open in the foreground.
         .onChange(of: scenePhase == .active && sync.connected && !sync.pairingActive, initial: true) { _, isActive in
             circle.setActive(isActive)
         }

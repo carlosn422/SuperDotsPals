@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {usePlus} from './PlusStore';
 import {supabase} from './supabase';
-import {MemberWatchCard,onFamilyChildrenChanged} from './FamilyScreenBreak';
+import {FamilyWatchEditor,MemberWatchCard,onFamilyChildrenChanged} from './FamilyScreenBreak';
 import SuperdotMascot from './SuperdotMascot';
 import {requireOptionalNativeModule} from 'expo';
 import {SectionHeader,WatchColorSheet,WatchImage,WatchRow,colorName,isWatchColor} from './WatchArt';
@@ -64,7 +64,7 @@ export default function FamilyWatches({reloadKey,onAdd}:{reloadKey:number;onAdd?
    {profiles.map((p,i)=><WatchRow key={p.id} last={i===profiles.length-1} color={isWatchColor(p.watchColor)?p.watchColor:null} name={shortProfileName(p.name)} title={p.name} label={'Manage '+p.name}
     lines={['Linked to '+shortProfileName(p.name),'Mood-only family watch',p.connected?'':'Watch not linked',isWatchColor(p.watchColor)?'':'Choose Watch Color in Manage']} onPress={()=>{setNotice('');setManaging(p)}}/>)}
   </View>
-  {managing?<ManageFamilyProfile profile={managing} onClose={()=>setManaging(null)} onDeleted={async()=>{setManaging(null);await load();familyProfilesChanged();setNotice(managing.name+' was permanently removed.')}}/>:null}
+  {managing?<FamilyWatchEditor profile={managing} onClose={()=>setManaging(null)} onDeleted={async()=>{setManaging(null);await load();familyProfilesChanged();setNotice(managing.name+' was permanently removed.')}}/>:null}
  </View>;
 }
 

@@ -8,8 +8,13 @@ public class SocialTrackModule: Module {
   public func definition() -> ModuleDefinition {
     Name("SocialTrack")
 
+    OnCreate {
+      SocialTrackShared.migrateIfNeeded()
+    }
+
     Function("getState") { () -> [String: Any] in
-      SocialTrackShared.applyPendingLimit()
+      SocialTrackShared.migrateIfNeeded()
+      SocialTrackShared.checkLimit()
       let selection = SocialTrackShared.loadSelection()
       let order = SocialTrackShared.orderedApps()
       return [
@@ -17,6 +22,7 @@ public class SocialTrackModule: Module {
         "enabled": SocialTrackShared.enabled,
         "limitMinutes": SocialTrackShared.limitMinutes,
         "limitHitToday": SocialTrackShared.limitHitToday,
+        "ownerToday": SocialTrackShared.ownerMinutesToday(),
         // Indexes of the apps chosen now (marks may also name apps removed since).
         "apps": order.enumerated().compactMap { selection?.applicationTokens.contains($0.element) == true ? $0.offset : nil },
         "groupCount": (selection?.categoryTokens.count ?? 0) + (selection?.webDomainTokens.count ?? 0),
@@ -34,7 +40,14 @@ public class SocialTrackModule: Module {
     /// Marks since `since` (seconds): [{app, minutes, at, family}] with `at` in seconds.
     Function("marks") { (since: Double) -> [[String: Any]] in
       SocialTrackShared.loadMarks().filter { $0.at.timeIntervalSince1970 >= since }.map {
-        ["app": $0.app, "minutes": $0.minutes, "at": $0.at.timeIntervalSince1970, "family": $0.family == true]
+        ["app": $0.app, "minutes": $0.minutes, "at": $0.at.timeIntervalSince1970, "family": $0.family == true, "member": $0.member ?? ""]
+      }
+    }
+
+    /// Minutes per person per day: [{day: "y-m-d", who: "you" or member id, minutes}].
+    Function("daily") { () -> [[String: Any]] in
+      SocialTrackShared.loadDaily().flatMap { day, people in
+        people.map { ["day": day, "who": $0.key, "minutes": $0.value] as [String: Any] }
       }
     }
 

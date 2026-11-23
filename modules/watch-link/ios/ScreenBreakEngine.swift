@@ -88,7 +88,7 @@ final class ScreenBreakEngine {
     queue.async { self.reconcileLocked() }
   }
 
-  /// `action`: state | start | addTime | endNow | cancel | release.
+  /// `action`: state | start | addTime | adjust | endNow | cancel (Stop) | release | lock | unlock.
   /// Fields: commandId, childId, minutes, sessionId, expectedVersion.
   func handle(_ command: [String: Any]) -> [String: Any] {
     queue.sync { handleLocked(command) }
@@ -257,10 +257,12 @@ final class ScreenBreakEngine {
       previous.updatedAt = now
       ScreenBreakShared.enqueueSync(previous)
     }
+    // Starting unlocks the iPhone (a watch lock or a finished timer) and sets the owner's daily limit aside.
     ScreenBreakShared.clearShield()
     manualLock = false
     session.updatedAt = now
     ScreenBreakShared.saveSession(session)
+    SocialTrackShared.liftForMember()
     ScreenBreakShared.enqueueSync(session)
     scheduleNotifications(session)
     if !entitlement.hasPlus && entitlement.trialAvailable {
@@ -371,6 +373,7 @@ final class ScreenBreakEngine {
     ScreenBreakShared.enqueueSync(session)
     scheduleNotifications(session)
     disarmTimer()
+    SocialTrackShared.checkLimit()
   }
 
   private func release(_ command: [String: Any]) throws {
@@ -386,6 +389,7 @@ final class ScreenBreakEngine {
     ScreenBreakShared.saveSession(session)
     ScreenBreakShared.enqueueSync(session)
     scheduleNotifications(session)
+    SocialTrackShared.checkLimit()
   }
 
   private func lock() throws {
@@ -417,6 +421,7 @@ final class ScreenBreakEngine {
       scheduleNotifications(session)
     }
     if ScreenBreakShared.loadSession()?.isActive != true { ScreenBreakShared.clearShield() }
+    SocialTrackShared.checkLimit()
   }
 
   // MARK: Enforcement
@@ -444,6 +449,7 @@ final class ScreenBreakEngine {
   private func reconcileLocked() {
     let now = Date()
     if ScreenBreakShared.expireIfDue(now: now) != nil {
+      SocialTrackShared.checkLimit(now: now)
       scheduleNotificationsAfterExpiry()
       disarmTimer()
       notifyLocked()
