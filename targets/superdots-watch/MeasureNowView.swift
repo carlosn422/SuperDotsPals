@@ -129,7 +129,7 @@ struct MeasureNowView: View {
                 case .idle:
                     AnimatedMoodMascot(mood: "Calm", size: 80, isActive: false)
                     Text("Measure now").font(.headline)
-                    Text("Sit still and breathe with the circle for one minute.")
+                    Text("Sit still and breathe with the square for one minute.")
                         .font(.caption2).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     Button("Start") { Task { await measurement.start() } }
                         .buttonStyle(.borderedProminent).tint(purple)
@@ -164,19 +164,42 @@ struct MeasureNowView: View {
     }
 }
 
+/// Same look as the iPhone breathing: a short line glides around a rounded square.
+/// Six breaths a minute: 4 s in over the top and right, 6 s out over the bottom and left.
 private struct BreathingPacer: View {
     let elapsed: TimeInterval
-    // Six breaths a minute: 4 s in, 6 s out.
-    private var inhaling: Bool { elapsed.truncatingRemainder(dividingBy: 10) < 4 }
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var start = Date()
+    private let green = Color(red: 0.30, green: 0.73, blue: 0.50)
+    private let trail = 0.14
+
+    private func position(_ t: TimeInterval) -> Double {
+        let c = t.truncatingRemainder(dividingBy: 10)
+        if reduceMotion { return c < 4 ? 0.5 : 1.0 }
+        return c < 4 ? 0.5 * c / 4 : 0.5 + 0.5 * (c - 4) / 6
+    }
+
     var body: some View {
-        VStack(spacing: 4) {
-            Circle()
-                .fill(Color(red: 0.30, green: 0.73, blue: 0.50).opacity(0.75))
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { context in
+            let t = reduceMotion ? elapsed : context.date.timeIntervalSince(start)
+            let p = position(t)
+            VStack(spacing: 4) {
+                ZStack {
+                    BreathSquare().stroke(green.opacity(0.25), lineWidth: 7)
+                    BreathSquare().trim(from: max(0, p - trail), to: p)
+                        .stroke(Color.white, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                    if p < trail {
+                        BreathSquare().trim(from: 1 - (trail - p), to: 1)
+                            .stroke(Color.white, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                    }
+                }
                 .frame(width: 92, height: 92)
-                .scaleEffect(inhaling ? 1.0 : 0.55)
-                .animation(.easeInOut(duration: inhaling ? 4 : 6), value: inhaling)
-            Text(inhaling ? "Breathe in" : "Breathe out").font(.caption.weight(.semibold))
+                Text(t.truncatingRemainder(dividingBy: 10) < 4 ? "Breathe in" : "Breathe out").font(.caption.weight(.semibold))
+            }
         }
+        // Follows the measurement clock, so the last breath ends with the reading.
+        .onAppear { start = Date().addingTimeInterval(-elapsed) }
+        .onChange(of: elapsed) { _, e in start = Date().addingTimeInterval(-e) }
     }
 }
 
