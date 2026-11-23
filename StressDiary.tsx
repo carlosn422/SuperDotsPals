@@ -1,5 +1,5 @@
 import React,{useMemo,useState} from 'react';
-import {View,Text,TouchableOpacity,TextInput,StyleSheet,Alert,ActivityIndicator} from 'react-native';
+import {View,Text,TouchableOpacity,TextInput,StyleSheet,Alert,ActivityIndicator,ActionSheetIOS,Modal,ScrollView} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {supabase} from './supabase';
 import {useStress} from './StressDashboard';
@@ -55,13 +55,14 @@ const weekday=(d:Date)=>d.toLocaleDateString(undefined,{weekday:'long'});
 
 export default function StressDiary({entries,onChanged,onAsk}:{entries:DiaryEntry[];onChanged:()=>Promise<void>|void;onAsk?:(text:string)=>void}){
  const {points,today}=useStress();
- const [filter,setFilter]=useState<StressLevel|'all'>('all');
+ // Stress levels to show; empty means all entries.
+ const [filter,setFilter]=useState<StressLevel[]>([]),[filtering,setFiltering]=useState(false);
  const [draft,setDraft]=useState(''),[tags,setTags]=useState<string[]>([]),[busy,setBusy]=useState(false);
  const [editing,setEditing]=useState<string|null>(null),[editText,setEditText]=useState('');
  const insights=useMemo(()=>diaryInsights(entries,points),[entries,points]);
  const summary=useMemo(()=>weeklySummary(entries,points),[entries,points]);
  const annotated=useMemo(()=>entries.map(e=>({e,p:stressAt(points,e.occurred_at)})),[entries,points]);
- const shown=annotated.filter(x=>filter==='all'||x.p?.level===filter);
+ const shown=annotated.filter(x=>!filter.length||(!!x.p&&filter.includes(x.p.level)));
  const groups:{key:string;date:Date;items:typeof shown}[]=[];
  shown.forEach(x=>{const d=new Date(x.e.occurred_at),k=dayKey(d);const g=groups.find(g=>g.key===k);if(g)g.items.push(x);else groups.push({key:k,date:d,items:[x]})});
 
@@ -80,6 +81,13 @@ export default function StressDiary({entries,onChanged,onAsk}:{entries:DiaryEntr
   Alert.alert('Delete entry?','This removes it from your diary permanently.',[{text:'Cancel',style:'cancel'},{text:'Delete',style:'destructive',onPress:async()=>{
    try{const {error}=await supabase.from('wellness_journal').delete().eq('id',id).eq('user_id',await uid());if(error)throw error;await onChanged()}catch(e:any){Alert.alert('Could not delete',e?.message||'Try again.')}
   }}]);
+ }
+ function more(e:DiaryEntry,p:StressPoint|null,auto:boolean){
+  const actions:{label:string;run:()=>void;destructive?:boolean}[]=[];
+  if(onAsk)actions.push({label:'Ask MoodPal',run:()=>onAsk(`Help me reflect on this diary entry from ${new Date(e.occurred_at).toLocaleString()}: "${e.body.slice(0,500)}"${e.mood?` (mood: ${e.mood})`:''}${p?` My stress level then was ${STRESS_LEVELS[p.level].label}.`:''}`)});
+  if(!auto)actions.push({label:'Edit',run:()=>{setEditing(e.id);setEditText(e.body)}});
+  actions.push({label:'Delete',run:()=>remove(e.id),destructive:true});
+  ActionSheetIOS.showActionSheetWithOptions({options:[...actions.map(a=>a.label),'Cancel'],cancelButtonIndex:actions.length,destructiveButtonIndex:actions.findIndex(a=>a.destructive)},i=>{if(i<actions.length)actions[i].run()});
  }
 
  return <View style={{gap:12}}>
@@ -113,7 +121,16 @@ export default function StressDiary({entries,onChanged,onAsk}:{entries:DiaryEntr
    <TouchableOpacity disabled={busy||!draft.trim()} onPress={()=>void save()} style={[st.button,{opacity:busy||!draft.trim()?0.5:1}]}>{busy?<ActivityIndicator color="#fff"/>:<Text style={st.buttonText}>Save entry</Text>}</TouchableOpacity>
   </View>
 
-  <View style={st.chips}>{(['all',...LEVEL_ORDER.slice().reverse()] as const).map(l=><TouchableOpacity key={l} onPress={()=>setFilter(l)} style={[st.chip,filter===l&&{backgroundColor:l==='all'?SW.ink:STRESS_LEVELS[l].color}]}><Text style={[st.chipText,filter===l&&{color:'#fff'}]}>{l==='all'?'All entries':STRESS_LEVELS[l].label}</Text></TouchableOpacity>)}</View>
+  <View style={st.between}>
+   <View style={{flex:1,gap:2}}><Text accessibilityRole="header" style={[st.title,{fontSize:22}]}>Entries</Text><Text style={st.muted}>Your recent check-ins</Text></View>
+   <TouchableOpacity accessibilityRole="button" accessibilityLabel={filter.length?`Filter, ${filter.length} selected`:'Filter'} onPress={()=>setFiltering(true)} style={st.filterBtn}>
+    <Ionicons name="options-outline" size={18} color={SW.green}/><Text style={st.filterText}>Filter</Text><Ionicons name="chevron-down" size={16} color={SW.green}/>
+   </TouchableOpacity>
+  </View>
+  {filter.length?<View style={st.chips}>{LEVEL_ORDER.slice().reverse().filter(l=>filter.includes(l)).map(l=><TouchableOpacity key={l} accessibilityRole="button" accessibilityLabel={'Remove '+STRESS_LEVELS[l].label+' filter'} onPress={()=>setFilter(f=>f.filter(x=>x!==l))} style={[st.chip,st.activeChip,{backgroundColor:STRESS_LEVELS[l].tint}]}>
+   <Text style={[st.chipText,{color:STRESS_LEVELS[l].color}]}>{STRESS_LEVELS[l].label}</Text><Ionicons name="close" size={14} color={STRESS_LEVELS[l].color}/>
+  </TouchableOpacity>)}</View>:null}
+  <FilterSheet visible={filtering} applied={filter} onApply={f=>{setFilter(f);setFiltering(false)}} onClose={()=>setFiltering(false)}/>
 
   {groups.length===0?<View style={st.card}><Text style={st.muted}>{entries.length?'No entries at this stress level.':'No entries yet. Your first reflection starts the timeline.'}</Text></View>:groups.map(g=>{
    const scores=g.items.map(x=>x.p?.score).filter((v):v is number=>v!==undefined);
@@ -139,15 +156,37 @@ export default function StressDiary({entries,onChanged,onAsk}:{entries:DiaryEntr
         {(e.stress_factors||[]).map(f=><View key={f} style={st.tag}><Text style={st.tagText}>{f}</Text></View>)}
         {e.energy_level&&e.energy_level!=='neutral'?<View style={st.tag}><Text style={st.tagText}>{e.energy_level==='tired'?'Tired':'Energized'}</Text></View>:null}
        </View>
-       {editing!==e.id?<View style={{flexDirection:'row',gap:16}}>
-        {onAsk?<TouchableOpacity onPress={()=>onAsk(`Help me reflect on this diary entry from ${new Date(e.occurred_at).toLocaleString()}: "${e.body.slice(0,500)}"${e.mood?` (mood: ${e.mood})`:''}${p?` My stress level then was ${STRESS_LEVELS[p.level].label}.`:''}`)}><Text style={st.link}>Ask MoodPal</Text></TouchableOpacity>:null}
-        {!auto?<TouchableOpacity onPress={()=>{setEditing(e.id);setEditText(e.body)}}><Text style={st.link}>Edit</Text></TouchableOpacity>:null}
-        <TouchableOpacity onPress={()=>remove(e.id)}><Text style={[st.link,{color:'#C2546B'}]}>Delete</Text></TouchableOpacity>
-       </View>:null}
+       {editing!==e.id?<TouchableOpacity accessibilityRole="button" accessibilityLabel="More actions" hitSlop={8} onPress={()=>more(e,p,auto)} style={st.more}><Ionicons name="ellipsis-horizontal" size={18} color={SW.muted}/></TouchableOpacity>:null}
       </View>
      </View>})}
    </View>})}
  </View>;
+}
+
+const FILTER_LEVELS=LEVEL_ORDER.slice().reverse();
+
+// Bottom sheet: pick stress levels (several at once), then Show Results. Closing without it keeps the old filter.
+function FilterSheet({visible,applied,onApply,onClose}:{visible:boolean;applied:StressLevel[];onApply:(f:StressLevel[])=>void;onClose:()=>void}){
+ const [draft,setDraft]=useState<StressLevel[]>(applied);
+ React.useEffect(()=>{if(visible)setDraft(applied)},[visible]);
+ const toggle=(l:StressLevel)=>setDraft(d=>d.includes(l)?d.filter(x=>x!==l):[...d,l]);
+ const option=(key:string,label:string,on:boolean,onPress:()=>void,icon:React.ReactNode)=><TouchableOpacity key={key} accessibilityRole="checkbox" accessibilityState={{checked:on}} accessibilityLabel={label} onPress={onPress} style={[st.option,on&&st.optionOn]}>
+  {icon}<Text style={[st.factor,{flex:1,fontSize:16}]}>{label}</Text>
+  <Ionicons name={on?'checkmark-circle':'ellipse-outline'} size={24} color={on?SW.green:'#C9D3D0'}/>
+ </TouchableOpacity>;
+ return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+  <View style={{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(29,43,51,0.3)'}}>
+   <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close"/>
+   <ScrollView style={{maxHeight:'88%',flexGrow:0}} contentContainerStyle={st.sheet}>
+    <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'}}/>
+    <View style={{gap:4}}><Text style={[st.title,{fontSize:22}]}>Filter Entries</Text><Text style={st.body}>Choose which stress levels to show.</Text></View>
+    {option('all','All entries',!draft.length,()=>setDraft([]),<Ionicons name="layers-outline" size={22} color={SW.green}/>)}
+    {FILTER_LEVELS.map(l=>option(l,STRESS_LEVELS[l].label,draft.includes(l),()=>toggle(l),<Ionicons name="stats-chart" size={20} color={STRESS_LEVELS[l].color}/>))}
+    <TouchableOpacity accessibilityRole="button" onPress={()=>onApply(draft)} style={[st.button,{marginTop:6}]}><Text style={st.buttonText}>Show Results</Text></TouchableOpacity>
+    <TouchableOpacity accessibilityRole="button" onPress={()=>setDraft([])} style={{alignItems:'center',minHeight:44,justifyContent:'center'}}><Text style={[st.link,{fontSize:15}]}>Clear Filters</Text></TouchableOpacity>
+   </ScrollView>
+  </View>
+ </Modal>;
 }
 
 function Mini({label,value,color}:{label:string;value:string;color:string}){return <View style={{flex:1,backgroundColor:'#fff',borderRadius:14,padding:10,gap:3}}><Text style={st.muted}>{label}</Text><Text style={{fontSize:14,fontWeight:'800',color}} numberOfLines={1}>{value}</Text></View>}
@@ -160,5 +199,12 @@ const st=StyleSheet.create({
  button:{backgroundColor:SW.green,borderRadius:14,padding:14,alignItems:'center'},buttonText:{color:'#fff',fontWeight:'800'},
  pill:{borderRadius:12,paddingHorizontal:10,paddingVertical:4},entry:{flexDirection:'row',gap:10,paddingTop:10,borderTopWidth:1,borderTopColor:'#EEF3F0'},bar:{width:4,borderRadius:2},
  tag:{backgroundColor:'#F1F5F3',borderRadius:10,paddingHorizontal:8,paddingVertical:4},tagText:{fontSize:10,fontWeight:'700',color:SW.muted},link:{fontSize:12,fontWeight:'800',color:SW.green},
- small:{borderRadius:10,paddingHorizontal:14,paddingVertical:8,backgroundColor:'#EEF3F0'}
+ small:{borderRadius:10,paddingHorizontal:14,paddingVertical:8,backgroundColor:'#EEF3F0'},
+ filterBtn:{flexDirection:'row',alignItems:'center',gap:6,minHeight:40,borderRadius:20,paddingHorizontal:14,backgroundColor:'#fff',borderWidth:1,borderColor:'#E3EBE7'},
+ filterText:{fontSize:14,fontWeight:'800',color:SW.green},
+ activeChip:{flexDirection:'row',alignItems:'center',gap:4},
+ more:{alignSelf:'flex-end',width:34,height:34,borderRadius:17,alignItems:'center',justifyContent:'center',backgroundColor:'#F1F5F3'},
+ sheet:{backgroundColor:'#fff',borderTopLeftRadius:28,borderTopRightRadius:28,padding:22,paddingBottom:40,gap:12},
+ option:{flexDirection:'row',alignItems:'center',gap:12,minHeight:54,borderRadius:16,borderWidth:1,borderColor:'#E3EBE7',paddingHorizontal:14},
+ optionOn:{borderColor:SW.green,borderWidth:2,backgroundColor:SW.mint}
 });
