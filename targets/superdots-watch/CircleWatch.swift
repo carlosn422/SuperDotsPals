@@ -28,7 +28,7 @@ struct WatchReactionSummary: Equatable {
 }
 
 /// Unread Circle reactions on the watch. Polls only while the app is active; a reaction is marked read
-/// when its floating animation finishes or when it is opened from the Circle list.
+/// when it is opened from the Circle list.
 @MainActor
 final class WatchCircleStore: ObservableObject {
     static let shared = WatchCircleStore()
@@ -143,9 +143,7 @@ final class WatchCircleStore: ObservableObject {
         var seen = known
         let seenSet = Set(seen)
         let new = fresh.filter { !seenSet.contains($0.id) }
-        if baselined {
-            queue += new.sorted { $0.at < $1.at }
-        }
+        // New reactions no longer float over the home screen; they wait in the Circle list.
         if !new.isEmpty { seen += new.map(\.id); known = seen }
         if !baselined || !new.isEmpty {
             NSLog("[WatchCircle] Inbox: %ld unread, %ld new%@", fresh.count, new.count, baselined ? "" : " (baseline)")
