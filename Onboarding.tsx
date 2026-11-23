@@ -142,7 +142,10 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
     supabase.from('user_settings').select('daily_reminders_enabled,daily_reminder_hour').eq('user_id',user.id).single()
    ]);if(pe||se)throw pe||se;if(!active)return;
    const raw=(p?.health_goals||[]) as string[],isGoal=(g:string):g is GoalId=>GOALS.some(x=>x.id===g);
-   const g=raw.filter(isGoal),tt={...DEFAULT_TARGETS,...(p?.baseline_preferences||{})},checkin=settings?.daily_reminders_enabled===true;
+   // Reminders live on each phone, so On means one is scheduled here (as in More › Reminders).
+   const id=await AsyncStorage.getItem('superdots-reminder-'+user.id).catch(()=>null);
+   const checkin=!!id&&(await Notifications.getAllScheduledNotificationsAsync().catch(()=>[])).some(n=>n.identifier===id);
+   const g=raw.filter(isGoal),tt={...DEFAULT_TARGETS,...(p?.baseline_preferences||{})};
    setGoals(g);setT(tt);setCheckinReminder(checkin);
    setLoaded({goals:g,t:tt,checkin,hour:Number(settings?.daily_reminder_hour??9),legacy:raw.filter(x=>!isGoal(x))});
   }catch(e:any){if(active)Alert.alert('Could not load your profile',e?.message||'Please try again.');}
