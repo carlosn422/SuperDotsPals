@@ -35,6 +35,10 @@ const GOALS_KEY='moodpals-health-goals';
 let goalCache:Record<GoalKey,number>={...GOAL_DEFAULTS};
 let goalsLoaded=false;
 const goalListeners=new Set<(g:Record<GoalKey,number>)=>void>();
+export async function saveHealthGoals(g:Partial<Record<GoalKey,number>>){
+ if(!goalsLoaded){goalsLoaded=true;try{const v=await AsyncStorage.getItem(GOALS_KEY);if(v)goalCache={...GOAL_DEFAULTS,...JSON.parse(v)}}catch{}}
+ goalCache={...goalCache,...g};goalListeners.forEach(l=>l(goalCache));await AsyncStorage.setItem(GOALS_KEY,JSON.stringify(goalCache)).catch(()=>{});
+}
 export function useHealthGoals(){
  const [goals,setGoals]=useState(goalCache);
  useEffect(()=>{

@@ -238,7 +238,7 @@ const cupPath=()=>{const {x,y,w,h}=CUP,inset=w*0.12,r=w*0.16,R=x+w,B=y+h;
  return `M${x} ${y} H${R} L${R-inset} ${B-r} Q${R-inset} ${B} ${R-inset-r} ${B} H${x+inset+r} Q${x+inset} ${B} ${x+inset} ${B-r} Z`};
 const wavePath=(level:number,phase:number)=>{if(level<=0)return '';const {x,y,w,h}=CUP,B=y+h,top=B-h*level,amp=level>=1?0:6;
  let d=`M${x} ${B} L${x} ${top}`;for(let px=0;px<=w;px+=4)d+=` L${x+px} ${top+amp*Math.sin(px/w*2*Math.PI+phase)}`;return d+` L${x+w} ${B} Z`};
-function Fill({kind,progress,color}:{kind:Drink;progress:number;color:string}){
+export function Fill({kind,progress,color}:{kind:Drink;progress:number;color:string}){
  const target=Math.max(0,Math.min(1,progress));
  const anim=useRef(new Animated.Value(0)).current;
  const [level,setLevel]=useState(0);
