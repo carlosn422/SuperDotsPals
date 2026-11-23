@@ -175,5 +175,14 @@ if (duo && 'IntersectionObserver' in window && !matchMedia('(prefers-reduced-mot
 }
 
 
-// Loop animations: stay still for people who prefer reduced motion.
-if (matchMedia('(prefers-reduced-motion: reduce)').matches) document.querySelectorAll('video[autoplay]').forEach(v => { v.removeAttribute('autoplay'); v.pause(); v.controls = true; });
+// Loop animations: pause/play button on each; stay still for people who prefer reduced motion.
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+document.querySelectorAll('.loop video').forEach(v => {
+  const fig = v.closest('.loop'), btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'slide-toggle';
+  const sync = () => { fig.classList.toggle('paused', v.paused); btn.setAttribute('aria-pressed', String(v.paused)); btn.setAttribute('aria-label', v.paused ? 'Play animation' : 'Pause animation'); };
+  btn.addEventListener('click', () => { if (v.paused) v.play(); else v.pause(); });
+  v.addEventListener('play', sync); v.addEventListener('pause', sync);
+  if (reduceMotion) { v.removeAttribute('autoplay'); v.pause(); }
+  fig.append(btn); sync();
+});
