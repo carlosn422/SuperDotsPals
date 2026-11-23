@@ -1,4 +1,4 @@
-import type {SocialMark} from './modules/watch-link/socialTrack';
+import type {DailyUse,SocialMark} from './modules/watch-link/socialTrack';
 import type {StressPoint} from './StressEngine';
 import {median} from './StressEngine';
 import {moodLabel} from './LittleSignalsData';
@@ -70,6 +70,62 @@ export function weekUse(marks:SocialMark[],points:StressPoint[],now=Date.now()):
   const a=avg(scores);
   return {start,minutes,stress:a===undefined?null:Math.round(a)};
  });
+}
+
+export const OWNER='you';
+export type UsagePeriod='day'|'week'|'month'|'year';
+export type UsageBucket={start:number;end:number;byWho:Record<string,number>;total:number;stress:number|null};
+
+const keyStart=(k:string)=>{const [y,m,d]=k.split('-').map(Number);return new Date(y,(m||1)-1,d||1).getTime()};
+
+/** Minutes per person per day in all tracked apps together (5-minute steps): OWNER or a family member's id.
+ * Days from before the daily totals existed fall back to the owner's 15-minute app marks. */
+export function usageByDay(daily:DailyUse[],marks:SocialMark[]){
+ const out=new Map<number,Map<string,number>>();
+ for(const u of daily){
+  const d=keyStart(u.day);if(!Number.isFinite(d)||!(u.minutes>0))continue;
+  const m=out.get(d)??new Map<string,number>();m.set(u.who,(m.get(u.who)??0)+u.minutes);out.set(d,m);
+ }
+ minutesByDay(marks).forEach((apps,d)=>{
+  if(out.has(d))return;
+  let n=0;apps.forEach(v=>{n+=v});
+  if(n)out.set(d,new Map([[OWNER,n]]));
+ });
+ return out;
+}
+
+export const ownerMinutesOn=(byDay:Map<number,Map<string,number>>,now=Date.now())=>byDay.get(dayStart(now))?.get(OWNER)??0;
+
+/** Day: today. Week: last 7 days. Month: last 30 days. Year: last 12 months. */
+export function usageBuckets(byDay:Map<number,Map<string,number>>,points:StressPoint[],period:UsagePeriod,now=Date.now()):UsageBucket[]{
+ const pts=points.map(p=>({t:Date.parse(p.at),s:p.score})).filter(p=>Number.isFinite(p.t));
+ const make=(start:number,end:number):UsageBucket=>{
+  const byWho:Record<string,number>={};
+  byDay.forEach((m,d)=>{if(d>=start&&d<end)m.forEach((v,k)=>{byWho[k]=(byWho[k]??0)+v})});
+  const a=avg(pts.filter(p=>p.t>=start&&p.t<end).map(p=>p.s));
+  return {start,end,byWho,total:Object.values(byWho).reduce((x,y)=>x+y,0),stress:a===undefined?null:Math.round(a)};
+ };
+ if(period==='year'){
+  const d=new Date(now);
+  return Array.from({length:12},(_,i)=>make(new Date(d.getFullYear(),d.getMonth()-11+i,1).getTime(),new Date(d.getFullYear(),d.getMonth()-10+i,1).getTime()));
+ }
+ const n=period==='day'?1:period==='week'?7:30;
+ return Array.from({length:n},(_,i)=>make(daysBefore(now,n-1-i),daysBefore(now,n-2-i)));
+}
+
+/** Minutes per app for one person (or everyone when `who` is undefined) between `start` and `end`, from the
+ * 15-minute app marks. Each mark adds its step to whoever was using the iPhone when it was reached. */
+export function appsFor(marks:SocialMark[],who:string|undefined,start:number,end:number){
+ const last=new Map<string,number>(),apps=new Map<number,number>();
+ for(const m of [...marks].sort((a,b)=>a.at-b.at)){
+  const key=`${dayStart(m.at)}:${m.app}`,prev=last.get(key)??0;
+  if(m.minutes<=prev)continue;
+  last.set(key,m.minutes);
+  const person=m.member||(m.family?'family':OWNER);
+  if(m.at<start||m.at>=end||(who!==undefined&&person!==who))continue;
+  apps.set(m.app,(apps.get(m.app)??0)+m.minutes-prev);
+ }
+ return [...apps.entries()].sort((a,b)=>b[1]-a[1]);
 }
 
 export function insightLine(i:AppInsight){
