@@ -238,12 +238,12 @@ const cupPath=()=>{const {x,y,w,h}=CUP,inset=w*0.12,r=w*0.16,R=x+w,B=y+h;
  return `M${x} ${y} H${R} L${R-inset} ${B-r} Q${R-inset} ${B} ${R-inset-r} ${B} H${x+inset+r} Q${x+inset} ${B} ${x+inset} ${B-r} Z`};
 const wavePath=(level:number,phase:number)=>{if(level<=0)return '';const {x,y,w,h}=CUP,B=y+h,top=B-h*level,amp=level>=1?0:6;
  let d=`M${x} ${B} L${x} ${top}`;for(let px=0;px<=w;px+=4)d+=` L${x+px} ${top+amp*Math.sin(px/w*2*Math.PI+phase)}`;return d+` L${x+w} ${B} Z`};
-export function Fill({kind,progress,color}:{kind:Drink;progress:number;color:string}){
+export function Fill({kind,progress,color,duration=900}:{kind:Drink;progress:number;color:string;duration?:number}){
  const target=Math.max(0,Math.min(1,progress));
  const anim=useRef(new Animated.Value(0)).current;
  const [level,setLevel]=useState(0);
  useEffect(()=>{const id=anim.addListener(({value})=>setLevel(value));return()=>anim.removeListener(id)},[anim]);
- useEffect(()=>{Animated.timing(anim,{toValue:target,duration:900,easing:Easing.inOut(Easing.ease),useNativeDriver:false}).start()},[target,anim]);
+ useEffect(()=>{Animated.timing(anim,{toValue:target,duration,easing:Easing.out(Easing.ease),useNativeDriver:false}).start()},[target,anim,duration]);
  const cup=cupPath();
  return <View style={{width:200,height:220,alignItems:'center',justifyContent:'center'}}>
   <Svg width={200} height={220} viewBox="0 0 200 220" style={StyleSheet.absoluteFill}>

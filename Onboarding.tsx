@@ -129,7 +129,7 @@ function GoalCard({g,on,onPress}:{g:typeof GOALS[number];on:boolean;onPress:()=>
 
 export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;editing?:boolean;onCancel?:()=>void}){
  const [i,setI]=useState(0),[goals,setGoals]=useState<GoalId[]>([]),[t,setT]=useState<Targets>(DEFAULT_TARGETS);
- const [mood,setMood]=useState<number|null>(null),[checkinReminder,setCheckinReminder]=useState(false);
+ const [mood,setMood]=useState<number|null>(null),[checkinReminder,setCheckinReminder]=useState(false),[fromPlan,setFromPlan]=useState(false);
  // What was saved before an edit, so only changed answers are applied and older text answers are kept.
  const [loaded,setLoaded]=useState<{goals:GoalId[];t:Targets;checkin:boolean;hour:number;legacy:string[]}|null>(null);
  const [health,setHealth]=useState<'idle'|'busy'|'done'>('idle'),[loading,setLoading]=useState(false),[fetching,setFetching]=useState(editing),[dragging,setDragging]=useState(false);
@@ -160,7 +160,9 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
  const step=steps[Math.min(i,steps.length-1)];
  const go=(n:number)=>{const to=Math.max(0,Math.min(steps.length-1,n));if(reduce){setI(to);return}
   Animated.timing(fade,{toValue:0,duration:120,useNativeDriver:true}).start(()=>{setI(to);Animated.timing(fade,{toValue:1,duration:220,easing:Easing.out(Easing.ease),useNativeDriver:true}).start()})};
- const jump=(s:Step)=>go(steps.indexOf(s));
+ // Edit from the plan opens one screen; Done goes straight back to the plan.
+ const jump=(s:Step)=>{setFromPlan(s!=='goals');go(steps.indexOf(s))};
+ const backToPlan=()=>{setFromPlan(false);go(steps.indexOf('plan'))};
  const setTarget=(k:keyof Targets)=>(v:number)=>setT(x=>({...x,[k]:v}));
 
  async function connectHealth(){
@@ -203,6 +205,13 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
   <View style={s.rowIcon}><Ionicons name={icon} size={20} color={SW.green}/></View>
   <View style={{flex:1}}><Text style={s.hint}>{label}</Text><Text style={s.rowLabel}>{value}</Text></View><Text style={s.edit}>Edit</Text>
  </TouchableOpacity>;
+ async function toggleCheckin(on:boolean){
+  if(!on){setCheckinReminder(false);return}
+  setCheckinReminder(true);
+  const p=await Notifications.getPermissionsAsync().catch(()=>null);
+  if(p?.granted||(await Notifications.requestPermissionsAsync().catch(()=>null))?.granted)return;
+  setCheckinReminder(false);Alert.alert('Notifications are off','To get a daily check-in, allow notifications for MoodPals in iPhone Settings.');
+ }
  const has=(g:GoalId)=>goals.includes(g);
  const last=i>=steps.length-1;
 
@@ -216,7 +225,7 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
    <View style={s.goalGrid}>{GOALS.map(g=><GoalCard key={g.id} g={g} on={has(g.id)} onPress={()=>setGoals(x=>x.includes(g.id)?x.filter(y=>y!==g.id):[...x,g.id])}/>)}</View></>;
   case 'water':return <>{head('How much water a day?','Turn the dial to set your daily goal.')}
    <Dial value={t.water} min={4} max={16} step={1} color="#3D9BE9" label="Water goal" format={v=>`${v} cups · ${v*8} oz`} onChange={setTarget('water')} onDrag={setDragging}>
-    <View style={{transform:[{scale:0.62}]}}><Fill kind="water" progress={(t.water-4)/12} color="#3D9BE9"/></View>
+    <View style={{transform:[{scale:0.66}]}}><Fill kind="water" progress={t.water/16} color="#3D9BE9" duration={reduce?0:220}/></View>
    </Dial>
    <Text style={[s.hint,{textAlign:'center'}]}>Your own water goal is part of MoodPals Plus. Free uses 64 oz (8 cups).</Text></>;
   case 'socialNow':return <>{head('How much time on social media now?','A rough guess is fine.')}
@@ -249,12 +258,12 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
    </TouchableOpacity>:<Text style={s.hint}>You can connect Apple Health later from the Health tab on your iPhone.</Text>}
    <Text style={s.hint}>MoodPals isn't a medical device and doesn't diagnose stress.</Text></>;
   case 'reminders':return <>{head('Gentle reminders','Turn on what helps. You can change these any time.')}
-   {toggleRow('Daily check-in',editing&&loaded?`A daily nudge at ${loaded.hour>12?loaded.hour-12+' PM':loaded.hour+(loaded.hour===12?' PM':' AM')} to log how you feel.`:'A nudge at 8 PM to log how you feel.',checkinReminder,setCheckinReminder,'happy-outline')}
+   {toggleRow('Daily check-in',editing&&loaded?`A daily nudge at ${loaded.hour>12?loaded.hour-12+' PM':loaded.hour+(loaded.hour===12?' PM':' AM')} to log how you feel.`:'A nudge at 8 PM to log how you feel.',checkinReminder,v=>void toggleCheckin(v),'happy-outline')}
 </>;
-  case 'plan':return <>{head(editing?'Your goals':'Your plan is ready',editing?'Tap any goal to change it.':'These are now your settings. Tap one to change it.')}
-   <View style={s.center}><View style={s.palStage}><SuperdotMascot id="joy" size={120}/></View></View>
+  case 'plan':return <><View style={{flexDirection:'row',alignItems:'center',gap:12}}><View style={s.planPal}><SuperdotMascot id="joy" size={64}/></View><View style={{flex:1}}>{head(editing?'Your goals':'Your plan is ready',editing?'Tap any goal to change it.':'These are now your settings. Tap one to change it.')}</View></View>
    <View style={{gap:8}}>
     {has('water')?planRow('water-outline','Water goal',`${t.water} cups (${t.water*8} oz) a day`,'water'):null}
+    {has('social')?planRow('time-outline','Social media now',formatMins(t.social_now)+' a day','socialNow'):null}
     {has('social')?planRow('phone-portrait-outline','Screen Time daily limit',formatMins(t.social_goal),'socialGoal'):null}
     {has('sleep')?planRow('moon-outline','Sleep goal',hours(t.sleep),'sleep'):null}
     {has('move')?planRow('walk-outline','Step goal',t.steps.toLocaleString()+' steps','move'):null}
@@ -268,7 +277,7 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
 
  return <View style={s.root}>
   <View style={s.top}>
-   {i>0?<TouchableOpacity accessibilityRole="button" accessibilityLabel="Back" hitSlop={10} onPress={()=>go(i-1)} style={s.iconBtn}><Ionicons name="chevron-back" size={22} color={SW.ink}/></TouchableOpacity>
+   {i>0?<TouchableOpacity accessibilityRole="button" accessibilityLabel="Back" hitSlop={10} onPress={()=>fromPlan&&step!=='plan'?backToPlan():go(i-1)} style={s.iconBtn}><Ionicons name="chevron-back" size={22} color={SW.ink}/></TouchableOpacity>
     :editing?<TouchableOpacity hitSlop={10} onPress={onCancel}><Text style={s.link}>Cancel</Text></TouchableOpacity>
     :<TouchableOpacity accessibilityRole="button" accessibilityLabel="Back to sign in" disabled={loading} hitSlop={10} onPress={()=>{openSignInNext();void supabase.auth.signOut()}}><Text style={s.link}>‹ Log in</Text></TouchableOpacity>}
    <View style={s.dots} accessibilityLabel={`Step ${i+1} of ${steps.length}`}>{steps.map((x,n)=><View key={x} style={[s.dot,n<=i&&{backgroundColor:SW.green},n===i&&{width:18}]}/>)}</View>
@@ -278,10 +287,10 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
    <Animated.View style={{gap:16,opacity:fade,transform:[{translateY:fade.interpolate({inputRange:[0,1],outputRange:[12,0]})}]}}>{body()}</Animated.View>
   </ScrollView>
   <View style={s.footer}>
-   <TouchableOpacity accessibilityRole="button" disabled={loading} onPress={()=>last?void finish():go(i+1)} style={s.primary}>
-    {loading?<ActivityIndicator color="#fff"/>:<Text style={s.primaryText}>{step==='welcome'?'Get started':last?(editing?'Save changes':'Start MoodPals'):'Continue'}</Text>}
+   <TouchableOpacity accessibilityRole="button" disabled={loading} onPress={()=>last?void finish():fromPlan&&step!=='welcome'?backToPlan():go(i+1)} style={s.primary}>
+    {loading?<ActivityIndicator color="#fff"/>:<Text style={s.primaryText}>{step==='welcome'?'Get started':last?(editing?'Save changes':'Start MoodPals'):fromPlan?'Done':'Continue'}</Text>}
    </TouchableOpacity>
-   {!last&&step!=='welcome'?<TouchableOpacity onPress={()=>go(i+1)} style={{minHeight:40,justifyContent:'center'}}><Text style={s.skip}>Skip</Text></TouchableOpacity>:null}
+   {!last&&!fromPlan&&step!=='welcome'?<TouchableOpacity onPress={()=>go(i+1)} style={{minHeight:40,justifyContent:'center'}}><Text style={s.skip}>Skip</Text></TouchableOpacity>:null}
   </View>
  </View>;
 }
@@ -295,6 +304,7 @@ const s=StyleSheet.create({
  dot:{width:6,height:6,borderRadius:3,backgroundColor:SW.line},
  content:{padding:22,paddingBottom:24,flexGrow:1},
  center:{alignItems:'center',gap:14},
+ planPal:{width:76,height:76,borderRadius:38,backgroundColor:SW.mint,alignItems:'center',justifyContent:'center'},
  palStage:{width:210,height:210,borderRadius:105,backgroundColor:SW.mint,alignItems:'center',justifyContent:'center',alignSelf:'center'},
  hero:{fontSize:32,lineHeight:38,fontWeight:'900',color:SW.ink,textAlign:'center'},
  title:{fontSize:27,lineHeight:33,fontWeight:'900',color:SW.ink},
