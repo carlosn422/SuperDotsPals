@@ -55,7 +55,7 @@ async function parentIdentity(ownerId:string){
  const u=data?.user,m=(u?.user_metadata||{}) as Record<string,unknown>;
  const name=([m.full_name,m.name,m.first_name].find(v=>typeof v==="string"&&v.trim()) as string|undefined)?.trim().slice(0,60);
  const [local,domain]=(u?.email||"").split("@");
- const account=local&&domain?local.slice(0,2)+"•••@"+domain:null;
+ const account=local&&domain?(local.length>4?local[0]:"")+"•••@"+domain:null;
  return {parentName:name||account||"A parent",parentAccount:account};
 }
 // Device approved: create its login and register it under the parent's family.
