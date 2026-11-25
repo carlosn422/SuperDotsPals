@@ -57,16 +57,25 @@ final class WatchFamilyDevicesStore: ObservableObject {
         let sync = WatchThemeSync.shared
         let now = ISO8601DateFormatter().string(from: Date())
         do {
-            async let d = sync.restRequest("/rest/v1/family_devices?select=id,name,device_type,status,auth_status,selection_count,restricted&status=eq.active&order=created_at", method: "GET")
+            async let d = sync.restRequest("/rest/v1/family_devices?select=id,name,device_type,status,auth_status,selection_count,restricted,last_sync_at&status=eq.active&order=created_at", method: "GET")
             async let p = sync.restRequest("/rest/v1/family_device_prefs?select=default_device_id", method: "GET")
             async let s = sync.restRequest("/rest/v1/screen_break_sessions?select=id,child_id,family_device_id,deadline_at&status=eq.active&family_device_id=not.is.null&deadline_at=gt.\(now)", method: "GET")
+            async let x = sync.restRequest("/rest/v1/screen_break_sessions?select=family_device_id,deadline_at&status=eq.active&family_device_id=not.is.null&deadline_at=lte.\(now)", method: "GET")
             async let c = sync.restRequest("/rest/v1/family_device_commands?select=id,device_id,type,child_id,minutes,expires_at&status=in.(pending,delivered)&expires_at=gt.\(now)&order=seq", method: "GET")
-            let (dd, pp, ss, cc) = try await (d, p, s, c)
+            let (dd, pp, ss, cc, xx) = try await (d, p, s, c, x)
+            // A timer that ran out before the device synced has already paused its apps there.
+            var ranOut: [String: Date] = [:]
+            for r in rows(xx) {
+                if let device = r["family_device_id"] as? String, let at = (r["deadline_at"] as? String).flatMap(Self.date) {
+                    ranOut[device] = max(at, ranOut[device] ?? .distantPast)
+                }
+            }
             devices = rows(dd).compactMap { r in
                 guard let id = r["id"] as? String, let name = r["name"] as? String else { return nil }
                 return WatchFamilyDevice(id: id, name: name, isPad: r["device_type"] as? String != "iphone",
                                          ready: r["auth_status"] as? String == "approved" && ((r["selection_count"] as? NSNumber)?.intValue ?? 0) > 0,
-                                         restricted: r["restricted"] as? Bool ?? false)
+                                         restricted: r["restricted"] as? Bool == true
+                                            || (ranOut[id].map { $0 > ((r["last_sync_at"] as? String).flatMap(Self.date) ?? .distantPast) } ?? false))
             }
             defaultId = rows(pp).first?["default_device_id"] as? String ?? Self.phone
             sessions = rows(ss).compactMap { r in
