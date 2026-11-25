@@ -304,6 +304,8 @@ final class SatelliteLink {
         }
       case "LOCK_APPS":
         run(["action": "lock", "commandId": id])
+      case "UNLOCK_APPS":
+        run(["action": "unlock", "commandId": id])
       case "UNLINK_DEVICE":
         clearLocal(reason: "unlinked", keepCredentials: true)
         _ = try? await rpc("satellite_ack", ["p_command": id, "p_ok": true, "p_restricted": false])

@@ -249,6 +249,7 @@ struct WatchBreakHomeView: View {
         // The "time is up" notification opens here, on the Lock page.
         .onChange(of: store.openRequest) { _, _ in page = 0 }
         .task { await store.refresh() }
+        .task { await WatchFamilyDevicesStore.shared.load() }
         // At the deadline the countdown gives way to the lock, even before the iPhone confirms.
         .task(id: running?.deadline) {
             guard let deadline = running?.deadline else { return }
@@ -264,11 +265,15 @@ struct WatchBreakHomeView: View {
 private struct LockPage: View {
     @ObservedObject private var store = WatchScreenBreakStore.shared
 
+    @ObservedObject private var devices = WatchFamilyDevicesStore.shared
+
     private var locked: Bool { store.manualLock || store.session?.isLocked == true }
 
     var body: some View {
         Group {
-            if !store.authorized || store.selectionCount == 0 {
+            if let device = devices.selected {
+                SatelliteLockView(device: device)
+            } else if !store.authorized || store.selectionCount == 0 {
                 ScrollView {
                     Text("Finish Screen Break setup in MoodPals on your iPhone.")
                         .font(.footnote).multilineTextAlignment(.center)
@@ -292,7 +297,9 @@ private struct LockPage: View {
                 .disabled(store.pending != nil)
             }
         }
-        .navigationTitle("Lock")
+        .navigationTitle(devices.selected?.name ?? "Lock")
+        // With no family devices there is no device icon: the lock is this iPhone's.
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { BreakDeviceButton() } }
     }
 
     /// No text under the lock: a failed lock or unlock gets a failure tap instead.
@@ -564,6 +571,8 @@ struct ScreenBreakControlView: View {
     @State private var managing = false
     @State private var justEnded = false
     @State private var leaving = false
+    /// With family devices linked, the device list comes right after the child: child → device → Start.
+    @State private var chosen = false
     @Environment(\.dismiss) private var dismiss
 
     private var mine: WatchBreakSession? {
@@ -581,6 +590,8 @@ struct ScreenBreakControlView: View {
         Group {
             if justEnded {
                 BreakEndedView()
+            } else if !chosen && !devices.devices.isEmpty && mine == nil {
+                DeviceChoiceList { chosen = true }
             } else if let device = devices.selected {
                 RemoteBreakView(child: child, device: device)
             } else if let session = mine {
@@ -619,7 +630,7 @@ struct ScreenBreakControlView: View {
         }
         .onAppear { minutes = min(180, max(5, (lastMinutes / 5) * 5)) }
         .onChange(of: mine == nil) { _, gone in if gone { managing = false } }
-        .toolbar { ToolbarItem(placement: .topBarTrailing) { BreakDeviceButton() } }
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { if chosen || mine != nil { BreakDeviceButton() } } }
         .task { await store.refresh() }
         .task { await devices.load() }
     }

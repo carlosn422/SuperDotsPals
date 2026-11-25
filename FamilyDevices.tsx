@@ -67,7 +67,7 @@ export function deviceStatus(d:FamilyDevice,commands:DeviceCommand[],sessions:Re
  if(d.status==='unlinking')return {label:'Unlink pending',tone:'warn',pending};
  if(pending){
   if(stale&&now-Date.parse(pending.created_at)>20000)return {label:'Waiting for device connection',tone:'warn',pending};
-  const label=pending.type==='START_SESSION'?(pending.status==='pending'?'Connecting':'Starting timer'):pending.type==='EXTEND_SESSION'?'Updating timer':pending.type==='END_SESSION'||pending.type==='LOCK_APPS'?'Lock pending':'Connecting';
+  const label=pending.type==='START_SESSION'?(pending.status==='pending'?'Connecting':'Starting timer'):pending.type==='EXTEND_SESSION'?'Updating timer':pending.type==='END_SESSION'||pending.type==='LOCK_APPS'?'Lock pending':pending.type==='UNLOCK_APPS'?'Updating':'Connecting';
   return {label,tone:'busy',pending};
  }
  if(d.auth_status!=='approved')return {label:'Authorization required',tone:'warn'};
@@ -148,6 +148,7 @@ function DeviceDetail({device,isDefault}:{device:FamilyDevice;isDefault:boolean}
   <Text style={s.sub}>Screen Time: {device.auth_status==='approved'?(device.auth_kind==='child'?'Family Sharing child':'This device')+' · '+device.selection_count+' to pause':device.auth_status==='denied'?'Not allowed — set it up on the device':'Set up on the device'}</Text>
   <Text style={s.sub}>Recovery code: <Text style={{fontWeight:'900',color:T.ink}}>{device.recovery_code}</Text> — enter it on the device under Parent recovery if it can't reach MoodPals.</Text>
   {isDefault?null:<TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>void act(()=>rpc('family_device_set_default',{p_device:device.id}))} style={s.ghost}><Text style={s.ghostText}>Make default device</Text></TouchableOpacity>}
+  {device.status==='active'&&device.auth_status==='approved'&&device.selection_count>0?<TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>void act(()=>deviceCommand(device.id,device.restricted?'UNLOCK_APPS':'LOCK_APPS'))} style={s.ghost}><Text style={s.ghostText}>{device.restricted?'Unlock apps':'Lock apps now'}</Text></TouchableOpacity>:null}
   <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>void act(()=>deviceCommand(device.id,'REQUEST_STATUS'))} style={s.ghost}><Text style={s.ghostText}>Check status</Text></TouchableOpacity>
   {device.status==='unlinking'?<TouchableOpacity accessibilityRole="button" disabled={busy} onPress={forceRemove} style={s.ghost}><Text style={[s.ghostText,{color:'#C2413A'}]}>Remove now</Text></TouchableOpacity>
    :<TouchableOpacity accessibilityRole="button" disabled={busy} onPress={remove} style={s.ghost}><Text style={[s.ghostText,{color:'#C2413A'}]}>Remove device</Text></TouchableOpacity>}
