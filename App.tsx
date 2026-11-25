@@ -10,7 +10,7 @@ import Onboarding,{DOTS} from './Onboarding';
 import {PlusProvider} from './PlusStore';
 import {PlusPaywallSheet} from './PlusPaywall';
 import SatelliteMode from './SatelliteMode';
-import {satelliteState} from './modules/watch-link/screenBreak';
+import {satelliteState,screenBreakSupported} from './modules/watch-link/screenBreak';
 export default function App(){
  const [editingProfile,setEditingProfile]=useState(false);
  // Satellite mode: a family iPad / spare iPhone linked to a parent. It never shows the parent's account.
@@ -33,5 +33,5 @@ export default function App(){
  },[session?.user.id]);
  async function complete(){const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data}=await supabase.from('user_settings').select('theme,companion').eq('user_id',user.id).maybeSingle();setTheme(data?.theme||'grape');setSelectedCompanion(data?.companion||'bloop');setOnboarded(true);setEditingProfile(false)}
  if(satellite)return <SafeAreaProvider><SatelliteMode onExit={()=>setSatellite(false)}/></SafeAreaProvider>;
- return <SafeAreaProvider>{!ready?<View style={{flex:1,justifyContent:'center',backgroundColor:'#F8F6FF'}}><ActivityIndicator color="#6536D9"/></View>:session?(onboarded===null?<View style={{flex:1,justifyContent:'center',backgroundColor:'#F8F6FF'}}><ActivityIndicator color="#6536D9"/></View>:(editingProfile||!onboarded)?<Onboarding editing={editingProfile} onCancel={()=>setEditingProfile(false)} done={()=>void complete()}/>:<PlusProvider><MainApp selectedTheme={theme} selectedCompanion={selectedCompanion} onEditProfile={()=>setEditingProfile(true)} onThemeChanged={(nextTheme,nextCompanion)=>{setTheme(nextTheme);setSelectedCompanion(nextCompanion)}}/><PlusPaywallSheet/></PlusProvider>):<AuthScreen onLinkDevice={()=>setSatellite(true)}/>}</SafeAreaProvider>;
+ return <SafeAreaProvider>{!ready?<View style={{flex:1,justifyContent:'center',backgroundColor:'#F8F6FF'}}><ActivityIndicator color="#6536D9"/></View>:session?(onboarded===null?<View style={{flex:1,justifyContent:'center',backgroundColor:'#F8F6FF'}}><ActivityIndicator color="#6536D9"/></View>:(editingProfile||!onboarded)?<Onboarding editing={editingProfile} onCancel={()=>setEditingProfile(false)} done={()=>void complete()}/>:<PlusProvider><MainApp selectedTheme={theme} selectedCompanion={selectedCompanion} onEditProfile={()=>setEditingProfile(true)} onThemeChanged={(nextTheme,nextCompanion)=>{setTheme(nextTheme);setSelectedCompanion(nextCompanion)}}/><PlusPaywallSheet/></PlusProvider>):<AuthScreen onLinkDevice={screenBreakSupported?()=>setSatellite(true):undefined}/>}</SafeAreaProvider>;
 }
