@@ -42,10 +42,10 @@ export default function SatelliteMode({onExit}:{onExit:()=>void}){
 }
 
 function Pair({onPaired,onCancel}:{onPaired:(s:SatelliteState)=>void;onCancel:()=>void}){
- const [link,setLink]=useState<{id:string;secret:string;code:string;expiresAt:string}|null>(null),[error,setError]=useState(''),[now,setNow]=useState(Date.now()),[busy,setBusy]=useState(false);
+ const [link,setLink]=useState<{id:string;secret:string;code:string;expiresAt:string}|null>(null),[error,setError]=useState(''),[now,setNow]=useState(Date.now()),[busy,setBusy]=useState(false),[confirm,setConfirm]=useState<string|null>(null);
  const installationId=satelliteState()?.installationId||'';
  const start=useCallback(async()=>{
-  setError('');setBusy(true);
+  setError('');setBusy(true);setConfirm(null);
   try{setLink(await pairing({action:'start',kind:'satellite',installationId,deviceType:isPad?'ipad':'iphone',deviceName:isPad?'Family iPad':'Family iPhone'}))}
   catch(e:any){setError(e.message)}finally{setBusy(false)}
  },[installationId]);
@@ -56,7 +56,10 @@ function Pair({onPaired,onCancel}:{onPaired:(s:SatelliteState)=>void;onCancel:()
   const t=setInterval(async()=>{
    try{
     const r=await pairing({action:'poll',id:link.id,secret:link.secret,installationId});
-    if(!active||r.status!=='approved'||!r.tokenHash)return;
+    if(!active)return;
+    if(r.status==='confirm'){setConfirm(r.parentName||'A parent');return}
+    if(r.status==='declined'){clearInterval(t);setConfirm(null);setLink(null);return}
+    if(r.status!=='approved'||!r.tokenHash)return;
     clearInterval(t);
     const temp=createClient(URL,KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
     const {data,error:otp}=await temp.auth.verifyOtp({token_hash:r.tokenHash,type:'magiclink'});
@@ -69,16 +72,26 @@ function Pair({onPaired,onCancel}:{onPaired:(s:SatelliteState)=>void;onCancel:()
   },3000);
   return()=>{active=false;clearInterval(t)};
  },[link,installationId,onPaired]);
+ const answer=async(accept:boolean)=>{
+  if(!link)return;setBusy(true);setError('');
+  try{const r=await pairing({action:'confirm',id:link.id,secret:link.secret,installationId,accept});if(r.status==='declined'){setConfirm(null);setLink(null)}}
+  catch(e:any){setError(e.message)}finally{setBusy(false)}
+ };
  const left=link?Math.max(0,Math.round((Date.parse(link.expiresAt)-now)/1000)):0;
  return <View style={st.stack}>
   <Text style={st.title}>Link as a Family Device</Text>
   <Text style={st.sub}>On the parent's iPhone, open MoodPals › Family › Family Devices › Add Device and enter this code.</Text>
-  <View style={st.card}>
+  {confirm&&link&&left>0?<View style={st.card}>
+   <Text style={st.ready}>Link to {confirm}’s family?</Text>
+   <Text style={st.muted}>{confirm} entered this device’s code. Approve only if you know them: they will be able to start timers and pause apps on this device.</Text>
+   <TouchableOpacity accessibilityRole="button" style={st.cta} disabled={busy} onPress={()=>void answer(true)}><Text style={st.ctaText}>Approve</Text></TouchableOpacity>
+   <TouchableOpacity accessibilityRole="button" style={st.ghost} disabled={busy} onPress={()=>void answer(false)}><Text style={st.ghostText}>Decline</Text></TouchableOpacity>
+  </View>:<View style={st.card}>
    {busy&&!link?<ActivityIndicator color={T.primary}/>:link&&left>0?<>
     <Text style={st.code} accessibilityLabel={'Code '+link.code.split('').join(' ')}>{link.code.slice(0,3)} {link.code.slice(3)}</Text>
     <Text style={st.muted}>Expires in {Math.floor(left/60)}:{String(left%60).padStart(2,'0')} · Waiting for the parent…</Text>
-   </>:<Text style={st.muted}>This code expired.</Text>}
-  </View>
+   </>:<Text style={st.muted}>{link?'This code expired.':'Link declined. Show a new code to try again.'}</Text>}
+  </View>}
   {error?<Text style={st.error}>{error}</Text>:null}
   {(!link||left===0||error)?<TouchableOpacity style={st.cta} onPress={()=>void start()} disabled={busy}><Text style={st.ctaText}>Show a new code</Text></TouchableOpacity>:null}
   <TouchableOpacity style={st.ghost} onPress={onCancel}><Text style={st.ghostText}>Cancel</Text></TouchableOpacity>

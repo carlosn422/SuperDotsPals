@@ -168,8 +168,8 @@ function AddDevice({onDone}:{onDone:()=>void}){
   }catch(x:any){setError(x.message)}finally{setBusy(false)}
  };
  if(done)return <View style={s.card}>
-  <Text style={s.rowTitle}>{done} is linked</Text>
-  <Text style={s.sub}>On the device, set up Screen Time and choose the apps to pause. Then pick it when you start a timer.</Text>
+  <Text style={s.rowTitle}>Approve on {done}</Text>
+  <Text style={s.sub}>Tap Approve on the device to finish linking. It then shows up here. Next, set up Screen Time on it and choose the apps to pause.</Text>
   <TouchableOpacity accessibilityRole="button" onPress={onDone} style={s.cta}><Text style={s.ctaText}>Done</Text></TouchableOpacity>
  </View>;
  return <View style={s.card}>
