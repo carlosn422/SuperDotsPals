@@ -63,6 +63,10 @@ public class ScreenBreakModule: Module {
       try await SatelliteLink.shared.accessToken()
     }
 
+    Function("satelliteReset") {
+      SatelliteLink.shared.resetUnlinked()
+    }
+
     Function("satelliteRecover") { (code: String) -> [String: Any] in
       SatelliteLink.shared.recover(code)
     }

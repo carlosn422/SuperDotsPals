@@ -26,6 +26,7 @@ type Native={
  satelliteSync(reason:string):Promise<SatelliteState>;
  satelliteAccessToken():Promise<string>;
  satelliteRecover(code:string):{ok:boolean;error?:string};
+ satelliteReset():void;
  requestSatelliteAuthorization(kind:'child'|'individual'):Promise<boolean>;
  authenticateGuardian(reason:string):Promise<boolean>;
  addListener(event:'onState',listener:(state:BreakState)=>void):{remove():void};
@@ -79,3 +80,4 @@ export const satelliteAccessToken=async():Promise<string|null>=>native?native.sa
 export const satelliteRecover=(code:string)=>native?native.satelliteRecover(code):{ok:false,error:'Not available on this device.'};
 export const requestSatelliteAuthorization=async(kind:'child'|'individual')=>native?native.requestSatelliteAuthorization(kind):false;
 export const authenticateGuardian=async(reason:string)=>native?native.authenticateGuardian(reason):true;
+export const satelliteReset=()=>native?.satelliteReset();

@@ -112,6 +112,12 @@ final class SatelliteLink {
     return out
   }
 
+  /// After the "unlinked" notice, the device can be linked again.
+  func resetUnlinked() {
+    guard !isLinked else { return }
+    info = [:]
+  }
+
   func setAuthKind(_ kind: String) {
     UserDefaults.standard.set(kind, forKey: Self.authKindKey)
   }

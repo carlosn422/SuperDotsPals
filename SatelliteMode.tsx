@@ -6,7 +6,7 @@ import * as Notifications from 'expo-notifications';
 import {createClient,type SupabaseClient} from '@supabase/supabase-js';
 import {APP_THEME as T} from './MoodMascot';
 import {DurationRing} from './FamilyScreenBreak';
-import {pickBreakApps,requestSatelliteAuthorization,satelliteAccessToken,satelliteRecover,satelliteSaveCredentials,satelliteState,satelliteSync,onBreakState,type SatelliteState} from './modules/watch-link/screenBreak';
+import {pickBreakApps,requestSatelliteAuthorization,satelliteAccessToken,satelliteRecover,satelliteSaveCredentials,satelliteReset,satelliteState,satelliteSync,onBreakState,type SatelliteState} from './modules/watch-link/screenBreak';
 
 const URL='https://hzoauxxpvrgahlavxmvp.supabase.co';
 const KEY='sb_publishable_pPPqosRo1SqwrbW-8MWURA_UxTED6Vs';
@@ -34,7 +34,7 @@ export default function SatelliteMode({onExit}:{onExit:()=>void}){
  const linked=!!state?.linked;
  return <SafeAreaView style={st.page}><ScrollView contentContainerStyle={[st.body,{paddingHorizontal:pad}]} keyboardShouldPersistTaps="handled">
   <Image source={require('./assets/branding/moodpals-logo.png')} accessibilityLabel="MoodPals" style={st.logo} resizeMode="contain"/>
-  {state?.unlinked?<Unlinked reason={state.reason} onDone={onExit}/>
+  {state?.unlinked?<Unlinked reason={state.reason} onDone={()=>{satelliteReset();onExit()}}/>
    :!linked?<Pair onPaired={next=>setState(next)} onCancel={onExit}/>
    :!state?.engine.authorized||!state.engine.selectionCount?<Setup state={state} onChange={()=>void refresh('setup')}/>
    :<Dashboard state={state} refresh={refresh} onState={setState}/>}
