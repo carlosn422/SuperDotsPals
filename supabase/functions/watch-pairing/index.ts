@@ -49,13 +49,14 @@ async function approveSatellite(user:{id:string},row:{id:string;device_name:stri
  if(error||!held?.length)return json({error:"This code has expired or was already used"},400);
  return json({status:"confirm",deviceName:(row.device_name||"Family iPad").slice(0,60),satellite:true});
 }
-async function parentName(ownerId:string){
+// Shown on the device so it can tell who is asking: the account email (masked) plus the editable name.
+async function parentIdentity(ownerId:string){
  const {data}=await admin.auth.admin.getUserById(ownerId);
  const u=data?.user,m=(u?.user_metadata||{}) as Record<string,unknown>;
- const name=[m.full_name,m.name,m.first_name].find(v=>typeof v==="string"&&v.trim()) as string|undefined;
- if(name)return name.trim().slice(0,60);
+ const name=([m.full_name,m.name,m.first_name].find(v=>typeof v==="string"&&v.trim()) as string|undefined)?.trim().slice(0,60);
  const [local,domain]=(u?.email||"").split("@");
- return local&&domain?local[0]+"•••@"+domain:"A parent";
+ const account=local&&domain?local.slice(0,2)+"•••@"+domain:null;
+ return {parentName:name||account||"A parent",parentAccount:account};
 }
 // Device approved: create its login and register it under the parent's family.
 async function linkSatellite(ownerId:string,row:{id:string;device_name:string;installation_id:string|null;device_type:string|null}){
@@ -155,7 +156,7 @@ Deno.serve(async req=>{
    if(row.status==="claimed")return json({status:"claimed"});
    if(Date.parse(row.expires_at)<Date.now())return json({status:"expired"});
    if(row.kind==="satellite"&&row.status==="confirm"){
-    if(action==="poll")return json({status:"confirm",parentName:await parentName(row.owner_id),satellite:true});
+    if(action==="poll")return json({status:"confirm",...await parentIdentity(row.owner_id),expiresAt:row.expires_at,satellite:true});
    }
    if(action==="complete"){
     const user=await authed(req);

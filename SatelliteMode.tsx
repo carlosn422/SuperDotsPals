@@ -42,7 +42,7 @@ export default function SatelliteMode({onExit}:{onExit:()=>void}){
 }
 
 function Pair({onPaired,onCancel}:{onPaired:(s:SatelliteState)=>void;onCancel:()=>void}){
- const [link,setLink]=useState<{id:string;secret:string;code:string;expiresAt:string}|null>(null),[error,setError]=useState(''),[now,setNow]=useState(Date.now()),[busy,setBusy]=useState(false),[confirm,setConfirm]=useState<string|null>(null);
+ const [link,setLink]=useState<{id:string;secret:string;code:string;expiresAt:string}|null>(null),[error,setError]=useState(''),[now,setNow]=useState(Date.now()),[busy,setBusy]=useState(false),[confirm,setConfirm]=useState<{name:string;account:string|null}|null>(null);
  const installationId=satelliteState()?.installationId||'';
  const start=useCallback(async()=>{
   setError('');setBusy(true);setConfirm(null);
@@ -57,7 +57,11 @@ function Pair({onPaired,onCancel}:{onPaired:(s:SatelliteState)=>void;onCancel:()
    try{
     const r=await pairing({action:'poll',id:link.id,secret:link.secret,installationId});
     if(!active)return;
-    if(r.status==='confirm'){setConfirm(r.parentName||'A parent');return}
+    if(r.status==='confirm'){
+     setConfirm({name:r.parentName||'A parent',account:r.parentAccount||null});
+     if(r.expiresAt)setLink(l=>l&&l.expiresAt!==r.expiresAt?{...l,expiresAt:r.expiresAt}:l);
+     return;
+    }
     if(r.status==='declined'){clearInterval(t);setConfirm(null);setLink(null);return}
     if(r.status!=='approved'||!r.tokenHash)return;
     clearInterval(t);
@@ -82,8 +86,9 @@ function Pair({onPaired,onCancel}:{onPaired:(s:SatelliteState)=>void;onCancel:()
   <Text style={st.title}>Link as a Family Device</Text>
   <Text style={st.sub}>On the parent's iPhone, open MoodPals › Family › Family Devices › Add Device and enter this code.</Text>
   {confirm&&link&&left>0?<View style={st.card}>
-   <Text style={st.ready}>Link to {confirm}’s family?</Text>
-   <Text style={st.muted}>{confirm} entered this device’s code. Approve only if you know them: they will be able to start timers and pause apps on this device.</Text>
+   <Text style={st.ready}>Link to {confirm.name}’s family?</Text>
+   {confirm.account?<Text style={st.muted}>Account: {confirm.account}</Text>:null}
+   <Text style={st.muted}>{confirm.name} entered this device’s code. Approve only if you know them: they will be able to start timers and pause apps on this device.</Text>
    <TouchableOpacity accessibilityRole="button" style={st.cta} disabled={busy} onPress={()=>void answer(true)}><Text style={st.ctaText}>Approve</Text></TouchableOpacity>
    <TouchableOpacity accessibilityRole="button" style={st.ghost} disabled={busy} onPress={()=>void answer(false)}><Text style={st.ghostText}>Decline</Text></TouchableOpacity>
   </View>:<View style={st.card}>
