@@ -754,8 +754,9 @@ function InsightsScreen({child,onBack}:{child:FamilyChild;onBack:()=>void}){
  const stats=useMemo(()=>periodStats(shown,period,anchor,new Date(now)),[shown,period,anchor,Math.floor(now/60000)]);
  const byDevice=useMemo(()=>{
   const keys=[...new Set(all.map(deviceKey))];
-  return keys.map(k=>({key:k,name:k===PHONE?'This iPhone':deviceName(k),seconds:periodStats(all.filter(r=>deviceKey(r)===k),period,anchor,new Date(now)).seconds})).filter(x=>x.seconds>0).sort((a,b)=>b.seconds-a.seconds);
+  return keys.map(k=>{const p=periodStats(all.filter(r=>deviceKey(r)===k),period,anchor,new Date(now));return {key:k,name:k===PHONE?'This iPhone':deviceName(k),seconds:p.seconds,sessions:p.sessions}}).filter(x=>x.seconds>0||x.sessions>0).sort((a,b)=>b.seconds-a.seconds);
  },[all,period,anchor,deviceName,Math.floor(now/60000)]);
+ const deviceTotal=useMemo(()=>byDevice.reduce((t,d)=>({seconds:t.seconds+d.seconds,sessions:t.sessions+d.sessions}),{seconds:0,sessions:0}),[byDevice]);
  const compare=comparison(stats);
  const notes=observations(stats,period);
  const startOfTimes=periodRange(period,new Date()).start;
@@ -784,9 +785,13 @@ function InsightsScreen({child,onBack}:{child:FamilyChild;onBack:()=>void}){
    {stats.hasData?<SessionLineChart period={period} buckets={stats.buckets}/>:<Text style={st.body}>No Screen Break sessions for {child.name} in this period.</Text>}
    {stats.highest&&period!=='day'?<Text style={st.sub}>Longest: {period==='week'?stats.highest.start.toLocaleDateString(undefined,{weekday:'long'}):period==='month'?'Week '+stats.highest.label.replace('Wk ',''):stats.highest.start.toLocaleDateString(undefined,{month:'long'})} · {formatDuration(stats.highest.seconds)}</Text>:null}
   </View>
-  {device==='all'&&byDevice.length>1?<View style={st.card}>
+  {device==='all'&&family.devices.length>0&&byDevice.length>0?<View style={st.card}>
    <Text style={st.kicker}>By device</Text>
-   {byDevice.map(d=><View key={d.key} style={{flexDirection:'row',justifyContent:'space-between'}}><Text style={st.body}>{d.name}</Text><Text style={[st.body,{fontWeight:'800'}]}>{formatDuration(d.seconds)}</Text></View>)}
+   {[...byDevice,{key:'total',name:'Total',seconds:deviceTotal.seconds,sessions:deviceTotal.sessions}].map(d=><View key={d.key} style={[{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},d.key==='total'?{borderTopWidth:1,borderTopColor:T.border,paddingTop:8}:null]}>
+    <View style={{flex:1}}><Text style={[st.body,d.key==='total'?{fontWeight:'800'}:null]}>{d.name}</Text><Text style={st.sub}>{d.sessions} session{d.sessions===1?'':'s'}</Text></View>
+    <Text style={[st.body,{fontWeight:'800'}]}>{formatDuration(d.seconds)}</Text>
+   </View>)}
+   {deviceTotal.seconds>stats.seconds?<Text style={st.sub}>Sessions that ran on two devices at once count once in Screen Break Time.</Text>:null}
   </View>:null}
   {allowed&&notes.length?<View style={st.card}>{notes.map(n=><Text key={n} style={st.body}>• {n}</Text>)}</View>:null}
   <Text style={st.sub}>Screen Break Time is the time inside {child.name}'s sessions, from start until the session ended, was canceled or reached its time. Time Granted is what you allowed. Neither is measured phone use.</Text>
