@@ -200,7 +200,8 @@ struct WatchBreakHomeView: View {
     @ObservedObject private var store = WatchScreenBreakStore.shared
     @Binding var path: [WatchBreakChild]
     @State private var managing = false
-    /// 0: Lock page, 1: member list.
+    @ObservedObject private var devices = WatchFamilyDevicesStore.shared
+    /// 0: Lock page, 1: member list. While this iPhone's timer runs: 0 timer, 1 Lock page, 2 member list.
     @State private var page = 0
     @State private var tick = 0
     @State private var reveal = 1.0
@@ -215,12 +216,23 @@ struct WatchBreakHomeView: View {
         let _ = tick
         Group {
             if let session = running {
-                ActiveBreakView(session: session) { managing = true }
+                let active = ActiveBreakView(session: session) { managing = true }
                     .navigationDestination(isPresented: $managing) {
                         ManageBreakView(child: WatchBreakChild(id: session.childId, name: session.childName),
                                         close: { managing = false }, ended: { managing = false; store.navReset += 1 })
                     }
+                if devices.devices.isEmpty {
+                    active.transition(.opacity)
+                } else {
+                    // Family devices stay reachable while this iPhone's timer runs.
+                    TabView(selection: $page) {
+                        active.tag(0)
+                        LockPage().tag(1)
+                        WatchFamilyView().tag(2)
+                    }
+                    .tabViewStyle(.page)
                     .transition(.opacity)
+                }
             } else {
                 TabView(selection: $page) {
                     LockPage().tag(0)
@@ -245,9 +257,12 @@ struct WatchBreakHomeView: View {
         }
         .navigationDestination(for: WatchBreakChild.self) { ScreenBreakControlView(child: $0) }
         // When a timer ends or stops, any member screen closes and the Lock page shows the lock to tap.
-        .onChange(of: running == nil) { _, gone in if gone { managing = false; path = []; page = 0 } }
+        .onChange(of: running == nil) { _, gone in
+            page = 0
+            if gone { managing = false; path = []; devices.picked = WatchFamilyDevicesStore.phone }
+        }
         // The "time is up" notification opens here, on the Lock page.
-        .onChange(of: store.openRequest) { _, _ in page = 0 }
+        .onChange(of: store.openRequest) { _, _ in page = 0; devices.picked = WatchFamilyDevicesStore.phone }
         .task { await store.refresh() }
         .task { await WatchFamilyDevicesStore.shared.load() }
         // At the deadline the countdown gives way to the lock, even before the iPhone confirms.
@@ -273,6 +288,8 @@ private struct LockPage: View {
         Group {
             if let device = devices.selected {
                 SatelliteLockView(device: device)
+            } else if let session = store.session, session.isRunning {
+                Text("Timer running for \(session.childName) on this iPhone.").font(.footnote).multilineTextAlignment(.center)
             } else if !store.authorized || store.selectionCount == 0 {
                 ScrollView {
                     Text("Finish Screen Break setup in MoodPals on your iPhone.")
