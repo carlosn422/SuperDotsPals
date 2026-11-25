@@ -1,5 +1,5 @@
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
-import {ActivityIndicator,Alert,Modal,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native';
+import {ActivityIndicator,Alert,Modal,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {supabase} from './supabase';
 import {APP_THEME as T} from './MoodMascot';
@@ -99,11 +99,13 @@ export function DeviceSelect({options,selected,defaultId,onSelect}:{options:Devi
     <View style={s.sheet} accessibilityRole="radiogroup" accessibilityLabel="Device">
      <View style={s.grabber}/>
      <Text style={s.sheetTitle}>Choose a device</Text>
+     <ScrollView style={{flexGrow:0}} contentContainerStyle={{gap:10}}>
      {options.map(o=>{const on=o.id===selected;return <TouchableOpacity key={o.id} accessibilityRole="radio" accessibilityState={{selected:on}} onPress={()=>{onSelect(o.id);setOpen(false)}} style={[s.opt,on&&s.optOn]}>
       {icon(o)}
       <View style={{flex:1}}><Text style={s.optName} numberOfLines={1}>{o.name}{o.id===defaultId?' · Default':''}</Text>{status(o)}</View>
       {on?<Ionicons name="checkmark-circle" size={24} color={T.primary}/>:null}
      </TouchableOpacity>})}
+     </ScrollView>
     </View>
    </View>
   </Modal>
@@ -234,7 +236,7 @@ const s=StyleSheet.create({
  addBtnText:{color:'#fff',fontWeight:'800',fontSize:13},
  select:{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#fff',borderRadius:18,borderWidth:1.5,borderColor:T.border,paddingHorizontal:14,paddingVertical:10,minHeight:64},
  selectLink:{fontSize:15,fontWeight:'800',color:T.primary},
- sheet:{backgroundColor:'#fff',borderTopLeftRadius:28,borderTopRightRadius:28,padding:22,paddingBottom:40,gap:10},
+ sheet:{backgroundColor:'#fff',borderTopLeftRadius:28,borderTopRightRadius:28,padding:22,paddingBottom:40,gap:10,maxHeight:'85%'},
  grabber:{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'},
  sheetTitle:{fontSize:22,fontWeight:'900',color:T.ink,marginBottom:4},
  opt:{flexDirection:'row',alignItems:'center',gap:12,borderRadius:18,borderWidth:1.5,borderColor:T.border,padding:12,minHeight:64},
