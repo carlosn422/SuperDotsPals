@@ -28,10 +28,38 @@ async function approveFamily(ownerId:string,row:{id:string;device_name:string},c
  await admin.from("connected_devices").upsert({user_id:profile.id,pairing_id:row.id,name:row.device_name,platform:"watchos",...(color?{watch_color:color}:{})},{onConflict:"pairing_id"});
  return json({status:"approved",deviceName:row.device_name,family:true,profileId:profile.id});
 }
-const CODE_WINDOW_MS=15*60*1000,CODE_MAX_FAILURES=10;
+const CODE_WINDOW_MS=15*60*1000,CODE_MAX_FAILURES=10,SATELLITE_CODE_MS=5*60*1000,SATELLITE_MAX_CODES=6;
 function sixDigits(){const a=crypto.getRandomValues(new Uint32Array(1));return String(a[0]%1000000).padStart(6,"0")}
+// A family device (child iPad / spare iPhone) gets its own restricted login that owns no MoodPals data.
+// It belongs to the parent's family account, not to a child; children are chosen per session.
+async function approveSatellite(user:{id:string},row:{id:string;device_name:string;installation_id:string|null;device_type:string|null}){
+ const [{data:isFamily},{data:isSatellite}]=await Promise.all([admin.rpc("is_family_profile",{uid:user.id}),admin.rpc("is_satellite",{uid:user.id})]);
+ if(isFamily||isSatellite)return json({error:"Link family devices from the parent's MoodPals app"},403);
+ if(!row.installation_id)return json({error:"Show a new code on the device"},400);
+ const {data:ent}=await admin.rpc("screen_break_entitlement_of",{p_uid:user.id});
+ if(!ent?.allowed)return json({error:"Your 14-day free trial has ended. MoodPals Plus keeps Screen Break on."},402);
+ const {data:prior}=await admin.from("family_devices").select("id,owner_id").eq("installation_id",row.installation_id).maybeSingle();
+ if(prior&&prior.owner_id!==user.id)return json({error:"This device is linked to another family. Unlink it there first."},409);
+ // Re-linking the same installation replaces its old login; the old device's history stays.
+ if(prior){const {error}=await admin.rpc("family_device_finalize_unlink",{p_device:prior.id});if(error)return json({error:"Unable to replace the old link"},500)}
+ const {data:created,error:createError}=await admin.auth.admin.createUser({email:"satellite-"+crypto.randomUUID()+"@family.moodpals.invalid",email_confirm:true,user_metadata:{satellite_device:true,owner_id:user.id}});
+ const login=created?.user;
+ if(createError||!login?.email)return json({error:"Unable to link device"},500);
+ const discard=async()=>{await admin.auth.admin.deleteUser(login.id)};
+ const name=(row.device_name||"Family iPad").slice(0,60);
+ const {data:device,error:deviceError}=await admin.from("family_devices").insert({owner_id:user.id,auth_user_id:login.id,installation_id:row.installation_id,name,device_type:row.device_type==="iphone"?"iphone":"ipad",recovery_code:sixDigits()}).select("id").single();
+ if(deviceError||!device){await discard();return json({error:"Unable to link device"},500)}
+ const {data:link,error:tokenError}=await admin.auth.admin.generateLink({type:"magiclink",email:login.email});
+ const token=link?.properties?.hashed_token;
+ if(tokenError||!token){await admin.from("family_devices").delete().eq("id",device.id);await discard();return json({error:"Unable to link device"},500)}
+ const {data:approved,error}=await admin.from("watch_pairing_requests").update({status:"approved",owner_id:login.id,login_token_hash:token}).eq("id",row.id).eq("status","pending").select("id");
+ if(error||!approved?.length){await admin.from("family_devices").delete().eq("id",device.id);await discard();return json({error:"This code has expired or was already used"},400)}
+ return json({status:"approved",deviceId:device.id,deviceName:name,satellite:true});
+}
 // The iPhone's choice (Add Watch vs Add Family Watch) wins: a Family Setup watch can't reliably tell it has no companion app.
-async function approveRow(user:{id:string;email?:string},row:{id:string;device_name:string;kind:string},color:string|null=null,family?:unknown){
+async function approveRow(user:{id:string;email?:string},row:{id:string;device_name:string;kind:string;installation_id:string|null;device_type:string|null},color:string|null=null,family?:unknown,satellite?:unknown){
+ if(row.kind==="satellite")return await approveSatellite(user,row);
+ if(satellite===true)return json({error:"That code is for an Apple Watch. Add it from Apple Watch settings."},400);
  if(typeof family==="boolean"?family:row.kind==="family")return await approveFamily(user.id,row,color);
  if(!user.email)return json({error:"Email-based Supabase login is required for pairing"},400);
  // Claim the request before minting a login token: a new magic link invalidates the previous one, so a losing duplicate approve must not mint.
@@ -65,12 +93,21 @@ Deno.serve(async req=>{
  try{
   const p=await req.json();const action=String(p.action||"");
   if(action==="start"){
-   const secret=random();
+   const secret=random(),satellite=p.kind==="satellite";
+   const installationId=String(p.installationId||"");
+   if(satellite){
+    // Satellite codes are bound to one installation, last 5 minutes, and a device can't mint them endlessly.
+    if(!/^[A-Za-z0-9-]{16,64}$/.test(installationId))return json({error:"Invalid device"},400);
+    const {count}=await admin.from("watch_pairing_requests").select("id",{count:"exact",head:true}).eq("installation_id",installationId).gte("created_at",new Date(Date.now()-CODE_WINDOW_MS).toISOString());
+    if((count||0)>=SATELLITE_MAX_CODES)return json({error:"Too many codes. Wait 15 minutes and try again."},429);
+    await admin.from("watch_pairing_requests").update({status:"expired",login_token_hash:null}).eq("installation_id",installationId).eq("status","pending");
+   }
    // Expired requests release their codes so the pending-code unique index only covers live codes.
    await admin.from("watch_pairing_requests").update({status:"expired",login_token_hash:null}).eq("status","pending").lt("expires_at",new Date().toISOString());
    for(let attempt=0;attempt<8;attempt++){
     const code=sixDigits();
-    const {data,error}=await admin.from("watch_pairing_requests").insert({secret_hash:await hash(secret),pair_code:code,device_name:String(p.deviceName||"Apple Watch").slice(0,80),kind:p.family===true?"family":"self"}).select("id,expires_at").single();
+    const {data,error}=await admin.from("watch_pairing_requests").insert({secret_hash:await hash(secret),pair_code:code,device_name:String(p.deviceName||(satellite?"Family iPad":"Apple Watch")).slice(0,80),kind:satellite?"satellite":p.family===true?"family":"self",
+      ...(satellite?{installation_id:installationId,device_type:p.deviceType==="iphone"?"iphone":"ipad",expires_at:new Date(Date.now()+SATELLITE_CODE_MS).toISOString()}:{})}).select("id,expires_at").single();
     if(error?.code==="23505")continue;
     if(error||!data)return json({error:"Could not create link"},500);
     return json({id:data.id,secret,code,expiresAt:data.expires_at});
@@ -82,6 +119,7 @@ Deno.serve(async req=>{
    if(!/^[0-9a-f-]{36}$/i.test(id)||!/^[0-9a-f]{64}$/i.test(secret))return json({error:"Invalid link"},400);
    const {data:row}=await admin.from("watch_pairing_requests").select("*").eq("id",id).maybeSingle();
    if(!row||row.secret_hash!==await hash(secret))return json({error:"Link not found"},404);
+   if(row.kind==="satellite"&&row.installation_id!==String(p.installationId||""))return json({error:"Link not found"},404);
    if(row.status==="claimed")return json({status:"claimed"});
    if(Date.parse(row.expires_at)<Date.now())return json({status:"expired"});
    if(action==="complete"){
@@ -91,14 +129,14 @@ Deno.serve(async req=>{
     await admin.from("connected_devices").update({last_seen_at:new Date().toISOString()}).eq("pairing_id",id).eq("user_id",user.id);
     return json({status:"claimed"});
    }
-   return json({status:row.status,tokenHash:row.status==="approved"?row.login_token_hash:undefined,moodOnly:row.kind==="family"});
+   return json({status:row.status,tokenHash:row.status==="approved"?row.login_token_hash:undefined,moodOnly:row.kind==="family",satellite:row.kind==="satellite"});
   }
   const user=await authed(req);if(!user)return json({error:"Sign in required"},401);
   if(action==="approve"){
    const id=String(p.id||""),secret=String(p.secret||"");
    const {data:row}=await admin.from("watch_pairing_requests").select("*").eq("id",id).maybeSingle();
    if(!row||row.secret_hash!==await hash(secret)||row.status!=="pending"||Date.parse(row.expires_at)<Date.now())return json({error:"This code has expired or was already used"},400);
-   return await approveRow(user,row,watchColor(p.color),p.family);
+   return await approveRow(user,row,watchColor(p.color),p.family,p.satellite);
   }
   if(action==="approve_code"){
    const code=String(p.code||"").replace(/\D/g,"");
@@ -110,7 +148,7 @@ Deno.serve(async req=>{
     await admin.from("watch_pairing_code_attempts").insert({user_id:user.id});
     return json({error:"That code didn't match a watch. Check the 6 digits on the watch, or show a new code."},400);
    }
-   return await approveRow(user,row,watchColor(p.color),p.family);
+   return await approveRow(user,row,watchColor(p.color),p.family,p.satellite);
   }
   if(action==="list"){
    const {data,error}=await admin.from("connected_devices").select("id,name,platform,linked_at,last_seen_at,revoked_at,watch_color").eq("user_id",user.id).is("revoked_at",null).order("linked_at",{ascending:false}).limit(50);

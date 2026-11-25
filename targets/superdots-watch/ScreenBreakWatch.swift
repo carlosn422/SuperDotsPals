@@ -575,10 +575,14 @@ struct ScreenBreakControlView: View {
         return session
     }
 
+    @ObservedObject private var devices = WatchFamilyDevicesStore.shared
+
     var body: some View {
         Group {
             if justEnded {
                 BreakEndedView()
+            } else if let device = devices.selected {
+                RemoteBreakView(child: child, device: device)
             } else if let session = mine {
                 ActiveBreakView(session: session) { managing = true }
             } else if let other {
@@ -615,7 +619,9 @@ struct ScreenBreakControlView: View {
         }
         .onAppear { minutes = min(180, max(5, (lastMinutes / 5) * 5)) }
         .onChange(of: mine == nil) { _, gone in if gone { managing = false } }
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { BreakDeviceButton() } }
         .task { await store.refresh() }
+        .task { await devices.load() }
     }
 
     private func note(_ text: String) -> some View {

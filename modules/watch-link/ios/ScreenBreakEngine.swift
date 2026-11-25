@@ -246,7 +246,8 @@ final class ScreenBreakEngine {
       throw ScreenBreakError(code: "plus", message: "Your 14-day free trial has ended. MoodPals Plus keeps Screen Break on.")
     }
     var session = ScreenBreakSession(
-      id: UUID().uuidString.lowercased(), childId: child.id, childName: child.name, deviceId: deviceId,
+      id: (command["sessionId"] as? String).flatMap { UUID(uuidString: $0)?.uuidString.lowercased() } ?? UUID().uuidString.lowercased(),
+      childId: child.id, childName: child.name, deviceId: deviceId,
       startedAt: now, deadline: now.addingTimeInterval(TimeInterval(minutes * 60)), grantedSeconds: minutes * 60,
       status: "active", endReason: nil, endedAt: nil, version: 1, updatedAt: now)
     try schedule(session)

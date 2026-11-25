@@ -13,6 +13,7 @@ import {ManageFamilyProfile,familyCall,familyProfilesChanged,shortProfileName,us
 import {WatchColorGrid,WatchColorSheet,WatchImage,colorName,isWatchColor,type WatchColor} from './WatchArt';
 import {ackBreakSync,getBreakState,onBreakState,pendingBreakSync,pickBreakApps,requestScreenTimeAccess,screenBreakSupported,sendBreakCommand,setBreakChildren,setBreakEntitlement,type BreakAction,type BreakSession,type BreakState,type BreakSyncRow} from './modules/watch-link/screenBreak';
 import {configureSocialTrack,getSocialState} from './modules/watch-link/socialTrack';
+import {DevicePicker,FamilyDevicesScreen,PHONE,cancelDeviceCommand,deviceCommand,deviceStatus,useDeviceNames,useFamilyDevices,type FamilyDevice} from './FamilyDevices';
 import {comparison,formatDuration,observations,periodRange,periodStats,type BreakPeriod,type Bucket,type SessionRow} from './ScreenBreakInsights';
 
 export type FamilyChild={id:string;name:string;profile_user_id:string|null;watch_only?:boolean};
@@ -130,7 +131,7 @@ function HeaderLock(){
 
 // ---------- Screens ----------
 
-type Route={name:'list'}|{name:'child';id:string}|{name:'insights';id:string};
+type Route={name:'list'}|{name:'child';id:string}|{name:'insights';id:string}|{name:'devices'};
 
 export default function FamilyScreenBreak({onBack,backLabel='Settings',target,onAddWatch,embedded,footer}:{onBack?:()=>void;backLabel?:string;target?:{childId?:string;profileId?:string;add?:boolean;at:number}|null;onAddWatch?:()=>void;embedded?:boolean;footer?:React.ReactNode}){
  const guest=useIsGuest();
@@ -148,8 +149,9 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
   const child=children.find(c=>c.id===target.childId||(!!target.profileId&&c.profile_user_id===target.profileId));
   if(child)setRoute({name:'child',id:child.id});
  },[target,loading,children]);
- const child=route.name!=='list'?children.find(c=>c.id===route.id):undefined;
+ const child=route.name==='child'||route.name==='insights'?children.find(c=>c.id===route.id):undefined;
  const members=children.filter(c=>!c.watch_only);
+ if(route.name==='devices')return <FamilyDevicesScreen onBack={()=>setRoute({name:'list'})} childName={id=>children.find(c=>c.id===id)?.name||'Someone'}/>;
  if(route.name==='insights'&&child)return <InsightsScreen child={child} onBack={()=>setRoute({name:'child',id:child.id})}/>;
  if(route.name==='child'&&child)return <ChildScreen child={child} children={children} onBack={()=>setRoute({name:'list'})} onInsights={()=>setRoute({name:'insights',id:child.id})} onChanged={()=>{void load();familyChildrenChanged()}} onRemoved={()=>{setRoute({name:'list'});void load()}} onAddWatch={onAddWatch} onOpen={id=>setRoute({name:'child',id})}/>;
  return <View style={{gap:14}}>
@@ -172,6 +174,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
      <Ionicons name="chevron-forward" size={18} color={T.muted}/>
     </TouchableOpacity>)}
    </View>:null}
+   {screenBreakSupported?<TouchableOpacity accessibilityRole="button" onPress={()=>setRoute({name:'devices'})} style={st.linkRow}><Ionicons name="tablet-portrait-outline" size={20} color={T.primary}/><View style={{flex:1}}><Text style={st.rowTitle}>Family Devices</Text><Text style={st.sub}>iPads and spare iPhones your kids share</Text></View><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>:null}
   </>}
   {footer?<View style={{marginTop:10}}>{footer}</View>:null}
  </View>;
@@ -212,6 +215,11 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
  const [editing,setEditing]=useState(false);
  const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState(''),[minutes,setMinutes]=useState(30),[adding,setAdding]=useState(false),[extra,setExtra]=useState(15);
  useEffect(()=>{void AsyncStorage.getItem(LAST_MINUTES_KEY).then(v=>{const n=Number(v);if(n>=5&&n<=180)setMinutes(Math.round(n/5)*5)})},[]);
+ const family=useFamilyDevices(screenBreakSupported);
+ // The default device is preselected; picking another only applies to this timer.
+ const [picked,setPicked]=useState<string|null>(null);
+ const target=picked&&(picked===PHONE||family.devices.some(d=>d.id===picked&&d.status==='active'))?picked:family.defaultId;
+ const remote=target!==PHONE?family.devices.find(d=>d.id===target):undefined;
  const session=state?.session;
  // A session whose member record was replaced (same name, old id) is still controllable from that member.
  const orphan=!!session&&!children.some(c=>c.id===session.childId)&&session.childName===child.name;
@@ -258,7 +266,8 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
   <EditMemberSheet visible={editing} child={child} children={children} onClose={()=>setEditing(false)} onChanged={onChanged} onRemoved={()=>{setEditing(false);onRemoved()}}/>
   {!screenBreakSupported?<View style={st.card}><Text style={st.body}>Screen Break needs the latest MoodPals build on this iPhone.</Text></View>:<>
    {state&&!state.hasPlus&&!isPlus?<PlanNote state={state} daysLeft={trialDaysLeft} onUpgrade={()=>showPaywall('screenBreak')}/>:null}
-   {mine?<View style={[st.card,{alignItems:'center'}]}>
+   <DevicePicker devices={family.devices} selected={target} defaultId={family.defaultId} onSelect={setPicked}/>
+   {remote?<RemoteTimer child={child} children={children} device={remote} family={family} minutes={minutes} setMinutes={setMinutes} onOpen={onOpen} onPlan={()=>showPaywall('screenBreak')}/>:mine?<View style={[st.card,{alignItems:'center'}]}>
     <Text style={st.kicker}>Screen time left</Text>
     <Text style={st.timer} accessibilityRole="timer">{countdown(mine.deadline*1000-now)}</Text>
     <Text style={st.sub}>Ends at {clock(mine.deadline)} · {formatDuration(mine.grantedSeconds)} granted</Text>
@@ -307,17 +316,77 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
      <View style={st.gatePill}><Ionicons name="lock-closed" size={16} color="#fff"/><Text style={st.ctaText}>Get MoodPals Plus</Text></View>
     </TouchableOpacity>:null}
    </View>}
-   {busy&&busy!=='auth'&&busy!=='pick'?<ActivityIndicator color={T.primary}/>:null}
+   {remote?null:<>{busy&&busy!=='auth'&&busy!=='pick'?<ActivityIndicator color={T.primary}/>:null}
    {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
-   {state&&!state.authorized&&mine?<Text style={[st.sub,{color:red}]}>Screen Time access was turned off, so apps can't be paused. Allow access again to restore the break.</Text>:null}
+   {state&&!state.authorized&&mine?<Text style={[st.sub,{color:red}]}>Screen Time access was turned off, so apps can't be paused. Allow access again to restore the break.</Text>:null}</>}
   </>}
   <TouchableOpacity accessibilityRole="button" onPress={onInsights} style={st.linkRow}><Ionicons name="bar-chart-outline" size={20} color={T.primary}/><Text style={[st.rowTitle,{flex:1}]}>Screen Time Insights</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>
   <MemberWatch child={child} children={children} onChanged={onChanged} onRemoved={onRemoved}/>
  </View>;
 }
 
+type FamilyDevicesData=ReturnType<typeof useFamilyDevices>;
+/** Timer for a family device (iPad / spare iPhone). Shows a session only once the device acknowledged it. */
+function RemoteTimer({child,children,device,family,minutes,setMinutes,onOpen,onPlan}:{child:FamilyChild;children:FamilyChild[];device:FamilyDevice;family:FamilyDevicesData;minutes:number;setMinutes:(n:number)=>void;onOpen?:(id:string)=>void;onPlan:()=>void}){
+ const [busy,setBusy]=useState(false),[error,setError]=useState(''),[extra,setExtra]=useState(15),[adding,setAdding]=useState(false);
+ const now=useNow(true);
+ const session=family.sessions.find(x=>x.family_device_id===device.id&&Date.parse(x.deadline_at)>now);
+ const status=deviceStatus(device,family.commands,family.sessions,now);
+ const failed=family.commands.find(c=>c.device_id===device.id&&(c.status==='rejected'||c.status==='expired')&&now-Date.parse(c.updated_at||c.created_at)<120000);
+ const who=(id:string)=>children.find(c=>c.id===id)?.name||'Someone';
+ const act=async(type:string,opts:{minutes?:number;child?:string}={})=>{
+  setBusy(true);setError('');
+  try{await deviceCommand(device.id,type,opts);void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(()=>{})}
+  catch(e:any){if(/trial|Plus/i.test(e.message))onPlan();setError(e.message)}
+  finally{setBusy(false)}
+ };
+ const extendSheet=session?<Modal visible={adding} transparent animationType="slide" onRequestClose={()=>setAdding(false)}>
+  <View style={{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(29,43,51,0.3)'}}>
+   <TouchableOpacity style={StyleSheet.absoluteFill} onPress={()=>setAdding(false)} accessibilityLabel="Close"/>
+   <View style={[st.sheet,{alignItems:'center'}]}>
+    <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6'}}/>
+    <Text style={st.sheetTitle}>Add time for {who(session.child_id)}</Text>
+    <DurationRing minutes={extra} onChange={setExtra} min={5} max={120} prefix="+"/>
+    <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>{setAdding(false);void act('EXTEND_SESSION',{minutes:extra})}} style={[st.cta,{alignSelf:'stretch'}]}><Text style={st.ctaText}>Add {formatDuration(extra*60)}</Text></TouchableOpacity>
+   </View>
+  </View>
+ </Modal>:null;
+ const pendingStart=status.pending?.type==='START_SESSION'?status.pending:undefined;
+ return <View style={[st.card,{alignItems:'stretch'}]}>
+  <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
+   <Text style={[st.heading,{flex:1}]} numberOfLines={1}>{device.name}</Text>
+   <Text style={[st.sub,{color:status.tone==='warn'?'#B7791F':T.primary,fontWeight:'800'}]}>{status.label}</Text>
+  </View>
+  {session?<>
+   {session.child_id===child.id?<View style={{alignItems:'center',gap:4}}>
+    <Text style={st.kicker}>Screen time left</Text>
+    <Text style={st.timer} accessibilityRole="timer">{countdown(Date.parse(session.deadline_at)-now)}</Text>
+    <Text style={st.sub}>Ends at {clock(Date.parse(session.deadline_at)/1000)} · {formatDuration(session.granted_seconds)} granted</Text>
+   </View>:<View style={[st.setupDone,{flexDirection:'column',alignItems:'stretch',gap:6,paddingVertical:14}]}>
+    <Text style={[st.body,{textAlign:'center'}]}>{who(session.child_id)} is using {device.name} · {Math.max(1,Math.ceil((Date.parse(session.deadline_at)-now)/60000))} min left</Text>
+    <Text style={[st.sub,{textAlign:'center'}]}>Add time or end that session before starting one for {child.name}, or pick another device.</Text>
+    {onOpen&&children.some(c=>c.id===session.child_id)?<TouchableOpacity accessibilityRole="button" onPress={()=>onOpen(session.child_id)}><Text style={[st.link,{textAlign:'center'}]}>Go to {who(session.child_id)}</Text></TouchableOpacity>:null}
+   </View>}
+   <TouchableOpacity accessibilityRole="button" disabled={busy||!!status.pending} onPress={()=>{setExtra(15);setAdding(true)}} style={[st.cta,(busy||!!status.pending)&&{opacity:.5}]}><Text style={st.ctaText}>Add Time</Text></TouchableOpacity>
+   <TouchableOpacity accessibilityRole="button" disabled={busy||!!status.pending} onPress={()=>void act('END_SESSION')} style={[st.ghost,(busy||!!status.pending)&&{opacity:.5}]}><Text style={[st.ghostText,{color:red}]}>End Now</Text></TouchableOpacity>
+   {extendSheet}
+  </>:pendingStart?<View style={{alignItems:'center',gap:10}}>
+   <ActivityIndicator color={T.primary}/>
+   <Text style={[st.body,{textAlign:'center'}]}>{status.label==='Waiting for device connection'?'Waiting for '+device.name+' to connect…':'Starting '+(pendingStart.minutes||0)+' min for '+who(pendingStart.child_id||'')+'…'}</Text>
+   <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>{setBusy(true);void cancelDeviceCommand(pendingStart.id).catch(e=>setError(e.message)).finally(()=>setBusy(false))}} style={[st.ghost,{alignSelf:'stretch'}]}><Text style={st.ghostText}>Cancel</Text></TouchableOpacity>
+  </View>:device.auth_status!=='approved'||!device.selection_count?<Text style={st.body}>Finish setup on {device.name}: allow Screen Time and choose the apps to pause.</Text>:<>
+   <Text style={[st.rowTitle,{marginTop:4,textAlign:'center'}]}>How long can {child.name} use {device.name}?</Text>
+   <DurationRing minutes={minutes} onChange={setMinutes} min={5} max={180}/>
+   <TouchableOpacity accessibilityRole="button" disabled={busy||!!status.pending} onPress={()=>{void AsyncStorage.setItem(LAST_MINUTES_KEY,String(minutes));void act('START_SESSION',{minutes,child:child.id})}} style={[st.cta,(busy||!!status.pending)&&{opacity:.5}]}>{busy?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>Start</Text>}</TouchableOpacity>
+  </>}
+  {status.pending&&!pendingStart?<Text style={[st.sub,{textAlign:'center'}]}>{status.label}…</Text>:null}
+  {failed?<Text style={[st.sub,{color:red,textAlign:'center'}]}>{failed.error||'The device couldn’t do that.'}</Text>:null}
+  {error?<Text style={[st.sub,{color:red,textAlign:'center'}]}>{error}</Text>:null}
+ </View>;
+}
+
 // Circular duration dial, same as the Apple Watch: drag around the ring in 5-minute steps.
-function DurationRing({minutes,onChange,min,max,step=5,prefix=''}:{minutes:number;onChange:(n:number)=>void;min:number;max:number;step?:number;prefix?:string}){
+export function DurationRing({minutes,onChange,min,max,step=5,prefix=''}:{minutes:number;onChange:(n:number)=>void;min:number;max:number;step?:number;prefix?:string}){
  // The knob is wider than the ring, so the ring is inset by the knob's radius to keep it inside the view.
  const SIZE=230,LINE=18,KNOB=LINE*0.75,R=SIZE/2-KNOB-3,C=SIZE/2,CIRC=2*Math.PI*R;
  const frac=(minutes-min)/(max-min);
@@ -666,7 +735,7 @@ function InsightsScreen({child,onBack}:{child:FamilyChild;onBack:()=>void}){
  const isCurrent=range.start<=new Date()&&new Date()<range.end;
  useEffect(()=>{
   let live=true;setLoading(true);setError('');
-  void supabase.from('screen_break_sessions').select('id,child_id,started_at,deadline_at,ended_at,granted_seconds,status,version')
+  void supabase.from('screen_break_sessions').select('id,child_id,family_device_id,started_at,deadline_at,ended_at,granted_seconds,status,version')
    .eq('child_id',child.id).lt('started_at',range.end.toISOString()).gte('deadline_at',previous.start.toISOString()).order('started_at').limit(2000)
    .then(({data,error:e})=>{if(!live)return;setLoading(false);if(e)setError('Unable to load session history. Showing sessions saved on this iPhone.');setRows((data as SessionRow[])||[])});
   return()=>{live=false};
@@ -677,7 +746,16 @@ function InsightsScreen({child,onBack}:{child:FamilyChild;onBack:()=>void}){
   if(state?.session&&state.session.childId===child.id)local.push(fromNative(state.session));
   return [...rows,...local];
  },[rows,state,child.id]);
- const stats=useMemo(()=>periodStats(all,period,anchor,new Date(now)),[all,period,anchor,Math.floor(now/60000)]);
+ const family=useFamilyDevices();
+ const deviceName=useDeviceNames(family.devices);
+ const [device,setDevice]=useState<string>('all');
+ const deviceKey=(r:SessionRow)=>r.family_device_id||PHONE;
+ const shown=useMemo(()=>device==='all'?all:all.filter(r=>deviceKey(r)===device),[all,device]);
+ const stats=useMemo(()=>periodStats(shown,period,anchor,new Date(now)),[shown,period,anchor,Math.floor(now/60000)]);
+ const byDevice=useMemo(()=>{
+  const keys=[...new Set(all.map(deviceKey))];
+  return keys.map(k=>({key:k,name:k===PHONE?'This iPhone':deviceName(k),seconds:periodStats(all.filter(r=>deviceKey(r)===k),period,anchor,new Date(now)).seconds})).filter(x=>x.seconds>0).sort((a,b)=>b.seconds-a.seconds);
+ },[all,period,anchor,deviceName,Math.floor(now/60000)]);
  const compare=comparison(stats);
  const notes=observations(stats,period);
  const startOfTimes=periodRange(period,new Date()).start;
@@ -686,6 +764,7 @@ function InsightsScreen({child,onBack}:{child:FamilyChild;onBack:()=>void}){
   <Text style={st.title}>Screen Time Insights</Text>
   <View style={st.segment}>{PERIODS.map(p=><TouchableOpacity key={p.key} accessibilityRole="tab" accessibilityState={{selected:period===p.key}} onPress={()=>{setPeriod(p.key);setAnchor(new Date())}} style={[st.segBtn,period===p.key&&st.segOn]}><Text style={[st.segText,period===p.key&&{color:'#fff'}]}>{p.label}</Text></TouchableOpacity>)}</View>
   <PeriodPicker period={period} anchor={anchor} onPick={setAnchor}/>
+  {family.devices.length?<View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{[{id:'all',name:'All devices'},{id:PHONE,name:'This iPhone'},...family.devices.map(d=>({id:d.id,name:d.name}))].map(o=><Chip key={o.id} label={o.name} on={device===o.id} onPress={()=>setDevice(o.id)}/>)}</View>:null}
   {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
   {loading?<ActivityIndicator color={T.primary}/>:null}
   <View style={st.note}><Ionicons name="bar-chart-outline" size={18} color={T.primary}/><Text style={[st.sub,{color:T.ink,flex:1}]}>{child.name}'s time in your tracked apps is in Actions › Screen Time & Stress: choose {child.name} above the chart.</Text></View>
@@ -705,6 +784,10 @@ function InsightsScreen({child,onBack}:{child:FamilyChild;onBack:()=>void}){
    {stats.hasData?<SessionLineChart period={period} buckets={stats.buckets}/>:<Text style={st.body}>No Screen Break sessions for {child.name} in this period.</Text>}
    {stats.highest&&period!=='day'?<Text style={st.sub}>Longest: {period==='week'?stats.highest.start.toLocaleDateString(undefined,{weekday:'long'}):period==='month'?'Week '+stats.highest.label.replace('Wk ',''):stats.highest.start.toLocaleDateString(undefined,{month:'long'})} · {formatDuration(stats.highest.seconds)}</Text>:null}
   </View>
+  {device==='all'&&byDevice.length>1?<View style={st.card}>
+   <Text style={st.kicker}>By device</Text>
+   {byDevice.map(d=><View key={d.key} style={{flexDirection:'row',justifyContent:'space-between'}}><Text style={st.body}>{d.name}</Text><Text style={[st.body,{fontWeight:'800'}]}>{formatDuration(d.seconds)}</Text></View>)}
+  </View>:null}
   {allowed&&notes.length?<View style={st.card}>{notes.map(n=><Text key={n} style={st.body}>• {n}</Text>)}</View>:null}
   <Text style={st.sub}>Screen Break Time is the time inside {child.name}'s sessions, from start until the session ended, was canceled or reached its time. Time Granted is what you allowed. Neither is measured phone use.</Text>
  </View>;

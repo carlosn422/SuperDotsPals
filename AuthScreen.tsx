@@ -10,7 +10,7 @@ import {appleAvailable,signInWithApple} from './AppleAuth';
 // Set before signing a guest out from onboarding so the auth screen opens on Sign in instead of Welcome.
 let nextMode:'welcome'|'signin'='welcome';
 export function openSignInNext(){nextMode='signin'}
-export default function AuthScreen(){
+export default function AuthScreen({onLinkDevice}:{onLinkDevice?:()=>void}={}){
  const [appleOk,setAppleOk]=useState(false);
  useEffect(()=>{void appleAvailable().then(setAppleOk)},[]);
  async function apple(){setMessage('');setLoading(true);try{await signInWithApple()}catch(e:any){setMessage(e?.message||'Sign in with Apple failed. Please try again.')}finally{setLoading(false)}}
@@ -74,6 +74,7 @@ export default function AuthScreen(){
   <View style={s.welcomeActions}>
    <TouchableOpacity accessibilityRole="button" onPress={()=>void startAsGuest()} disabled={loading} style={[s.welcomePrimary,loading&&{opacity:.7}]}>{loading?<ActivityIndicator color="white"/>:<Text style={s.welcomePrimaryText}>Get Started</Text>}</TouchableOpacity>
    <TouchableOpacity accessibilityRole="button" onPress={()=>setMode('signin')} style={s.welcomeSecondary}><Text style={s.welcomeSecondaryText}>Already have an account?</Text></TouchableOpacity>
+   {onLinkDevice?<TouchableOpacity accessibilityRole="button" onPress={onLinkDevice} style={s.secondaryAction}><Text style={s.link}>Link as a Family Device</Text></TouchableOpacity>:null}
   </View>
  </View>;
  return <KeyboardAvoidingView style={s.page} behavior={Platform.OS==='ios'?'padding':undefined}>
@@ -99,6 +100,7 @@ export default function AuthScreen(){
     {mode==='signin' && waitingForConfirmation?<TouchableOpacity onPress={()=>void completeConfirmation()} style={s.confirmButton}><Text style={s.confirmText}>I've confirmed my email — continue</Text></TouchableOpacity>:null}
     {mode!=='reset'&&appleOk?<><View style={s.orRow}><View style={s.orLine}/><Text style={s.orText}>or</Text><View style={s.orLine}/></View><AppleAuthentication.AppleAuthenticationButton buttonType={mode==='signup'?AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP:AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN} buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK} cornerRadius={17} style={{height:54,width:'100%',opacity:loading?.6:1}} onPress={()=>{if(!loading)void apple()}}/></>:null}
     {mode==='signin'?<TouchableOpacity onPress={()=>{setMode('reset');setMessage('')}} style={s.secondaryAction}><Text style={s.link}>Forgot password?</Text></TouchableOpacity>:null}
+    {mode==='signin'&&onLinkDevice?<TouchableOpacity accessibilityRole="button" onPress={onLinkDevice} style={s.secondaryAction}><Text style={s.link}>Link as a Family Device</Text></TouchableOpacity>:null}
     <TouchableOpacity onPress={()=>{setMode(mode==='signup'?'signin':'signup');setMessage('')}} style={s.secondaryAction}><Text style={s.link}>{mode==='signup'?'Already have an account? Sign in':mode==='reset'?'Back to sign in':'New here? Create an account'}</Text></TouchableOpacity>
    </View>
    <Text style={s.foot}>Your reflections are private. Apple Health access is optional and requires your permission.</Text>
