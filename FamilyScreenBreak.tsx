@@ -13,7 +13,7 @@ import {ManageFamilyProfile,familyCall,familyProfilesChanged,shortProfileName,us
 import {WatchColorGrid,WatchColorSheet,WatchImage,colorName,isWatchColor,type WatchColor} from './WatchArt';
 import {ackBreakSync,getBreakState,onBreakState,pendingBreakSync,pickBreakApps,requestScreenTimeAccess,screenBreakSupported,sendBreakCommand,setBreakChildren,setBreakEntitlement,type BreakAction,type BreakSession,type BreakState,type BreakSyncRow} from './modules/watch-link/screenBreak';
 import {configureSocialTrack,getSocialState} from './modules/watch-link/socialTrack';
-import {DevicePicker,FamilyDevicesScreen,PHONE,cancelDeviceCommand,deviceCommand,deviceStatus,useDeviceNames,useFamilyDevices,type DeviceCommand,type FamilyDevice,type RemoteSession} from './FamilyDevices';
+import {DeviceSelect,FamilyDevicesScreen,PHONE,cancelDeviceCommand,deviceCommand,deviceStatus,useDeviceNames,useFamilyDevices,type DeviceCommand,type FamilyDevice,type RemoteSession} from './FamilyDevices';
 import {comparison,formatDuration,observations,periodRange,periodStats,type BreakPeriod,type Bucket,type SessionRow} from './ScreenBreakInsights';
 
 export type FamilyChild={id:string;name:string;profile_user_id:string|null;watch_only?:boolean};
@@ -187,9 +187,13 @@ function deviceInUse(childId:string,family:{sessions:RemoteSession[];commands:De
   ||family.commands.find(c=>c.type==='START_SESSION'&&(c.status==='pending'||c.status==='delivered')&&c.child_id===childId)?.device_id;
 }
 
-/** Starting for a member on a device someone else is using ends that timer; one tap to confirm. */
-function confirmReplace(name:string,start:()=>void){
- Alert.alert(name+"'s timer is running",'Starting ends it.',[{text:'Cancel',style:'cancel'},{text:'Start',onPress:start}]);
+const minLeft=(ms:number)=>Math.max(1,Math.ceil(ms/60000))+' min left';
+/** Shown above Start when another member's timer runs on the chosen device: starting ends it. */
+function ReplaceNote({name,ms}:{name:string;ms:number}){
+ return <View style={st.replaceNote} accessible accessibilityLabel={name+"'s timer is running, "+minLeft(ms)+'. Starting ends it.'}>
+  <Ionicons name="timer-outline" size={22} color="#B7791F"/>
+  <View style={{flex:1}}><Text style={st.rowTitle}>{name}'s timer is running</Text><Text style={st.sub}>{minLeft(ms)} · Starting ends it.</Text></View>
+ </View>;
 }
 
 function ActiveBadge({childId,remote}:{childId:string;remote?:RemoteSession}){
@@ -245,6 +249,10 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
  const inUse=mine?PHONE:family.devices.some(d=>d.id===busyOn)?busyOn:undefined;
  const target=inUse||(picked&&(picked===PHONE||family.devices.some(d=>d.id===picked&&d.status==='active'))?picked:family.defaultId);
  const remote=target!==PHONE?family.devices.find(d=>d.id===target):undefined;
+ const t=Date.now(),nameOf=(id:string)=>children.find(c=>c.id===id)?.name||'Someone';
+ const deviceOptions=[{id:PHONE,name:'This iPhone',busy:other?other.childName+' · '+minLeft(other.deadline*1000-t):undefined},
+  ...family.devices.filter(d=>d.status==='active').map(d=>{const x=family.sessions.find(y=>y.family_device_id===d.id&&Date.parse(y.deadline_at)>t);
+   return {id:d.id,name:d.name,tablet:d.device_type==='ipad',busy:x?nameOf(x.child_id)+' · '+minLeft(Date.parse(x.deadline_at)-t):undefined,note:d.auth_status!=='approved'||!d.selection_count?'Finish setup on the device':undefined}})];
  const lock=useRef(false);
  const refresh=()=>setState(getBreakState());
  useEffect(()=>{void syncScreenBreak(isPlus).then(refresh)},[child.id]);
@@ -283,7 +291,7 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
   <EditMemberSheet visible={editing} child={child} children={children} onClose={()=>setEditing(false)} onChanged={onChanged} onRemoved={()=>{setEditing(false);onRemoved()}}/>
   {!screenBreakSupported?<View style={st.card}><Text style={st.body}>Screen Break needs the latest MoodPals build on this iPhone.</Text></View>:<>
    {state&&!state.hasPlus&&!isPlus?<PlanNote state={state} daysLeft={trialDaysLeft} onUpgrade={()=>showPaywall('screenBreak')}/>:null}
-   {inUse?null:<DevicePicker devices={family.devices} selected={target} defaultId={family.defaultId} onSelect={setPicked}/>}
+   {inUse?null:<DeviceSelect options={deviceOptions} selected={target} defaultId={family.defaultId} onSelect={setPicked}/>}
    {remote?<RemoteTimer child={child} children={children} device={remote} family={family} minutes={minutes} setMinutes={setMinutes} onOpen={onOpen} onPlan={()=>showPaywall('screenBreak')}/>:mine?<View style={[st.card,{alignItems:'center'}]}>
     <Text style={st.kicker}>Screen time left</Text>
     <Text style={st.timer} accessibilityRole="timer">{countdown(mine.deadline*1000-now)}</Text>
@@ -304,10 +312,7 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
     <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Stop '+child.name+"'s timer"} disabled={!!busy} onPress={()=>run('cancel')} style={[st.ghost,{alignSelf:'stretch',marginTop:6}]}><Text style={[st.ghostText,{color:red}]}>Stop</Text></TouchableOpacity>
    </View>:<View style={st.card}>
     <Text style={st.heading}>Screen Break</Text>
-    {other?<View style={[st.setupDone,{flexDirection:'column',alignItems:'stretch',gap:10,paddingVertical:14}]}>
-     <Text style={[st.body,{textAlign:'center'}]}>A timer is running for {other.childName} · {Math.max(1,Math.ceil((other.deadline*1000-now)/60000))} min left</Text>
-     {children.some(c=>c.id===other.childId)&&onOpen?<TouchableOpacity accessibilityRole="button" onPress={()=>onOpen(other.childId)}><Text style={[st.link,{textAlign:'center'}]}>Go to {other.childName}</Text></TouchableOpacity>:null}
-    </View>:null}
+    {other?<ReplaceNote name={other.childName} ms={other.deadline*1000-now}/>:null}
     {!state?.authorized?<View style={{gap:10}}>
      <Text style={st.kicker}>Step 1 of 2</Text>
      <Text style={st.rowTitle}>Allow Screen Time access</Text>
@@ -326,7 +331,7 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
     {ready?<>
     <Text style={[st.rowTitle,{marginTop:8,textAlign:'center'}]}>How long can {child.name} use the phone?</Text>
     <DurationRing minutes={minutes} onChange={setMinutes} min={5} max={180}/>
-    <TouchableOpacity accessibilityRole="button" disabled={!ready||!validMinutes||!!busy} onPress={()=>{const go=()=>{void AsyncStorage.setItem(LAST_MINUTES_KEY,String(chosen));run('start',{minutes:chosen,replace:!!other})};other?confirmReplace(other.childName,go):go()}} style={[st.cta,(!ready||!validMinutes||!!busy)&&{opacity:0.5}]}><Text style={st.ctaText}>Start</Text></TouchableOpacity>
+    <TouchableOpacity accessibilityRole="button" disabled={!ready||!validMinutes||!!busy} onPress={()=>{void AsyncStorage.setItem(LAST_MINUTES_KEY,String(chosen));run('start',{minutes:chosen,replace:!!other})}} style={[st.cta,(!ready||!validMinutes||!!busy)&&{opacity:0.5}]}><Text style={st.ctaText}>Start</Text></TouchableOpacity>
     <Text style={[st.sub,{textAlign:'center'}]}>Your Apple Watch reminds you 5 minutes before and lets you manage it.</Text>
     </>:null}
     {state?.entitlementKnown&&!state.allowed&&!state.hasPlus&&!isPlus&&!other?<TouchableOpacity accessibilityRole="button" accessibilityLabel="Free trial ended. See MoodPals Plus" onPress={()=>showPaywall('screenBreak')} style={st.gate}>
@@ -388,10 +393,10 @@ function RemoteTimer({child,children,device,family,minutes,setMinutes,onOpen,onP
    <Text style={[st.body,{textAlign:'center'}]}>{status.label==='Waiting for device connection'?'Waiting for '+device.name+' to connect…':'Starting '+(pendingStart.minutes||0)+' min for '+who(pendingStart.child_id||'')+'…'}</Text>
    <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>{setBusy(true);void cancelDeviceCommand(pendingStart.id).catch(e=>setError(e.message)).finally(()=>setBusy(false))}} style={[st.ghost,{alignSelf:'stretch'}]}><Text style={st.ghostText}>Cancel</Text></TouchableOpacity>
   </View>:device.auth_status!=='approved'||!device.selection_count?<Text style={st.body}>Finish setup on {device.name}: allow Screen Time and choose the apps to pause.</Text>:<>
-   {session?<Text style={[st.sub,{textAlign:'center'}]}>{who(session.child_id)} is using {device.name} · {Math.max(1,Math.ceil((Date.parse(session.deadline_at)-now)/60000))} min left</Text>:null}
+   {session?<ReplaceNote name={who(session.child_id)} ms={Date.parse(session.deadline_at)-now}/>:null}
    <Text style={[st.rowTitle,{marginTop:4,textAlign:'center'}]}>How long can {child.name} use {device.name}?</Text>
    <DurationRing minutes={minutes} onChange={setMinutes} min={5} max={180}/>
-   <TouchableOpacity accessibilityRole="button" disabled={busy||!!status.pending} onPress={()=>{const go=()=>{void AsyncStorage.setItem(LAST_MINUTES_KEY,String(minutes));void act('START_SESSION',{minutes,child:child.id,replace:!!session})};session?confirmReplace(who(session.child_id),go):go()}} style={[st.cta,(busy||!!status.pending)&&{opacity:.5}]}>{busy?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>Start</Text>}</TouchableOpacity>
+   <TouchableOpacity accessibilityRole="button" disabled={busy||!!status.pending} onPress={()=>{void AsyncStorage.setItem(LAST_MINUTES_KEY,String(minutes));void act('START_SESSION',{minutes,child:child.id,replace:!!session})}} style={[st.cta,(busy||!!status.pending)&&{opacity:.5}]}>{busy?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>Start</Text>}</TouchableOpacity>
   </>}
   {status.pending&&!pendingStart?<Text style={[st.sub,{textAlign:'center'}]}>{status.label}…</Text>:null}
   {failed?<Text style={[st.sub,{color:red,textAlign:'center'}]}>{failed.error||'The device couldn’t do that.'}</Text>:null}
@@ -968,6 +973,7 @@ const st=StyleSheet.create({
  calDay:{width:34,height:34,borderRadius:17,alignItems:'center',justifyContent:'center'},
  addBtn:{flexDirection:'row',alignItems:'center',gap:6,backgroundColor:T.primary,paddingHorizontal:18,minHeight:44,borderRadius:22},
  addBtnText:{color:'#fff',fontWeight:'900',fontSize:15},
+ replaceNote:{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#FDF3E1',borderRadius:16,padding:14},
  sheet:{backgroundColor:'#fff',borderTopLeftRadius:28,borderTopRightRadius:28,padding:22,paddingBottom:40,gap:14},
  sheetTitle:{fontSize:22,fontWeight:'900',color:T.ink},
  codeInput:{borderWidth:1.5,borderColor:T.border,borderRadius:18,minHeight:64,fontSize:30,fontWeight:'900',letterSpacing:10,textAlign:'center',color:T.ink,backgroundColor:'#fff'},

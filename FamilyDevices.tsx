@@ -1,5 +1,5 @@
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
-import {ActivityIndicator,Alert,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native';
+import {ActivityIndicator,Alert,Modal,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {supabase} from './supabase';
 import {APP_THEME as T} from './MoodMascot';
@@ -77,15 +77,37 @@ export function deviceStatus(d:FamilyDevice,commands:DeviceCommand[],sessions:Re
  return {label:'Ready',tone:'ok'};
 }
 
-export function DevicePicker({devices,selected,defaultId,onSelect}:{devices:FamilyDevice[];selected:string;defaultId:string;onSelect:(id:string)=>void}){
- if(!devices.length)return null;
- const all=[{id:PHONE,name:'This iPhone',icon:'phone-portrait-outline'},...devices.filter(d=>d.status==='active').map(d=>({id:d.id,name:d.name,icon:d.device_type==='ipad'?'tablet-portrait-outline':'phone-portrait-outline'}))];
- return <View style={s.chips} accessibilityRole="radiogroup" accessibilityLabel="Device">
-  {all.map(o=><TouchableOpacity key={o.id} accessibilityRole="radio" accessibilityState={{selected:selected===o.id}} onPress={()=>onSelect(o.id)} style={[s.chip,selected===o.id&&s.chipOn]}>
-   <Ionicons name={o.icon as any} size={16} color={selected===o.id?'#fff':T.ink}/>
-   <Text style={[s.chipText,selected===o.id&&{color:'#fff'}]} numberOfLines={1}>{o.name}{o.id===defaultId?' · Default':''}</Text>
-  </TouchableOpacity>)}
- </View>;
+export type DeviceOption={id:string;name:string;tablet?:boolean;busy?:string;note?:string};
+const WARN='#B7791F';
+/** The device for this timer as one row; tapping it slides up every device with who's using it. */
+export function DeviceSelect({options,selected,defaultId,onSelect}:{options:DeviceOption[];selected:string;defaultId:string;onSelect:(id:string)=>void}){
+ const [open,setOpen]=useState(false);
+ if(options.length<2)return null;
+ const cur=options.find(o=>o.id===selected)||options[0];
+ const icon=(o:DeviceOption)=><View style={s.optIcon}><Ionicons name={o.tablet?'tablet-portrait-outline':'phone-portrait-outline'} size={20} color={T.primary}/></View>;
+ const status=(o:DeviceOption)=><Text style={[s.optSub,!!o.busy&&{color:WARN,fontWeight:'700'}]} numberOfLines={1}>{o.busy||o.note||'Available'}</Text>;
+ return <>
+  <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Device: '+cur.name+(cur.busy?', '+cur.busy:'')+'. Change device'} onPress={()=>setOpen(true)} style={s.select}>
+   {icon(cur)}
+   <View style={{flex:1}}><Text style={s.optName} numberOfLines={1}>{cur.name}</Text>{status(cur)}</View>
+   <Text style={s.selectLink}>Change</Text>
+   <Ionicons name="chevron-down" size={18} color={T.primary}/>
+  </TouchableOpacity>
+  <Modal visible={open} transparent animationType="slide" onRequestClose={()=>setOpen(false)}>
+   <View style={{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(29,43,51,0.3)'}}>
+    <TouchableOpacity style={StyleSheet.absoluteFill} onPress={()=>setOpen(false)} accessibilityLabel="Close"/>
+    <View style={s.sheet} accessibilityRole="radiogroup" accessibilityLabel="Device">
+     <View style={s.grabber}/>
+     <Text style={s.sheetTitle}>Choose a device</Text>
+     {options.map(o=>{const on=o.id===selected;return <TouchableOpacity key={o.id} accessibilityRole="radio" accessibilityState={{selected:on}} onPress={()=>{onSelect(o.id);setOpen(false)}} style={[s.opt,on&&s.optOn]}>
+      {icon(o)}
+      <View style={{flex:1}}><Text style={s.optName} numberOfLines={1}>{o.name}{o.id===defaultId?' · Default':''}</Text>{status(o)}</View>
+      {on?<Ionicons name="checkmark-circle" size={24} color={T.primary}/>:null}
+     </TouchableOpacity>})}
+    </View>
+   </View>
+  </Modal>
+ </>;
 }
 
 export function FamilyDevicesScreen({onBack,childName}:{onBack:()=>void;childName:(id:string)=>string}){
@@ -210,6 +232,16 @@ const s=StyleSheet.create({
  link:{color:T.primary,fontWeight:'800',fontSize:13},
  addBtn:{flexDirection:'row',alignItems:'center',gap:4,backgroundColor:T.primary,borderRadius:18,paddingHorizontal:12,paddingVertical:8},
  addBtnText:{color:'#fff',fontWeight:'800',fontSize:13},
+ select:{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#fff',borderRadius:18,borderWidth:1.5,borderColor:T.border,paddingHorizontal:14,paddingVertical:10,minHeight:64},
+ selectLink:{fontSize:15,fontWeight:'800',color:T.primary},
+ sheet:{backgroundColor:'#fff',borderTopLeftRadius:28,borderTopRightRadius:28,padding:22,paddingBottom:40,gap:10},
+ grabber:{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'},
+ sheetTitle:{fontSize:22,fontWeight:'900',color:T.ink,marginBottom:4},
+ opt:{flexDirection:'row',alignItems:'center',gap:12,borderRadius:18,borderWidth:1.5,borderColor:T.border,padding:12,minHeight:64},
+ optOn:{borderColor:T.primary,backgroundColor:T.primarySoft},
+ optIcon:{width:40,height:40,borderRadius:12,backgroundColor:T.primarySoft,alignItems:'center',justifyContent:'center'},
+ optName:{fontSize:17,fontWeight:'800',color:T.ink},
+ optSub:{fontSize:14,color:T.muted,marginTop:2},
  chips:{flexDirection:'row',flexWrap:'wrap',gap:8,justifyContent:'center'},
  chip:{flexDirection:'row',alignItems:'center',gap:6,borderRadius:18,borderWidth:1.5,borderColor:T.border,backgroundColor:'#fff',paddingHorizontal:12,paddingVertical:8,maxWidth:240},
  chipOn:{backgroundColor:T.primary,borderColor:T.primary},
