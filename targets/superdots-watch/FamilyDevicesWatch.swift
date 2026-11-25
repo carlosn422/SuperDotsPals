@@ -53,6 +53,13 @@ final class WatchFamilyDevicesStore: ObservableObject {
         pending.first { $0.deviceId == device }
     }
 
+    /// One device per member: the family device this member's timer runs (or is starting) on.
+    func device(usedBy child: String) -> WatchFamilyDevice? {
+        let id = sessions.first { $0.childId == child && $0.deadline > Date() }?.deviceId
+            ?? pending.first { $0.type == "START_SESSION" && $0.childId == child }?.deviceId
+        return devices.first { $0.id == id }
+    }
+
     func load() async {
         let sync = WatchThemeSync.shared
         let now = ISO8601DateFormatter().string(from: Date())

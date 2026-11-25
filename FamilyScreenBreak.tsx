@@ -13,7 +13,7 @@ import {ManageFamilyProfile,familyCall,familyProfilesChanged,shortProfileName,us
 import {WatchColorGrid,WatchColorSheet,WatchImage,colorName,isWatchColor,type WatchColor} from './WatchArt';
 import {ackBreakSync,getBreakState,onBreakState,pendingBreakSync,pickBreakApps,requestScreenTimeAccess,screenBreakSupported,sendBreakCommand,setBreakChildren,setBreakEntitlement,type BreakAction,type BreakSession,type BreakState,type BreakSyncRow} from './modules/watch-link/screenBreak';
 import {configureSocialTrack,getSocialState} from './modules/watch-link/socialTrack';
-import {DevicePicker,FamilyDevicesScreen,PHONE,cancelDeviceCommand,deviceCommand,deviceStatus,useDeviceNames,useFamilyDevices,type FamilyDevice} from './FamilyDevices';
+import {DevicePicker,FamilyDevicesScreen,PHONE,cancelDeviceCommand,deviceCommand,deviceStatus,useDeviceNames,useFamilyDevices,type DeviceCommand,type FamilyDevice,type RemoteSession} from './FamilyDevices';
 import {comparison,formatDuration,observations,periodRange,periodStats,type BreakPeriod,type Bucket,type SessionRow} from './ScreenBreakInsights';
 
 export type FamilyChild={id:string;name:string;profile_user_id:string|null;watch_only?:boolean};
@@ -137,6 +137,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  const guest=useIsGuest();
  const [children,setChildren]=useState<FamilyChild[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const [route,setRoute]=useState<Route>({name:'list'}),[adding,setAdding]=useState(false);
+ const family=useFamilyDevices(screenBreakSupported&&!guest&&route.name==='list');
  const load=useCallback(async()=>{
   try{const list=await loadChildren();setChildren(list);setError('');if(screenBreakSupported)setBreakChildren(list.filter(c=>!c.watch_only).map(c=>({id:c.id,name:c.name})))}
   catch{setError('Unable to load your family members. Check your connection.')}
@@ -170,7 +171,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
     {members.map((c,i)=><TouchableOpacity key={c.id} accessibilityRole="button" accessibilityLabel={'Open '+c.name} onPress={()=>setRoute({name:'child',id:c.id})} style={[st.row,i>0&&st.rowLine]}>
      <View style={st.avatar}><Text style={st.avatarText}>{c.name.slice(0,1).toUpperCase()}</Text></View>
      <View style={{flex:1}}><Text style={st.rowTitle}>{c.name}</Text><Text style={st.sub}>{c.profile_user_id?'Watch assigned':'No watch assigned'}</Text></View>
-     <ActiveBadge childId={c.id}/>
+     <ActiveBadge childId={c.id} remote={family.sessions.find(x=>x.child_id===c.id&&Date.parse(x.deadline_at)>Date.now())}/>
      <Ionicons name="chevron-forward" size={18} color={T.muted}/>
     </TouchableOpacity>)}
    </View>:null}
@@ -180,12 +181,20 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  </View>;
 }
 
-function ActiveBadge({childId}:{childId:string}){
+/** The family device a member's timer runs or is starting on. */
+function deviceInUse(childId:string,family:{sessions:RemoteSession[];commands:DeviceCommand[]},now=Date.now()){
+ return family.sessions.find(x=>x.child_id===childId&&Date.parse(x.deadline_at)>now)?.family_device_id
+  ||family.commands.find(c=>c.type==='START_SESSION'&&(c.status==='pending'||c.status==='delivered')&&c.child_id===childId)?.device_id;
+}
+
+function ActiveBadge({childId,remote}:{childId:string;remote?:RemoteSession}){
  const [state]=useBreakState();
  const s=state?.session;
- const now=useNow(!!s&&s.childId===childId&&s.status==='active');
- if(!s||s.childId!==childId||s.status!=='active'||s.deadline*1000<=now)return null;
- const left=Math.max(1,Math.ceil((s.deadline*1000-now)/60000));
+ const local=!!s&&s.childId===childId&&s.status==='active';
+ const now=useNow(local||!!remote);
+ const deadline=local?s!.deadline*1000:remote?Date.parse(remote.deadline_at):0;
+ if(deadline<=now)return null;
+ const left=Math.max(1,Math.ceil((deadline-now)/60000));
  return <View style={st.badge}><Text style={st.badgeText}>{left+' min left'}</Text></View>;
 }
 
@@ -218,8 +227,6 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
  const family=useFamilyDevices(screenBreakSupported);
  // The default device is preselected; picking another only applies to this timer.
  const [picked,setPicked]=useState<string|null>(null);
- const target=picked&&(picked===PHONE||family.devices.some(d=>d.id===picked&&d.status==='active'))?picked:family.defaultId;
- const remote=target!==PHONE?family.devices.find(d=>d.id===target):undefined;
  const session=state?.session;
  // A session whose member record was replaced (same name, old id) is still controllable from that member.
  const orphan=!!session&&!children.some(c=>c.id===session.childId)&&session.childName===child.name;
@@ -228,6 +235,11 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
  const running=session&&session.status==='active'&&session.deadline*1000>now?session:null;
  const mine=running&&(running.childId===child.id||orphan)?running:null;
  const other=running&&running.childId!==child.id&&!orphan?running:null;
+ // One device per member: a running (or starting) timer pins the member to its device.
+ const busyOn=deviceInUse(child.id,family);
+ const inUse=mine?PHONE:family.devices.some(d=>d.id===busyOn)?busyOn:undefined;
+ const target=inUse||(picked&&(picked===PHONE||family.devices.some(d=>d.id===picked&&d.status==='active'))?picked:family.defaultId);
+ const remote=target!==PHONE?family.devices.find(d=>d.id===target):undefined;
  const lock=useRef(false);
  const refresh=()=>setState(getBreakState());
  useEffect(()=>{void syncScreenBreak(isPlus).then(refresh)},[child.id]);
@@ -266,7 +278,7 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
   <EditMemberSheet visible={editing} child={child} children={children} onClose={()=>setEditing(false)} onChanged={onChanged} onRemoved={()=>{setEditing(false);onRemoved()}}/>
   {!screenBreakSupported?<View style={st.card}><Text style={st.body}>Screen Break needs the latest MoodPals build on this iPhone.</Text></View>:<>
    {state&&!state.hasPlus&&!isPlus?<PlanNote state={state} daysLeft={trialDaysLeft} onUpgrade={()=>showPaywall('screenBreak')}/>:null}
-   <DevicePicker devices={family.devices} selected={target} defaultId={family.defaultId} onSelect={setPicked}/>
+   {inUse?null:<DevicePicker devices={family.devices} selected={target} defaultId={family.defaultId} onSelect={setPicked}/>}
    {remote?<RemoteTimer child={child} children={children} device={remote} family={family} minutes={minutes} setMinutes={setMinutes} onOpen={onOpen} onPlan={()=>showPaywall('screenBreak')}/>:mine?<View style={[st.card,{alignItems:'center'}]}>
     <Text style={st.kicker}>Screen time left</Text>
     <Text style={st.timer} accessibilityRole="timer">{countdown(mine.deadline*1000-now)}</Text>

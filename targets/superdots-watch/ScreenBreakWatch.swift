@@ -330,6 +330,7 @@ private struct LockPage: View {
 /// Timer → choose the member the time is for.
 struct WatchFamilyView: View {
     @ObservedObject private var store = WatchScreenBreakStore.shared
+    @ObservedObject private var devices = WatchFamilyDevicesStore.shared
 
     var body: some View {
         List {
@@ -342,7 +343,9 @@ struct WatchFamilyView: View {
                 NavigationLink(value: child) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(child.name).font(.headline)
-                        if let session = store.session, session.isRunning {
+                        if let device = devices.device(usedBy: child.id) {
+                            Text("Timer running on \(device.name)").font(.caption2).foregroundStyle(BreakStyle.green)
+                        } else if let session = store.session, session.isRunning {
                             Text(session.childId == child.id ? "Timer running" : "Timer running for \(session.childName)")
                                 .font(.caption2).foregroundStyle(BreakStyle.green)
                         }
@@ -607,12 +610,14 @@ struct ScreenBreakControlView: View {
         Group {
             if justEnded {
                 BreakEndedView()
-            } else if !chosen && !devices.devices.isEmpty && mine == nil {
+            } else if let session = mine {
+                ActiveBreakView(session: session) { managing = true }
+            } else if let device = devices.device(usedBy: child.id) {
+                RemoteBreakView(child: child, device: device)
+            } else if !chosen && !devices.devices.isEmpty {
                 DeviceChoiceList { chosen = true }
             } else if let device = devices.selected {
                 RemoteBreakView(child: child, device: device)
-            } else if let session = mine {
-                ActiveBreakView(session: session) { managing = true }
             } else if let other {
                 VStack(spacing: 8) {
                     Text("A timer is running for \(other.childName).").font(.footnote).multilineTextAlignment(.center)
@@ -647,7 +652,8 @@ struct ScreenBreakControlView: View {
         }
         .onAppear { minutes = min(180, max(5, (lastMinutes / 5) * 5)) }
         .onChange(of: mine == nil) { _, gone in if gone { managing = false } }
-        .toolbar { ToolbarItem(placement: .topBarTrailing) { if chosen || mine != nil { BreakDeviceButton() } } }
+        // A member's running timer stays on its device, so there is nothing to switch.
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { if chosen && mine == nil && devices.device(usedBy: child.id) == nil { BreakDeviceButton() } } }
         .task { await store.refresh() }
         .task { await devices.load() }
     }
