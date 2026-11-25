@@ -135,7 +135,7 @@ function DeviceDetail({device,isDefault}:{device:FamilyDevice;isDefault:boolean}
   if(!await authenticateGuardian('Remove '+device.name))throw Error('Confirm with Face ID or your passcode to remove a device.');
   await deviceCommand(device.id,'UNLINK_DEVICE');
  })}]);
- const forceRemove=()=>Alert.alert('Remove now?','Use this if the device is lost or offline. Enter the recovery code on it to lift its pauses.',[{text:'Cancel',style:'cancel'},{text:'Remove now',style:'destructive',onPress:()=>void act(async()=>{
+ const forceRemove=()=>Alert.alert('Remove now?','Use this if the device is lost or offline. Write down its recovery code first: '+device.recovery_code+'. Enter it on the device under Parent recovery to lift its pauses.',[{text:'Cancel',style:'cancel'},{text:'Remove now',style:'destructive',onPress:()=>void act(async()=>{
   if(!await authenticateGuardian('Remove '+device.name))throw Error('Confirm with Face ID or your passcode to remove a device.');
   await rpc('family_device_remove',{p_device:device.id});
  })}]);
