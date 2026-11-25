@@ -1,6 +1,9 @@
 -- One device per member: a member can't start a timer on a family device while their timer runs
--- (or is starting) on this iPhone or another family device. Same function as 20261209 plus that check.
-create or replace function public.family_device_command(p_device uuid, p_type text, p_minutes int default null, p_child uuid default null)
+-- (or is starting) on this iPhone or another family device. Starting on a device another member is
+-- using takes p_replace (the parent confirmed): it queues END_SESSION for that member, then the start.
+-- Same function as 20261209 plus those two changes.
+drop function if exists public.family_device_command(uuid, text, int, uuid);
+create or replace function public.family_device_command(p_device uuid, p_type text, p_minutes int default null, p_child uuid default null, p_replace boolean default false)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
   me uuid := (select auth.uid());
@@ -41,12 +44,12 @@ begin
     if p_minutes is null or p_minutes not between 1 and 720 then
       raise exception 'Choose between 1 minute and 12 hours.' using errcode = '22023';
     end if;
-    if v_session.id is not null then
+    if v_session.id is not null and not coalesce(p_replace, false) then
       select c.name into v_who from public.family_children c where c.id = v_session.child_id;
       raise exception '% is using % (% min left). Add time or end that session first.', coalesce(v_who, 'Someone'), d.name,
         greatest(1, ceil(extract(epoch from v_session.deadline_at - now()) / 60)::int) using errcode = 'P0001';
     end if;
-    if v_start.id is not null then
+    if v_start.id is not null and not coalesce(p_replace, false) then
       raise exception 'Screen time is already starting on %.', d.name using errcode = 'P0001';
     end if;
     -- One device per member: the member's timer (on this iPhone or another family device) must end first.
@@ -64,6 +67,17 @@ begin
     if v_where is not null then
       select c.name into v_who from public.family_children c where c.id = p_child;
       raise exception '% already has screen time on %. End it there first.', coalesce(v_who, 'This member'), v_where using errcode = 'P0001';
+    end if;
+    if coalesce(p_replace, false) then
+      if v_start.id is not null then
+        update public.family_device_commands set status = 'canceled' where id = v_start.id;
+      end if;
+      -- The device applies commands in seq order: the other member's session ends, then this one starts.
+      if v_session.id is not null then
+        update public.family_devices set last_seq = last_seq + 1, updated_at = now() where id = d.id returning last_seq into v_seq;
+        insert into public.family_device_commands(owner_id, device_id, child_id, session_id, seq, type, minutes, expires_at)
+          values (me, d.id, v_session.child_id, v_session.id, v_seq, 'END_SESSION', null, now() + v_ttl);
+      end if;
     end if;
     v_child := p_child;
     v_sid := gen_random_uuid();
@@ -109,5 +123,5 @@ begin
   perform public.family_device_wake(d.id);
   return to_jsonb(v_cmd);
 end $$;
-revoke all on function public.family_device_command(uuid, text, int, uuid) from public, anon;
-grant execute on function public.family_device_command(uuid, text, int, uuid) to authenticated;
+revoke all on function public.family_device_command(uuid, text, int, uuid, boolean) from public, anon;
+grant execute on function public.family_device_command(uuid, text, int, uuid, boolean) to authenticated;

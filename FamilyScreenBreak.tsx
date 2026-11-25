@@ -187,6 +187,11 @@ function deviceInUse(childId:string,family:{sessions:RemoteSession[];commands:De
   ||family.commands.find(c=>c.type==='START_SESSION'&&(c.status==='pending'||c.status==='delivered')&&c.child_id===childId)?.device_id;
 }
 
+/** Starting for a member on a device someone else is using ends that timer; one tap to confirm. */
+function confirmReplace(name:string,start:()=>void){
+ Alert.alert(name+"'s timer is running",'Starting ends it.',[{text:'Cancel',style:'cancel'},{text:'Start',onPress:start}]);
+}
+
 function ActiveBadge({childId,remote}:{childId:string;remote?:RemoteSession}){
  const [state]=useBreakState();
  const s=state?.session;
@@ -244,11 +249,11 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
  const refresh=()=>setState(getBreakState());
  useEffect(()=>{void syncScreenBreak(isPlus).then(refresh)},[child.id]);
 
- function run(action:BreakAction,extra:{minutes?:number}={}){
+ function run(action:BreakAction,extra:{minutes?:number;replace?:boolean}={}){
   if(lock.current)return;
   lock.current=true;setBusy(action);setError('');
   try{
-   const reply=sendBreakCommand(action,{childId:child.id,minutes:extra.minutes,session:action==='start'?undefined:mine||undefined});
+   const reply=sendBreakCommand(action,{childId:child.id,minutes:extra.minutes,replace:extra.replace,session:action==='start'?undefined:mine||undefined});
    if(reply.state)setState(reply.state);
    if(!reply.ok){
     if(reply.code==='plus')showPaywall('screenBreak');
@@ -301,7 +306,7 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
     <Text style={st.heading}>Screen Break</Text>
     {other?<View style={[st.setupDone,{flexDirection:'column',alignItems:'stretch',gap:10,paddingVertical:14}]}>
      <Text style={[st.body,{textAlign:'center'}]}>A timer is running for {other.childName} · {Math.max(1,Math.ceil((other.deadline*1000-now)/60000))} min left</Text>
-     {children.some(c=>c.id===other.childId)&&onOpen?<TouchableOpacity accessibilityRole="button" onPress={()=>onOpen(other.childId)} style={st.cta}><Text style={st.ctaText}>Go to {other.childName}</Text></TouchableOpacity>:null}
+     {children.some(c=>c.id===other.childId)&&onOpen?<TouchableOpacity accessibilityRole="button" onPress={()=>onOpen(other.childId)}><Text style={[st.link,{textAlign:'center'}]}>Go to {other.childName}</Text></TouchableOpacity>:null}
     </View>:null}
     {!state?.authorized?<View style={{gap:10}}>
      <Text style={st.kicker}>Step 1 of 2</Text>
@@ -318,10 +323,10 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
      <Text style={[st.body,{flex:1}]}>Setup complete · {state.selectionCount} to pause</Text>
      <Text style={st.link}>Edit apps</Text>
     </TouchableOpacity>}
-    {ready&&!other?<>
+    {ready?<>
     <Text style={[st.rowTitle,{marginTop:8,textAlign:'center'}]}>How long can {child.name} use the phone?</Text>
     <DurationRing minutes={minutes} onChange={setMinutes} min={5} max={180}/>
-    <TouchableOpacity accessibilityRole="button" disabled={!ready||!validMinutes||!!busy||!!other} onPress={()=>{void AsyncStorage.setItem(LAST_MINUTES_KEY,String(chosen));run('start',{minutes:chosen})}} style={[st.cta,(!ready||!validMinutes||!!busy||!!other)&&{opacity:0.5}]}><Text style={st.ctaText}>Start</Text></TouchableOpacity>
+    <TouchableOpacity accessibilityRole="button" disabled={!ready||!validMinutes||!!busy} onPress={()=>{const go=()=>{void AsyncStorage.setItem(LAST_MINUTES_KEY,String(chosen));run('start',{minutes:chosen,replace:!!other})};other?confirmReplace(other.childName,go):go()}} style={[st.cta,(!ready||!validMinutes||!!busy)&&{opacity:0.5}]}><Text style={st.ctaText}>Start</Text></TouchableOpacity>
     <Text style={[st.sub,{textAlign:'center'}]}>Your Apple Watch reminds you 5 minutes before and lets you manage it.</Text>
     </>:null}
     {state?.entitlementKnown&&!state.allowed&&!state.hasPlus&&!isPlus&&!other?<TouchableOpacity accessibilityRole="button" accessibilityLabel="Free trial ended. See MoodPals Plus" onPress={()=>showPaywall('screenBreak')} style={st.gate}>
@@ -346,7 +351,7 @@ function RemoteTimer({child,children,device,family,minutes,setMinutes,onOpen,onP
  const status=deviceStatus(device,family.commands,family.sessions,now);
  const failed=family.commands.find(c=>c.device_id===device.id&&(c.status==='rejected'||c.status==='expired')&&now-Date.parse(c.updated_at||c.created_at)<120000);
  const who=(id:string)=>children.find(c=>c.id===id)?.name||'Someone';
- const act=async(type:string,opts:{minutes?:number;child?:string}={})=>{
+ const act=async(type:string,opts:{minutes?:number;child?:string;replace?:boolean}={})=>{
   setBusy(true);setError('');
   try{await deviceCommand(device.id,type,opts);void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(()=>{})}
   catch(e:any){if(/trial|Plus/i.test(e.message))onPlan();setError(e.message)}
@@ -369,16 +374,12 @@ function RemoteTimer({child,children,device,family,minutes,setMinutes,onOpen,onP
    <Text style={[st.heading,{flex:1}]} numberOfLines={1}>{device.name}</Text>
    <Text style={[st.sub,{color:status.tone==='warn'?'#B7791F':T.primary,fontWeight:'800'}]}>{status.label}</Text>
   </View>
-  {session?<>
-   {session.child_id===child.id?<View style={{alignItems:'center',gap:4}}>
+  {session&&session.child_id===child.id?<>
+   <View style={{alignItems:'center',gap:4}}>
     <Text style={st.kicker}>Screen time left</Text>
     <Text style={st.timer} accessibilityRole="timer">{countdown(Date.parse(session.deadline_at)-now)}</Text>
     <Text style={st.sub}>Ends at {clock(Date.parse(session.deadline_at)/1000)} · {formatDuration(session.granted_seconds)} granted</Text>
-   </View>:<View style={[st.setupDone,{flexDirection:'column',alignItems:'stretch',gap:6,paddingVertical:14}]}>
-    <Text style={[st.body,{textAlign:'center'}]}>{who(session.child_id)} is using {device.name} · {Math.max(1,Math.ceil((Date.parse(session.deadline_at)-now)/60000))} min left</Text>
-    <Text style={[st.sub,{textAlign:'center'}]}>Add time or end that session before starting one for {child.name}, or pick another device.</Text>
-    {onOpen&&children.some(c=>c.id===session.child_id)?<TouchableOpacity accessibilityRole="button" onPress={()=>onOpen(session.child_id)}><Text style={[st.link,{textAlign:'center'}]}>Go to {who(session.child_id)}</Text></TouchableOpacity>:null}
-   </View>}
+   </View>
    <TouchableOpacity accessibilityRole="button" disabled={busy||!!status.pending} onPress={()=>{setExtra(15);setAdding(true)}} style={[st.cta,(busy||!!status.pending)&&{opacity:.5}]}><Text style={st.ctaText}>Add Time</Text></TouchableOpacity>
    <TouchableOpacity accessibilityRole="button" disabled={busy||!!status.pending} onPress={()=>void act('END_SESSION')} style={[st.ghost,(busy||!!status.pending)&&{opacity:.5}]}><Text style={[st.ghostText,{color:red}]}>End Now</Text></TouchableOpacity>
    {extendSheet}
@@ -387,9 +388,10 @@ function RemoteTimer({child,children,device,family,minutes,setMinutes,onOpen,onP
    <Text style={[st.body,{textAlign:'center'}]}>{status.label==='Waiting for device connection'?'Waiting for '+device.name+' to connect…':'Starting '+(pendingStart.minutes||0)+' min for '+who(pendingStart.child_id||'')+'…'}</Text>
    <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>{setBusy(true);void cancelDeviceCommand(pendingStart.id).catch(e=>setError(e.message)).finally(()=>setBusy(false))}} style={[st.ghost,{alignSelf:'stretch'}]}><Text style={st.ghostText}>Cancel</Text></TouchableOpacity>
   </View>:device.auth_status!=='approved'||!device.selection_count?<Text style={st.body}>Finish setup on {device.name}: allow Screen Time and choose the apps to pause.</Text>:<>
+   {session?<Text style={[st.sub,{textAlign:'center'}]}>{who(session.child_id)} is using {device.name} · {Math.max(1,Math.ceil((Date.parse(session.deadline_at)-now)/60000))} min left</Text>:null}
    <Text style={[st.rowTitle,{marginTop:4,textAlign:'center'}]}>How long can {child.name} use {device.name}?</Text>
    <DurationRing minutes={minutes} onChange={setMinutes} min={5} max={180}/>
-   <TouchableOpacity accessibilityRole="button" disabled={busy||!!status.pending} onPress={()=>{void AsyncStorage.setItem(LAST_MINUTES_KEY,String(minutes));void act('START_SESSION',{minutes,child:child.id})}} style={[st.cta,(busy||!!status.pending)&&{opacity:.5}]}>{busy?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>Start</Text>}</TouchableOpacity>
+   <TouchableOpacity accessibilityRole="button" disabled={busy||!!status.pending} onPress={()=>{const go=()=>{void AsyncStorage.setItem(LAST_MINUTES_KEY,String(minutes));void act('START_SESSION',{minutes,child:child.id,replace:!!session})};session?confirmReplace(who(session.child_id),go):go()}} style={[st.cta,(busy||!!status.pending)&&{opacity:.5}]}>{busy?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>Start</Text>}</TouchableOpacity>
   </>}
   {status.pending&&!pendingStart?<Text style={[st.sub,{textAlign:'center'}]}>{status.label}…</Text>:null}
   {failed?<Text style={[st.sub,{color:red,textAlign:'center'}]}>{failed.error||'The device couldn’t do that.'}</Text>:null}

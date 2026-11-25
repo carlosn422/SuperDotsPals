@@ -55,11 +55,12 @@ export function onBreakState(listener:(state:BreakState)=>void){return native?na
 const newId=()=>'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&3|8)).toString(16)});
 
 // Every tap gets a fresh command id; commands on a session carry the version the parent saw.
-export function sendBreakCommand(action:BreakAction,opts:{childId?:string;minutes?:number;session?:BreakSession}={}):BreakReply{
+export function sendBreakCommand(action:BreakAction,opts:{childId?:string;minutes?:number;session?:BreakSession;replace?:boolean}={}):BreakReply{
  if(!native)return {ok:false,error:'Screen Break needs the latest MoodPals build.',code:'unsupported',commandId:'',state:null as unknown as BreakState};
  const cmd:Record<string,unknown>={action,commandId:newId()};
  if(opts.childId)cmd.childId=opts.childId;
  if(opts.minutes)cmd.minutes=opts.minutes;
+ if(opts.replace)cmd.replace=true;
  if(opts.session){cmd.sessionId=opts.session.id;cmd.expectedVersion=opts.session.version}
  return native.command(cmd);
 }

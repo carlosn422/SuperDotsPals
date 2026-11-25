@@ -51,7 +51,7 @@ async function rpc(name:string,args:Record<string,unknown>){
  familyDevicesChanged();
  return data;
 }
-export const deviceCommand=(device:string,type:string,opts:{minutes?:number;child?:string}={})=>rpc('family_device_command',{p_device:device,p_type:type,p_minutes:opts.minutes??null,p_child:opts.child??null});
+export const deviceCommand=(device:string,type:string,opts:{minutes?:number;child?:string;replace?:boolean}={})=>rpc('family_device_command',{p_device:device,p_type:type,p_minutes:opts.minutes??null,p_child:opts.child??null,...(opts.replace?{p_replace:true}:{})});
 export const cancelDeviceCommand=(command:string)=>rpc('family_device_cancel_command',{p_command:command});
 
 export function lastSeen(d:FamilyDevice,now=Date.now()){

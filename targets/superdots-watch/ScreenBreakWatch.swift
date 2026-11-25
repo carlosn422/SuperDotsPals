@@ -107,10 +107,11 @@ final class WatchScreenBreakStore: ObservableObject {
     }
 
     @discardableResult
-    func command(_ action: String, childId: String? = nil, minutes: Int? = nil) async -> Bool {
+    func command(_ action: String, childId: String? = nil, minutes: Int? = nil, replace: Bool = false) async -> Bool {
         guard pending == nil else { return false }
         var command: [String: Any] = ["action": action, "commandId": UUID().uuidString]
         if let childId { command["childId"] = childId }
+        if replace { command["replace"] = true }
         if let minutes { command["minutes"] = minutes }
         // Commands on a session carry the version the parent saw, so a stale tap can't change a newer session.
         if !["start", "lock", "unlock"].contains(action), let session {
@@ -593,6 +594,7 @@ struct ScreenBreakControlView: View {
     @State private var leaving = false
     /// With family devices linked, the device list comes right after the child: child → device → Start.
     @State private var chosen = false
+    @State private var replacing = false
     @Environment(\.dismiss) private var dismiss
 
     private var mine: WatchBreakSession? {
@@ -618,11 +620,6 @@ struct ScreenBreakControlView: View {
                 DeviceChoiceList { chosen = true }
             } else if let device = devices.selected {
                 RemoteBreakView(child: child, device: device)
-            } else if let other {
-                VStack(spacing: 8) {
-                    Text("A timer is running for \(other.childName).").font(.footnote).multilineTextAlignment(.center)
-                    Button("Go to \(other.childName)") { dismiss() }.buttonStyle(BreakButtonStyle(kind: .primary))
-                }
             } else if !store.authorized || store.selectionCount == 0 {
                 note("Finish Screen Break setup in MoodPals on your iPhone.")
             } else if !store.allowed {
@@ -638,7 +635,7 @@ struct ScreenBreakControlView: View {
                         Spacer()
                         HStack(spacing: 8) {
                             BreakMemberName(name: child.name)
-                            BreakCornerButton(systemImage: "play.fill", color: BreakStyle.green, busy: store.pending == "start", label: "Start for \(child.name)") { start() }
+                            BreakCornerButton(systemImage: "play.fill", color: BreakStyle.green, busy: store.pending == "start", label: "Start for \(child.name)") { if other != nil { replacing = true } else { start() } }
                                 .disabled(store.pending != nil)
                         }
                     }
@@ -650,6 +647,10 @@ struct ScreenBreakControlView: View {
         .navigationDestination(isPresented: $managing) {
             ManageBreakView(child: child, close: { managing = false }, ended: finishEnd)
         }
+        .confirmationDialog("\(other?.childName ?? "Someone")'s timer is running", isPresented: $replacing, titleVisibility: .visible) {
+            Button("Start") { start(replace: true) }
+            Button("Cancel", role: .cancel) {}
+        } message: { Text("Starting ends it.") }
         .onAppear { minutes = min(180, max(5, (lastMinutes / 5) * 5)) }
         .onChange(of: mine == nil) { _, gone in if gone { managing = false } }
         // A member's running timer stays on its device, so there is nothing to switch.
@@ -667,10 +668,10 @@ struct ScreenBreakControlView: View {
         }
     }
 
-    private func start() {
+    private func start(replace: Bool = false) {
         let chosen = minutes
         Task { @MainActor in
-            if await store.command("start", childId: child.id, minutes: chosen) {
+            if await store.command("start", childId: child.id, minutes: chosen, replace: replace) {
                 lastMinutes = chosen
                 withAnimation(.easeOut(duration: 0.25)) { leaving = true }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { store.navReset += 1 }

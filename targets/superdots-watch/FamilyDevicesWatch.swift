@@ -49,8 +49,9 @@ final class WatchFamilyDevicesStore: ObservableObject {
         sessions.first { $0.deviceId == device && $0.deadline > Date() }
     }
 
+    /// The latest pending command (a confirmed start queues END_SESSION, then START_SESSION).
     func pending(on device: String) -> WatchDeviceCommand? {
-        pending.first { $0.deviceId == device }
+        pending.last { $0.deviceId == device }
     }
 
     /// One device per member: the family device this member's timer runs (or is starting) on.
@@ -100,7 +101,7 @@ final class WatchFamilyDevicesStore: ObservableObject {
     }
 
     @discardableResult
-    func command(_ type: String, device: String, minutes: Int? = nil, child: String? = nil) async -> Bool {
+    func command(_ type: String, device: String, minutes: Int? = nil, child: String? = nil, replace: Bool = false) async -> Bool {
         guard !busy else { return false }
         busy = true
         error = nil
@@ -108,6 +109,7 @@ final class WatchFamilyDevicesStore: ObservableObject {
         var params: [String: Any] = ["p_device": device, "p_type": type]
         if let minutes { params["p_minutes"] = minutes }
         if let child { params["p_child"] = child }
+        if replace { params["p_replace"] = true }
         do {
             _ = try await WatchThemeSync.shared.rpc("family_device_command", params)
             WKInterfaceDeviceHaptic.play(.click)
@@ -280,8 +282,16 @@ struct RemoteBreakView: View {
     @ObservedObject private var phone = WatchScreenBreakStore.shared
     @AppStorage("screenBreak.lastMinutes") private var lastMinutes = 30
     @State private var minutes = 30
+    @State private var replacing = false
 
     private func name(_ id: String?) -> String { phone.children.first { $0.id == id }?.name ?? "Someone" }
+
+    private func start(replace: Bool = false) {
+        let chosen = minutes
+        Task {
+            if await store.command("START_SESSION", device: device.id, minutes: chosen, child: child.id, replace: replace) { lastMinutes = chosen }
+        }
+    }
 
     var body: some View {
         Group {
@@ -294,10 +304,10 @@ struct RemoteBreakView: View {
                         Button("Cancel") { Task { await store.cancel(command) } }.buttonStyle(BreakButtonStyle(kind: .secondary, compact: true))
                     }
                 }
-            } else if let session = store.session(on: device.id) {
+            } else if let session = store.session(on: device.id), session.childId == child.id {
                 ScrollView {
                     VStack(spacing: 8) {
-                        Text(session.childId == child.id ? child.name : "\(name(session.childId)) is using \(device.name)")
+                        Text(child.name)
                             .font(.footnote).multilineTextAlignment(.center)
                         Text(timerInterval: Date()...max(Date(), session.deadline), countsDown: true)
                             .font(.system(size: 30, weight: .bold, design: .rounded)).monospacedDigit()
@@ -322,10 +332,7 @@ struct RemoteBreakView: View {
                         HStack(spacing: 8) {
                             BreakMemberName(name: child.name)
                             BreakCornerButton(systemImage: "play.fill", color: BreakStyle.green, busy: store.busy, label: "Start for \(child.name) on \(device.name)") {
-                                let chosen = minutes
-                                Task {
-                                    if await store.command("START_SESSION", device: device.id, minutes: chosen, child: child.id) { lastMinutes = chosen }
-                                }
+                                if store.session(on: device.id) != nil { replacing = true } else { start() }
                             }
                             .disabled(store.busy)
                         }
@@ -333,6 +340,10 @@ struct RemoteBreakView: View {
                 }
             }
         }
+        .confirmationDialog("\(name(store.session(on: device.id)?.childId))'s timer is running", isPresented: $replacing, titleVisibility: .visible) {
+            Button("Start") { start(replace: true) }
+            Button("Cancel", role: .cancel) {}
+        } message: { Text("Starting ends it.") }
         .onAppear { minutes = min(180, max(5, (lastMinutes / 5) * 5)) }
         .task {
             // The device acknowledges within seconds when online; poll while this screen is open.
