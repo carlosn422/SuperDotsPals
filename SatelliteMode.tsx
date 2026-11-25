@@ -206,7 +206,7 @@ function Status({ok,label}:{ok:boolean;label:string}){
 const st=StyleSheet.create({
  page:{flex:1,backgroundColor:T.background},
  body:{paddingVertical:24,gap:18,flexGrow:1,justifyContent:'center'},
- logo:{height:30,width:30*607/97,alignSelf:'center'},
+ logo:{height:60,width:60*3,alignSelf:'center'},
  stack:{gap:14},
  title:{fontSize:28,fontWeight:'900',color:T.ink,textAlign:'center'},
  sub:{fontSize:15,lineHeight:21,color:T.muted,textAlign:'center'},
