@@ -61,7 +61,9 @@ export default function AuthScreen({onLinkDevice}:{onLinkDevice?:()=>void}={}){
    }
   }catch(e:any){setMessage(e.message || 'Something went wrong. Please try again.');}finally{setLoading(false);}
  }
- if(mode==='welcome')return <View style={s.welcomePage}>
+ // An iPad is only ever a family device: its welcome offers linking, never an account.
+ const linkOnly=Platform.OS==='ios'&&Platform.isPad&&!!onLinkDevice;
+ if(mode==='welcome'||linkOnly)return <View style={s.welcomePage}>
   <View style={s.welcomeBrand}>
    <View style={s.welcomeWordmark}><Svg width={34} height={40} viewBox="0 0 34 40"><Path d="M 20 13 L 7 2" stroke="#F59FCF" strokeWidth="7" strokeLinecap="round"/><Path d="M 14 25 L 3 29" stroke="#83B6FF" strokeWidth="7" strokeLinecap="round"/></Svg><Text style={s.welcomeLogo}>Mood<Text style={s.logoMint}>Pals</Text></Text><Svg width={36} height={40} viewBox="0 0 36 40"><Path d="M 7 14 L 23 2" stroke="#FFD15D" strokeWidth="7" strokeLinecap="round"/><Path d="M 16 28 L 32 23" stroke="#FFB86B" strokeWidth="7" strokeLinecap="round"/></Svg></View>
    <Text style={s.welcomeTagline}>A kinder you,{'\n'}brighter days. 🌈</Text>
@@ -71,11 +73,14 @@ export default function AuthScreen({onLinkDevice}:{onLinkDevice?:()=>void}={}){
     style={{width:'100%',height:'100%'}} resizeMode="contain"
     accessibilityLabel="Purple and mint MoodPals smiling together"/>
   </View>
-  <View style={s.welcomeActions}>
+  {linkOnly?<View style={s.welcomeActions}>
+   <TouchableOpacity accessibilityRole="button" onPress={onLinkDevice} style={s.welcomePrimary}><Text style={s.welcomePrimaryText}>Link as a Family Device</Text></TouchableOpacity>
+   <Text style={s.linkNote}>Then enter the code on your iPhone in MoodPals › Family › Family Devices › Add Device.</Text>
+  </View>:<View style={s.welcomeActions}>
    <TouchableOpacity accessibilityRole="button" onPress={()=>void startAsGuest()} disabled={loading} style={[s.welcomePrimary,loading&&{opacity:.7}]}>{loading?<ActivityIndicator color="white"/>:<Text style={s.welcomePrimaryText}>Get Started</Text>}</TouchableOpacity>
    <TouchableOpacity accessibilityRole="button" onPress={()=>setMode('signin')} style={s.welcomeSecondary}><Text style={s.welcomeSecondaryText}>Already have an account?</Text></TouchableOpacity>
    {onLinkDevice?<TouchableOpacity accessibilityRole="button" onPress={onLinkDevice} style={s.secondaryAction}><Text style={s.link}>Link as a Family Device</Text></TouchableOpacity>:null}
-  </View>
+  </View>}
  </View>;
  return <KeyboardAvoidingView style={s.page} behavior={Platform.OS==='ios'?'padding':undefined}>
   <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -112,6 +117,7 @@ const s=StyleSheet.create({
  welcomeBrand:{alignItems:'center',gap:22,marginTop:14},
  welcomeWordmark:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5},
  welcomeLogo:{fontSize:39,fontWeight:'900',letterSpacing:-2,color:'#32217D'},
+ linkNote:{fontSize:15,lineHeight:21,color:'#7260A6',textAlign:'center',marginTop:12},
  welcomeTagline:{fontSize:21,fontWeight:'700',lineHeight:28,color:'#7260A6',textAlign:'center'},
  welcomeArt:{flex:1,minHeight:260,alignItems:'center',justifyContent:'center',overflow:'hidden'},
  welcomeGlowLeft:{position:'absolute',width:230,height:230,borderRadius:115,backgroundColor:'#F4E8FF',left:-105,top:'23%'},
