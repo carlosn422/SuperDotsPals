@@ -247,7 +247,8 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
  // One device per member: a running (or starting) timer pins the member to its device.
  const busyOn=deviceInUse(child.id,family);
  const inUse=mine?PHONE:family.devices.some(d=>d.id===busyOn)?busyOn:undefined;
- const target=inUse||(picked&&(picked===PHONE||family.devices.some(d=>d.id===picked&&d.status==='active'))?picked:family.defaultId);
+ const usable=(id:string)=>id===PHONE||family.devices.some(d=>d.id===id&&d.status==='active');
+ const target=inUse||(picked&&usable(picked)?picked:usable(family.defaultId)?family.defaultId:PHONE);
  const remote=target!==PHONE?family.devices.find(d=>d.id===target):undefined;
  const t=Date.now(),nameOf=(id:string)=>children.find(c=>c.id===id)?.name||'Someone';
  const deviceOptions=[{id:PHONE,name:'This iPhone',busy:other?other.childName+' · '+minLeft(other.deadline*1000-t):undefined},
