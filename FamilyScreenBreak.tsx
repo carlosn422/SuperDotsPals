@@ -785,7 +785,7 @@ function InsightsScreen({child,onBack}:{child:FamilyChild;onBack:()=>void}){
    {stats.hasData?<SessionLineChart period={period} buckets={stats.buckets}/>:<Text style={st.body}>No Screen Break sessions for {child.name} in this period.</Text>}
    {stats.highest&&period!=='day'?<Text style={st.sub}>Longest: {period==='week'?stats.highest.start.toLocaleDateString(undefined,{weekday:'long'}):period==='month'?'Week '+stats.highest.label.replace('Wk ',''):stats.highest.start.toLocaleDateString(undefined,{month:'long'})} · {formatDuration(stats.highest.seconds)}</Text>:null}
   </View>
-  {device==='all'&&family.devices.length>0&&byDevice.length>0?<View style={st.card}>
+  {device==='all'&&(family.devices.length>0||byDevice.some(d=>d.key!==PHONE))&&byDevice.length>0?<View style={st.card}>
    <Text style={st.kicker}>By device</Text>
    {[...byDevice,{key:'total',name:'Total',seconds:deviceTotal.seconds,sessions:deviceTotal.sessions}].map(d=><View key={d.key} style={[{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},d.key==='total'?{borderTopWidth:1,borderTopColor:T.border,paddingTop:8}:null]}>
     <View style={{flex:1}}><Text style={[st.body,d.key==='total'?{fontWeight:'800'}:null]}>{d.name}</Text><Text style={st.sub}>{d.sessions} session{d.sessions===1?'':'s'}</Text></View>
