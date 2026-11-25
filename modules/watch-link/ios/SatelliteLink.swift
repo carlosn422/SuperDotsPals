@@ -351,6 +351,8 @@ final class SatelliteLink {
     remove("recovery")
     info = ["unlinked": true, "reason": reason]
     engine.setChildren([])
+    // A relinked device goes through app selection again.
+    ScreenBreakShared.defaults.removeObject(forKey: ScreenBreakShared.selectionKey)
   }
 
   // MARK: Networking
