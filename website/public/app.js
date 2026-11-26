@@ -189,7 +189,7 @@ document.querySelectorAll('.loop video').forEach(v => {
   fig.append(btn); sync();
 });
 document.querySelectorAll('.t-show').forEach(show => {
-  const devs = [...show.querySelectorAll('.t-dev')], pans = show.querySelectorAll('.t-panel'), ptr = show.querySelector('.t-pointer');
+  const devs = [...show.querySelectorAll('.t-devs .t-dev')], pans = show.querySelectorAll('.t-panel'), ptr = show.querySelector('.t-pointer');
   let cur = 0, paused = false;
   const narrow = matchMedia('(max-width: 600px)'), car = show.querySelector('.t-carousel');
   const place = () => {
