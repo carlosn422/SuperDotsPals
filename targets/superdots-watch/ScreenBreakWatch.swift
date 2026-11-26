@@ -442,7 +442,7 @@ struct DurationDial: View {
                 Circle()
                     .fill(Color.white)
                     .frame(width: line * 1.5, height: line * 1.5)
-                    .offset(y: -(size - line) / 2)
+                    .offset(y: -size / 2)
                     .rotationEffect(.degrees(360 * fraction))
                 VStack(spacing: 0) {
                     Text("\(prefix)\(minutes)")
