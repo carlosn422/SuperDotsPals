@@ -76,6 +76,7 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
  return <View style={[s.page,{gap:17}]}>
   <StressHero mood={companion} onCheckin={onCheckin} onHealthMood={onHealthMood} corner={isPlus?undefined:<UpgradePill compact/>}/>
   {dayRow}
+  {screenCard}
   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Breathing for Calm. Start a one-minute breathing exercise" onPress={onBreathing} style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#FFFAF2',borderRadius:22,paddingVertical:12,paddingHorizontal:14,borderWidth:1,borderColor:'#EAF3EC'}}>
    <SuperdotMascot id="calm" size={54} animate={false}/>
    <View style={{flex:1,gap:3}}><Text style={{fontWeight:'900',color:'#2E1F5E',fontSize:16}}>Breathing for Calm</Text><Text style={{color:'#8276A5',fontSize:12}}>A one-minute reset with your MoodPal</Text></View>
@@ -95,7 +96,6 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
    </View>
   </View>
   {socialCard}
-  {screenCard}
   <InviteFriendsCard onInvite={onInvite}/>
   <RecoveryInsights companion={companion} onChat={onChat}/>
   <PlusOfferCard onAllPlans={onPlans}/>

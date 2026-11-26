@@ -241,14 +241,27 @@ export function SocialHrvTodayCard({onOpen}:{onOpen:()=>void}){
  if(!socialTrackSupported||!state?.enabled)return null;
  const used=ownerMinutesOn(byDay);
  const flagged=insights.find(i=>!i.learning&&i.delta!==undefined&&i.delta>=8);
- return <TouchableOpacity accessibilityRole="button" onPress={onOpen} style={st.card}>
-  <View style={st.row}><Ionicons name="phone-portrait-outline" size={20} color={T.primary}/><Text style={[st.heading,{flex:1}]}>Screen Time</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></View>
-  <Text style={st.body}>{formatMins(used)} in tracked apps today{state.limitMinutes?` of ${formatMins(state.limitMinutes)}`:''}</Text>
-  {flagged?<View style={st.row}><Text style={st.sub}>Higher stress after:</Text><AppName app={flagged.app}/></View>:<Text style={st.sub}>{insights.some(i=>!i.learning)?'No app stands out for stress right now.':'Still learning your patterns.'}</Text>}
+ const limit=state.limitMinutes||0,p=limit?Math.min(1,used/limit):used?1:0;
+ const color=!limit?'#5B8DEF':used>=limit?'#EE6F86':used>=limit*.75?'#F2A56F':'#34B37E';
+ const label=!limit?'No daily limit':used>=limit?'Limit reached':`${formatMins(Math.max(0,limit-used))} left of ${formatMins(limit)}`;
+ const size=78,sw=9,r=(size-sw)/2,c=2*Math.PI*r;
+ const note=flagged?null:insights.some(i=>!i.learning)?'No app stands out for stress right now.':'Be healthy and manage your screen time.';
+ return <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Screen Time, ${formatMins(used)} today. ${label}`} onPress={onOpen} activeOpacity={0.85} style={st.todayCard}>
+  <View style={{width:size,height:size,alignItems:'center',justifyContent:'center'}}>
+   <Svg width={size} height={size} style={{position:'absolute'}}><Circle cx={size/2} cy={size/2} r={r} stroke={color} strokeOpacity={0.18} strokeWidth={sw} fill="none"/>{p>0?<Circle cx={size/2} cy={size/2} r={r} stroke={color} strokeWidth={sw} fill="none" strokeLinecap="round" strokeDasharray={`${c*p} ${c}`} transform={`rotate(-90 ${size/2} ${size/2})`}/>:null}</Svg>
+   <Ionicons name="phone-portrait" size={28} color={color}/>
+  </View>
+  <View style={{flex:1,gap:4}}>
+   <Text style={{fontSize:19,fontWeight:'800',color:T.ink}}>Screen Time <Text style={{color}}>{formatMins(used)}</Text></Text>
+   <Text style={{fontSize:14,fontWeight:'800',color}}>{label}</Text>
+   {flagged?<View style={st.row}><Text style={st.sub}>Higher stress after:</Text><AppName app={flagged.app}/></View>:<Text style={{fontSize:11,lineHeight:16,color:T.muted}}>{note}</Text>}
+  </View>
+  <Ionicons name="chevron-forward" size={18} color={T.muted}/>
  </TouchableOpacity>;
 }
 
 const st=StyleSheet.create({
+ todayCard:{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#FFFFFF',borderRadius:24,padding:17,shadowColor:'#2D4A3E',shadowOpacity:0.06,shadowRadius:14,shadowOffset:{width:0,height:5},elevation:2},
  title:{fontSize:30,fontWeight:'900',color:T.ink},
  heading:{fontSize:16,fontWeight:'900',color:T.ink},
  rowTitle:{fontSize:15,fontWeight:'800',color:T.ink},
