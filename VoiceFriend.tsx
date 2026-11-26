@@ -170,7 +170,7 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
    }catch(e:any){fail(e?.message||'Could not start the call.')}
   })();
   return()=>{alive=false;clearTimeout(timer);clearTimeout(wrapT);clearInterval(byeT);clearInterval(silT);clearInterval(hangup);
-   if(callId)void supabase.rpc('finish_voice_call',{p_call_id:callId,p_seconds:Math.round((Date.now()-callStart)/1000),p_input_text:use.inText,p_input_audio:use.inAudio,p_output_text:use.outText,p_output_audio:use.outAudio});try{recorder?.clearOnAudioReady();void recorder?.stop()}catch{}try{ws?.close()}catch{}void ctx?.close().catch(()=>{});void AudioManager.setAudioSessionActivity(false).catch(()=>{})};
+   if(callId)void supabase.rpc('finish_voice_call',{p_call_id:callId,p_seconds:Math.round((Date.now()-callStart)/1000),p_input_text:use.inText,p_input_audio:use.inAudio,p_output_text:use.outText,p_output_audio:use.outAudio}).then(()=>{},()=>{});try{recorder?.clearOnAudioReady();void recorder?.stop()}catch{}try{ws?.close()}catch{}void ctx?.close().catch(()=>{});void AudioManager.setAudioSessionActivity(false).catch(()=>{})};
  },[visible]);
 
  async function undo(){if(!saved)return;const id=saved.id;setSaved(null);await supabase.from('wellness_journal').delete().eq('id',id)}
