@@ -13,11 +13,11 @@ export const PLUS_HEALTH_DAYS=30;
 
 export type PlusPlan='monthly'|'annual';
 export type PlusFeature='general'|'trends'|'customization'|'circles'|'reflections'|'family'|'health'|'hydration'|'screenBreak'|'screenTime';
-export type PlusPrice={price:string;period:string;label:string;note?:string};
+export type PlusPrice={price:string;period:string;label:string;note?:string;perMonth?:string};
 
 export const PLUS_PRICES:Record<PlusPlan,PlusPrice>={
  monthly:{price:'$1.99',period:'month',label:'Monthly'},
- annual:{price:'$19.99',period:'year',label:'Yearly',note:'Save 16%'},
+ annual:{price:'$19.99',period:'year',label:'Yearly',note:'Save 16%',perMonth:'$1.67'},
 };
 
 export const FEATURE_COPY:Record<PlusFeature,{title:string;body:string}>={
@@ -97,7 +97,7 @@ export function PlusProvider({children}:{children:React.ReactNode}){
     const save=monthly&&annual&&monthly.product.price>0?Math.round((1-annual.product.price/(monthly.product.price*12))*100):0;
     setPrices({
      monthly:{...PLUS_PRICES.monthly,price:monthly?.product.priceString??PLUS_PRICES.monthly.price},
-     annual:{...PLUS_PRICES.annual,price:annual?.product.priceString??PLUS_PRICES.annual.price,note:save>0?`Save ${save}%`:undefined},
+     annual:{...PLUS_PRICES.annual,price:annual?.product.priceString??PLUS_PRICES.annual.price,note:save>0?`Save ${save}%`:undefined,perMonth:annual?(annual.product.pricePerMonthString??undefined):PLUS_PRICES.annual.perMonth},
     });
    }catch(e:any){
     console.warn('RevenueCat sync failed:',e?.message||e);

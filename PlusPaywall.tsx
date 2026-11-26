@@ -61,10 +61,11 @@ export function PlusPaywallSheet({nested=false}:{nested?:boolean}){
    <Text style={s.title}>{feature.title}</Text>
    <Text style={s.body}>{feature.body}</Text>
    <View style={s.card}>{BENEFITS.map(b=><View key={b.text} style={s.benefit}><View style={s.benefitIcon}><Ionicons name={b.icon} size={17} color={T.primary}/></View><Text style={s.benefitText}>{b.text}</Text></View>)}</View>
-   <View style={{gap:10,alignSelf:'stretch'}}>{(['annual','monthly'] as PlusPlan[]).map(p=>{const x=prices[p],on=plan===p;return <TouchableOpacity key={p} accessibilityRole="radio" accessibilityState={{checked:on}} onPress={()=>setPlan(p)} style={[s.plan,on&&s.planOn]}>
-    <Ionicons name={on?'radio-button-on':'radio-button-off'} size={22} color={on?T.primary:'#B8C4BE'}/>
-    <View style={{flex:1}}><Text style={s.planLabel}>{x.label}</Text><Text style={s.planSub}>{x.price} / {x.period}</Text></View>
-    {x.note?<View style={s.badge}><Text style={s.badgeText}>{x.note}</Text></View>:null}
+   <View style={{gap:10,alignSelf:'stretch'}}>{(['annual','monthly'] as PlusPlan[]).map(p=>{const x=prices[p],on=plan===p,yearly=p==='annual',ribbon=yearly?['Best value',x.note].filter(Boolean).join(' · '):'';const big=yearly?x.perMonth:x.price;return <TouchableOpacity key={p} accessibilityRole="radio" accessibilityState={{checked:on}} accessibilityLabel={`${x.label}, ${x.price} per ${x.period}${ribbon?'. '+ribbon:''}`} onPress={()=>setPlan(p)} style={[s.plan,on&&s.planOn,yearly&&{marginTop:8,paddingTop:19}]}>
+    {ribbon?<View style={s.ribbon}><Text style={s.ribbonText}>{ribbon.toUpperCase()}</Text></View>:null}
+    <Ionicons name={on?'checkmark-circle':'ellipse-outline'} size={24} color={on?T.primary:'#B8C4BE'}/>
+    <View style={{flex:1}}><Text style={s.planLabel}>{x.label}</Text><Text style={s.planSub} numberOfLines={1}>{yearly?`${x.price} / year`:'Billed monthly'}</Text></View>
+    {big?<Text style={s.planPrice}>{big}<Text style={s.planPer}>/mo</Text></Text>:<Text style={s.planPrice}>{x.price}<Text style={s.planPer}>/{x.period==='year'?'yr':'mo'}</Text></Text>}
    </TouchableOpacity>})}</View>
    {guest&&!isPlus?<View style={s.account}>
     <Text style={s.accountTitle}>Create a free account to subscribe</Text>
@@ -138,6 +139,10 @@ const s=StyleSheet.create({
  planLabel:{fontSize:16,fontWeight:'900',color:T.ink},
  planSub:{fontSize:13,color:T.muted,marginTop:2},
  badge:{backgroundColor:T.primary,borderRadius:10,paddingHorizontal:9,paddingVertical:4},
+ ribbon:{position:'absolute',top:-11,left:14,backgroundColor:T.primary,borderRadius:10,paddingHorizontal:9,paddingVertical:4},
+ ribbonText:{color:'#fff',fontSize:10,fontWeight:'900',letterSpacing:0.6},
+ planPrice:{fontSize:19,fontWeight:'900',color:T.ink},
+ planPer:{fontSize:12,fontWeight:'600',color:T.muted},
  badgeText:{color:'#fff',fontSize:11,fontWeight:'900'},
  cta:{alignSelf:'stretch',backgroundColor:T.primary,borderRadius:28,paddingVertical:16,alignItems:'center'},
  ctaText:{color:'#fff',fontSize:16,fontWeight:'900'},
