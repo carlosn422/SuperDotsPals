@@ -12,7 +12,7 @@
 <link rel="icon" href="/img/mascots/disgust.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/styles.css?v=41">
+<link rel="stylesheet" href="/styles.css?v=42">
 </head>
 <body>
 <header class="nav">
@@ -21,19 +21,19 @@
 </header>
 
 <main id="top">
-  <section class="hero t-hero">
+  <section class="hero t-hero t-hero3">
     <div class="sparkles" aria-hidden="true"><i>♥</i><i>♥</i><i>♥</i><i>♥</i><i>♥</i><i>♥</i><i>♥</i></div>
-    <div class="hero-copy">
-      <h1 class="logo"><img src="/img/logo.webp" alt="MoodPals" width="978" height="359"></h1>
-      <p class="tagline">A pal to talk to. A diary that writes itself.</p>
+    <h1 class="logo t-logo-top"><img src="/img/logo.webp" alt="MoodPals" width="978" height="359"></h1>
+    <div class="t-hero-row">
+      <div class="hero-copy"><p class="tagline">A pal to talk to. A diary that writes itself.</p>
       <p class="lead">Call your MoodPal and talk about your day, like you would with a best friend. Your pal listens and saves what matters to your diary. No typing.</p>
       <div class="store-row"><a class="appstore" href="https://apps.apple.com/us/app/moodpals-tracker/id6823441439" target="_blank" rel="noopener" aria-label="Download MoodPals on the App Store"><svg viewBox="0 0 384 512" aria-hidden="true"><path fill="currentColor" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg><span><small>Download on the</small>App Store</span></a></div>
-      <p class="trial-line">Free to download. Talk with your pal on MoodPals Plus.</p>
+      <p class="trial-line">Free to download. Talk with your pal on MoodPals Plus.</p></div>
+      <div class="hero-phone t-held"><div class="phone" data-screen="call" data-slides="call"></div></div>
     </div>
-    <div class="hero-phone"><div class="phone" data-screen="call" data-slides="call"></div></div>
   </section>
 
-  <section class="t-band" id="features"><h2>Everything in one friendly app</h2><span id="diary"></span><div class="t-tiles"><article class="t-tile" id="talk"><img src="/img/store/talk.webp?v=1" alt="Talk to your pal in MoodPals" loading="lazy" width="600" height="1300"><div><span class="kicker green">Talk to your pal</span><h3>A pal who listens. Your diary writes itself.</h3><p>Six friendly voices to call any time. Talk about your day and your pal saves what matters to your diary.</p><a class="spot-link" href="/how-to/talk-with-your-pal">See how →</a></div></article><article class="t-tile" id="screen-time"><img src="/img/store/screen-time.webp?v=1" alt="Screen Time in MoodPals" loading="lazy" width="600" height="1300"><div><span class="kicker green">Screen Time</span><h3>Your app time, next to your stress.</h3><p>See which apps take your time, set one daily limit and take short breaks.</p><a class="spot-link" href="/how-to/screen-time">See how →</a></div></article><article class="t-tile" id="family"><img src="/img/store/family.webp?v=1" alt="Family devices in MoodPals" loading="lazy" width="600" height="1300"><div><span class="kicker lilac">Family devices</span><h3>Run your kids' screen time from your wrist.</h3><p>Link a family iPad, start a timer for your child, and lock apps from Apple Watch.</p><a class="spot-link" href="/how-to/family-devices">See how →</a></div></article><article class="t-tile" id="health"><img src="/img/store/health.webp?v=1" alt="Health in MoodPals" loading="lazy" width="600" height="1300"><div><span class="kicker pink">Health</span><h3>Stress, sleep and recovery in one place.</h3><p>A daily stress score from your Apple Watch HRV, plus sleep, fitness and water.</p><a class="spot-link" href="/how-to/health">See how →</a></div></article></div></section>
+  <section class="t-band" id="features"><h2>Everything in one friendly app</h2><span id="diary"></span><div class="t-show"><div class="t-devs"><button type="button" class="t-dev t-ph" id="talk" data-i="0" aria-pressed="true" aria-label="Talk to your pal"><span class="t-frame"><img src="/img/screens/call.webp?v=1" alt="" loading="lazy"></span></button><button type="button" class="t-dev t-ph" id="screen-time" data-i="1" aria-pressed="false" aria-label="Screen Time"><span class="t-frame"><img src="/img/screens/screentime.webp?v=1" alt="" loading="lazy"></span></button><button type="button" class="t-dev t-tb" id="family" data-i="2" aria-pressed="false" aria-label="Family devices"><span class="t-frame"><img src="/img/screens/ipad-family.webp?v=1" alt="" loading="lazy"></span></button><button type="button" class="t-dev t-ph" id="health" data-i="3" aria-pressed="false" aria-label="Health"><span class="t-frame"><img src="/img/screens/today.png?v=1" alt="" loading="lazy"></span></button></div><svg class="t-pointer" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2v17l4.5-4.2 3 6.7 3-1.4-3-6.6H20z" fill="#fff" stroke="#2b1e45" stroke-width="1.6" stroke-linejoin="round"/></svg><div class="t-panels" aria-live="polite"><div class="t-panel on" data-i="0"><span class="kicker green">Talk to your pal</span><h3>A pal who listens. Your diary writes itself.</h3><p>Call one of six friendly pals and talk about your day. Your pal saves what matters to your diary. No typing.</p><a class="spot-link" href="/how-to/talk-with-your-pal">See how →</a></div><div class="t-panel" data-i="1"><span class="kicker green">Screen Time</span><h3>Your app time, next to your stress.</h3><p>See which apps take your time, set one daily limit and take short breaks.</p><a class="spot-link" href="/how-to/screen-time">See how →</a></div><div class="t-panel" data-i="2"><span class="kicker lilac">Family devices</span><h3>Manage screen time on iPads too.</h3><p>Link a family iPad. Start a timer for your child and lock its apps from your iPhone or Apple Watch.</p><a class="spot-link" href="/how-to/family-devices">See how →</a></div><div class="t-panel" data-i="3"><span class="kicker pink">Health</span><h3>Stress, sleep and recovery in one place.</h3><p>A daily stress score from your Apple Watch HRV, plus sleep, fitness and water.</p><a class="spot-link" href="/how-to/health">See how →</a></div></div></div></section>
 
   <section class="pricing" id="pricing">
     <h2>Simple pricing</h2>
@@ -84,6 +84,6 @@
   </section>
 </main>
 <footer><span>© <span id="yr"></span> MoodPals</span><span class="foot-links"><a href="/screen-time-tracker">Screen time tracker</a><a href="/kids-screen-time">Kids screen time</a><a href="/apple-watch-stress-tracker">Apple Watch stress tracker</a><a href="/sleep-tracker">Sleep tracker</a><a href="/hrv-tracker">HRV tracker</a><a href="/hydration-caffeine-tracker">Water &amp; caffeine tracker</a></span><span class="foot-links"><a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Use</a><a href="/support">Support</a><a href="mailto:hello@moodpals.com">hello@moodpals.com</a></span><span>Made with <span class="heart">♥</span> for calmer days</span></footer>
-<script src="/app.js?v=29" defer></script>
+<script src="/app.js?v=30" defer></script>
 </body>
 </html>

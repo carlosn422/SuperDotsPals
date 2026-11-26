@@ -188,3 +188,24 @@ document.querySelectorAll('.loop video').forEach(v => {
   if (reduceMotion) { v.removeAttribute('autoplay'); v.pause(); }
   fig.append(btn); sync();
 });
+document.querySelectorAll('.t-show').forEach(show => {
+  const devs = [...show.querySelectorAll('.t-dev')], pans = show.querySelectorAll('.t-panel'), ptr = show.querySelector('.t-pointer');
+  let cur = 0, paused = false;
+  const place = () => {
+    const d = devs[cur], box = show.getBoundingClientRect(), r = d.getBoundingClientRect();
+    ptr.style.transform = `translate(${r.left - box.left + r.width * .62}px, ${r.bottom - box.top - 16}px)`;
+  };
+  const pick = i => {
+    cur = i;
+    devs.forEach((d, n) => d.setAttribute('aria-pressed', String(n === i)));
+    pans.forEach((p, n) => p.classList.toggle('on', n === i));
+    place();
+  };
+  devs.forEach((d, n) => { d.addEventListener('click', () => pick(n)); d.addEventListener('mouseenter', () => pick(n)); d.addEventListener('focus', () => pick(n)); });
+  show.addEventListener('mouseenter', () => paused = true);
+  show.addEventListener('mouseleave', () => paused = false);
+  addEventListener('resize', place);
+  setTimeout(place, 600);
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) setInterval(() => { if (!paused && !document.hidden) pick((cur + 1) % devs.length); }, 3500);
+  pick(0);
+});
