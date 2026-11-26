@@ -7,7 +7,7 @@ import StressDiary from './StressDiary';
 import {ChatAction,ACTION_META,actionsFor,useStressContext,StressContextBar,promptsFor,TypingBubble} from './ChatExtras';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {usePlus} from './PlusStore';
-import VoiceFriend from './VoiceFriend';
+import VoiceFriend,{BuddyCall} from './VoiceFriend';
 
 const feelings=['Good','Calm','Joyful','Angry','Frustrated','Stressed','Anxious','Sad','Tired','Overwhelmed'];
 const activities=['Walking','Workout','Work','Meeting','Rest','Social time','Other'];
@@ -22,7 +22,9 @@ export default function WellnessCompanion({companion,color,initialView='checkin'
  const [chatText,setChatText]=useState(''),[messages,setMessages]=useState<Message[]>([]),[conversationId,setConversationId]=useState<string|null>(null),[busy,setBusy]=useState(false);
  const [pending,setPending]=useState<string|null>(null),[failed,setFailed]=useState<{text:string;error:string}|null>(null);
  const ctx=useStressContext();
- const [talking,setTalking]=useState(false);
+ const [talking,setTalking]=useState(false),[topic,setTopic]=useState<string|undefined>(),[typing,setTyping]=useState(false),[firstName,setFirstName]=useState('');
+ useEffect(()=>{void (async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data}=await supabase.from('profiles').select('display_name').eq('id',user.id).maybeSingle();setFirstName(String(data?.display_name||'').trim().split(/\s+/)[0]||'')})()},[]);
+ const call=(t?:string)=>{if(!isPlus){showPaywall('reflections');return}setTopic(t);setTalking(true)};
  const scroller=React.useRef<ScrollView>(null);
  async function userId(){const {data:{user}}=await supabase.auth.getUser();if(!user)throw Error('Please sign in');return user.id}
  async function load(){
@@ -72,16 +74,15 @@ export default function WellnessCompanion({companion,color,initialView='checkin'
   catch(e:any){Alert.alert('Could not save',e?.message||'Try again.')}
  }
  return <View style={s.container}>
- {view!=='checkin'?<><View style={s.header}><SuperdotMascot id={companion} color={color} size={66}/><View style={{flex:1}}><Text style={s.title}>{view==='chat'?'Ask MoodPal':'Stress diary'}</Text><Text style={s.sub}>{view==='chat'?'Answers based on your own readings and diary.':'See what drives your stress over time.'}</Text></View></View>
- <View style={s.tabs}>{(['chat','history'] as const).map(t=><TouchableOpacity key={t} onPress={()=>t==='chat'&&!isPlus?showPaywall('reflections'):setView(t)} style={[s.tab,view===t&&{backgroundColor:color}]}><Text style={[s.tabText,view===t&&{color:'#fff'}]}>{t==='chat'?'Ask MoodPal':'Stress diary'}</Text></TouchableOpacity>)}</View></>:null}
- {view==='checkin'?<MoodCheckinWizard color={color} onShareWithCircle={onShareWithCircle} onSaved={nextMood=>onMoodSaved?.(nextMood)} onDone={()=>onCheckinDone?.()} onJournal={()=>setView('history')} onInsights={()=>onOpenInsights?.()} onFindVerse={(selectedMood,answers)=>onFindVerse?.(selectedMood,answers)} onNavigate={onWizardNavigate} onExploreAI={selectedMood=>{setChatText("I'd like to explore feeling "+selectedMood+". Please ask me one supportive, open-ended question.");setView('chat');}}/>:null}
- {view==='chat'?<View style={s.card}>
-  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Talk with your MoodPal" onPress={()=>isPlus?setTalking(true):showPaywall('reflections')} style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#E4F6EA',borderRadius:18,padding:12}}>
-   <View style={{width:44,height:44,borderRadius:22,backgroundColor:'#34B37E',alignItems:'center',justifyContent:'center'}}><Ionicons name="mic" size={22} color="#fff"/></View>
-   <View style={{flex:1}}><Text style={{fontSize:15,fontWeight:'900',color:'#1D2B33'}}>Talk with your pal</Text><Text style={s.sub}>Tell them how your day went</Text></View>
-   <Ionicons name="call" size={20} color="#34B37E"/>
+ {view!=='checkin'?<><View style={s.header}><SuperdotMascot id={companion} color={color} size={66}/><View style={{flex:1}}><Text style={s.title}>{view==='chat'?'Your buddy':'Stress diary'}</Text><Text style={s.sub}>{view==='chat'?'Here whenever you want to talk.':'See what drives your stress over time.'}</Text></View></View>
+ <View style={s.tabs}>{(['chat','history'] as const).map(t=><TouchableOpacity key={t} onPress={()=>t==='chat'&&!isPlus?showPaywall('reflections'):setView(t)} style={[s.tab,view===t&&{backgroundColor:color}]}><Text style={[s.tabText,view===t&&{color:'#fff'}]}>{t==='chat'?'Buddy':'Stress diary'}</Text></TouchableOpacity>)}</View></>:null}
+ {view==='checkin'?<MoodCheckinWizard color={color} onShareWithCircle={onShareWithCircle} onSaved={nextMood=>onMoodSaved?.(nextMood)} onDone={()=>onCheckinDone?.()} onJournal={()=>setView('history')} onInsights={()=>onOpenInsights?.()} onFindVerse={(selectedMood,answers)=>onFindVerse?.(selectedMood,answers)} onNavigate={onWizardNavigate} onExploreAI={selectedMood=>{setChatText("I'd like to explore feeling "+selectedMood+". Please ask me one supportive, open-ended question.");setTyping(true);setView('chat');}}/>:null}
+ <VoiceFriend visible={talking} onClose={()=>setTalking(false)} companion={companion} topic={topic}/>
+ {view==='chat'&&!typing?<BuddyCall companion={companion} name={firstName} onCall={call} onType={()=>setTyping(true)}/>:null}
+ {view==='chat'&&typing?<View style={s.card}>
+  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Call your buddy" onPress={()=>setTyping(false)} style={{flexDirection:'row',alignItems:'center',gap:8,alignSelf:'flex-end',backgroundColor:'#E4F6EA',borderRadius:18,paddingHorizontal:12,paddingVertical:8}}>
+   <Ionicons name="call" size={16} color="#2E8F64"/><Text style={{fontSize:13,fontWeight:'900',color:'#2E8F64'}}>Call your buddy</Text>
   </TouchableOpacity>
-  <VoiceFriend visible={talking} onClose={()=>setTalking(false)} companion={companion}/>
   <StressContextBar chips={ctx.chips}/>
   <ScrollView ref={scroller} style={{maxHeight:420}} contentContainerStyle={{gap:10}} onContentSizeChange={()=>scroller.current?.scrollToEnd({animated:true})}>
    {messages.length===0&&!pending?<Text style={s.sub}>Ask anything about your stress, sleep or mood. MoodPal sees today's readings above plus your recent diary.</Text>:null}

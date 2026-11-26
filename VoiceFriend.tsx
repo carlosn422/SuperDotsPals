@@ -39,7 +39,7 @@ function toBase64(f:Float32Array){
  return btoa(s);
 }
 
-export default function VoiceFriend({visible,onClose,companion='calm'}:{visible:boolean;onClose:()=>void;companion?:string}){
+export default function VoiceFriend({visible,onClose,companion='calm',topic}:{visible:boolean;onClose:()=>void;companion?:string;topic?:string}){
  const {showPaywall}=usePlus();
  const reduce=useReduceMotion();
  const [phase,setPhase]=useState<Phase>('connecting'),[caption,setCaption]=useState(''),[muted,setMuted]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState<Saved|null>(null);
@@ -83,7 +83,7 @@ export default function VoiceFriend({visible,onClose,companion='calm'}:{visible:
        ws.send(JSON.stringify({realtimeInput:{audio:{data:toBase64(buffer.getChannelData(0).subarray(0,numFrames)),mimeType:'audio/pcm;rate=16000'}}}));
       });
       await recorder.start();
-      ws?.send(JSON.stringify({realtimeInput:{text:'(The call just started. Greet me warmly in one short sentence and ask how my day was.)'}}));
+      ws?.send(JSON.stringify({realtimeInput:{text:topic?`(The call just started. I tapped "${topic}". Greet me warmly in one short sentence and gently ask about it.)`:'(The call just started. Greet me warmly in one short sentence and ask how my day was.)'}}));
       setPhase('listening');
       timer=setTimeout(()=>{ws?.close()},(data.maxMinutes||10)*60000);
      }
@@ -157,6 +157,37 @@ export default function VoiceFriend({visible,onClose,companion='calm'}:{visible:
   </View>
  </Modal>;
 }
+const TOPICS=[{e:'😮‍💨',l:'Rough day'},{e:'😊',l:'Good news'},{e:'😴',l:"Can't sleep"}];
+// The pal is the call button: tap it, or a quick start, to call.
+export function BuddyCall({companion,name,onCall,onType}:{companion:string;name?:string;onCall:(topic?:string)=>void;onType:()=>void}){
+ const reduce=useReduceMotion();
+ const p=useRef(new Animated.Value(0)).current;
+ useEffect(()=>{if(reduce)return;const a=Animated.loop(Animated.timing(p,{toValue:1,duration:2200,easing:Easing.out(Easing.ease),useNativeDriver:true}));a.start();return()=>a.stop()},[reduce]);
+ const wave={transform:[{scale:p.interpolate({inputRange:[0,1],outputRange:[0.85,1.12]})}],opacity:p.interpolate({inputRange:[0,1],outputRange:[0.8,0]})};
+ return <View style={b.wrap}>
+  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Call your buddy" activeOpacity={0.85} onPress={()=>onCall()} style={b.stage}>
+   <Animated.View style={[b.ring,{width:300,height:300,borderRadius:150},reduce?null:wave]}/>
+   <View style={[b.ring,{width:250,height:250,borderRadius:125,borderColor:'rgba(52,179,126,0.4)'}]}/>
+   <View style={b.face}><SuperdotMascot id={companion} size={160}/></View>
+   <View style={b.say}><Text style={b.sayText}>Hey{name?' '+name:''}! 👋 Wanna talk?</Text></View>
+   <View style={b.tap}><Ionicons name="call" size={18} color="#fff"/><Text style={b.tapText}>Tap me to call</Text></View>
+  </TouchableOpacity>
+  <View style={b.quick}>{TOPICS.map(t=><TouchableOpacity key={t.l} accessibilityRole="button" accessibilityLabel={'Call about: '+t.l} onPress={()=>onCall(t.l)} style={b.q}><Text style={b.qText}>{t.e} {t.l}</Text></TouchableOpacity>)}</View>
+  <TouchableOpacity accessibilityRole="button" onPress={onType} style={b.type}><Ionicons name="chatbubble-ellipses" size={16} color="#8A63D2"/><Text style={b.typeText}>Rather type? Send a message</Text></TouchableOpacity>
+ </View>;
+}
+const b=StyleSheet.create({
+ wrap:{gap:14},stage:{height:330,alignItems:'center',justifyContent:'center'},
+ ring:{position:'absolute',borderWidth:2,borderColor:'rgba(52,179,126,0.25)'},
+ face:{width:200,height:200,borderRadius:100,backgroundColor:'#E4F6EA',alignItems:'center',justifyContent:'center',shadowColor:'#34B37E',shadowOpacity:0.25,shadowRadius:15,shadowOffset:{width:0,height:10}},
+ say:{position:'absolute',top:6,left:4,backgroundColor:'#fff',borderRadius:18,borderBottomLeftRadius:4,paddingHorizontal:12,paddingVertical:9,shadowColor:'#000',shadowOpacity:0.08,shadowRadius:8,shadowOffset:{width:0,height:3}},
+ sayText:{fontSize:15,fontWeight:'800',color:APP_THEME.ink},
+ tap:{position:'absolute',bottom:14,flexDirection:'row',alignItems:'center',gap:8,backgroundColor:'#34B37E',borderRadius:24,paddingHorizontal:20,paddingVertical:12,shadowColor:'#34B37E',shadowOpacity:0.35,shadowRadius:10,shadowOffset:{width:0,height:6}},
+ tapText:{fontSize:16,fontWeight:'900',color:'#fff'},
+ quick:{flexDirection:'row',flexWrap:'wrap',justifyContent:'center',gap:8},
+ q:{backgroundColor:'#fff',borderWidth:1,borderColor:'#DCEBE2',borderRadius:18,paddingHorizontal:13,paddingVertical:9},qText:{fontSize:14,fontWeight:'800',color:APP_THEME.ink},
+ type:{alignSelf:'center',flexDirection:'row',alignItems:'center',gap:6,padding:8},typeText:{fontSize:14,fontWeight:'800',color:'#8A63D2'},
+});
 const st=StyleSheet.create({
  root:{flex:1,backgroundColor:APP_THEME.primarySoft,alignItems:'center',paddingTop:90,paddingBottom:40,paddingHorizontal:24,gap:18},
  status:{fontSize:15,fontWeight:'800',color:APP_THEME.primary,letterSpacing:0.4},
