@@ -11,6 +11,7 @@ import {useReduceMotion} from './CircleComponents';
 
 export type VoiceGender='female'|'male';
 export const VOICE_DEMOS:Record<VoiceGender,number>={female:require('./assets/voice/demo-female.m4a'),male:require('./assets/voice/demo-male.m4a')};
+const RING=require('./assets/voice/ring.m4a');
 const WS='wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained?access_token=';
 type Phase='connecting'|'listening'|'speaking'|'ended'|'error';
 type Saved={id:string;summary:string};
@@ -67,6 +68,10 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
     AudioManager.setSystemOptions({ios:{category:'playAndRecord',mode:'voiceChat',options:['defaultToSpeaker','allowBluetoothHFP']}});
     await AudioManager.setAudioSessionActivity(true);
     ctx=new AudioContext({sampleRate:24000});
+    // One soft ring while the call connects; the pal says hi when it ends.
+    const ringCtx=ctx;let ringEnd=Date.now()+1900;
+    playEnd=ctx.currentTime+1.9;
+    void ringCtx.decodeAudioData(RING).then(buf=>{if(!alive)return;const src=ringCtx.createBufferSource();src.buffer=buf;src.connect(ringCtx.destination);src.start();ringEnd=Date.now()+buf.duration*1000;playEnd=Math.max(playEnd,ringCtx.currentTime+buf.duration)}).catch(()=>{});
     const queue=ctx.createBufferQueueSource();queue.connect(ctx.destination);queue.start();
     interruptRef.current=()=>{turn++;queue.clearBuffers();playEnd=0;setPhase('listening')};
     ws=new WebSocket(WS+encodeURIComponent(data.token));
@@ -83,7 +88,8 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
        ws.send(JSON.stringify({realtimeInput:{audio:{data:toBase64(buffer.getChannelData(0).subarray(0,numFrames)),mimeType:'audio/pcm;rate=16000'}}}));
       });
       await recorder.start();
-      ws?.send(JSON.stringify({realtimeInput:{text:topic?`(The call just started. I tapped "${topic}". Greet me warmly in one short sentence and gently ask about it.)`:'(The call just started. Greet me warmly in one short sentence and ask how my day was.)'}}));
+      const hello=JSON.stringify({realtimeInput:{text:topic?`(The call just started. I tapped "${topic}". Greet me warmly in one short sentence and gently ask about it.)`:'(The call just started. Greet me warmly in one short sentence and ask how my day was.)'}});
+      setTimeout(()=>{if(alive&&ws?.readyState===1)ws.send(hello)},Math.max(0,ringEnd-Date.now()-600));
       setPhase('listening');
       const total=(data.maxMinutes||5)*60000,quiet=()=>!!ctx&&Date.now()-lastChunk>900&&ctx.currentTime>playEnd+0.3;
       wrapT=setTimeout(()=>{if(ws?.readyState===1)ws.send(JSON.stringify({clientContent:{turns:[{role:'user',parts:[{text:'(Note: time is almost up.)'}]}],turnComplete:false}}))},Math.max(0,total-60000));
