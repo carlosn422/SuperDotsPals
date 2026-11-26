@@ -488,3 +488,5 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 .t-show .t-vbar b{animation:none;width:calc(20% + var(--lk,0) * 72%)}
 @media(min-width:601px) and (max-height:620px){.t-devs,.t-pointer{display:none}.t-sticky{grid-template-areas:"left stage"}
 .t-slide .t-dev.t-ph{--w:calc((var(--vh,100vh) - var(--navh,64px) - 40px) / 2.16)}.t-slide .t-dev.t-tb{--w:calc((var(--vh,100vh) - var(--navh,64px) - 40px) * .75)}.t-slide .t-dev.t-wt{--w:calc((var(--vh,100vh) - var(--navh,64px) - 40px) * .85)}}
+@media(min-width:601px) and (max-height:620px){.t-cta{display:none}.t-sticky{align-items:center}.t-panel h3{font-size:26px;margin:6px 0}.t-panel p{font-size:16px;margin-bottom:8px}
+.t-slide .t-dev.t-ph{--w:calc((var(--vh,100vh) - var(--navh,64px) - 60px) / 2.16)}.t-slide .t-dev.t-tb{--w:calc((var(--vh,100vh) - var(--navh,64px) - 60px) * .75)}.t-slide .t-dev.t-wt{--w:calc((var(--vh,100vh) - var(--navh,64px) - 60px) * .85)}}
