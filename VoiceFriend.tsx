@@ -121,7 +121,7 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
     if(await AudioManager.requestRecordingPermissions()!=='Granted')return fail('Allow the microphone for MoodPals in iPhone Settings to talk with your pal.');
     const pal=voicePal(await loadVoicePal());
     const {data,error:fnError}=await supabase.functions.invoke('voice-live-token',{body:{voice:pal.gender,pal:pal.id}});
-    if(fnError){let msg='Could not start the call. Please try again.';try{const d=await (fnError as any).context?.json?.();if(d?.code==='plus_required'){onClose();showPaywall('reflections');return}if(d?.code==='voice_limit'){if(alive){setLimit({cap:Number(d.cap)||20,resetsAt:d.resetsAt});setPhase('ended')}return}if(d?.error)msg=d.error}catch{}return fail(msg)}
+    if(fnError){let msg='Could not start the call. Please try again.';try{const d=await (fnError as any).context?.json?.();if(d?.code==='plus_required'){onClose();showPaywall('reflections');return}if(d?.code==='voice_limit'){if(alive){setLimit({cap:Number(d.cap)||15,resetsAt:d.resetsAt});setPhase('ended')}return}if(d?.error)msg=d.error}catch{}return fail(msg)}
     if(!alive||!data?.token)return;
     callId=data.callId||null;callStart=Date.now();
     await teardown;if(!alive)return;

@@ -25,7 +25,7 @@ export type PlusPrice={price:string;period:string;label:string;note?:string;perM
 export const PLUS_PRICES:Record<PlusPlan,PlusPrice>={
  weekly:{price:'$6.99',period:'week',label:'Weekly',perDay:'$1'},
  monthly:{price:'$12.99',period:'month',label:'Monthly',perDay:'$0.43'},
- annual:{price:'$29.99',period:'year',label:'Annual',perDay:'$0.08'},
+ annual:{price:'$39.99',period:'year',label:'Annual',perDay:'$0.11'},
 };
 const PLAN_DAYS:Record<PlusPlan,number>={weekly:7,monthly:30,annual:365};
 const perDay=(price:number,currency:string,days:number)=>{
@@ -47,7 +47,7 @@ export const FEATURE_COPY:Record<PlusFeature,{title:string;body:string}>={
 
 export const PLAN_FEATURES:{label:string;free:string|boolean;plus:string|boolean}[]=[
  {label:'Six MoodPal characters',free:true,plus:true},
- {label:'Talk time with your pal',free:false,plus:'20 min / month'},
+ {label:'Talk time with your pal',free:false,plus:'15 min / month'},
  {label:'Mood check-ins and basic history',free:true,plus:true},
  {label:'Apple Watch app and complications',free:true,plus:true},
  {label:'Family watches (mood-only)',free:'1',plus:'Up to 4'},
