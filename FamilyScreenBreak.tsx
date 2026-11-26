@@ -173,7 +173,8 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  // The member cards stay pinned above the tab bar (drawn by the host, outside this scroll view).
  const [devSel,setDevSel]=useState<string|null>(null),[addingDevice,setAddingDevice]=useState(false);
  const showDock=!guest&&route.name==='list'&&!loading&&!error&&(section==='devices'||members.length>0);
- const dock=section==='devices'?<DeviceDock devices={family.devices} defaultId={family.defaultId} sessions={family.sessions} selected={devSel} adding={addingDevice} onSelect={id=>{void Haptics.selectionAsync();setAddingDevice(false);setDevSel(id)}} onAdd={()=>setAddingDevice(a=>!a)}/>:<ProfileRow members={members} selected={current?.id} adding={adding} onSelect={id=>{setAdding(false);setSelected(id)}} onAdd={()=>setAdding(a=>!a)} sessions={family.sessions}/>;
+ const dockRow=section==='devices'?<DeviceDock devices={family.devices} defaultId={family.defaultId} sessions={family.sessions} selected={devSel} adding={addingDevice} onSelect={id=>{void Haptics.selectionAsync();setAddingDevice(false);setDevSel(id)}} onAdd={()=>setAddingDevice(a=>!a)}/>:<ProfileRow members={members} selected={current?.id} adding={adding} onSelect={id=>{setAdding(false);setSelected(id)}} onAdd={()=>setAdding(a=>!a)} sessions={family.sessions}/>;
+ const dock=<View style={st.dockShell}><View style={st.dockHead}><Ionicons name={section==='devices'?'tablet-portrait':'people'} size={15} color="#fff"/><Text style={st.dockLabel}>{section==='devices'?'Devices':'Family'}</Text></View><View style={st.dockInner}>{dockRow}</View></View>;
  const dockKey=section+'|'+devSel+'|'+addingDevice+'|'+family.defaultId+'|'+family.devices.map(d=>d.id+d.name+d.device_type).join()+'|'+members.map(c=>c.id+c.name).join()+'|'+current?.id+'|'+adding+'|'+family.sessions.map(x=>x.id+x.deadline_at+x.granted_seconds).join();
  useEffect(()=>{onDock?.(showDock?dock:null)},[onDock,showDock,dockKey]);
  useEffect(()=>()=>onDock?.(null),[onDock]);
@@ -433,15 +434,16 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
 
  return <View style={{gap:14}}>
   {inline?null:<Back label="Family" onPress={onBack}/>}
-  <View style={{flexDirection:'row',alignItems:'center',gap:12}}>
-   {inline?null:<View style={[st.avatar,{width:52,height:52,borderRadius:26}]}><Text style={[st.avatarText,{fontSize:22}]}>{child.name.slice(0,1).toUpperCase()}</Text></View>}
-   <Text style={[inline?st.heroTitle:st.title,{flex:1}]} numberOfLines={1}>{child.name}</Text>
-   {inline?<TouchableOpacity accessibilityRole="button" accessibilityLabel={'More for '+child.name} onPress={()=>{
-    const opts=[['Screen Time Insights',onInsights],...(state?.selectionCount?[['Apps to Pause',()=>void pick()]]:[]),['Apple Watch',()=>setWatchOpen(true)],['Edit '+child.name,()=>setEditing(true)]] as [string,()=>void][];
-    ActionSheetIOS.showActionSheetWithOptions({options:[...opts.map(o=>o[0]),'Cancel'],cancelButtonIndex:opts.length},i=>opts[i]?.[1]());
-   }} style={st.moreBtn}><Ionicons name="ellipsis-horizontal" size={22} color={T.primary}/></TouchableOpacity>
-   :<TouchableOpacity accessibilityRole="button" accessibilityLabel={'Edit '+child.name} onPress={()=>setEditing(true)} style={st.editBtn}><Text style={st.editBtnText}>Edit</Text></TouchableOpacity>}
-  </View>
+  {inline?<View style={{alignItems:'center',gap:14}}>
+   <Text style={[st.heroTitle,{textAlign:'center'}]} numberOfLines={1} accessibilityRole="header">{child.name}</Text>
+   <View style={{flexDirection:'row',justifyContent:'center',gap:20}}>
+    {([['bar-chart','Insights',onInsights],...(state?.selectionCount?[['apps','Apps',()=>void pick()]]:[]),['watch','Watch',()=>setWatchOpen(true)],['create','Edit',()=>setEditing(true)]] as [any,string,()=>void][]).map(([icon,label,fn])=><TouchableOpacity key={label} accessibilityRole="button" accessibilityLabel={label+' for '+child.name} onPress={()=>{void Haptics.selectionAsync();fn()}} style={{alignItems:'center',gap:5}}><View style={st.roundBtn}><Ionicons name={icon} size={22} color={T.primary}/></View><Text style={st.roundLabel}>{label}</Text></TouchableOpacity>)}
+   </View>
+  </View>:<View style={{flexDirection:'row',alignItems:'center',gap:12}}>
+   <View style={[st.avatar,{width:52,height:52,borderRadius:26}]}><Text style={[st.avatarText,{fontSize:22}]}>{child.name.slice(0,1).toUpperCase()}</Text></View>
+   <Text style={[st.title,{flex:1}]} numberOfLines={1}>{child.name}</Text>
+   <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Edit '+child.name} onPress={()=>setEditing(true)} style={st.editBtn}><Text style={st.editBtnText}>Edit</Text></TouchableOpacity>
+  </View>}
   <EditMemberSheet visible={editing} child={child} children={children} onClose={()=>setEditing(false)} onChanged={onChanged} onRemoved={()=>{setEditing(false);onRemoved()}}/>
   {!screenBreakSupported?<View style={st.card}><Text style={st.body}>Screen Break needs the latest MoodPals build on this iPhone.</Text></View>:<>
    {inUse?null:<DeviceSelect options={deviceOptions} selected={target} defaultId={family.defaultId} onSelect={setPicked}/>}
@@ -495,6 +497,7 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
   <TouchableOpacity accessibilityRole="button" onPress={onInsights} style={st.linkRow}><IconTile icon="bar-chart" color={TINT_INK[2]}/><Text style={[st.rowTitle,{flex:1}]}>Screen Time Insights</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>
   <MemberWatch child={child} children={children} onChanged={onChanged} onRemoved={onRemoved}/>
   </>}
+  {inline?<ChildStats child={child}/>:null}
  </View>;
 }
 
@@ -991,6 +994,41 @@ function bucketName(period:BreakPeriod,b:Bucket){
 // Line graph of recorded Screen Break time. Press and drag along it to read the time at each point.
 const SERIES_COLORS=[T.primary,'#4A8CFF','#F2A93B','#E5484D','#9B7BC8','#2A9DA8'];
 /** Colored stacked bars, one color per device; tap a bar for its time. */
+/** This week and today for one child, Actions-card style. */
+function ChildStats({child}:{child:FamilyChild}){
+ const [state]=useBreakState();
+ const [rows,setRows]=useState<SessionRow[]>([]);
+ const week=periodRange('week',new Date()),ws=week.start.getTime();
+ useEffect(()=>{let live=true;void supabase.from('screen_break_sessions').select('id,child_id,family_device_id,started_at,deadline_at,ended_at,granted_seconds,status,version').eq('child_id',child.id).gte('deadline_at',new Date(ws).toISOString()).order('started_at').limit(500).then(({data})=>{if(live)setRows((data as SessionRow[])||[])});return()=>{live=false}},[child.id,ws,state?.session?.version]);
+ const all=useMemo(()=>{const local=pendingBreakSync().filter(r=>r.child_id===child.id).map(fromSync);if(state?.session&&state.session.childId===child.id)local.push(fromNative(state.session));return [...rows,...local]},[rows,state,child.id]);
+ const now=new Date(),day=periodStats(all,'day',now,now),wk=periodStats(all,'week',now,now);
+ const top=useMemo(()=>{const by=new Map<number,number>();for(const m of socialMarks(ws))if(m.member===child.id)by.set(m.app,(by.get(m.app)||0)+m.minutes);return [...by].sort((a,b)=>b[1]-a[1])[0]},[child.id,ws]);
+ const peak=Math.max(60,...wk.buckets.map(b=>b.seconds));
+ const val=(label:string,value:string,color:string)=><View style={{gap:2}}><Text style={{fontSize:12,fontWeight:'800',color}}>{label}</Text><Text style={st.statNum}>{value}</Text></View>;
+ const head=(icon:any,color:string,title:string)=><View style={{flexDirection:'row',alignItems:'center',gap:7}}><Ionicons name={icon} size={18} color={color}/><Text style={st.statHead}>{title}</Text></View>;
+ return <View style={{gap:12}}>
+  <View style={st.statBox}>
+   <View style={{flex:1,gap:10}}>
+    {head('calendar','#4A8CFF','This week')}
+    <View style={{flexDirection:'row',gap:18}}>{val('Time',formatDuration(wk.seconds),T.primary)}{val('Sessions',String(wk.sessions),'#4A8CFF')}{val('Daily avg',formatDuration(wk.dailyAverage),'#F2A93B')}</View>
+   </View>
+   <View style={{flexDirection:'row',alignItems:'flex-end',gap:4,height:56}} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">{wk.buckets.map((b,i)=><View key={i} style={{width:7,height:Math.max(5,56*b.seconds/peak),borderRadius:4,backgroundColor:b.seconds?T.primary:'#E3EEE8'}}/>)}</View>
+  </View>
+  <View style={{flexDirection:'row',gap:12}}>
+   <View style={[st.statBox,{flex:1,flexDirection:'column',alignItems:'flex-start'}]}>
+    {head('sunny','#F2A93B','Today')}
+    <Text style={st.statBig}>{formatDuration(day.seconds)}</Text>
+    <View style={[st.statOrb,{backgroundColor:'#FFF7E8'}]}><Ionicons name="hourglass" size={24} color="#F2A93B"/></View>
+   </View>
+   <View style={[st.statBox,{flex:1,flexDirection:'column',alignItems:'flex-start'}]}>
+    {head('apps','#9B7BC8','Top app')}
+    {top?<><View style={{height:26,alignSelf:'stretch'}}>{SocialAppLabel?<SocialAppLabel app={top[0]} style={{height:26,flex:1}}/>:<Text style={st.rowTitle}>App</Text>}</View><Text style={st.statBig}>{formatDuration(top[1]*60)}</Text></>:<Text style={st.statBig}>—</Text>}
+    {top?null:<View style={[st.statOrb,{backgroundColor:'#F4EBFF'}]}><Ionicons name="apps" size={24} color="#9B7BC8"/></View>}
+   </View>
+  </View>
+ </View>;
+}
+
 function StackedBars({period,series}:{period:BreakPeriod;series:{key:string;name:string;buckets:Bucket[]}[]}){
  const [picked,setPicked]=useState<number|null>(null),[width,setWidth]=useState(0);
  const H=140,n=series[0]?.buckets.length||0;
@@ -1113,7 +1151,18 @@ const st=StyleSheet.create({
  segmentOn:{backgroundColor:'#fff',shadowColor:'#000',shadowOpacity:.08,shadowRadius:4,shadowOffset:{width:0,height:1}},
  segmentText:{fontSize:15,fontWeight:'800',color:T.muted},
  moreBtn:{width:44,height:44,borderRadius:22,backgroundColor:T.primarySoft,alignItems:'center',justifyContent:'center'},
- memberCard:{width:84,paddingVertical:12,borderRadius:20,alignItems:'center',gap:8,backgroundColor:'#fff',borderWidth:1,borderColor:'#E6EEEA'},
+ memberCard:{width:84,paddingVertical:12,borderRadius:20,alignItems:'center',gap:8,backgroundColor:'#F4FAF6',borderWidth:1,borderColor:'#EAF2EE'},
+ dockShell:{backgroundColor:T.primary,borderRadius:28,padding:6,paddingTop:9,gap:7,shadowColor:'#1D2B33',shadowOpacity:.12,shadowRadius:12,shadowOffset:{width:0,height:4}},
+ dockHead:{flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:12},
+ dockLabel:{color:'#fff',fontSize:14,fontWeight:'900'},
+ dockInner:{backgroundColor:'#fff',borderRadius:22,padding:6},
+ roundBtn:{width:54,height:54,borderRadius:27,backgroundColor:'#fff',borderWidth:2,borderColor:'#D5EEDF',alignItems:'center',justifyContent:'center'},
+ roundLabel:{fontSize:12,fontWeight:'800',color:T.ink},
+ statBox:{backgroundColor:'#fff',borderRadius:24,padding:16,gap:10,flexDirection:'row',alignItems:'center',shadowColor:'#2D4A3E',shadowOpacity:.06,shadowRadius:12,shadowOffset:{width:0,height:4}},
+ statHead:{fontSize:17,fontWeight:'900',color:T.ink},
+ statNum:{fontSize:20,fontWeight:'900',color:T.ink},
+ statBig:{fontSize:26,fontWeight:'900',color:T.ink},
+ statOrb:{width:52,height:52,borderRadius:26,alignItems:'center',justifyContent:'center',alignSelf:'center'},
  profile:{width:58,height:58,borderRadius:29,alignItems:'center',justifyContent:'center'},
  profileName:{fontSize:13,fontWeight:'800',color:T.muted,maxWidth:68},
  profileTimer:{position:'absolute',right:2,bottom:2,width:22,height:22,borderRadius:11,backgroundColor:T.primary,borderWidth:2,borderColor:'#fff',alignItems:'center',justifyContent:'center'},
