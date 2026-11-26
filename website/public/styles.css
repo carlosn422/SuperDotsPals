@@ -446,3 +446,4 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 .t-cap{width:100%;max-width:360px;box-sizing:border-box;background:var(--card);border-radius:22px;padding:14px 18px;box-shadow:0 10px 30px rgba(43,30,69,.08);text-align:center}
 .t-cap .kicker{margin-bottom:4px}.t-cap h3{margin:4px 0;font-size:19px}.t-cap p{margin:0 0 6px;color:var(--muted);font-size:15px}}
 @media(max-width:600px) and (prefers-reduced-motion:reduce){.t-slide,.t-slide.on{transition:none}}
+@media(max-width:600px) and (max-height:700px){.t-devs{display:none}.t-carousel{margin-top:8px}}
