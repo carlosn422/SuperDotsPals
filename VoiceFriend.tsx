@@ -157,10 +157,12 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
      if(m.toolCall){
       const responses=await Promise.all((m.toolCall.functionCalls||[]).map(async(f:any)=>{
        if(f.name==='end_call'){
-        // Hang up once the goodbye has finished playing, like a real call.
+        // Hang up once the goodbye has finished playing, like a real call. The mic stops and the model
+        // gets no tool response, so it has nothing to answer and can't say goodbye again.
+        stopMic();
         const started=Date.now();
         if(!hangup)hangup=setInterval(()=>{if(!alive||!ctx)return;const idle=Date.now()-lastChunk>900&&ctx.currentTime>playEnd+0.4;if(idle||Date.now()-started>10000){clearInterval(hangup);void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);onClose()}},250);
-        return {id:f.id,name:f.name,response:{result:'hanging up'}};
+        return null;
        }
        if(f.name!=='save_journal_entry')return {id:f.id,name:f.name,response:{error:'unknown tool'}};
        try{
@@ -171,7 +173,8 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
         return {id:f.id,name:f.name,response:{result:'saved for today'}};
        }catch{return {id:f.id,name:f.name,response:{error:'could not save'}}}
       }));
-      ws?.send(JSON.stringify({toolResponse:{functionResponses:responses}}));
+      const replies=responses.filter(Boolean);
+      if(replies.length)ws?.send(JSON.stringify({toolResponse:{functionResponses:replies}}));
      }
      if(m.usageMetadata){add(m.usageMetadata.promptTokensDetails,'in');add(m.usageMetadata.responseTokensDetails,'out');use.outText+=Number(m.usageMetadata.thoughtsTokenCount)||0}
      if(m.goAway)setTimeout(()=>ws?.close(),1000);
