@@ -7,6 +7,7 @@ import StressDiary from './StressDiary';
 import {ChatAction,ACTION_META,actionsFor,useStressContext,StressContextBar,promptsFor,TypingBubble} from './ChatExtras';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {usePlus} from './PlusStore';
+import VoiceFriend from './VoiceFriend';
 
 const feelings=['Good','Calm','Joyful','Angry','Frustrated','Stressed','Anxious','Sad','Tired','Overwhelmed'];
 const activities=['Walking','Workout','Work','Meeting','Rest','Social time','Other'];
@@ -21,6 +22,7 @@ export default function WellnessCompanion({companion,color,initialView='checkin'
  const [chatText,setChatText]=useState(''),[messages,setMessages]=useState<Message[]>([]),[conversationId,setConversationId]=useState<string|null>(null),[busy,setBusy]=useState(false);
  const [pending,setPending]=useState<string|null>(null),[failed,setFailed]=useState<{text:string;error:string}|null>(null);
  const ctx=useStressContext();
+ const [talking,setTalking]=useState(false);
  const scroller=React.useRef<ScrollView>(null);
  async function userId(){const {data:{user}}=await supabase.auth.getUser();if(!user)throw Error('Please sign in');return user.id}
  async function load(){
@@ -74,6 +76,12 @@ export default function WellnessCompanion({companion,color,initialView='checkin'
  <View style={s.tabs}>{(['chat','history'] as const).map(t=><TouchableOpacity key={t} onPress={()=>t==='chat'&&!isPlus?showPaywall('reflections'):setView(t)} style={[s.tab,view===t&&{backgroundColor:color}]}><Text style={[s.tabText,view===t&&{color:'#fff'}]}>{t==='chat'?'Ask MoodPal':'Stress diary'}</Text></TouchableOpacity>)}</View></>:null}
  {view==='checkin'?<MoodCheckinWizard color={color} onShareWithCircle={onShareWithCircle} onSaved={nextMood=>onMoodSaved?.(nextMood)} onDone={()=>onCheckinDone?.()} onJournal={()=>setView('history')} onInsights={()=>onOpenInsights?.()} onFindVerse={(selectedMood,answers)=>onFindVerse?.(selectedMood,answers)} onNavigate={onWizardNavigate} onExploreAI={selectedMood=>{setChatText("I'd like to explore feeling "+selectedMood+". Please ask me one supportive, open-ended question.");setView('chat');}}/>:null}
  {view==='chat'?<View style={s.card}>
+  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Talk with your MoodPal" onPress={()=>isPlus?setTalking(true):showPaywall('reflections')} style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#E4F6EA',borderRadius:18,padding:12}}>
+   <View style={{width:44,height:44,borderRadius:22,backgroundColor:'#34B37E',alignItems:'center',justifyContent:'center'}}><Ionicons name="mic" size={22} color="#fff"/></View>
+   <View style={{flex:1}}><Text style={{fontSize:15,fontWeight:'900',color:'#1D2B33'}}>Talk with your pal</Text><Text style={s.sub}>Tell them how your day went</Text></View>
+   <Ionicons name="call" size={20} color="#34B37E"/>
+  </TouchableOpacity>
+  <VoiceFriend visible={talking} onClose={()=>setTalking(false)} companion={companion}/>
   <StressContextBar chips={ctx.chips}/>
   <ScrollView ref={scroller} style={{maxHeight:420}} contentContainerStyle={{gap:10}} onContentSizeChange={()=>scroller.current?.scrollToEnd({animated:true})}>
    {messages.length===0&&!pending?<Text style={s.sub}>Ask anything about your stress, sleep or mood. MoodPal sees today's readings above plus your recent diary.</Text>:null}

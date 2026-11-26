@@ -70,7 +70,14 @@
       "./scripts/with-scene-lifecycle.cjs",
       "expo-sharing",
       "expo-apple-authentication",
-      "expo-maps"
+      "expo-maps",
+      [
+        "react-native-audio-api",
+        {
+          "iosBackgroundMode": false,
+          "iosMicrophonePermission": "MoodPals uses the microphone so you can talk with your MoodPal."
+        }
+      ]
     ],
     "extra": {
       "eas": {
