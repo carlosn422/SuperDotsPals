@@ -15,6 +15,7 @@ import {saveHealthGoals} from './HealthDetail';
 import {healthKitAvailable,syncNativeHealth} from './HealthDataPanel';
 import {configureSocialTrack,getSocialState,socialTrackSupported} from './modules/watch-link/socialTrack';
 import {formatMins} from './SocialHrvInsights';
+import {VoicePalGrid,saveVoicePal,type VoicePalId} from './VoiceFriend';
 export const DOTS=[
  {id:'bloop',name:'Bloop',theme:'grape',color:'#7139E9',light:'#EEE5FF',face:'●',description:'Curious & cuddly'},
  {id:'poppy',name:'Poppy',theme:'coral',color:'#E76B8A',light:'#FFE7EE',face:'✿',description:'Warm & cheerful'},
@@ -36,7 +37,7 @@ const MOODS=[{mood:'Joyful',pal:'joy'},{mood:'Calm',pal:'calm'},{mood:'Sad',pal:
 // Same keys as earlier onboarding versions so saved answers still load when editing.
 type Targets={water:number;sleep:number;steps:number;mindfulness:number;social_now:number;social_goal:number};
 const DEFAULT_TARGETS:Targets={water:8,sleep:8,steps:8000,mindfulness:10,social_now:180,social_goal:60};
-type Step='welcome'|'goals'|'water'|'socialNow'|'socialGoal'|'sleep'|'move'|'mindful'|'feeling'|'health'|'reminders'|'plan';
+type Step='welcome'|'goals'|'water'|'socialNow'|'socialGoal'|'sleep'|'move'|'mindful'|'feeling'|'health'|'voice'|'reminders'|'plan';
 // Same daily check-in reminder (storage key, settings columns, text) as More › Reminders, so either place can change it.
 async function setDailyCheckin(uid:string,on:boolean,hour:number){
  const key='superdots-reminder-'+uid;
@@ -129,6 +130,7 @@ function GoalCard({g,on,onPress}:{g:typeof GOALS[number];on:boolean;onPress:()=>
 
 export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;editing?:boolean;onCancel?:()=>void}){
  const [i,setI]=useState(0),[goals,setGoals]=useState<GoalId[]>(editing?[]:['water','social']),[t,setT]=useState<Targets>(DEFAULT_TARGETS);
+ const [voice,setVoice]=useState<VoicePalId>('maya');
  const [mood,setMood]=useState<number|null>(null),[checkinReminder,setCheckinReminder]=useState(false),[fromPlan,setFromPlan]=useState(false);
  // What was saved before an edit, so only changed answers are applied and older text answers are kept.
  const [loaded,setLoaded]=useState<{goals:GoalId[];t:Targets;checkin:boolean;hour:number;legacy:string[]}|null>(null);
@@ -155,9 +157,9 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
  const steps=useMemo<Step[]>(()=>{
   const has=(g:GoalId)=>goals.includes(g);
   // New accounts get a short setup (water, social media, Apple Health); the rest has defaults and is editable later.
-  if(!editing)return ['welcome','water','socialNow','socialGoal','health','plan'];
+  if(!editing)return ['welcome','water','socialNow','socialGoal','health','voice','plan'];
   return ['welcome','goals',...(has('water')?['water' as const]:[]),...(has('social')?['socialNow' as const,'socialGoal' as const]:[]),...(has('sleep')?['sleep' as const]:[]),
-   ...(has('move')?['move' as const]:[]),...(has('mindful')||has('stress')?['mindful' as const]:[]),...(editing?[]:['feeling' as const]),'health','reminders','plan'];
+   ...(has('move')?['move' as const]:[]),...(has('mindful')||has('stress')?['mindful' as const]:[]),...(editing?[]:['feeling' as const]),'health','voice','reminders','plan'];
  },[goals,editing]);
  const step=steps[Math.min(i,steps.length-1)];
  const go=(n:number)=>{const to=Math.max(0,Math.min(steps.length-1,n));if(reduce){setI(to);return}
@@ -188,6 +190,7 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
    if(fresh('social','social_goal')&&socialTrackSupported){try{configureSocialTrack(getSocialState()?.enabled??false,t.social_goal)}catch{}}
    if(!editing&&mood!==null){await supabase.from('wellness_journal').insert({user_id:user.id,entry_type:'reflection',body:'Mood check-in',mood:MOODS[mood].mood,reflection_answers:{},stress_factors:[]})}
    if(!editing?checkinReminder:loaded&&checkinReminder!==loaded.checkin)await setDailyCheckin(user.id,checkinReminder,loaded?.hour??20);
+   await saveVoicePal(voice);
    if(!editing)void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(()=>{});
    done();
   }catch(e:any){Alert.alert('Could not save',e?.message||'Please try again.');}
@@ -253,6 +256,9 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
    </Dial></>;
   case 'feeling':return <>{head('How have you been feeling lately?','Slide across the pals. This is your first check-in.')}
    <MoodSlider value={mood} onChange={setMood} onDrag={setDragging}/></>;
+  case 'voice':return <>{head('Pick your buddy','Talk about your day like you would with a best friend. Tap one to hear them say hi.')}
+   <VoicePalGrid value={voice} onPick={setVoice}/>
+   <Text style={s.hint}>Calls are part of MoodPals Plus. You can change your buddy any time.</Text></>;
   case 'health':return <>{head('Connect Apple Health','MoodPals reads your HRV, sleep and steps to show how your body handles stress. Nothing is shared.')}
    <View style={s.center}><View style={s.palStage}><SuperdotMascot id="calm" size={150}/></View></View>
    {healthKitAvailable()?<TouchableOpacity disabled={health!=='idle'} onPress={()=>void connectHealth()} style={[s.secondary,health==='done'&&{backgroundColor:SW.mint}]} accessibilityRole="button">
