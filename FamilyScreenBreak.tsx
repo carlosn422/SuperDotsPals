@@ -169,11 +169,20 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  const parentScrub=useContext(ChartScrubContext),[scrub,setScrub]=useState(false);
  const scrubCtx=useCallback((v:boolean)=>{setScrub(v);parentScrub(v)},[parentScrub]);
  const index=Math.max(0,members.findIndex(c=>c.id===current?.id));
- useEffect(()=>{pager.current?.scrollTo({x:index*screenW,animated:!reduce})},[index,screenW]);
+ // Swipes already land on the page; taps jump there and fade the new profile in instead of sliding past blank pages.
+ const tapped=useRef(false),fade=useRef(new Animated.Value(1)).current;
+ useEffect(()=>{
+  pager.current?.scrollTo({x:index*screenW,animated:false});
+  if(!tapped.current)return;
+  tapped.current=false;
+  if(reduce)return;
+  fade.setValue(0);
+  Animated.timing(fade,{toValue:1,duration:260,useNativeDriver:true}).start();
+ },[index,screenW]);
  // The member cards stay pinned above the tab bar (drawn by the host, outside this scroll view).
  const [devSel,setDevSel]=useState<string|null>(null),[addingDevice,setAddingDevice]=useState(false),[watchesOpen,setWatchesOpen]=useState(false);
  const showDock=!guest&&route.name==='list'&&!loading&&!error&&(section==='devices'||members.length>0);
- const dockRow=section==='devices'?<DeviceDock devices={family.devices} defaultId={family.defaultId} sessions={family.sessions} selected={devSel} adding={addingDevice} onSelect={id=>{void Haptics.selectionAsync();setAddingDevice(false);setDevSel(id)}} onAdd={()=>setAddingDevice(a=>!a)}/>:<ProfileRow members={members} selected={current?.id} adding={adding} onSelect={id=>{setAdding(false);setSelected(id)}} onAdd={()=>setAdding(a=>!a)} sessions={family.sessions}/>;
+ const dockRow=section==='devices'?<DeviceDock devices={family.devices} defaultId={family.defaultId} sessions={family.sessions} selected={devSel} adding={addingDevice} onSelect={id=>{void Haptics.selectionAsync();setAddingDevice(false);setDevSel(id)}} onAdd={()=>setAddingDevice(a=>!a)}/>:<ProfileRow members={members} selected={current?.id} adding={adding} onSelect={id=>{setAdding(false);if(id!==current?.id)tapped.current=true;setSelected(id)}} onAdd={()=>setAdding(a=>!a)} sessions={family.sessions}/>;
  const dock=<View style={st.dockShell}><MintWave edge="bottom"/><View style={st.dockInner}>{dockRow}</View></View>;
  const dockKey=section+'|'+devSel+'|'+addingDevice+'|'+family.defaultId+'|'+family.devices.map(d=>d.id+d.name+d.device_type).join()+'|'+members.map(c=>c.id+c.name).join()+'|'+current?.id+'|'+adding+'|'+family.sessions.map(x=>x.id+x.deadline_at+x.granted_seconds).join();
  useEffect(()=>{onDock?.(showDock?dock:null)},[onDock,showDock,dockKey]);
@@ -194,9 +203,9 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
    {!loading&&!error?<View style={st.famSegment} accessibilityRole="tablist">{(['family','devices'] as const).map(k=><TouchableOpacity key={k} accessibilityRole="tab" accessibilityState={{selected:section===k}} onPress={()=>{if(section!==k){void Haptics.selectionAsync();setSection(k)}}} style={[st.segmentItem,section===k&&st.segmentOn]}><Ionicons name={k==='family'?'people':'tablet-portrait'} size={16} color={section===k?T.ink:T.muted}/><Text style={[st.segmentText,section===k&&{color:T.ink}]}>{k==='family'?'Family':'Devices'}</Text></TouchableOpacity>)}</View>:null}
    {section==='devices'&&!loading&&!error?<FamilyDevicesScreen childName={id=>children.find(c=>c.id===id)?.name||'Someone'} onStart={members.length?setStartOn:undefined} selectedId={devSel} adding={addingDevice} onAddDone={()=>setAddingDevice(false)}/>:<>
     {adding||(!loading&&!error&&!members.length)?<AddChild onAdded={id=>{setAdding(false);void load().then(()=>{if(id)setSelected(id)});familyChildrenChanged()}}/>:null}
-    {current&&!adding?<ChartScrubContext.Provider value={scrubCtx}><ScrollView ref={pager} horizontal pagingEnabled scrollEnabled={!scrub} showsHorizontalScrollIndicator={false} contentOffset={{x:index*screenW,y:0}} onMomentumScrollEnd={e=>{const c=members[Math.round(e.nativeEvent.contentOffset.x/screenW)];if(c&&c.id!==current.id){void Haptics.selectionAsync();setSelected(c.id)}}} style={{marginHorizontal:-20}}>
-     {members.map(c=><View key={c.id} style={{width:screenW,paddingHorizontal:20}}>{c.id===current.id?<ChildScreen inline child={c} children={children} onBack={()=>{}} onInsights={()=>setInsightsId(c.id)} onChanged={()=>{void load();familyChildrenChanged()}} onRemoved={()=>{setSelected(null);void load()}} onAddWatch={onAddWatch} onOpen={select}/>:<View style={{minHeight:420}}/>}</View>)}
-    </ScrollView></ChartScrubContext.Provider>:null}
+    {current&&!adding?<ChartScrubContext.Provider value={scrubCtx}><Animated.View style={{opacity:fade,transform:[{translateY:fade.interpolate({inputRange:[0,1],outputRange:[10,0]})}]}}><ScrollView ref={pager} horizontal pagingEnabled scrollEnabled={!scrub} showsHorizontalScrollIndicator={false} contentOffset={{x:index*screenW,y:0}} onMomentumScrollEnd={e=>{const c=members[Math.round(e.nativeEvent.contentOffset.x/screenW)];if(c&&c.id!==current.id){void Haptics.selectionAsync();setSelected(c.id)}}} style={{marginHorizontal:-20}}>
+     {members.map((c,i)=><View key={c.id} style={{width:screenW,paddingHorizontal:20}}>{Math.abs(i-index)<=1?<ChildScreen inline child={c} children={children} onBack={()=>{}} onInsights={()=>setInsightsId(c.id)} onChanged={()=>{void load();familyChildrenChanged()}} onRemoved={()=>{setSelected(null);void load()}} onAddWatch={onAddWatch} onOpen={select}/>:<View style={{minHeight:420}}/>}</View>)}
+    </ScrollView></Animated.View></ChartScrubContext.Provider>:null}
     {!onDock&&!loading&&!error&&members.length?dock:null}
    </>}
   </>}
