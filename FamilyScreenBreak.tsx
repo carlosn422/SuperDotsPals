@@ -902,7 +902,7 @@ function InsightsScreen({child,onBack}:{child:FamilyChild;onBack:()=>void}){
  const stats=useMemo(()=>periodStats(shown,period,anchor,new Date(now)),[shown,period,anchor,Math.floor(now/60000)]);
  const byDevice=useMemo(()=>{
   const keys=[...new Set(all.map(deviceKey))];
-  return keys.map(k=>{const p=periodStats(all.filter(r=>deviceKey(r)===k),period,anchor,new Date(now));return {key:k,name:k===PHONE?'This iPhone':deviceName(k),seconds:p.seconds,sessions:p.sessions}}).filter(x=>x.seconds>0||x.sessions>0).sort((a,b)=>b.seconds-a.seconds);
+  return keys.map(k=>{const p=periodStats(all.filter(r=>deviceKey(r)===k),period,anchor,new Date(now));return {key:k,name:k===PHONE?'This iPhone':deviceName(k),seconds:p.seconds,sessions:p.sessions,buckets:p.buckets}}).filter(x=>x.seconds>0||x.sessions>0).sort((a,b)=>b.seconds-a.seconds);
  },[all,period,anchor,deviceName,Math.floor(now/60000)]);
  const deviceTotal=useMemo(()=>byDevice.reduce((t,d)=>({seconds:t.seconds+d.seconds,sessions:t.sessions+d.sessions}),{seconds:0,sessions:0}),[byDevice]);
  const compare=comparison(stats);
@@ -930,7 +930,7 @@ function InsightsScreen({child,onBack}:{child:FamilyChild;onBack:()=>void}){
   </View>
   <View style={st.card}>
    <Text style={st.kicker}>{({day:'Sessions by hour',week:'Sessions by day',month:'Sessions by week',year:'Sessions by month'} as const)[period]}</Text>
-   {stats.hasData?<SessionLineChart period={period} buckets={stats.buckets}/>:<Text style={st.body}>No Screen Break sessions for {child.name} in this period.</Text>}
+   {stats.hasData?<StackedBars period={period} series={device==='all'&&byDevice.length>1?byDevice:[{key:'one',name:child.name,buckets:stats.buckets}]}/>:<Text style={st.body}>No Screen Break sessions for {child.name} in this period.</Text>}
    {stats.highest&&period!=='day'?<Text style={st.sub}>Longest: {period==='week'?stats.highest.start.toLocaleDateString(undefined,{weekday:'long'}):period==='month'?'Week '+stats.highest.label.replace('Wk ',''):stats.highest.start.toLocaleDateString(undefined,{month:'long'})} · {formatDuration(stats.highest.seconds)}</Text>:null}
   </View>
   {device==='all'&&(family.devices.length>0||byDevice.some(d=>d.key!==PHONE))&&byDevice.length>0?<View style={st.card}>
@@ -954,6 +954,32 @@ function bucketName(period:BreakPeriod,b:Bucket){
 }
 
 // Line graph of recorded Screen Break time. Press and drag along it to read the time at each point.
+const SERIES_COLORS=[T.primary,'#4A8CFF','#F2A93B','#E5484D','#9B7BC8','#2A9DA8'];
+/** Colored stacked bars, one color per device; tap a bar for its time. */
+function StackedBars({period,series}:{period:BreakPeriod;series:{key:string;name:string;buckets:Bucket[]}[]}){
+ const [picked,setPicked]=useState<number|null>(null),[width,setWidth]=useState(0);
+ const H=140,n=series[0]?.buckets.length||0;
+ const totals=Array.from({length:n},(_,i)=>series.reduce((t,x)=>t+(x.buckets[i]?.seconds||0),0));
+ const peak=Math.max(60,...totals),total=totals.reduce((a,b)=>a+b,0);
+ const gap=n>12?3:6,bw=n?Math.max(4,(width-gap*(n-1))/n):0;
+ const sel=picked!==null?picked:null;
+ return <View style={{gap:10}}>
+  <View>
+   <Text style={st.statValue}>{formatDuration(sel!==null?totals[sel]:total)}</Text>
+   <Text style={st.sub}>{sel!==null?bucketName(period,series[0].buckets[sel]):'Total'}</Text>
+  </View>
+  <View onLayout={e=>setWidth(e.nativeEvent.layout.width)} style={{height:H,flexDirection:'row',alignItems:'flex-end',gap}}>
+   {width?totals.map((t,i)=><TouchableOpacity key={i} accessibilityRole="button" accessibilityLabel={bucketName(period,series[0].buckets[i])+', '+formatDuration(t)} onPress={()=>{void Haptics.selectionAsync();setPicked(p=>p===i?null:i)}} style={{width:bw,height:H,justifyContent:'flex-end'}}>
+    <View style={{height:Math.max(4,H*t/peak),borderRadius:Math.min(6,bw/2),overflow:'hidden',backgroundColor:t?undefined:'#EEF2F0',opacity:sel===null||sel===i?1:.35,flexDirection:'column-reverse'}}>
+     {t?series.map((x,k)=>{const v=x.buckets[i]?.seconds||0;return v?<View key={x.key} style={{flex:v,backgroundColor:SERIES_COLORS[k%SERIES_COLORS.length]}}/>:null}):null}
+    </View>
+   </TouchableOpacity>):null}
+  </View>
+  <View style={{flexDirection:'row',justifyContent:'space-between'}}>{[0,Math.floor((n-1)/2),n-1].filter((v,i,a)=>n&&a.indexOf(v)===i).map(i=><Text key={i} style={st.axis}>{series[0].buckets[i].label}</Text>)}</View>
+  {series.length>1?<View style={{flexDirection:'row',flexWrap:'wrap',gap:12}}>{series.map((x,k)=><View key={x.key} style={{flexDirection:'row',alignItems:'center',gap:6}}><View style={{width:10,height:10,borderRadius:5,backgroundColor:SERIES_COLORS[k%SERIES_COLORS.length]}}/><Text style={[st.sub,{fontWeight:'700'}]}>{x.name}</Text></View>)}</View>:null}
+ </View>;
+}
+
 function SessionLineChart({period,buckets}:{period:BreakPeriod;buckets:Bucket[]}){
  const [width,setWidth]=useState(0),[picked,setPicked]=useState<number|null>(null);
  const H=120,pad=8,n=buckets.length;
