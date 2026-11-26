@@ -5,7 +5,7 @@ import Svg,{Circle} from 'react-native-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {supabase} from './supabase';
 import {APP_THEME as T} from './MoodMascot';
-import {authenticateGuardian} from './modules/watch-link/screenBreak';
+import {authenticateGuardian,getBreakState,onBreakState,sendBreakCommand,type BreakState} from './modules/watch-link/screenBreak';
 import {useReduceMotion} from './CircleComponents';
 import {formatDuration,periodStats,periodRange,type SessionRow} from './ScreenBreakInsights';
 
@@ -77,7 +77,7 @@ export function deviceStatus(d:FamilyDevice,commands:DeviceCommand[],sessions:Re
  if(d.auth_status!=='approved')return {label:'Authorization required',tone:'warn'};
  if(sessions.some(s=>s.family_device_id===d.id&&Date.parse(s.deadline_at)>now))return {label:'Timer active',tone:'busy'};
  if(stale&&d.last_sync_at&&now-Date.parse(d.last_sync_at)>60*60000)return {label:'Device unavailable',tone:'warn'};
- if(d.restricted)return {label:'Apps paused',tone:'ok'};
+ if(d.restricted)return {label:'Apps locked',tone:'ok'};
  return {label:'Ready',tone:'ok'};
 }
 
@@ -170,6 +170,9 @@ export function FamilyDevicesScreen({childName,onStart,selectedId,adding,onAddDo
  useEffect(()=>{if(sheet&&loaded&&!open)setSheet(null)},[sheet,loaded,open]);
  const id=selectedId&&(selectedId===PHONE||devices.some(d=>d.id===selectedId))?selectedId:deviceOrder(devices,defaultId)[0];
  const d=devices.find(x=>x.id===id);
+ const [phoneState,setPhoneState]=useState<BreakState|null>(()=>getBreakState());
+ useEffect(()=>{const sub=onBreakState(setPhoneState);return()=>sub.remove()},[]);
+ const phoneSend=(a:'lock'|'unlock')=>{const r=sendBreakCommand(a);if(r.state)setPhoneState(r.state);if(!r.ok)Alert.alert('This iPhone',r.error||'Something went wrong. Please try again.')};
  return <View style={{gap:14}}>
   {adding?<AddDevice onDone={()=>onAddDone?.()}/>:null}
   {!loaded?<ActivityIndicator color={T.primary}/>:null}
@@ -179,11 +182,12 @@ export function FamilyDevicesScreen({childName,onStart,selectedId,adding,onAddDo
     <IconTile icon="phone-portrait" color="#4A8CFF" size={52}/>
     <View style={{flex:1}}>
      <View style={s.nameLine}><Text style={s.rowTitle} numberOfLines={1}>This iPhone</Text>{defaultId===PHONE?<DefaultPill/>:null}</View>
-     <StatusLine icon="checkmark-circle" color={OK} text="Your iPhone"/>
+     {phoneState?.manualLock?<StatusLine icon="lock-closed" color={PAUSED} text="Apps locked"/>:phoneState?.session?.status==='active'?<StatusLine icon="hourglass" color={OK} text="Timer running"/>:<StatusLine icon="checkmark-circle" color={OK} text="Available"/>}
     </View>
     {defaultId===PHONE?null:<TouchableOpacity accessibilityRole="button" accessibilityLabel="Make This iPhone the default device" onPress={()=>void rpc('family_device_clear_default',{}).catch(e=>Alert.alert('Family Devices',e.message))} style={s.textBtn}><Text style={s.link}>Make default</Text></TouchableOpacity>}
    </View>
-   {onStart?<View style={s.actions}><ActionBtn primary label="Start timer" icon="time-outline" onPress={()=>onStart(THIS_PHONE)}/></View>:null}
+   {phoneState?.manualLock?<View style={s.actions}><ActionBtn primary label="Unlock apps" icon="lock-open-outline" onPress={()=>phoneSend('unlock')}/>{onStart?<ActionBtn label="Start timer" icon="time-outline" onPress={()=>onStart(THIS_PHONE)}/>:null}</View>
+   :<View style={s.actions}>{onStart?<ActionBtn primary label="Start timer" icon="time-outline" onPress={()=>onStart(THIS_PHONE)}/>:null}{phoneState?.session?.status==='active'?null:<ActionBtn label="Lock apps" icon="lock-closed-outline" onPress={()=>phoneSend('lock')}/>}</View>}
   </View>
   </>:null}
   {!adding&&loaded?<DeviceStats deviceId={d?d.id:PHONE} childName={childName}/>:null}
@@ -255,7 +259,7 @@ export function DeviceCard({device:d,isDefault,commands,sessions,now,childName,o
   :session?{icon:'timer-outline',color:T.primary,text:childName(session.child_id)+' · '+left}
   :!ready?{icon:'alert-circle',color:WARN,text:d.auth_status==='approved'?'Choose apps to pause on the device':'Finish Screen Time setup on the device'}
   :st.label==='Device unavailable'?{icon:'cloud-offline-outline',color:WARN,text:'Offline · '+seen(d,now)}
-  :d.restricted?{icon:'lock-closed',color:PAUSED,text:'Apps paused · '+seen(d,now)}
+  :d.restricted?{icon:'lock-closed',color:PAUSED,text:'Apps locked · '+seen(d,now)}
   :{icon:'checkmark-circle',color:OK,text:'Available · '+seen(d,now)};
  const pendingStart=st.pending?.type==='START_SESSION'?st.pending:undefined;
  return <View style={[s.card,width?{width}:null]}>
@@ -271,7 +275,7 @@ export function DeviceCard({device:d,isDefault,commands,sessions,now,childName,o
    :st.pending||!ready?null
    :session?<View style={s.actions}><ActionBtn primary label="Add time" icon="add" onPress={addTime}/><ActionBtn danger label="End" icon="stop-circle-outline" onPress={()=>void send('END_SESSION')}/></View>
    :d.restricted?<View style={s.actions}><ActionBtn primary label="Unlock apps" icon="lock-open-outline" onPress={()=>void send('UNLOCK_APPS')}/>{onStart?<ActionBtn label="Start timer" icon="time-outline" onPress={()=>onStart(d)}/>:null}</View>
-   :<View style={s.actions}>{onStart?<ActionBtn primary label="Start timer" icon="time-outline" onPress={()=>onStart(d)}/>:null}<ActionBtn label="Pause apps" icon="lock-closed-outline" onPress={()=>void send('LOCK_APPS')}/></View>}
+   :<View style={s.actions}>{onStart?<ActionBtn primary label="Start timer" icon="time-outline" onPress={()=>onStart(d)}/>:null}<ActionBtn label="Lock apps" icon="lock-closed-outline" onPress={()=>void send('LOCK_APPS')}/></View>}
   {failed&&!st.pending?<Text style={[s.sub,{color:PAUSED}]}>{failed.error||'The device couldn’t do that.'}</Text>:null}
   {error?<Text style={[s.sub,{color:PAUSED}]}>{error}</Text>:null}
  </View>;
