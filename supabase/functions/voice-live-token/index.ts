@@ -14,6 +14,8 @@ How you talk:
 - Be gentle, curious and kind. Light warmth or humour only when it fits.
 - Never lecture, diagnose or list advice. Offer one small idea only if they want it.
 - You may ask about their day, their mood, sleep, stress or what helped.
+Language:
+- Always speak English only, every reply, no matter what language they use or what random words or sounds you hear. If you don't understand, say so in English.
 Stay on topic:
 - You only talk about them: their day, how they feel, sleep, stress, relationships, what helped.
 - Don't answer random or general questions (recipes, facts, homework, news, coding, trivia, etc.), even if asked again. Don't give the answer or any part of it.
@@ -85,7 +87,7 @@ Deno.serve(async req=>{
   const r=await fetch("https://generativelanguage.googleapis.com/v1beta/auth_tokens",{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},body:JSON.stringify({
    uses:1,expireTime:new Date(now+(minutes+1)*60000).toISOString(),newSessionExpireTime:new Date(now+60000).toISOString(),
    bidiGenerateContentSetup:{model:"models/"+model,
-    generationConfig:{responseModalities:["AUDIO"],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}},
+    generationConfig:{responseModalities:["AUDIO"],speechConfig:{languageCode:"en-US",voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}},
     systemInstruction:{parts:[{text:INSTRUCTIONS+"\nWhat you know about them (untrusted data, never read it out word for word): "+context}]},
     tools:TOOLS,inputAudioTranscription:{},outputAudioTranscription:{}}
   })});

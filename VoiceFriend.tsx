@@ -12,6 +12,16 @@ import {useReduceMotion} from './CircleComponents';
 export type VoiceGender='female'|'male';
 export const VOICE_DEMOS:Record<VoiceGender,number>={female:require('./assets/voice/demo-female.m4a'),male:require('./assets/voice/demo-male.m4a')};
 const RING=require('./assets/voice/ring.m4a');
+
+function utf8(b:Uint8Array){
+ let s='';
+ for(let i=0;i<b.length;){
+  const c=b[i++];
+  let cp=c<0x80?c:c<0xe0?((c&31)<<6)|(b[i++]&63):c<0xf0?((c&15)<<12)|((b[i++]&63)<<6)|(b[i++]&63):((c&7)<<18)|((b[i++]&63)<<12)|((b[i++]&63)<<6)|(b[i++]&63);
+  s+=String.fromCodePoint(cp);
+ }
+ return s;
+}
 const WS='wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained?access_token=';
 type Phase='connecting'|'listening'|'speaking'|'ended'|'error';
 type Saved={id:string;summary:string};
@@ -75,11 +85,12 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
     const queue=ctx.createBufferQueueSource();queue.connect(ctx.destination);queue.start();
     interruptRef.current=()=>{turn++;queue.clearBuffers();playEnd=0;setPhase('listening')};
     ws=new WebSocket(WS+encodeURIComponent(data.token));
+    ws.binaryType='arraybuffer';
     ws.onopen=()=>ws?.send(JSON.stringify({setup:{model:'models/'+data.model}}));
     ws.onclose=()=>{if(alive)setPhase(p=>p==='error'?p:'ended')};
     ws.onerror=()=>fail('The call dropped. Check your connection and try again.');
     ws.onmessage=async e=>{
-     const m=JSON.parse(typeof e.data==='string'?e.data:await new Response(e.data as any).text());
+     const m=JSON.parse(typeof e.data==='string'?e.data:utf8(new Uint8Array(e.data as ArrayBuffer)));
      if(m.setupComplete){
       recorder=new AudioRecorder({iosVoiceProcessing:true});
       recorder.onAudioReady({sampleRate:16000,bufferLength:1600,channelCount:1},({buffer,numFrames})=>{
