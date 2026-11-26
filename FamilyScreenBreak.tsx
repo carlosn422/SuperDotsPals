@@ -212,9 +212,9 @@ const heroColor=(frac:number,ms:number)=>ms<=5*60000||frac<=.2?'#E5484D':frac<=.
 /** Running timer: full-color card with the countdown, then who/where with a progress bar. */
 /** Soft mint wave that blends a section into the page background. */
 function MintWave({edge}:{edge:'top'|'bottom'}){
- const id='mw'+edge,{width:w}=useWindowDimensions();
- if(edge==='bottom')return <View style={st.dockWave} pointerEvents="none"><Svg width={w} height={420}>
-  <Defs><LinearGradient id={id} x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#FFFFFF" stopOpacity=".55"/><Stop offset=".25" stopColor="#E4F6EA" stopOpacity=".9"/><Stop offset="1" stopColor="#D6F1E1" stopOpacity="1"/></LinearGradient></Defs>
+ const id='mw'+edge,[w,setW]=useState(useWindowDimensions().width);
+ if(edge==='bottom')return <View style={st.dockWave} pointerEvents="none" onLayout={e=>setW(e.nativeEvent.layout.width)}><Svg width={w} height={420}>
+  <Defs><LinearGradient id={id} x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#FFFFFF" stopOpacity=".35"/><Stop offset=".22" stopColor="#E4F6EA" stopOpacity=".8"/><Stop offset=".5" stopColor={T.background} stopOpacity="1"/></LinearGradient></Defs>
   <Path d={`M0 34 C${w*.28} -6 ${w*.6} -4 ${w} 30 V420 H0 Z`} fill={'url(#'+id+')'}/>
   <Path d={`M0 34 C${w*.28} -6 ${w*.6} -4 ${w} 30`} stroke="#FFFFFF" strokeWidth={1.5} fill="none"/>
  </Svg></View>;
@@ -296,11 +296,11 @@ function ProfileRow({members,selected,adding,onSelect,onAdd,sessions}:{members:F
  </ScrollView>;
 }
 function ProfileCard({name,index,on,frac,onPress}:{name:string;index:number;on:boolean;frac:number|null;onPress:()=>void}){
- const k=index%TINTS.length,r=20,cc=2*Math.PI*r,color=frac===null?T.primary:heroColor(frac,Infinity),d=frac===null?44:32;
+ const k=index%TINTS.length,r=16,cc=2*Math.PI*r,color=frac===null?T.primary:heroColor(frac,Infinity),d=frac===null?36:26;
  return <TouchableOpacity accessibilityRole="button" accessibilityLabel={name+(frac!==null?', timer running':'')} accessibilityState={{selected:on}} onPress={onPress} style={[st.memberCard,on&&{backgroundColor:T.primary,borderColor:T.primary}]}>
-  <View style={{width:46,height:46,alignItems:'center',justifyContent:'center'}}>
-   {frac!==null?<Svg width={46} height={46} style={StyleSheet.absoluteFill}><Circle cx={23} cy={23} r={r} stroke={on?'rgba(255,255,255,.35)':color+'33'} strokeWidth={4} fill="none"/><Circle cx={23} cy={23} r={r} stroke={on?'#fff':color} strokeWidth={4} fill="none" strokeLinecap="round" strokeDasharray={cc+' '+cc} strokeDashoffset={cc*(1-frac)} transform="rotate(-90 23 23)"/></Svg>:null}
-   <View style={{width:d,height:d,borderRadius:d/2,backgroundColor:on?'rgba(255,255,255,.25)':TINTS[k],alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:frac===null?20:15,fontWeight:'900',color:on?'#fff':TINT_INK[k]}}>{name.slice(0,1).toUpperCase()}</Text></View>
+  <View style={{width:38,height:38,alignItems:'center',justifyContent:'center'}}>
+   {frac!==null?<Svg width={38} height={38} style={StyleSheet.absoluteFill}><Circle cx={19} cy={19} r={r} stroke={on?'rgba(255,255,255,.35)':color+'33'} strokeWidth={3.5} fill="none"/><Circle cx={19} cy={19} r={r} stroke={on?'#fff':color} strokeWidth={3.5} fill="none" strokeLinecap="round" strokeDasharray={cc+' '+cc} strokeDashoffset={cc*(1-frac)} transform="rotate(-90 19 19)"/></Svg>:null}
+   <View style={{width:d,height:d,borderRadius:d/2,backgroundColor:on?'rgba(255,255,255,.25)':TINTS[k],alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:frac===null?17:13,fontWeight:'900',color:on?'#fff':TINT_INK[k]}}>{name.slice(0,1).toUpperCase()}</Text></View>
   </View>
   <Text style={[st.profileName,{color:on?'#fff':T.ink}]} numberOfLines={1}>{name}</Text>
  </TouchableOpacity>;
@@ -1172,9 +1172,9 @@ const st=StyleSheet.create({
  segmentOn:{backgroundColor:'#fff',shadowColor:'#000',shadowOpacity:.08,shadowRadius:4,shadowOffset:{width:0,height:1}},
  segmentText:{fontSize:15,fontWeight:'800',color:T.muted},
  moreBtn:{width:44,height:44,borderRadius:22,backgroundColor:T.primarySoft,alignItems:'center',justifyContent:'center'},
- memberCard:{width:84,paddingVertical:12,borderRadius:20,alignItems:'center',gap:8,backgroundColor:'rgba(255,255,255,.8)',borderWidth:1,borderColor:'#fff'},
- dockShell:{paddingTop:30,gap:8},
- dockWave:{position:'absolute',top:0,left:-32,right:-32,bottom:-200},
+ memberCard:{width:70,paddingVertical:9,borderRadius:18,alignItems:'center',gap:6,backgroundColor:'rgba(255,255,255,.8)',borderWidth:1,borderColor:'#fff'},
+ dockShell:{paddingTop:30,paddingHorizontal:20,paddingBottom:8,gap:8},
+ dockWave:{position:'absolute',top:0,left:0,right:0,bottom:0,overflow:'hidden'},
  dockHead:{flexDirection:'row',alignItems:'center',gap:7,paddingHorizontal:4},
  dockLabel:{color:'#0F4D3A',fontSize:17,fontWeight:'900'},
  dockInner:{},
@@ -1187,7 +1187,7 @@ const st=StyleSheet.create({
  statBig:{fontSize:26,fontWeight:'900',color:T.ink},
  statOrb:{width:52,height:52,borderRadius:26,alignItems:'center',justifyContent:'center',alignSelf:'center'},
  profile:{width:58,height:58,borderRadius:29,alignItems:'center',justifyContent:'center'},
- profileName:{fontSize:13,fontWeight:'800',color:T.muted,maxWidth:68},
+ profileName:{fontSize:12,fontWeight:'800',color:T.muted,maxWidth:60},
  profileTimer:{position:'absolute',right:2,bottom:2,width:22,height:22,borderRadius:11,backgroundColor:T.primary,borderWidth:2,borderColor:'#fff',alignItems:'center',justifyContent:'center'},
  tile:{width:43,height:43,borderRadius:15,alignItems:'center',justifyContent:'center'},
  presets:{flexDirection:'row',flexWrap:'wrap',justifyContent:'center',gap:8},

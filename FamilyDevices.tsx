@@ -164,16 +164,16 @@ export function DeviceDock({devices,defaultId,sessions,selected,adding,onSelect,
    const d=devices.find(x=>x.id===id),on=!adding&&id===cur,name=d?d.name:'This iPhone';
    const run=d?sessions.find(x=>x.family_device_id===d.id&&Date.parse(x.deadline_at)>now):undefined;
    const frac=run?Math.min(1,(Date.parse(run.deadline_at)-now)/1000/Math.max(1,run.granted_seconds)):null;
-   const color=frac===null?T.primary:frac<=.2?'#E5484D':frac<=.5?'#F2A93B':T.primary,r=20,cc=2*Math.PI*r;
+   const color=frac===null?T.primary:frac<=.2?'#E5484D':frac<=.5?'#F2A93B':T.primary,r=16,cc=2*Math.PI*r;
    return <TouchableOpacity key={id} accessibilityRole="button" accessibilityLabel={name+(frac!==null?', timer running':'')+(defaultId===id?', default':'')} accessibilityState={{selected:on}} onPress={()=>onSelect(id)} style={[s.dockCard,on&&{backgroundColor:T.primary,borderColor:T.primary}]}>
-    <View style={{width:46,height:46,alignItems:'center',justifyContent:'center'}}>
-     {frac!==null?<Svg width={46} height={46} style={StyleSheet.absoluteFill}><Circle cx={23} cy={23} r={r} stroke={on?'rgba(255,255,255,.35)':color+'33'} strokeWidth={4} fill="none"/><Circle cx={23} cy={23} r={r} stroke={on?'#fff':color} strokeWidth={4} fill="none" strokeLinecap="round" strokeDasharray={cc+' '+cc} strokeDashoffset={cc*(1-frac)} transform="rotate(-90 23 23)"/></Svg>:null}
-     {on?<Ionicons name={d?.device_type==='ipad'?'tablet-landscape':'phone-portrait'} size={frac===null?26:18} color="#fff"/>:<IconTile icon={d?.device_type==='ipad'?'tablet-landscape':'phone-portrait'} color="#4A8CFF" size={frac===null?44:32}/>}
+    <View style={{width:38,height:38,alignItems:'center',justifyContent:'center'}}>
+     {frac!==null?<Svg width={38} height={38} style={StyleSheet.absoluteFill}><Circle cx={19} cy={19} r={r} stroke={on?'rgba(255,255,255,.35)':color+'33'} strokeWidth={3.5} fill="none"/><Circle cx={19} cy={19} r={r} stroke={on?'#fff':color} strokeWidth={3.5} fill="none" strokeLinecap="round" strokeDasharray={cc+' '+cc} strokeDashoffset={cc*(1-frac)} transform="rotate(-90 19 19)"/></Svg>:null}
+     {on?<Ionicons name={d?.device_type==='ipad'?'tablet-landscape':'phone-portrait'} size={frac===null?22:15} color="#fff"/>:<IconTile icon={d?.device_type==='ipad'?'tablet-landscape':'phone-portrait'} color="#4A8CFF" size={frac===null?36:26}/>}
     </View>
     <Text style={[s.dockName,{color:on?'#fff':T.ink}]} numberOfLines={1}>{name}</Text>
    </TouchableOpacity>})}
   <TouchableOpacity accessibilityRole="button" accessibilityLabel={adding?'Close add device':'Add device'} onPress={onAdd} style={[s.dockCard,{borderStyle:'dashed',borderWidth:2,borderColor:adding?T.primary:'#C9D6CF'}]}>
-   <View style={{width:46,height:46,alignItems:'center',justifyContent:'center'}}><Ionicons name={adding?'close':'add'} size={28} color={T.primary}/></View>
+   <View style={{width:38,height:38,alignItems:'center',justifyContent:'center'}}><Ionicons name={adding?'close':'add'} size={24} color={T.primary}/></View>
    <Text style={[s.dockName,{color:T.ink}]}>{adding?'Close':'Add'}</Text>
   </TouchableOpacity>
  </ScrollView>;
@@ -325,8 +325,8 @@ const s=StyleSheet.create({
  select:{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#fff',borderRadius:18,borderWidth:1.5,borderColor:T.border,paddingHorizontal:14,paddingVertical:10,minHeight:64},
  selectLink:{fontSize:15,fontWeight:'800',color:T.primary},
  sheet:{backgroundColor:'#fff',borderTopLeftRadius:28,borderTopRightRadius:28,padding:22,paddingBottom:40,gap:10,maxHeight:'85%'},
- dockCard:{width:84,paddingVertical:12,borderRadius:20,alignItems:'center',gap:8,backgroundColor:'rgba(255,255,255,.8)',borderWidth:1,borderColor:'#fff'},
- dockName:{fontSize:13,fontWeight:'800',maxWidth:72},
+ dockCard:{width:70,paddingVertical:9,borderRadius:18,alignItems:'center',gap:6,backgroundColor:'rgba(255,255,255,.8)',borderWidth:1,borderColor:'#fff'},
+ dockName:{fontSize:12,fontWeight:'800',maxWidth:60},
  showAll:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6,alignSelf:'center',minHeight:44,paddingHorizontal:16},
  closeBtn:{width:40,height:40,borderRadius:20,backgroundColor:'#fff',alignItems:'center',justifyContent:'center'},
  grabber:{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'},
