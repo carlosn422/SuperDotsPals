@@ -1084,7 +1084,7 @@ function ChildStats({child,onPress}:{child:FamilyChild;onPress:()=>void}){
    </TouchableOpacity>
    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open Insights" onPress={onPress} activeOpacity={0.7} style={[st.statBox,{flex:1,flexDirection:'column',alignItems:'flex-start'}]}>
     {head('apps','#9B7BC8','Top app')}
-    {top?<><View style={{height:26,alignSelf:'stretch'}}>{SocialAppLabel?<SocialAppLabel app={top[0]} style={{height:26,flex:1}}/>:<Text style={st.rowTitle}>App</Text>}</View><Text style={st.statBig}>{formatDuration(top[1]*60)}</Text></>:<Text style={st.statBig}>—</Text>}
+    {top?<><View style={{height:26,alignSelf:'stretch'}}>{SocialAppLabel?<SocialAppLabel app={top[0]} style={{height:26,flex:1}}/>:<Text style={st.rowTitle}>App</Text>}</View><Text style={st.statBig}>{formatDuration(top[1]*60)}</Text></>:<Text style={{fontSize:17,fontWeight:'700',color:T.muted,marginTop:6}}>None yet</Text>}
     {top?null:<View style={[st.statOrb,{backgroundColor:'#F4EBFF'}]}><Ionicons name="apps" size={24} color="#9B7BC8"/></View>}
    </TouchableOpacity>
   </View>
