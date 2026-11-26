@@ -12,6 +12,7 @@ import {useReduceMotion} from './CircleComponents';
 import SuperdotMascot from './SuperdotMascot';
 import {usePlus} from './PlusStore';
 import {UpgradePill} from './TodayUpsell';
+import {SocialAppLabel,socialMarks} from './modules/watch-link/socialTrack';
 import {useIsGuest} from './Account';
 import {ManageFamilyProfile,familyCall,familyProfilesChanged,shortProfileName,useFamilyProfiles,type FamilyProfile} from './FamilyWatches';
 import {WatchColorGrid,WatchColorSheet,WatchImage,colorName,isWatchColor,type WatchColor} from './WatchArt';
@@ -162,7 +163,8 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  const members=children.filter(c=>!c.watch_only);
  const current=members.find(c=>c.id===selected)||members[0];
  const pager=useRef<ScrollView>(null),reduce=useReduceMotion();
- const [section,setSection]=useState<'family'|'devices'>('family');
+ const [section,setSection]=useState<'family'|'devices'>('family'),[insightsId,setInsightsId]=useState<string|null>(null);
+ const insightsChild=insightsId?children.find(c=>c.id===insightsId):undefined;
  // The timer ring locks this pager while it's dragged, as well as the page behind it.
  const parentScrub=useContext(ChartScrubContext),[scrub,setScrub]=useState(false);
  const scrubCtx=useCallback((v:boolean)=>{setScrub(v);parentScrub(v)},[parentScrub]);
@@ -183,15 +185,18 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
    {!loading&&!error?<TrialBanner/>:null}
    {!loading&&!error?<View style={st.famSegment} accessibilityRole="tablist">{(['family','devices'] as const).map(k=><TouchableOpacity key={k} accessibilityRole="tab" accessibilityState={{selected:section===k}} onPress={()=>{if(section!==k){void Haptics.selectionAsync();setSection(k)}}} style={[st.segmentItem,section===k&&st.segmentOn]}><Ionicons name={k==='family'?'people':'tablet-portrait'} size={16} color={section===k?T.ink:T.muted}/><Text style={[st.segmentText,section===k&&{color:T.ink}]}>{k==='family'?'Family':'Devices'}</Text></TouchableOpacity>)}</View>:null}
    {section==='devices'&&!loading&&!error?<DevicesArea family={family} now={dashNow} width={screenW} childName={id=>children.find(c=>c.id===id)?.name||'Someone'} onOpen={id=>setRoute({name:'devices',id})} onAll={()=>setRoute({name:'devices'})} onStart={members.length?setStartOn:undefined}/>:<>
-    {!loading&&!error&&members.length?<ProfileRow members={members} selected={current?.id} adding={adding} onSelect={id=>{setAdding(false);setSelected(id)}} onAdd={()=>setAdding(a=>!a)} sessions={family.sessions}/>:null}
     {adding||(!loading&&!error&&!members.length)?<AddChild onAdded={id=>{setAdding(false);void load().then(()=>{if(id)setSelected(id)});familyChildrenChanged()}}/>:null}
     {current&&!adding?<ChartScrubContext.Provider value={scrubCtx}><ScrollView ref={pager} horizontal pagingEnabled scrollEnabled={!scrub} showsHorizontalScrollIndicator={false} contentOffset={{x:index*screenW,y:0}} onMomentumScrollEnd={e=>{const c=members[Math.round(e.nativeEvent.contentOffset.x/screenW)];if(c&&c.id!==current.id){void Haptics.selectionAsync();setSelected(c.id)}}} style={{marginHorizontal:-20}}>
-     {members.map(c=><View key={c.id} style={{width:screenW,paddingHorizontal:20}}>{c.id===current.id?<ChildScreen inline child={c} children={children} onBack={()=>{}} onInsights={()=>setRoute({name:'insights',id:c.id})} onChanged={()=>{void load();familyChildrenChanged()}} onRemoved={()=>{setSelected(null);void load()}} onAddWatch={onAddWatch} onOpen={select}/>:<View style={{minHeight:420}}/>}</View>)}
+     {members.map(c=><View key={c.id} style={{width:screenW,paddingHorizontal:20}}>{c.id===current.id?<ChildScreen inline child={c} children={children} onBack={()=>{}} onInsights={()=>setInsightsId(c.id)} onChanged={()=>{void load();familyChildrenChanged()}} onRemoved={()=>{setSelected(null);void load()}} onAddWatch={onAddWatch} onOpen={select}/>:<View style={{minHeight:420}}/>}</View>)}
     </ScrollView></ChartScrubContext.Provider>:null}
+    {!loading&&!error&&members.length?<ProfileRow members={members} selected={current?.id} adding={adding} onSelect={id=>{setAdding(false);setSelected(id)}} onAdd={()=>setAdding(a=>!a)} sessions={family.sessions}/>:null}
    </>}
   </>}
   {footer&&section==='devices'?<View style={{marginTop:10}}>{footer}</View>:null}
   <StartTimerSheet device={startOn} members={members} onClose={()=>setStartOn(null)}/>
+  <Modal visible={!!insightsChild} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setInsightsId(null)}>
+   {insightsChild?<ChartScrubContext.Provider value={scrubCtx}><ScrollView style={{flex:1,backgroundColor:T.background}} contentContainerStyle={{padding:20,paddingBottom:48}} showsVerticalScrollIndicator={false}><InsightsScreen sheet child={insightsChild} onBack={()=>setInsightsId(null)}/></ScrollView></ChartScrubContext.Provider>:null}
+  </Modal>
  </View>;
 }
 
@@ -228,31 +233,49 @@ function DevicesArea({family,now,width,childName,onOpen,onAll,onStart}:{family:R
  </View>;
 }
 
-/** Family members as circles; the selected one gets an animated ring. */
+/** Apps this child used on this iPhone in the period (MoodPals tracking, 15-minute steps). */
+function ChildApps({childId,start,end}:{childId:string;start:number;end:number}){
+ const rows=useMemo(()=>{
+  const by=new Map<number,number>();
+  for(const m of socialMarks(start))if(m.member===childId&&m.at<end)by.set(m.app,(by.get(m.app)||0)+m.minutes);
+  return [...by].map(([app,minutes])=>({app,minutes})).sort((a,b)=>b.minutes-a.minutes);
+ },[childId,start,end]);
+ const top=Math.max(1,...rows.map(r=>r.minutes));
+ return <View style={st.card}>
+  <Text style={st.kicker}>Apps</Text>
+  {!rows.length?<Text style={st.sub}>No tracked app time yet.</Text>:rows.map((r,i)=>{const c=SERIES_COLORS[i%SERIES_COLORS.length];return <View key={r.app} style={{gap:6}}>
+   <View style={{flexDirection:'row',alignItems:'center',gap:10}}>{SocialAppLabel?<SocialAppLabel app={r.app} style={{height:26,flex:1}}/>:<Text style={[st.rowTitle,{flex:1}]}>{r.app<0?'Other apps & sites':'App '+(r.app+1)}</Text>}<Text style={[st.rowTitle,{color:c}]}>{formatDuration(r.minutes*60)}</Text></View>
+   <View style={st.barTrack}><View style={[st.barFill,{width:`${Math.max(4,r.minutes/top*100)}%`,backgroundColor:c}]}/></View>
+  </View>})}
+ </View>;
+}
+
+/** Family members as cards; a running timer shows as a ring of the time left. */
 function ProfileRow({members,selected,adding,onSelect,onAdd,sessions}:{members:FamilyChild[];selected?:string;adding:boolean;onSelect:(id:string)=>void;onAdd:()=>void;sessions:RemoteSession[]}){
  const [state]=useBreakState();
- const now=Date.now();
- const timing=(id:string)=>(state?.session?.status==='active'&&state.session.childId===id&&state.session.deadline*1000>now)||sessions.some(x=>x.child_id===id&&Date.parse(x.deadline_at)>now);
- return <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:16,paddingVertical:4,paddingHorizontal:2}}>
-  {members.map((c,i)=><ProfileCircle key={c.id} name={c.name} index={i} on={!adding&&c.id===selected} timer={timing(c.id)} onPress={()=>{if(c.id!==selected||adding){void Haptics.selectionAsync();onSelect(c.id)}}}/>)}
-  <TouchableOpacity accessibilityRole="button" accessibilityLabel={adding?'Close add member':'Add member'} onPress={onAdd} style={{alignItems:'center',gap:6,width:68}}>
-   <View style={[st.profile,{borderStyle:'dashed',borderWidth:2,borderColor:adding?T.primary:'#C9D6CF',backgroundColor:'#fff'}]}><Ionicons name={adding?'close':'add'} size={28} color={T.primary}/></View>
-   <Text style={st.profileName}>{adding?'Close':'Add'}</Text>
+ const left=(id:string):number|null=>{
+  const now=Date.now(),s=state?.session;
+  if(s?.status==='active'&&s.childId===id&&s.deadline*1000>now)return Math.min(1,(s.deadline*1000-now)/1000/Math.max(1,s.grantedSeconds));
+  const r=sessions.find(x=>x.child_id===id&&Date.parse(x.deadline_at)>now);
+  return r?Math.min(1,(Date.parse(r.deadline_at)-now)/1000/Math.max(1,r.granted_seconds)):null;
+ };
+ useNow(members.some(c=>left(c.id)!==null));
+ return <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginTop:4}} contentContainerStyle={{gap:10,paddingVertical:4,paddingHorizontal:2}}>
+  {members.map((c,i)=><ProfileCard key={c.id} name={c.name} index={i} on={!adding&&c.id===selected} frac={left(c.id)} onPress={()=>{if(c.id!==selected||adding){void Haptics.selectionAsync();onSelect(c.id)}}}/>)}
+  <TouchableOpacity accessibilityRole="button" accessibilityLabel={adding?'Close add member':'Add member'} onPress={onAdd} style={[st.memberCard,{borderStyle:'dashed',borderWidth:2,borderColor:adding?T.primary:'#C9D6CF'}]}>
+   <View style={{width:46,height:46,alignItems:'center',justifyContent:'center'}}><Ionicons name={adding?'close':'add'} size={28} color={T.primary}/></View>
+   <Text style={[st.profileName,{color:T.ink}]}>{adding?'Close':'Add'}</Text>
   </TouchableOpacity>
  </ScrollView>;
 }
-function ProfileCircle({name,index,on,timer,onPress}:{name:string;index:number;on:boolean;timer:boolean;onPress:()=>void}){
- const reduce=useReduceMotion();
- const ring=useRef(new Animated.Value(on?1:0)).current;
- useEffect(()=>{if(reduce)ring.setValue(on?1:0);else Animated.spring(ring,{toValue:on?1:0,useNativeDriver:true,speed:18,bounciness:8}).start()},[on,reduce]);
- const k=index%TINTS.length;
- return <TouchableOpacity accessibilityRole="button" accessibilityLabel={name+(timer?', timer running':'')} accessibilityState={{selected:on}} onPress={onPress} style={{alignItems:'center',gap:6,width:68}}>
-  <View style={{width:68,height:68,alignItems:'center',justifyContent:'center'}}>
-   <Animated.View style={[StyleSheet.absoluteFill,{borderRadius:34,borderWidth:3,borderColor:T.primary,opacity:ring,transform:[{scale:ring.interpolate({inputRange:[0,1],outputRange:[0.85,1]})}]}]}/>
-   <View style={[st.profile,{backgroundColor:TINTS[k]}]}><Text style={{fontSize:24,fontWeight:'900',color:TINT_INK[k]}}>{name.slice(0,1).toUpperCase()}</Text></View>
-   {timer?<View style={st.profileTimer}><Ionicons name="hourglass" size={11} color="#fff"/></View>:null}
+function ProfileCard({name,index,on,frac,onPress}:{name:string;index:number;on:boolean;frac:number|null;onPress:()=>void}){
+ const k=index%TINTS.length,r=20,cc=2*Math.PI*r,color=frac===null?T.primary:heroColor(frac,Infinity),d=frac===null?44:32;
+ return <TouchableOpacity accessibilityRole="button" accessibilityLabel={name+(frac!==null?', timer running':'')} accessibilityState={{selected:on}} onPress={onPress} style={[st.memberCard,on&&{backgroundColor:T.primary,borderColor:T.primary}]}>
+  <View style={{width:46,height:46,alignItems:'center',justifyContent:'center'}}>
+   {frac!==null?<Svg width={46} height={46} style={StyleSheet.absoluteFill}><Circle cx={23} cy={23} r={r} stroke={on?'rgba(255,255,255,.35)':color+'33'} strokeWidth={4} fill="none"/><Circle cx={23} cy={23} r={r} stroke={on?'#fff':color} strokeWidth={4} fill="none" strokeLinecap="round" strokeDasharray={cc+' '+cc} strokeDashoffset={cc*(1-frac)} transform="rotate(-90 23 23)"/></Svg>:null}
+   <View style={{width:d,height:d,borderRadius:d/2,backgroundColor:on?'rgba(255,255,255,.25)':TINTS[k],alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:frac===null?20:15,fontWeight:'900',color:on?'#fff':TINT_INK[k]}}>{name.slice(0,1).toUpperCase()}</Text></View>
   </View>
-  <Text style={[st.profileName,on&&{color:T.ink}]} numberOfLines={1}>{name}</Text>
+  <Text style={[st.profileName,{color:on?'#fff':T.ink}]} numberOfLines={1}>{name}</Text>
  </TouchableOpacity>;
 }
 
@@ -872,7 +895,7 @@ function periodTitle(period:BreakPeriod,anchor:Date){
 function fromSync(r:BreakSyncRow):SessionRow{return {id:r.id,child_id:r.child_id,started_at:r.started_at,deadline_at:r.deadline_at,ended_at:r.ended_at||null,granted_seconds:r.granted_seconds,status:r.status,version:r.version}}
 function fromNative(s:BreakSession):SessionRow{return {id:s.id,child_id:s.childId,started_at:new Date(s.startedAt*1000).toISOString(),deadline_at:new Date(s.deadline*1000).toISOString(),ended_at:s.endedAt?new Date(s.endedAt*1000).toISOString():null,granted_seconds:s.grantedSeconds,status:s.status,version:s.version}}
 
-function InsightsScreen({child,onBack}:{child:FamilyChild;onBack:()=>void}){
+function InsightsScreen({child,onBack,sheet}:{child:FamilyChild;onBack:()=>void;sheet?:boolean}){
  const [period,setPeriod]=useState<BreakPeriod>('week');
  const [anchor,setAnchor]=useState(()=>new Date());
  const [rows,setRows]=useState<SessionRow[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
@@ -911,14 +934,17 @@ function InsightsScreen({child,onBack}:{child:FamilyChild;onBack:()=>void}){
  const notes=observations(stats,period);
  const startOfTimes=periodRange(period,new Date()).start;
  return <View style={{gap:14}}>
-  <Back label={child.name} onPress={onBack}/>
-  <Text style={st.title}>Screen Time Insights</Text>
+  {sheet?<View style={{gap:10}}>
+   <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'}}/>
+   <View style={{flexDirection:'row',alignItems:'center',gap:12}}><IconTile icon="bar-chart" color={TINT_INK[2]}/><Text style={[st.title,{flex:1}]} numberOfLines={1}>{child.name}</Text>
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={onBack} style={st.moreBtn}><Ionicons name="close" size={22} color={T.ink}/></TouchableOpacity></View>
+  </View>:<><Back label={child.name} onPress={onBack}/><Text style={st.title}>Screen Time Insights</Text></>}
   <View style={st.segment}>{PERIODS.map(p=><TouchableOpacity key={p.key} accessibilityRole="tab" accessibilityState={{selected:period===p.key}} onPress={()=>{setPeriod(p.key);setAnchor(new Date())}} style={[st.segBtn,period===p.key&&st.segOn]}><Text style={[st.segText,period===p.key&&{color:'#fff'}]}>{p.label}</Text></TouchableOpacity>)}</View>
   <PeriodPicker period={period} anchor={anchor} onPick={setAnchor}/>
   {family.devices.length?<View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{[{id:'all',name:'All devices'},{id:PHONE,name:'This iPhone'},...family.devices.map(d=>({id:d.id,name:d.name}))].map(o=><Chip key={o.id} label={o.name} on={device===o.id} onPress={()=>setDevice(o.id)}/>)}</View>:null}
   {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
   {loading?<ActivityIndicator color={T.primary}/>:null}
-  <View style={st.note}><Ionicons name="bar-chart-outline" size={18} color={T.primary}/><Text style={[st.sub,{color:T.ink,flex:1}]}>{child.name}'s time in your tracked apps is in Actions › Screen Time & Stress: choose {child.name} above the chart.</Text></View>
+  <ChildApps childId={child.id} start={range.start.getTime()} end={range.end.getTime()}/>
   <View style={st.grid}>
    <Stat label="Screen Break Time" value={formatDuration(stats.seconds)} sub={'Recorded sessions for '+child.name}/>
    <Stat label="Daily Average" value={formatDuration(stats.dailyAverage)} sub={'Over '+stats.days+' day'+(stats.days===1?'':'s')}/>
@@ -1080,6 +1106,7 @@ const st=StyleSheet.create({
  segmentOn:{backgroundColor:'#fff',shadowColor:'#000',shadowOpacity:.08,shadowRadius:4,shadowOffset:{width:0,height:1}},
  segmentText:{fontSize:15,fontWeight:'800',color:T.muted},
  moreBtn:{width:44,height:44,borderRadius:22,backgroundColor:T.primarySoft,alignItems:'center',justifyContent:'center'},
+ memberCard:{width:84,paddingVertical:12,borderRadius:20,alignItems:'center',gap:8,backgroundColor:'#fff',borderWidth:1,borderColor:'#E6EEEA'},
  profile:{width:58,height:58,borderRadius:29,alignItems:'center',justifyContent:'center'},
  profileName:{fontSize:13,fontWeight:'800',color:T.muted,maxWidth:68},
  profileTimer:{position:'absolute',right:2,bottom:2,width:22,height:22,borderRadius:11,backgroundColor:T.primary,borderWidth:2,borderColor:'#fff',alignItems:'center',justifyContent:'center'},
