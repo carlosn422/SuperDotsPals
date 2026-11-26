@@ -18,7 +18,8 @@ type ThreadItem=
  |{kind:'theirMood';key:string;at:string;mood:FriendSharedMood}
  |{kind:'myMood';key:string;at:string;moodId:string;mood:CircleMood;sharedAt?:string;emoji:string;style?:EmojiStyle;unread:boolean}
  |{kind:'signal';key:string;at:string;signal:ReceivedSignal}
- |{kind:'sentSignal';key:string;at:string;signal:SignalId};
+ |{kind:'sentSignal';key:string;at:string;signal:SignalId}
+ |{kind:'myShare';key:string;at:string;mood:CircleMood};
 
 export type Conversation={id:string;name:string;detail?:string;friend?:Friend;mood?:CircleMood;lastAt:string;preview:string;previewColor?:string;unread:number;pinnedAt?:string};
 
@@ -44,6 +45,8 @@ export function threadItems(store:CircleStore,id:string):ThreadItem[]{
   items.push({kind:'myMood',key:'r'+n.moodId,at:n.at,moodId:n.moodId,mood:n.mood,sharedAt:store.myMoods.find(m=>m.id===n.moodId)?.sharedAt,emoji:n.emoji,style:store.myMoods.find(m=>m.id===n.moodId)?.reactions.find(r=>r.friendId===n.friendId)?.style,unread:!n.read})});
  store.myMoods.forEach(m=>m.reactions.filter(r=>r.friendId===id&&!seen.has(m.id)).forEach(r=>{seen.add(m.id);
   items.push({kind:'myMood',key:'r'+m.id,at:r.at,moodId:m.id,mood:m.mood,sharedAt:m.sharedAt,emoji:r.emoji,style:r.style,unread:false})}));
+ // My mood changes only appear when this person reacted to them.
+ seen.forEach(mid=>{const m=store.myMoods.find(x=>x.id===mid);if(m)items.push({kind:'myShare',key:'p'+m.id,at:m.sharedAt,mood:m.mood})});
  store.signals.filter(s=>s.friendId===id).forEach(s=>items.push({kind:'signal',key:'s'+s.id,at:s.at,signal:s}));
  store.sentSignals.forEach((s,i)=>{if(s.friendIds.includes(id))items.push({kind:'sentSignal',key:'x'+s.at+i,at:s.at,signal:s.signal})});
  // The history fetch and live updates may overlap. Render each persisted event only once.
@@ -65,6 +68,7 @@ function previewOf(it:ThreadItem,first:string):{text:string;color?:string;at:str
   case 'myMood':return {text:'Reacted '+it.emoji+' to your '+moodLabel(it.mood)+' mood',at:it.at};
   case 'signal':{const s=signalById(it.signal.signal);return {text:s.emoji+' '+s.label,at:it.at};}
   case 'sentSignal':{const s=signalById(it.signal);return {text:'You sent '+s.emoji+' '+s.label,at:it.at};}
+  case 'myShare':return {text:'You felt '+moodLabel(it.mood),color:MOOD_TINTS[it.mood].color,at:it.at};
  }
 }
 
@@ -319,6 +323,15 @@ export function ConversationScreen({id,focus,onBack,onInfo,onSend,fill,padding=2
      node=<View style={[trailNode,{backgroundColor:'#FFF1F4',borderColor:'#F4A7BA'}]}><Text style={{fontSize:22}}>{sg.emoji}</Text></View>;
      card=<View style={[bubble,corner,{backgroundColor:'#FFF1F4',borderWidth:2,borderColor:lit?'#E76B8A':'transparent'}]} accessible accessibilityLabel={first+' sent '+sg.label+', '+clock(it.at)}>
        <Text style={{fontSize:14,fontWeight:'800',color:CT.ink}}>{sg.label}</Text><Text style={meta}>Little Signal · {clock(it.at)}</Text>
+      </View>;
+    }else if(it.kind==='myShare'){const t=MOOD_TINTS[it.mood];
+     node=<View style={[trailNode,{backgroundColor:t.tint,borderColor:t.color}]}><MoodPalThumb mood={it.mood} size={32}/></View>;
+     card=<View style={[bubble,corner,{backgroundColor:t.tint,borderWidth:2,borderColor:lit?t.color:'transparent'}]} accessible accessibilityLabel={'You changed your mood to '+moodLabel(it.mood)+', '+clock(it.at)}>
+       <View style={{gap:1,paddingHorizontal:4,flexShrink:1}}>
+        <Text style={{fontSize:13,fontWeight:'700',color:CT.ink}}>You changed to</Text>
+        <Text style={{fontSize:19,fontWeight:'900',color:t.color}}>{moodLabel(it.mood)}</Text>
+        <Text style={[meta,{marginTop:2}]}>{clock(it.at)}</Text>
+       </View>
       </View>;
     }else{const sg=signalById(it.signal);
      node=<View style={[trailNode,{backgroundColor:CT.primarySoft,borderColor:CT.primary}]}><Text style={{fontSize:21}}>{sg.emoji}</Text></View>;
