@@ -241,7 +241,15 @@ function ActionBtn({label,icon,primary,danger,locked,onPress}:{label:string;icon
 /** One device: what it's doing now, and only the actions that fit its confirmed state. */
 export function DeviceCard({device:d,isDefault,commands,sessions,now,childName,onOpen,onStart,width}:{width?:number;device:FamilyDevice;isDefault:boolean;commands:DeviceCommand[];sessions:RemoteSession[];now:number;childName:(id:string)=>string;onOpen:()=>void;onStart?:(device:FamilyDevice)=>void}){
  const [sending,setSending]=useState(false),[error,setError]=useState('');
- const st=deviceStatus(d,commands,sessions,now);
+ // Lock state shown right after a tap, until the device confirms it or the command fails.
+ const [expect,setExpect]=useState<{locked:boolean;at:number}|null>(null);
+ const st0=deviceStatus(d,commands,sessions,now);
+ const lockPending=!!st0.pending&&(st0.pending.type==='LOCK_APPS'||st0.pending.type==='UNLOCK_APPS');
+ const st=expect&&lockPending?{...st0,pending:undefined}:st0;
+ const locked=expect?.locked??d.restricted;
+ useEffect(()=>{
+  if(expect&&!lockPending&&(d.restricted===expect.locked||Date.now()-expect.at>4000))setExpect(null);
+ },[expect,lockPending,d.restricted,now]);
  const session=sessions.find(x=>x.family_device_id===d.id&&Date.parse(x.deadline_at)>now);
  const failed=commands.find(c=>c.device_id===d.id&&(c.status==='rejected'||c.status==='expired')&&now-Date.parse(c.updated_at||c.created_at)<120000);
  const ready=d.status==='active'&&d.auth_status==='approved'&&d.selection_count>0;
@@ -249,6 +257,11 @@ export function DeviceCard({device:d,isDefault,commands,sessions,now,childName,o
   if(sending||st.pending)return;
   setSending(true);setError('');
   try{await deviceCommand(d.id,type,opts)}catch(e:any){setError(e.message)}finally{setSending(false)}
+ };
+ const toggleLock=()=>{
+  const target=!locked;
+  setExpect({locked:target,at:Date.now()});setError('');
+  void deviceCommand(d.id,target?'LOCK_APPS':'UNLOCK_APPS').catch(()=>setExpect(null));
  };
  const addTime=()=>ActionSheetIOS.showActionSheetWithOptions({title:'Add time for '+childName(session!.child_id),options:['+15 min','+30 min','+1 hour','Cancel'],cancelButtonIndex:3},i=>{const m=[15,30,60][i];if(m)void send('EXTEND_SESSION',{minutes:m})});
  const left=session?Math.max(1,Math.ceil((Date.parse(session.deadline_at)-now)/60000))+' min left':'';
@@ -258,7 +271,7 @@ export function DeviceCard({device:d,isDefault,commands,sessions,now,childName,o
   :session?{icon:'timer-outline',color:T.primary,text:childName(session.child_id)+' · '+left}
   :!ready?{icon:'alert-circle',color:WARN,text:d.auth_status==='approved'?'Choose apps to pause on the device':'Finish Screen Time setup on the device'}
   :st.label==='Device unavailable'?{icon:'cloud-offline-outline',color:WARN,text:'Offline · '+seen(d,now)}
-  :d.restricted?{icon:'lock-closed',color:PAUSED,text:'Apps locked · '+seen(d,now)}
+  :locked?{icon:'lock-closed',color:PAUSED,text:'Apps locked · '+seen(d,now)}
   :{icon:'checkmark-circle',color:OK,text:'Available · '+seen(d,now)};
  const pendingStart=st.pending?.type==='START_SESSION'?st.pending:undefined;
  return <View style={[s.card,width?{width}:null]}>
@@ -273,9 +286,9 @@ export function DeviceCard({device:d,isDefault,commands,sessions,now,childName,o
   {sending||d.status!=='active'?null:pendingStart?<View style={s.actions}><ActionBtn label="Cancel" icon="close" onPress={()=>{setSending(true);void cancelDeviceCommand(pendingStart.id).catch(e=>setError(e.message)).finally(()=>setSending(false))}}/></View>
    :st.pending||!ready?null
    :session?<View style={s.actions}><ActionBtn primary label="Add time" icon="add" onPress={addTime}/><ActionBtn danger label="End" icon="stop-circle-outline" onPress={()=>void send('END_SESSION')}/></View>
-   :d.restricted?<View style={s.actions}><ActionBtn locked label="Unlock apps" icon="lock-open-outline" onPress={()=>void send('UNLOCK_APPS')}/>{onStart?<ActionBtn primary label="Start timer" icon="time-outline" onPress={()=>onStart(d)}/>:null}</View>
-   :<View style={s.actions}><ActionBtn label="Lock apps" icon="lock-closed-outline" onPress={()=>void send('LOCK_APPS')}/>{onStart?<ActionBtn primary label="Start timer" icon="time-outline" onPress={()=>onStart(d)}/>:null}</View>}
-  {failed&&!st.pending?<Text style={[s.sub,{color:PAUSED}]}>{failed.error||'The device couldn’t do that.'}</Text>:null}
+   :locked?<View style={s.actions}><ActionBtn locked label="Unlock apps" icon="lock-open-outline" onPress={toggleLock}/>{onStart?<ActionBtn primary label="Start timer" icon="time-outline" onPress={()=>onStart(d)}/>:null}</View>
+   :<View style={s.actions}><ActionBtn label="Lock apps" icon="lock-closed-outline" onPress={toggleLock}/>{onStart?<ActionBtn primary label="Start timer" icon="time-outline" onPress={()=>onStart(d)}/>:null}</View>}
+  {failed&&!st.pending&&failed.type!=='LOCK_APPS'&&failed.type!=='UNLOCK_APPS'?<Text style={[s.sub,{color:PAUSED}]}>{failed.error||'The device couldn’t do that.'}</Text>:null}
   {error?<Text style={[s.sub,{color:PAUSED}]}>{error}</Text>:null}
  </View>;
 }

@@ -35,6 +35,8 @@ final class WatchFamilyDevicesStore: ObservableObject {
     @Published private(set) var sessions: [WatchDeviceSession] = []
     @Published private(set) var pending: [WatchDeviceCommand] = []
     @Published private(set) var busy = false
+    /// Lock state shown right after a tap, until the device confirms it or the command fails.
+    @Published private(set) var expected: [String: (locked: Bool, at: Date)] = [:]
     @Published var error: String?
     /// The device picked for the next timer; nil uses the parent's default.
     @Published var picked: String?
@@ -95,6 +97,10 @@ final class WatchFamilyDevicesStore: ObservableObject {
                 guard let id = r["id"] as? String, let device = r["device_id"] as? String, let type = r["type"] as? String else { return nil }
                 return WatchDeviceCommand(id: id, deviceId: device, type: type, childId: r["child_id"] as? String, minutes: (r["minutes"] as? NSNumber)?.intValue)
             }
+            for (id, e) in expected where !pending.contains(where: { $0.deviceId == id && Self.isLock($0.type) }) {
+                let actual = devices.first { $0.id == id }?.restricted
+                if actual == e.locked || Date().timeIntervalSince(e.at) > 4 { expected[id] = nil }
+            }
         } catch {
             // Family Setup watches and signed-out watches only control the iPhone.
         }
@@ -119,6 +125,23 @@ final class WatchFamilyDevicesStore: ObservableObject {
         } catch {
             self.error = Self.message(error)
             return false
+        }
+    }
+
+    static func isLock(_ type: String) -> Bool { type == "LOCK_APPS" || type == "UNLOCK_APPS" }
+
+    func locked(_ device: WatchFamilyDevice) -> Bool { expected[device.id]?.locked ?? device.restricted }
+
+    /// Shows the new lock state at once; if the command fails it quietly goes back.
+    func toggleLock(_ device: WatchFamilyDevice) {
+        let target = !locked(device)
+        expected[device.id] = (target, Date())
+        Task { @MainActor in
+            if await command(target ? "LOCK_APPS" : "UNLOCK_APPS", device: device.id) == false {
+                expected[device.id] = nil
+                error = nil
+                WKInterfaceDeviceHaptic.play(.failure)
+            }
         }
     }
 
@@ -240,7 +263,8 @@ struct SatelliteLockView: View {
 
     var body: some View {
         let pending = store.pending(on: device.id)
-        let locked = device.restricted
+        let locked = store.locked(device)
+        let waiting = pending.map { !WatchFamilyDevicesStore.isLock($0.type) } ?? false
         Group {
             if let session = store.session(on: device.id) {
                 VStack(spacing: 6) {
@@ -254,22 +278,18 @@ struct SatelliteLockView: View {
             } else {
                 VStack(spacing: 4) {
                     Button {
-                        Task { @MainActor in
-                            if await store.command(locked ? "UNLOCK_APPS" : "LOCK_APPS", device: device.id) == false {
-                                WKInterfaceDeviceHaptic.play(.failure)
-                            }
-                        }
+                        store.toggleLock(device)
                     } label: {
                         BreakLock(locked: locked, size: 80)
-                            .opacity(pending != nil || store.busy ? 0.3 : 1)
+                            .opacity(waiting ? 0.3 : 1)
                             .frame(width: 136, height: 136)
                             .background(Circle().fill((locked ? BreakStyle.red : BreakStyle.green).opacity(0.16)))
-                            .overlay { if pending != nil || store.busy { ProgressView().scaleEffect(1.6).tint(.white) } }
+                            .overlay { if waiting { ProgressView().scaleEffect(1.6).tint(.white) } }
                             .animation(.easeInOut(duration: 0.35), value: locked)
                     }
                     .buttonStyle(.plain)
-                    .disabled(pending != nil || store.busy)
-                    .accessibilityLabel(pending != nil ? "Waiting for \(device.name)" : locked ? "\(device.name) apps locked. Unlock" : "\(device.name) apps unlocked. Lock")
+                    .disabled(waiting || store.busy)
+                    .accessibilityLabel(waiting ? "Waiting for \(device.name)" : locked ? "\(device.name) apps locked. Unlock" : "\(device.name) apps unlocked. Lock")
                     if let text = store.error {
                         Text(text).font(.caption2).foregroundStyle(BreakStyle.red).multilineTextAlignment(.center)
                     }
