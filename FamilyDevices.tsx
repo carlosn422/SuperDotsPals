@@ -112,9 +112,9 @@ export function DeviceSelect({options,selected,defaultId,onSelect}:{options:Devi
  </>;
 }
 
-export function FamilyDevicesScreen({onBack,childName,onStart}:{onBack:()=>void;childName:(id:string)=>string;onStart?:(device:FamilyDevice)=>void}){
+export function FamilyDevicesScreen({onBack,childName,onStart,openId}:{onBack:()=>void;childName:(id:string)=>string;onStart?:(device:FamilyDevice)=>void;openId?:string}){
  const {devices,defaultId,commands,sessions,loaded}=useFamilyDevices();
- const [adding,setAdding]=useState(false),[detail,setDetail]=useState<string|null>(null),[now,setNow]=useState(Date.now());
+ const [adding,setAdding]=useState(false),[detail,setDetail]=useState<string|null>(openId||null),[now,setNow]=useState(Date.now());
  useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),15000);return()=>clearInterval(t)},[]);
  const open=devices.find(d=>d.id===detail);
  if(open)return <DeviceSettings device={open} isDefault={defaultId===open.id} now={now} onBack={()=>setDetail(null)}/>;
@@ -155,7 +155,7 @@ function ActionBtn({label,icon,primary,danger,onPress}:{label:string;icon:string
 }
 
 /** One device: what it's doing now, and only the actions that fit its confirmed state. */
-function DeviceCard({device:d,isDefault,commands,sessions,now,childName,onOpen,onStart}:{device:FamilyDevice;isDefault:boolean;commands:DeviceCommand[];sessions:RemoteSession[];now:number;childName:(id:string)=>string;onOpen:()=>void;onStart?:(device:FamilyDevice)=>void}){
+export function DeviceCard({device:d,isDefault,commands,sessions,now,childName,onOpen,onStart,width}:{width?:number;device:FamilyDevice;isDefault:boolean;commands:DeviceCommand[];sessions:RemoteSession[];now:number;childName:(id:string)=>string;onOpen:()=>void;onStart?:(device:FamilyDevice)=>void}){
  const [sending,setSending]=useState(false),[error,setError]=useState('');
  const st=deviceStatus(d,commands,sessions,now);
  const session=sessions.find(x=>x.family_device_id===d.id&&Date.parse(x.deadline_at)>now);
@@ -177,7 +177,7 @@ function DeviceCard({device:d,isDefault,commands,sessions,now,childName,onOpen,o
   :d.restricted?{icon:'lock-closed',color:PAUSED,text:'Apps paused · '+seen(d,now)}
   :{icon:'checkmark-circle',color:OK,text:'Available · '+seen(d,now)};
  const pendingStart=st.pending?.type==='START_SESSION'?st.pending:undefined;
- return <View style={s.card}>
+ return <View style={[s.card,width?{width}:null]}>
   <TouchableOpacity accessibilityRole="button" accessibilityLabel={d.name+(isDefault?', default':'')+', '+status.text+'. Device settings'} onPress={onOpen} style={s.deviceRow}>
    <View style={s.deviceIcon}><Ionicons name={d.device_type==='ipad'?'tablet-landscape-outline':'phone-portrait-outline'} size={28} color="#4A8CFF"/></View>
    <View style={{flex:1}}>

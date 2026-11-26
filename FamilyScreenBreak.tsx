@@ -1,6 +1,6 @@
 import React,{useCallback,useContext,useEffect,useMemo,useRef,useState} from 'react';
 import {ChartScrubContext} from './StressDashboard';
-import {ActivityIndicator,Alert,Animated,AppState,Modal,PanResponder,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native';
+import {ActivityIndicator,Alert,Animated,AppState,Modal,PanResponder,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View,useWindowDimensions} from 'react-native';
 import Svg,{Circle,Defs,Line,LinearGradient,Path,Stop} from 'react-native-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -15,7 +15,7 @@ import {ManageFamilyProfile,familyCall,familyProfilesChanged,shortProfileName,us
 import {WatchColorGrid,WatchColorSheet,WatchImage,colorName,isWatchColor,type WatchColor} from './WatchArt';
 import {ackBreakSync,getBreakState,onBreakState,pendingBreakSync,pickBreakApps,requestScreenTimeAccess,screenBreakSupported,sendBreakCommand,setBreakChildren,setBreakEntitlement,type BreakAction,type BreakSession,type BreakState,type BreakSyncRow} from './modules/watch-link/screenBreak';
 import {configureSocialTrack,getSocialState} from './modules/watch-link/socialTrack';
-import {DeviceSelect,FamilyDevicesScreen,PHONE,cancelDeviceCommand,deviceCommand,deviceStatus,useDeviceNames,useFamilyDevices,type DeviceCommand,type FamilyDevice,type RemoteSession} from './FamilyDevices';
+import {DeviceCard,DeviceSelect,FamilyDevicesScreen,PHONE,cancelDeviceCommand,deviceCommand,deviceStatus,useDeviceNames,useFamilyDevices,type DeviceCommand,type FamilyDevice,type RemoteSession} from './FamilyDevices';
 import {comparison,formatDuration,observations,periodRange,periodStats,type BreakPeriod,type Bucket,type SessionRow} from './ScreenBreakInsights';
 
 export type FamilyChild={id:string;name:string;profile_user_id:string|null;watch_only?:boolean};
@@ -133,7 +133,7 @@ function HeaderLock(){
 
 // ---------- Screens ----------
 
-type Route={name:'list'}|{name:'child';id:string}|{name:'insights';id:string}|{name:'devices'};
+type Route={name:'list'}|{name:'child';id:string}|{name:'insights';id:string}|{name:'devices';id?:string};
 
 export default function FamilyScreenBreak({onBack,backLabel='Settings',target,onAddWatch,embedded,footer}:{onBack?:()=>void;backLabel?:string;target?:{childId?:string;profileId?:string;add?:boolean;at:number}|null;onAddWatch?:()=>void;embedded?:boolean;footer?:React.ReactNode}){
  const guest=useIsGuest();
@@ -142,6 +142,8 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  const select=(id:string)=>{setSelected(id);setRoute({name:'list'})};
  const [startOn,setStartOn]=useState<FamilyDevice|null>(null);
  const family=useFamilyDevices(screenBreakSupported&&!guest&&route.name==='list');
+ const dashNow=useNow(route.name==='list'&&family.devices.length>0);
+ const {width:screenW}=useWindowDimensions();
  const load=useCallback(async()=>{
   try{const list=await loadChildren();setChildren(list);setError('');if(screenBreakSupported)setBreakChildren(list.filter(c=>!c.watch_only).map(c=>({id:c.id,name:c.name})))}
   catch{setError('Unable to load your family members. Check your connection.')}
@@ -157,7 +159,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  const child=route.name==='child'||route.name==='insights'?children.find(c=>c.id===route.id):undefined;
  const members=children.filter(c=>!c.watch_only);
  if(route.name==='devices')return <>
-  <FamilyDevicesScreen onBack={()=>setRoute({name:'list'})} childName={id=>children.find(c=>c.id===id)?.name||'Someone'} onStart={members.length?setStartOn:undefined}/>
+  <FamilyDevicesScreen openId={route.id} onBack={()=>setRoute({name:'list'})} childName={id=>children.find(c=>c.id===id)?.name||'Someone'} onStart={members.length?setStartOn:undefined}/>
   <StartTimerSheet device={startOn} members={members} onClose={()=>setStartOn(null)}/>
  </>;
  if(route.name==='insights'&&child)return <InsightsScreen child={child} onBack={()=>select(child.id)}/>;
@@ -173,9 +175,15 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
    {!loading&&!error&&members.length?<ProfileRow members={members} selected={current?.id} adding={adding} onSelect={id=>{setAdding(false);setSelected(id)}} onAdd={()=>setAdding(a=>!a)} sessions={family.sessions}/>:null}
    {adding||(!loading&&!error&&!members.length)?<AddChild onAdded={id=>{setAdding(false);void load().then(()=>{if(id)setSelected(id)});familyChildrenChanged()}}/>:null}
    {current&&!adding?<ChildScreen inline key={current.id} child={current} children={children} onBack={()=>{}} onInsights={()=>setRoute({name:'insights',id:current.id})} onChanged={()=>{void load();familyChildrenChanged()}} onRemoved={()=>{setSelected(null);void load()}} onAddWatch={onAddWatch} onOpen={select}/>:null}
-   {screenBreakSupported?<TouchableOpacity accessibilityRole="button" onPress={()=>setRoute({name:'devices'})} style={st.linkRow}><View style={[st.tile,{backgroundColor:TINTS[1]}]}><Ionicons name="tablet-portrait" size={21} color={TINT_INK[1]}/></View><View style={{flex:1}}><Text style={st.rowTitle}>Family Devices</Text></View><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>:null}
+   {screenBreakSupported&&family.devices.length?<>
+    <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={st.heading}>Devices</Text><TouchableOpacity accessibilityRole="button" accessibilityLabel="All family devices" onPress={()=>setRoute({name:'devices'})} style={{minHeight:44,justifyContent:'center'}}><Text style={st.link}>See all</Text></TouchableOpacity></View>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={family.devices.length>1?screenW-76:undefined} decelerationRate="fast" contentContainerStyle={{gap:12}}>
+     {family.devices.map(d=><DeviceCard key={d.id} width={family.devices.length>1?screenW-88:screenW-40} device={d} isDefault={family.defaultId===d.id} commands={family.commands} sessions={family.sessions} now={dashNow} childName={id=>children.find(c=>c.id===id)?.name||'Someone'} onOpen={()=>setRoute({name:'devices',id:d.id})} onStart={members.length?setStartOn:undefined}/>)}
+    </ScrollView>
+   </>:screenBreakSupported?<TouchableOpacity accessibilityRole="button" onPress={()=>setRoute({name:'devices'})} style={st.linkRow}><View style={[st.tile,{backgroundColor:TINTS[1]}]}><Ionicons name="tablet-portrait" size={21} color={TINT_INK[1]}/></View><View style={{flex:1}}><Text style={st.rowTitle}>Family Devices</Text></View><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>:null}
   </>}
   {footer?<View style={{marginTop:10}}>{footer}</View>:null}
+  <StartTimerSheet device={startOn} members={members} onClose={()=>setStartOn(null)}/>
  </View>;
 }
 
