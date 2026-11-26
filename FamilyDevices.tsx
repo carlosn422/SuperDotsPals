@@ -186,7 +186,7 @@ export function FamilyDevicesScreen({childName,onStart,selectedId,adding,onAddDo
     </View>
     {defaultId===PHONE?null:<TouchableOpacity accessibilityRole="button" accessibilityLabel="Make This iPhone the default device" onPress={()=>void rpc('family_device_clear_default',{}).catch(e=>Alert.alert('Family Devices',e.message))} style={s.textBtn}><Text style={s.link}>Make default</Text></TouchableOpacity>}
    </View>
-   <View style={s.actions}>{onStart?<ActionBtn primary label="Start timer" icon="time-outline" onPress={()=>onStart(THIS_PHONE)}/>:null}{phoneState?.manualLock?<ActionBtn locked label="Unlock apps" icon="lock-open-outline" onPress={()=>phoneSend('unlock')}/>:phoneState?.session?.status==='active'?null:<ActionBtn label="Lock apps" icon="lock-closed-outline" onPress={()=>phoneSend('lock')}/>}</View>
+   <View style={s.actions}>{phoneState?.manualLock?<ActionBtn locked label="Unlock apps" icon="lock-open-outline" onPress={()=>phoneSend('unlock')}/>:phoneState?.session?.status==='active'?null:<ActionBtn label="Lock apps" icon="lock-closed-outline" onPress={()=>phoneSend('lock')}/>}{onStart?<ActionBtn primary label="Start timer" icon="time-outline" onPress={()=>onStart(THIS_PHONE)}/>:null}</View>
   </View>
   </>:null}
   {!adding&&loaded?<DeviceStats deviceId={d?d.id:PHONE} childName={childName}/>:null}
@@ -273,8 +273,8 @@ export function DeviceCard({device:d,isDefault,commands,sessions,now,childName,o
   {sending||d.status!=='active'?null:pendingStart?<View style={s.actions}><ActionBtn label="Cancel" icon="close" onPress={()=>{setSending(true);void cancelDeviceCommand(pendingStart.id).catch(e=>setError(e.message)).finally(()=>setSending(false))}}/></View>
    :st.pending||!ready?null
    :session?<View style={s.actions}><ActionBtn primary label="Add time" icon="add" onPress={addTime}/><ActionBtn danger label="End" icon="stop-circle-outline" onPress={()=>void send('END_SESSION')}/></View>
-   :d.restricted?<View style={s.actions}>{onStart?<ActionBtn primary label="Start timer" icon="time-outline" onPress={()=>onStart(d)}/>:null}<ActionBtn locked label="Unlock apps" icon="lock-open-outline" onPress={()=>void send('UNLOCK_APPS')}/></View>
-   :<View style={s.actions}>{onStart?<ActionBtn primary label="Start timer" icon="time-outline" onPress={()=>onStart(d)}/>:null}<ActionBtn label="Lock apps" icon="lock-closed-outline" onPress={()=>void send('LOCK_APPS')}/></View>}
+   :d.restricted?<View style={s.actions}><ActionBtn locked label="Unlock apps" icon="lock-open-outline" onPress={()=>void send('UNLOCK_APPS')}/>{onStart?<ActionBtn primary label="Start timer" icon="time-outline" onPress={()=>onStart(d)}/>:null}</View>
+   :<View style={s.actions}><ActionBtn label="Lock apps" icon="lock-closed-outline" onPress={()=>void send('LOCK_APPS')}/>{onStart?<ActionBtn primary label="Start timer" icon="time-outline" onPress={()=>onStart(d)}/>:null}</View>}
   {failed&&!st.pending?<Text style={[s.sub,{color:PAUSED}]}>{failed.error||'The device couldn’t do that.'}</Text>:null}
   {error?<Text style={[s.sub,{color:PAUSED}]}>{error}</Text>:null}
  </View>;
