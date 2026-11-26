@@ -53,7 +53,9 @@ export function threadItems(store:CircleStore,id:string):ThreadItem[]{
  // Distinct event IDs are deliberately kept, even when mood and timestamp match.
  const unique=new Map<string,ThreadItem>();
  items.forEach(item=>{if(!unique.has(item.key))unique.set(item.key,item)});
- return [...unique.values()].sort((a,b)=>a.at.localeCompare(b.at)||a.key.localeCompare(b.key));
+ const sorted=[...unique.values()].sort((a,b)=>a.at.localeCompare(b.at)||a.key.localeCompare(b.key));
+ // Keep my mood change only when their reaction to it comes right after; anything else in between (like a signal) skips it.
+ return sorted.filter((it,i)=>it.kind!=='myShare'||sorted[i+1]?.key==='r'+it.key.slice(1));
 }
 
 function unreadFor(store:CircleStore,id:string){
