@@ -213,6 +213,7 @@ document.querySelectorAll('.t-show').forEach(show => {
   let mi = 0;
   const slides = car ? [...car.children] : [];
   const onScroll = () => {
+    show.style.setProperty('--vh', innerHeight + 'px');
     if (!narrow.matches || !car) return;
     const nav = document.querySelector('.nav');
     show.style.setProperty('--navh', (nav ? nav.offsetHeight : 64) + 'px');
@@ -225,6 +226,5 @@ document.querySelectorAll('.t-show').forEach(show => {
   };
   addEventListener('scroll', onScroll, { passive: true });
   addEventListener('resize', onScroll);
-  show.style.setProperty('--vh', innerHeight + 'px');
   pick(0); onScroll();
 });
