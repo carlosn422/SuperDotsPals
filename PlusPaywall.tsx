@@ -56,15 +56,16 @@ export function PlusPaywallSheet({nested=false}:{nested?:boolean}){
   <ScrollView style={{flex:1,backgroundColor:T.background}} contentContainerStyle={s.sheet} keyboardShouldPersistTaps="handled">
    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={hidePaywall} style={s.close}><Ionicons name="close" size={24} color={T.muted}/></TouchableOpacity>
    {creating?<View style={{alignSelf:'stretch'}}><CreateAccountScreen accent={T.primary} backLabel="MoodPals Plus" onBack={()=>setCreating(false)}/></View>:<>
-   <Image source={CALM} style={s.mascot} accessibilityIgnoresInvertColors/>
+   <Image source={require('./assets/branding/moodpals-logo.png')} accessibilityLabel="MoodPals" style={s.mascot} resizeMode="contain" accessibilityIgnoresInvertColors/>
    <Text style={s.kicker}>MoodPals Plus</Text>
    <Text style={s.title}>{feature.title}</Text>
    <Text style={s.body}>{feature.body}</Text>
    <View style={s.card}>{BENEFITS.map(b=><View key={b.text} style={s.benefit}><View style={s.benefitIcon}><Ionicons name={b.icon} size={17} color={T.primary}/></View><Text style={s.benefitText}>{b.text}</Text></View>)}</View>
-   <View style={{gap:10,alignSelf:'stretch'}}>{(['annual','monthly'] as PlusPlan[]).map(p=>{const x=prices[p],on=plan===p;return <TouchableOpacity key={p} accessibilityRole="radio" accessibilityState={{checked:on}} onPress={()=>setPlan(p)} style={[s.plan,on&&s.planOn]}>
-    <Ionicons name={on?'radio-button-on':'radio-button-off'} size={22} color={on?T.primary:'#B8C4BE'}/>
-    <View style={{flex:1}}><Text style={s.planLabel}>{x.label}</Text><Text style={s.planSub}>{x.price} / {x.period}</Text></View>
-    {x.note?<View style={s.badge}><Text style={s.badgeText}>{x.note}</Text></View>:null}
+   <View style={{gap:10,alignSelf:'stretch'}}>{(['annual','monthly'] as PlusPlan[]).map(p=>{const x=prices[p],on=plan===p,yearly=p==='annual',ribbon=yearly?['Best value',x.note].filter(Boolean).join(' · '):'';const big=yearly?x.perMonth:x.price;return <TouchableOpacity key={p} accessibilityRole="radio" accessibilityState={{checked:on}} accessibilityLabel={`${x.label}, ${x.price} per ${x.period}${ribbon?'. '+ribbon:''}`} onPress={()=>setPlan(p)} style={[s.plan,on&&s.planOn,yearly&&{marginTop:8,paddingTop:19}]}>
+    {ribbon?<View style={s.ribbon}><Text style={s.ribbonText}>{ribbon.toUpperCase()}</Text></View>:null}
+    <Ionicons name={on?'checkmark-circle':'ellipse-outline'} size={24} color={on?T.primary:'#B8C4BE'}/>
+    <View style={{flex:1}}><Text style={s.planLabel}>{x.label}</Text><Text style={s.planSub} numberOfLines={1}>{yearly?`${x.price} / year`:'Billed monthly'}</Text></View>
+    {big?<Text style={s.planPrice}>{big}<Text style={s.planPer}>/mo</Text></Text>:<Text style={s.planPrice}>{x.price}<Text style={s.planPer}>/{x.period==='year'?'yr':'mo'}</Text></Text>}
    </TouchableOpacity>})}</View>
    {guest&&!isPlus?<View style={s.account}>
     <Text style={s.accountTitle}>Create a free account to subscribe</Text>
@@ -125,7 +126,7 @@ const s=StyleSheet.create({
  emailBtn:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,height:52,borderRadius:16,borderWidth:1.5,borderColor:T.border,backgroundColor:'#fff'},emailText:{fontSize:16,fontWeight:'800',color:T.ink},
  sheet:{padding:22,paddingBottom:44,alignItems:'center',gap:14},
  close:{alignSelf:'flex-end',padding:4},
- mascot:{width:132,height:132,marginTop:-18},
+ mascot:{width:204,height:68,marginTop:4,marginBottom:6},
  kicker:{fontSize:12,fontWeight:'900',color:T.primary,letterSpacing:1,textTransform:'uppercase'},
  title:{fontSize:26,fontWeight:'900',color:T.ink,textAlign:'center'},
  body:{fontSize:15,color:T.muted,textAlign:'center',lineHeight:21,paddingHorizontal:10},
@@ -138,6 +139,10 @@ const s=StyleSheet.create({
  planLabel:{fontSize:16,fontWeight:'900',color:T.ink},
  planSub:{fontSize:13,color:T.muted,marginTop:2},
  badge:{backgroundColor:T.primary,borderRadius:10,paddingHorizontal:9,paddingVertical:4},
+ ribbon:{position:'absolute',top:-11,left:14,backgroundColor:T.primary,borderRadius:10,paddingHorizontal:9,paddingVertical:4},
+ ribbonText:{color:'#fff',fontSize:10,fontWeight:'900',letterSpacing:0.6},
+ planPrice:{fontSize:19,fontWeight:'900',color:T.ink},
+ planPer:{fontSize:12,fontWeight:'600',color:T.muted},
  badgeText:{color:'#fff',fontSize:11,fontWeight:'900'},
  cta:{alignSelf:'stretch',backgroundColor:T.primary,borderRadius:28,paddingVertical:16,alignItems:'center'},
  ctaText:{color:'#fff',fontSize:16,fontWeight:'900'},
