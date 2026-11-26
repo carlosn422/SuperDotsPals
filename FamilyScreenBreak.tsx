@@ -155,12 +155,19 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  useEffect(()=>{if(guest){setLoading(false);return}void load();listeners.add(load);return()=>{listeners.delete(load)}},[load,guest]);
  useEffect(()=>{
   if(!target||loading)return;
-  if(target.add){setRoute({name:'list'});setAdding(true);return}
+  if(target.add){setRoute({name:'list'});tryAdd(true);return}
   const child=children.find(c=>c.id===target.childId||(!!target.profileId&&c.profile_user_id===target.profileId));
   if(child)select(child.id);
  },[target,loading,children]);
  const child=route.name==='child'||route.name==='insights'?children.find(c=>c.id===route.id):undefined;
  const members=children.filter(c=>!c.watch_only);
+ const {isPlus,showPaywall}=usePlus(),memberCap=isPlus?4:1;
+ const tryAdd=(open?:boolean)=>{
+  if(members.length<memberCap){setAdding(a=>open||!a);return}
+  setAdding(false);
+  if(!isPlus)showPaywall('family');
+  else Alert.alert('Family is full','Plus includes up to 4 family members.');
+ };
  const current=members.find(c=>c.id===selected)||members[0];
  const pager=useRef<ScrollView>(null),reduce=useReduceMotion();
  const [section,setSection]=useState<'family'|'devices'>('family'),[insightsId,setInsightsId]=useState<string|null>(null);
@@ -182,7 +189,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  // The member cards stay pinned above the tab bar (drawn by the host, outside this scroll view).
  const [devSel,setDevSel]=useState<string|null>(null),[addingDevice,setAddingDevice]=useState(false),[watchesOpen,setWatchesOpen]=useState(false);
  const showDock=!guest&&route.name==='list'&&!loading&&!error&&(section==='devices'||members.length>0);
- const dockRow=section==='devices'?<DeviceDock devices={family.devices} defaultId={family.defaultId} sessions={family.sessions} selected={devSel} adding={addingDevice} onSelect={id=>{void Haptics.selectionAsync();setAddingDevice(false);setDevSel(id)}} onAdd={()=>setAddingDevice(a=>!a)}/>:<ProfileRow members={members} selected={current?.id} adding={adding} onSelect={id=>{setAdding(false);if(id!==current?.id)tapped.current=true;setSelected(id)}} onAdd={()=>setAdding(a=>!a)} sessions={family.sessions}/>;
+ const dockRow=section==='devices'?<DeviceDock devices={family.devices} defaultId={family.defaultId} sessions={family.sessions} selected={devSel} adding={addingDevice} onSelect={id=>{void Haptics.selectionAsync();setAddingDevice(false);setDevSel(id)}} onAdd={()=>setAddingDevice(a=>!a)}/>:<ProfileRow members={members} selected={current?.id} adding={adding} onSelect={id=>{setAdding(false);if(id!==current?.id)tapped.current=true;setSelected(id)}} onAdd={()=>tryAdd()} sessions={family.sessions}/>;
  const dock=<View style={st.dockShell}><MintWave edge="bottom"/><View style={st.dockInner}>{dockRow}</View></View>;
  const dockKey=section+'|'+devSel+'|'+addingDevice+'|'+family.defaultId+'|'+family.devices.map(d=>d.id+d.name+d.device_type).join()+'|'+members.map(c=>c.id+c.name).join()+'|'+current?.id+'|'+adding+'|'+family.sessions.map(x=>x.id+x.deadline_at+x.granted_seconds).join();
  useEffect(()=>{onDock?.(showDock?dock:null)},[onDock,showDock,dockKey]);
