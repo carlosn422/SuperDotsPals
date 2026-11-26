@@ -11,6 +11,7 @@ import {APP_THEME as T} from './MoodMascot';
 import {useReduceMotion} from './CircleComponents';
 import SuperdotMascot from './SuperdotMascot';
 import {usePlus} from './PlusStore';
+import {UpgradePill} from './TodayUpsell';
 import {useIsGuest} from './Account';
 import {ManageFamilyProfile,familyCall,familyProfilesChanged,shortProfileName,useFamilyProfiles,type FamilyProfile} from './FamilyWatches';
 import {WatchColorGrid,WatchColorSheet,WatchImage,colorName,isWatchColor,type WatchColor} from './WatchArt';
@@ -179,6 +180,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
   {guest?<View style={st.card}><Text style={st.body}>Create a free account to add family members and use Screen Break.</Text></View>:<>
    {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
    {loading?<ActivityIndicator color={T.primary}/>:null}
+   {!loading&&!error?<TrialBanner/>:null}
    {!loading&&!error?<View style={st.famSegment} accessibilityRole="tablist">{(['family','devices'] as const).map(k=><TouchableOpacity key={k} accessibilityRole="tab" accessibilityState={{selected:section===k}} onPress={()=>{if(section!==k){void Haptics.selectionAsync();setSection(k)}}} style={[st.segmentItem,section===k&&st.segmentOn]}><Ionicons name={k==='family'?'people':'tablet-portrait'} size={16} color={section===k?T.ink:T.muted}/><Text style={[st.segmentText,section===k&&{color:T.ink}]}>{k==='family'?'Family':'Devices'}</Text></TouchableOpacity>)}</View>:null}
    {section==='devices'&&!loading&&!error?<DevicesArea family={family} now={dashNow} width={screenW} childName={id=>children.find(c=>c.id===id)?.name||'Someone'} onOpen={id=>setRoute({name:'devices',id})} onAll={()=>setRoute({name:'devices'})} onStart={members.length?setStartOn:undefined}/>:<>
     {!loading&&!error&&members.length?<ProfileRow members={members} selected={current?.id} adding={adding} onSelect={id=>{setAdding(false);setSelected(id)}} onAdd={()=>setAdding(a=>!a)} sessions={family.sessions}/>:null}
@@ -412,7 +414,6 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
   </View>
   <EditMemberSheet visible={editing} child={child} children={children} onClose={()=>setEditing(false)} onChanged={onChanged} onRemoved={()=>{setEditing(false);onRemoved()}}/>
   {!screenBreakSupported?<View style={st.card}><Text style={st.body}>Screen Break needs the latest MoodPals build on this iPhone.</Text></View>:<>
-   {state&&!state.hasPlus&&!isPlus?<PlanNote state={state} daysLeft={trialDaysLeft} onUpgrade={()=>showPaywall('screenBreak')}/>:null}
    {inUse?null:<DeviceSelect options={deviceOptions} selected={target} defaultId={family.defaultId} onSelect={setPicked}/>}
    {remote?<RemoteTimer child={child} children={children} device={remote} family={family} minutes={minutes} setMinutes={setMinutes} onOpen={onOpen} onPlan={()=>showPaywall('screenBreak')}/>:mine?<View>
     <TimerHero remainingMs={mine.deadline*1000-now} grantedSec={mine.grantedSeconds} endsAt={mine.deadline} name={child.name} device="This iPhone" disabled={!!busy} onAdd={()=>{setExtra(15);setAdding(true)}} onEnd={()=>run('cancel')}/>
@@ -577,12 +578,16 @@ export function DurationRing({minutes,onChange,min,max,step=5,prefix=''}:{minute
  </View>;
 }
 
-function PlanNote({state,daysLeft,onUpgrade}:{state:BreakState;daysLeft:number|null;onUpgrade:()=>void}){
- if(!state.entitlementKnown)return null;
- const text=state.trialAvailable?'14 days free: your trial starts with the first Screen Break or when you turn on Screen Time & Stress.':state.allowed?'Free trial: '+daysLeft+' day'+(daysLeft===1?'':'s')+' left.':'Your 14-day free trial has ended. Your history stays here, and you can always stop a timer or unlock.';
- return <TouchableOpacity accessibilityRole="button" onPress={onUpgrade} style={st.note}>
-  <Ionicons name="sparkles-outline" size={18} color={T.primary}/><Text style={[st.sub,{flex:1,color:T.ink}]}>{text}</Text>
-  {!state.allowed||!state.trialAvailable?<Text style={{color:T.primary,fontWeight:'900',fontSize:12}}>Plus</Text>:null}
+/** Trial status above the Family / Devices tabs, with the Upgrade pill. */
+function TrialBanner(){
+ const [state]=useBreakState(),{isPlus,showPaywall}=usePlus();
+ if(!state?.entitlementKnown||state.hasPlus||isPlus)return null;
+ const days=state.trialEndsAt?Math.max(0,Math.ceil((state.trialEndsAt*1000-Date.now())/864e5)):null;
+ const [title,sub]=state.trialAvailable?['14 days free','Starts with your first timer']:state.allowed&&days!==null?[days+' day'+(days===1?'':'s')+' left','Free trial']:['Free trial ended','Timers can still be stopped'];
+ return <TouchableOpacity accessibilityRole="button" accessibilityLabel={title+'. '+sub+'. Upgrade to MoodPals Plus'} activeOpacity={0.85} onPress={()=>showPaywall('screenBreak')} style={st.trialBanner}>
+  <IconTile icon="sparkles" color="#7B5CE6" size={46}/>
+  <View style={{flex:1}}><Text style={st.trialTitle} numberOfLines={1}>{title}</Text><Text style={[st.sub,{color:'#6B5AA6'}]} numberOfLines={1}>{sub}</Text></View>
+  <UpgradePill/>
  </TouchableOpacity>;
 }
 
@@ -1132,6 +1137,8 @@ const st=StyleSheet.create({
 
  small:{borderRadius:14,paddingHorizontal:16,paddingVertical:10,minHeight:44,justifyContent:'center',backgroundColor:T.primarySoft,alignItems:'center'},
  smallText:{fontSize:13,fontWeight:'800',color:T.primary},
+ trialBanner:{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#F1ECFF',borderRadius:22,padding:14,borderWidth:1,borderColor:'#E3DAFB'},
+ trialTitle:{fontSize:18,fontWeight:'900',color:'#4B3A99'},
  note:{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:T.primarySoft,borderRadius:16,padding:12},
  link:{color:T.primary,fontWeight:'800',fontSize:14},
  linkRow:{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:T.surface,borderRadius:18,padding:16,borderWidth:1,borderColor:T.border},
