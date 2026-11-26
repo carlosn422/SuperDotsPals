@@ -47,7 +47,7 @@ export const FEATURE_COPY:Record<PlusFeature,{title:string;body:string}>={
 
 export const PLAN_FEATURES:{label:string;free:string|boolean;plus:string|boolean}[]=[
  {label:'Six MoodPal characters',free:true,plus:true},
- {label:'Talk time with your pal',free:false,plus:'30 min / month'},
+ {label:'Talk time with your pal',free:false,plus:'20 min / month'},
  {label:'Mood check-ins and basic history',free:true,plus:true},
  {label:'Apple Watch app and complications',free:true,plus:true},
  {label:'Family watches (mood-only)',free:'1',plus:'Up to 4'},
