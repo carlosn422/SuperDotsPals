@@ -43,13 +43,14 @@ export default function VoiceFriend({visible,onClose,companion='calm'}:{visible:
  const reduce=useReduceMotion();
  const [phase,setPhase]=useState<Phase>('connecting'),[caption,setCaption]=useState(''),[muted,setMuted]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState<Saved|null>(null);
  const mutedRef=useRef(false);mutedRef.current=muted;
+ const interruptRef=useRef<()=>void>(()=>{});
  const pulse=useRef(new Animated.Value(0)).current;
  useEffect(()=>{if(phase!=='speaking'||reduce){pulse.setValue(0);return}
   const a=Animated.loop(Animated.sequence([Animated.timing(pulse,{toValue:1,duration:700,easing:Easing.inOut(Easing.ease),useNativeDriver:true}),Animated.timing(pulse,{toValue:0,duration:700,easing:Easing.inOut(Easing.ease),useNativeDriver:true})]));
   a.start();return()=>a.stop()},[phase,reduce]);
 
  useEffect(()=>{if(!visible)return;
-  let alive=true,ws:WebSocket|null=null,ctx:AudioContext|null=null,recorder:AudioRecorder|null=null,timer:any=null,decoding=Promise.resolve(),turn=0;
+  let alive=true,ws:WebSocket|null=null,ctx:AudioContext|null=null,recorder:AudioRecorder|null=null,timer:any=null,decoding=Promise.resolve(),turn=0,playEnd=0;
   setPhase('connecting');setCaption('');setError('');setSaved(null);setMuted(false);
   const fail=(m:string)=>{if(!alive)return;setError(m);setPhase('error')};
   (async()=>{
@@ -63,6 +64,7 @@ export default function VoiceFriend({visible,onClose,companion='calm'}:{visible:
     await AudioManager.setAudioSessionActivity(true);
     ctx=new AudioContext({sampleRate:24000});
     const queue=ctx.createBufferQueueSource();queue.connect(ctx.destination);queue.start();
+    interruptRef.current=()=>{turn++;queue.clearBuffers();playEnd=0;setPhase('listening')};
     ws=new WebSocket(WS+encodeURIComponent(data.token));
     ws.onopen=()=>ws?.send(JSON.stringify({setup:{model:'models/'+data.model}}));
     ws.onclose=()=>{if(alive)setPhase(p=>p==='error'?p:'ended')};
@@ -72,7 +74,8 @@ export default function VoiceFriend({visible,onClose,companion='calm'}:{visible:
      if(m.setupComplete){
       recorder=new AudioRecorder({iosVoiceProcessing:true});
       recorder.onAudioReady({sampleRate:16000,bufferLength:1600,channelCount:1},({buffer,numFrames})=>{
-       if(mutedRef.current||ws?.readyState!==1)return;
+       // The mic stays closed while the pal talks (plus a short tail) so it never hears itself.
+       if(mutedRef.current||ws?.readyState!==1||!ctx||ctx.currentTime<playEnd+0.35)return;
        ws.send(JSON.stringify({realtimeInput:{audio:{data:toBase64(buffer.getChannelData(0).subarray(0,numFrames)),mimeType:'audio/pcm;rate=16000'}}}));
       });
       await recorder.start();
@@ -82,11 +85,11 @@ export default function VoiceFriend({visible,onClose,companion='calm'}:{visible:
      }
      const sc=m.serverContent;
      if(sc){
-      if(sc.interrupted){turn++;queue.clearBuffers();setPhase('listening')}
+      if(sc.interrupted){turn++;queue.clearBuffers();playEnd=0;setPhase('listening')}
       const id=turn;
       for(const p of sc.modelTurn?.parts||[])if(p.inlineData?.data){
        const chunk=p.inlineData.data;setPhase('speaking');
-       decoding=decoding.then(async()=>{if(id!==turn||!ctx)return;const b=await ctx.decodePCMInBase64(chunk,24000,1);if(id===turn)queue.enqueueBuffer(b)}).catch(()=>{});
+       decoding=decoding.then(async()=>{if(id!==turn||!ctx)return;const b=await ctx.decodePCMInBase64(chunk,24000,1);if(id===turn&&ctx){queue.enqueueBuffer(b);playEnd=Math.max(playEnd,ctx.currentTime)+b.duration}}).catch(()=>{});
       }
       if(sc.inputTranscription?.text)setCaption('');
       if(sc.outputTranscription?.text)setCaption(c=>(c+sc.outputTranscription.text).slice(-220));
@@ -118,10 +121,11 @@ export default function VoiceFriend({visible,onClose,companion='calm'}:{visible:
  return <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
   <View style={st.root}>
    <Text style={st.status} accessibilityLiveRegion="polite">{status}</Text>
-   <View style={st.stage}>
+   <TouchableOpacity activeOpacity={0.85} disabled={phase!=='speaking'} accessibilityRole="button" accessibilityLabel="Interrupt your pal" onPress={()=>interruptRef.current()} style={st.stage}>
     <Animated.View style={[st.ring,{transform:[{scale}]}]}/>
     <SuperdotMascot id={companion} size={170}/>
-   </View>
+   </TouchableOpacity>
+   <Text style={[st.note,{opacity:phase==='speaking'?1:0}]}>Tap your pal to jump in</Text>
    {phase==='connecting'?<ActivityIndicator color={APP_THEME.primary}/>:null}
    {error?<Text style={st.error}>{error}</Text>:<Text style={st.caption} numberOfLines={4}>{caption}</Text>}
    {saved?<View style={st.saved} accessible accessibilityLabel={'Logged for today: '+saved.summary}>
