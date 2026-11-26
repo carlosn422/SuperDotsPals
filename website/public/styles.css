@@ -425,3 +425,7 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 .t-panel.on{opacity:1;transform:none;visibility:visible}.t-panel h3{margin:6px 0;font-size:26px}.t-panel p{margin:0 0 12px;color:var(--muted)}
 @media(max-width:900px){.t-hero-row{grid-template-columns:1fr;text-align:center}.t-held .phone{transform:rotateY(-14deg) rotateZ(2deg);animation:none}}
 @media(prefers-reduced-motion:reduce){.t-held .phone{animation:none}.t-dev,.t-pointer,.t-panel{transition:none}}
+.t-dev.t-ph{--w:clamp(68px,17vw,190px);width:var(--w)}.t-dev.t-tb{--w:clamp(110px,27vw,300px);width:var(--w)}
+.t-dev .t-frame,.t-dev.t-tb .t-frame{padding:calc(var(--w)*.022);border-radius:calc(var(--w)*.15);box-shadow:0 0 0 1px #2c2c2e inset,0 18px 34px rgba(43,30,69,.2)}
+.t-dev .t-frame img,.t-dev.t-tb .t-frame img{border-radius:calc(var(--w)*.13)}
+.t-dev.t-tb .t-frame{border-radius:calc(var(--w)*.06)}.t-dev.t-tb .t-frame img{border-radius:calc(var(--w)*.045)}
