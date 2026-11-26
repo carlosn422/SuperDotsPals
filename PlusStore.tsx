@@ -12,6 +12,11 @@ export const FREE_HEALTH_DAYS=7;
 export const PLUS_HEALTH_DAYS=30;
 
 export type PlusPlan='weekly'|'monthly'|'annual';
+// Extra call minutes, sold as consumables from their own RevenueCat offering.
+export type MinutePackId='minutes_10'|'minutes_30'|'minutes_60';
+export const MINUTES_OFFERING='voice_minutes';
+export const MINUTE_PACKS:{id:MinutePackId;minutes:number;price:string}[]=[{id:'minutes_10',minutes:10,price:'$0.99'},{id:'minutes_30',minutes:30,price:'$2.99'},{id:'minutes_60',minutes:60,price:'$3.99'}];
+const MINUTE_PRICES=Object.fromEntries(MINUTE_PACKS.map(p=>[p.id,p.price])) as Record<MinutePackId,string>;
 // RevenueCat offering for this release's prices. Older app versions keep using the current (legacy) offering.
 export const PLUS_OFFERING='plus_v2';
 export type PlusFeature='general'|'trends'|'customization'|'circles'|'reflections'|'family'|'health'|'hydration'|'screenBreak'|'screenTime';
@@ -60,7 +65,7 @@ type PlusState={
  paywall:{feature:PlusFeature}|null;
  showPaywall:(feature?:PlusFeature)=>void;hidePaywall:()=>void;nestedPaywalls:number;setNestedPaywalls:React.Dispatch<React.SetStateAction<number>>;
  purchase:(plan:PlusPlan)=>Promise<boolean>;restore:()=>Promise<boolean>;resetToFree:()=>void;
-};
+ minutePrices:Record<MinutePackId,string>;buyMinutes:(id:MinutePackId)=>Promise<boolean>};
 const Ctx=createContext<PlusState|null>(null);
 
 let configured=false;
@@ -77,6 +82,7 @@ export function PlusProvider({children}:{children:React.ReactNode}){
  const [prices,setPrices]=useState(PLUS_PRICES);
  const [packages,setPackages]=useState<Partial<Record<PlusPlan,PurchasesPackage>>>({});
  const [paywall,setPaywall]=useState<{feature:PlusFeature}|null>(null);
+ const [minutePkgs,setMinutePkgs]=useState<Partial<Record<MinutePackId,PurchasesPackage>>>({}),[minutePrices,setMinutePrices]=useState(MINUTE_PRICES);
  const [nestedPaywalls,setNestedPaywalls]=useState(0);
  const userRef=useRef<string|null>(null);
 
@@ -98,6 +104,8 @@ export function PlusProvider({children}:{children:React.ReactNode}){
     Purchases.addCustomerInfoUpdateListener(apply);
     apply(await Purchases.getCustomerInfo());
     const offerings=await Purchases.getOfferings();
+    const mo=offerings.all[MINUTES_OFFERING];
+    if(mo&&active){const mp:Partial<Record<MinutePackId,PurchasesPackage>>={};for(const p of mo.availablePackages)if(MINUTE_PACKS.some(x=>x.id===p.identifier))mp[p.identifier as MinutePackId]=p;setMinutePkgs(mp);setMinutePrices({...MINUTE_PRICES,...Object.fromEntries(Object.entries(mp).map(([k,v])=>[k,v!.product.priceString]))})}
     const offer=offerings.all[PLUS_OFFERING]??offerings.current;
     if(!offer||!active)return;
     const pkgs:Partial<Record<PlusPlan,PurchasesPackage>>={};
@@ -142,9 +150,16 @@ export function PlusProvider({children}:{children:React.ReactNode}){
    return false;
   }
  },[plan]);
+ const buyMinutes=useCallback(async(id:MinutePackId)=>{
+  if(PLUS_MOCKUP){Alert.alert('Preview','No purchase is made in preview mode.');return false}
+  const pkg=minutePkgs[id];
+  if(!pkg){Alert.alert('Minutes unavailable','Extra minutes can\'t be bought right now. Please try again later.');return false}
+  try{await Purchases.purchasePackage(pkg);return true}
+  catch(e:any){if(!e?.userCancelled)Alert.alert('Purchase didn\'t go through',e?.message||'Please try again.');return false}
+ },[minutePkgs]);
  const resetToFree=useCallback(()=>{if(PLUS_MOCKUP)setPlan(null)},[]);
  const available=useMemo(()=>Object.keys(packages) as PlusPlan[],[packages]),plansLoaded=available.length>0;
- const value=useMemo(()=>({isPlus:plan!==null,plusKnown,plan,prices,available,plansLoaded,paywall,showPaywall,hidePaywall,nestedPaywalls,setNestedPaywalls,purchase,restore,resetToFree}),[plan,plusKnown,prices,available,plansLoaded,paywall,showPaywall,hidePaywall,nestedPaywalls,purchase,restore,resetToFree]);
+ const value=useMemo(()=>({isPlus:plan!==null,plusKnown,plan,prices,available,plansLoaded,paywall,showPaywall,hidePaywall,nestedPaywalls,setNestedPaywalls,purchase,restore,resetToFree,minutePrices,buyMinutes}),[minutePrices,buyMinutes,plan,plusKnown,prices,available,plansLoaded,paywall,showPaywall,hidePaywall,nestedPaywalls,purchase,restore,resetToFree]);
  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

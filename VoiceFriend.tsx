@@ -1,5 +1,5 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {AppState,Modal,View,Text,TouchableOpacity,StyleSheet,Animated,Easing,ActivityIndicator,Image} from 'react-native';
+import {Alert,AppState,Modal,View,Text,TouchableOpacity,StyleSheet,Animated,Easing,ActivityIndicator,Image} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
@@ -7,7 +7,7 @@ import {AudioContext,AudioRecorder,AudioManager} from 'react-native-audio-api';
 import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
 import {APP_THEME} from './MoodMascot';
-import {usePlus} from './PlusStore';
+import {MINUTE_PACKS,MinutePackId,usePlus} from './PlusStore';
 import {useReduceMotion} from './CircleComponents';
 
 export type VoiceGender='female'|'male';
@@ -74,7 +74,8 @@ function toBase64(f:Float32Array){
 }
 
 export default function VoiceFriend({visible,onClose,companion='calm',topic}:{visible:boolean;onClose:()=>void;companion?:string;topic?:string}){
- const {showPaywall}=usePlus();
+ const {showPaywall,minutePrices,buyMinutes}=usePlus();
+ const [limit,setLimit]=useState<{cap:number;resetsAt?:string}|null>(null),[attempt,setAttempt]=useState(0),[pack,setPack]=useState<MinutePackId>('minutes_30'),[buying,setBuying]=useState(false);
  const reduce=useReduceMotion();
  const [phase,setPhase]=useState<Phase>('connecting'),[caption,setCaption]=useState(''),[muted,setMuted]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState<Saved|null>(null);
  const mutedRef=useRef(false);mutedRef.current=muted;
@@ -94,14 +95,14 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
   // Leaving the app hangs up, so Gemini never keeps running in the background.
   const appSub=AppState.addEventListener('change',st=>{if(st==='background'&&alive)onClose()});
   const add=(d:any[]|undefined,into:'in'|'out')=>{for(const x of d||[]){const n=Number(x?.tokenCount)||0;if(x?.modality==='AUDIO')use[into==='in'?'inAudio':'outAudio']+=n;else use[into==='in'?'inText':'outText']+=n}};
-  setPhase('connecting');setCaption('');setError('');setSaved(null);setMuted(false);
+  setPhase('connecting');setCaption('');setError('');setSaved(null);setMuted(false);setLimit(null);
   const fail=(m:string)=>{if(!alive)return;setError(m);setPhase('error')};
   (async()=>{
    try{
     if(await AudioManager.requestRecordingPermissions()!=='Granted')return fail('Allow the microphone for MoodPals in iPhone Settings to talk with your pal.');
     const pal=voicePal(await loadVoicePal());
     const {data,error:fnError}=await supabase.functions.invoke('voice-live-token',{body:{voice:pal.gender,pal:pal.id}});
-    if(fnError){let msg='Could not start the call. Please try again.';try{const d=await (fnError as any).context?.json?.();if(d?.code==='plus_required'){onClose();showPaywall('reflections');return}if(d?.error)msg=d.error}catch{}return fail(msg)}
+    if(fnError){let msg='Could not start the call. Please try again.';try{const d=await (fnError as any).context?.json?.();if(d?.code==='plus_required'){onClose();showPaywall('reflections');return}if(d?.code==='voice_limit'){if(alive){setLimit({cap:Number(d.cap)||60,resetsAt:d.resetsAt});setPhase('ended')}return}if(d?.error)msg=d.error}catch{}return fail(msg)}
     if(!alive||!data?.token)return;
     callId=data.callId||null;callStart=Date.now();
     AudioManager.setSystemOptions({ios:{category:'playAndRecord',mode:'voiceChat',options:['defaultToSpeaker','allowBluetoothHFP']}});
@@ -179,13 +180,41 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
   })();
   return()=>{alive=false;clearTimeout(timer);clearTimeout(wrapT);clearInterval(byeT);clearInterval(silT);clearInterval(hangup);
    appSub.remove();finish();stopMic();try{ws?.close()}catch{}void ctx?.close().catch(()=>{});void AudioManager.setAudioSessionActivity(false).catch(()=>{})};
- },[visible]);
+ },[visible,attempt]);
 
+ async function buy(){
+  setBuying(true);
+  try{
+   if(!await buyMinutes(pack))return;
+   // The store webhook credits the minutes a moment after the purchase.
+   for(let i=0;i<15;i++){
+    const {data}=await supabase.rpc('my_voice_minutes').single();
+    if(Number((data as any)?.minutes_left)>=1){setLimit(null);setAttempt(a=>a+1);return}
+    await new Promise(r=>setTimeout(r,1500));
+   }
+   Alert.alert('Almost there','Your minutes are on their way. Try calling again in a minute.');
+  }finally{setBuying(false)}
+ }
  async function undo(){if(!saved)return;const id=saved.id;setSaved(null);await supabase.from('wellness_journal').delete().eq('id',id)}
  const status=phase==='connecting'?'Calling your pal…':phase==='speaking'?'Speaking':phase==='listening'?(muted?'Muted':'Listening'):phase==='ended'?'Call ended':'';
  const scale=pulse.interpolate({inputRange:[0,1],outputRange:[1,1.12]});
  return <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
-  <View style={st.root}>
+  {limit?<View style={st.root}>
+   <SuperdotMascot id={companion} size={120}/>
+   <View style={st.limitBubble}><Ionicons name="hourglass" size={26} color="#8A63D2"/></View>
+   <Text style={st.limitTitle} accessibilityRole="header">You're out of call minutes</Text>
+   <Text style={st.limitBody}>{`Your ${limit.cap} Plus minutes come back${limit.resetsAt?' on '+new Date(limit.resetsAt).toLocaleDateString(undefined,{month:'long',day:'numeric',timeZone:'UTC'}):' next month'}. Need more time now?`}</Text>
+   <View style={st.packs}>{MINUTE_PACKS.map(p=>{const on=pack===p.id,best=p.minutes===60;return <TouchableOpacity key={p.id} accessibilityRole="radio" accessibilityState={{checked:on}} accessibilityLabel={`${p.minutes} minutes, ${minutePrices[p.id]}${best?', best value':''}`} onPress={()=>setPack(p.id)} style={[st.pack,on&&st.packOn]}>
+    {best?<View style={st.best}><Text style={st.bestText}>Best value</Text></View>:null}
+    <Text style={st.packMin}>{p.minutes}</Text><Text style={st.packUnit}>minutes</Text><Text style={st.packPrice}>{minutePrices[p.id]}</Text>
+   </TouchableOpacity>})}</View>
+   <TouchableOpacity accessibilityRole="button" disabled={buying} onPress={()=>void buy()} style={[st.buy,buying&&{opacity:0.6}]}>
+    {buying?<ActivityIndicator color="#fff"/>:<Ionicons name="call" size={20} color="#fff"/>}
+    <Text style={st.buyText}>{`Get ${MINUTE_PACKS.find(p=>p.id===pack)!.minutes} minutes · ${minutePrices[pack]}`}</Text>
+   </TouchableOpacity>
+   <TouchableOpacity accessibilityRole="button" onPress={onClose}><Text style={st.later}>Maybe later</Text></TouchableOpacity>
+   <Text style={[st.note,{marginTop:'auto'}]}>Extra minutes don't expire. They're used after your monthly Plus minutes.</Text>
+  </View>:<View style={st.root}>
    <Text style={st.status} accessibilityLiveRegion="polite">{status}</Text>
    <TouchableOpacity activeOpacity={0.85} disabled={phase!=='speaking'} accessibilityRole="button" accessibilityLabel="Interrupt your pal" onPress={()=>interruptRef.current()} style={st.stage}>
     <Animated.View style={[st.ring,{transform:[{scale}]}]}/>
@@ -208,7 +237,7 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
     </TouchableOpacity>
    </View>
    <Text style={st.note}>Your MoodPal is a caring friend, not a therapist. In a crisis in the US, call or text 988.</Text>
-  </View>
+  </View>}
  </Modal>;
 }
 const TOPICS=[{e:'😮‍💨',l:'Rough day'},{e:'😊',l:'Good news'},{e:'😴',l:"Can't sleep"}];
@@ -299,6 +328,16 @@ const b=StyleSheet.create({
  q:{backgroundColor:'#fff',borderWidth:1,borderColor:'#DCEBE2',borderRadius:18,paddingHorizontal:13,paddingVertical:9},qText:{fontSize:14,fontWeight:'800',color:APP_THEME.ink},
 });
 const st=StyleSheet.create({
+ limitBubble:{width:56,height:56,borderRadius:28,backgroundColor:'#ECE6FF',alignItems:'center',justifyContent:'center',marginTop:-34,borderWidth:3,borderColor:'#fff'},
+ limitTitle:{fontSize:24,fontWeight:'900',color:APP_THEME.ink,textAlign:'center'},
+ limitBody:{fontSize:15,lineHeight:21,color:APP_THEME.muted,textAlign:'center',paddingHorizontal:8},
+ packs:{flexDirection:'row',gap:10,alignSelf:'stretch',marginTop:6},
+ pack:{flex:1,alignItems:'center',backgroundColor:'#fff',borderRadius:20,paddingVertical:16,borderWidth:2,borderColor:'#fff',shadowColor:'#2D4A3E',shadowOpacity:0.08,shadowRadius:8,shadowOffset:{width:0,height:3}},
+ packOn:{borderColor:APP_THEME.primary,backgroundColor:'#F7FDF9'},
+ best:{position:'absolute',top:-10,backgroundColor:'#8A63D2',borderRadius:10,paddingHorizontal:8,paddingVertical:3},bestText:{color:'#fff',fontSize:10,fontWeight:'900'},
+ packMin:{fontSize:30,fontWeight:'900',color:APP_THEME.ink},packUnit:{fontSize:12,fontWeight:'700',color:APP_THEME.muted},packPrice:{fontSize:15,fontWeight:'900',color:APP_THEME.primary,marginTop:6},
+ buy:{flexDirection:'row',gap:10,alignSelf:'stretch',alignItems:'center',justifyContent:'center',backgroundColor:APP_THEME.primary,borderRadius:28,paddingVertical:16},buyText:{color:'#fff',fontSize:16,fontWeight:'900'},
+ later:{fontSize:14,fontWeight:'800',color:APP_THEME.primary,padding:6},
  root:{flex:1,backgroundColor:APP_THEME.primarySoft,alignItems:'center',paddingTop:90,paddingBottom:40,paddingHorizontal:24,gap:18},
  status:{fontSize:15,fontWeight:'800',color:APP_THEME.primary,letterSpacing:0.4},
  stage:{width:240,height:240,alignItems:'center',justifyContent:'center'},

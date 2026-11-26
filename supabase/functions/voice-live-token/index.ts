@@ -62,17 +62,11 @@ Deno.serve(async req=>{
   const {data:plus,error:plusError}=await adminDb.rpc("has_plus",{uid:user.id});
   if(plusError)return new Response(JSON.stringify({error:"Could not check your plan. Please try again."}),{status:503,headers});
   if(plus!==true)return new Response(JSON.stringify({error:"Talking with your MoodPal is part of MoodPals Plus.",code:"plus_required"}),{status:402,headers});
-  const monthStart=new Date();monthStart.setUTCDate(1);monthStart.setUTCHours(0,0,0,0);
-  const [{data:cfg,error:cfgError},{data:calls,error:callsError}]=await Promise.all([
-   adminDb.from("voice_settings").select("monthly_minutes_cap").eq("id",true).maybeSingle(),
-   adminDb.from("voice_calls").select("started_at,duration_seconds").eq("user_id",user.id).gte("started_at",monthStart.toISOString())
-  ]);
-  if(cfgError||callsError)return new Response(JSON.stringify({error:"Could not check your voice minutes. Please try again."}),{status:503,headers});
-  const cap=Number(cfg?.monthly_minutes_cap??60);
-  // Calls that never reported an end count as their elapsed time, up to one full call.
-  const usedSeconds=(calls||[]).reduce((t,c)=>t+(c.duration_seconds??Math.min(SESSION_MINUTES*60,(Date.now()-Date.parse(c.started_at))/1000)),0);
-  const minutesLeft=Math.floor(cap-usedSeconds/60);
-  if(minutesLeft<1)return new Response(JSON.stringify({error:`You've used your ${cap} voice minutes for this month. They reset on the 1st.`,code:"voice_limit",cap}),{status:402,headers});
+  const {data:status,error:statusError}=await adminDb.rpc("voice_minutes_status",{p_user:user.id}).single();
+  if(statusError||!status)return new Response(JSON.stringify({error:"Could not check your voice minutes. Please try again."}),{status:503,headers});
+  const cap=Number((status as any).cap),minutesLeft=Math.floor(Number((status as any).minutes_left));
+  const next=new Date();next.setUTCDate(1);next.setUTCHours(0,0,0,0);next.setUTCMonth(next.getUTCMonth()+1);
+  if(minutesLeft<1)return new Response(JSON.stringify({error:`You've used your ${cap} voice minutes for this month.`,code:"voice_limit",cap,resetsAt:next.toISOString()}),{status:402,headers});
   const minutes=Math.min(SESSION_MINUTES,minutesLeft);
   const payload=await req.json().catch(()=>({}));
   const pal=PALS[payload?.pal as keyof typeof PALS]??(payload?.voice==="male"?PALS.leo:PALS.maya);

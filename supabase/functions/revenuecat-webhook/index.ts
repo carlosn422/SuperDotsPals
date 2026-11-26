@@ -52,6 +52,24 @@ Deno.serve(async (req) => {
 
   const ids = [event.app_user_id, event.original_app_user_id, ...(event.aliases || [])].filter((id: unknown) => typeof id === "string" && UUID.test(id));
   const userId = ids[0];
+  // Consumable minute packs (moodpals_voice_10min etc.) add call minutes; a refund removes them.
+  const pack = /^moodpals_voice_(\d+)min$/.exec(String(event.product_id || ""));
+  if (pack) {
+    const tx = String(event.transaction_id || event.original_transaction_id || event.id || "");
+    if (!userId || !tx) return json({ ok: true, ignored: true });
+    if (event.type === "NON_RENEWING_PURCHASE") {
+      const { error } = await db.from("voice_minute_purchases").upsert({
+        user_id: userId, product_id: event.product_id, minutes: Number(pack[1]), transaction_id: tx,
+        store: event.store ?? null, environment: event.environment ?? null,
+        purchased_at: event.purchased_at_ms ? new Date(event.purchased_at_ms).toISOString() : eventAt,
+      }, { onConflict: "transaction_id", ignoreDuplicates: true });
+      if (error) return json({ error: error.message }, 500);
+    } else if (event.type === "CANCELLATION") {
+      const { error } = await db.from("voice_minute_purchases").update({ refunded_at: eventAt }).eq("transaction_id", tx);
+      if (error) return json({ error: error.message }, 500);
+    }
+    return json({ ok: true });
+  }
   const entitlements: string[] = event.entitlement_ids || (event.entitlement_id ? [event.entitlement_id] : []);
   if (!userId || !entitlements.includes(ENTITLEMENT)) return json({ ok: true, ignored: true });
 
