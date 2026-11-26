@@ -1,3 +1,4 @@
+import {IconTile} from './IconTile';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {ActionSheetIOS,ActivityIndicator,Alert,Modal,ScrollView,StyleSheet,Switch,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -128,7 +129,7 @@ export function FamilyDevicesScreen({onBack,childName,onStart,openId}:{onBack:()
   {!loaded?<ActivityIndicator color={T.primary}/>:null}
   <View style={s.card}>
    <View style={s.deviceRow}>
-    <View style={s.deviceIcon}><Ionicons name="phone-portrait-outline" size={28} color="#4A8CFF"/></View>
+    <IconTile icon="phone-portrait" color="#4A8CFF" size={52}/>
     <View style={{flex:1}}>
      <View style={s.nameLine}><Text style={s.rowTitle} numberOfLines={1}>This iPhone</Text>{defaultId===PHONE?<DefaultPill/>:null}</View>
      <StatusLine icon="checkmark-circle" color={OK} text="Your iPhone"/>
@@ -179,7 +180,7 @@ export function DeviceCard({device:d,isDefault,commands,sessions,now,childName,o
  const pendingStart=st.pending?.type==='START_SESSION'?st.pending:undefined;
  return <View style={[s.card,width?{width}:null]}>
   <TouchableOpacity accessibilityRole="button" accessibilityLabel={d.name+(isDefault?', default':'')+', '+status.text+'. Device settings'} onPress={onOpen} style={s.deviceRow}>
-   <View style={s.deviceIcon}><Ionicons name={d.device_type==='ipad'?'tablet-landscape-outline':'phone-portrait-outline'} size={28} color="#4A8CFF"/></View>
+   <IconTile icon={d.device_type==='ipad'?'tablet-landscape':'phone-portrait'} color="#4A8CFF" size={52}/>
    <View style={{flex:1}}>
     <View style={s.nameLine}><Text style={s.rowTitle} numberOfLines={1}>{d.name}</Text>{isDefault?<DefaultPill/>:null}</View>
     <StatusLine {...status}/>

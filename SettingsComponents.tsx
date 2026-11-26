@@ -1,3 +1,4 @@
+import {IconTile} from './IconTile';
 import React from 'react';
 import {View,Text,TouchableOpacity,ScrollView,StyleSheet,Alert} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -43,7 +44,7 @@ const TILE_TINTS:[string,string][]=[['#E4F6EA','#23966A'],['#EAF1FF','#4A8CFF'],
 const ICON_TILE:Partial<Record<string,number>>={'sparkles-outline':2,'hourglass-outline':0,'watch-outline':1,'heart-outline':4,'notifications-outline':3,'people-outline':5,'person-circle-outline':2,'shield-checkmark-outline':1,'help-circle-outline':3};
 export function SettingsItem({title,subtitle,icon,onPress}:{title:string;subtitle:string;status?:string;icon:SettingIcon;onPress:()=>void;accent?:string}){
  const tile=ICON_TILE[icon]??[...title].reduce((n,c)=>n+c.charCodeAt(0),0)%TILE_TINTS.length;
- return <TouchableOpacity onPress={onPress} accessibilityRole="button" style={s.settingRow}><View style={[s.iconBadge,{backgroundColor:TILE_TINTS[tile][0]}]}><Ionicons name={icon} size={23} color={TILE_TINTS[tile][1]}/></View><View style={{flex:1,gap:3}}><Text style={s.title}>{title}</Text><Text style={s.subtitle}>{subtitle}</Text></View><Ionicons name="chevron-forward" size={17} color="#AAA4AF"/></TouchableOpacity>;
+ return <TouchableOpacity onPress={onPress} accessibilityRole="button" style={s.settingRow}><IconTile icon={icon} color={TILE_TINTS[tile][1]} size={46}/><View style={{flex:1,gap:3}}><Text style={s.title}>{title}</Text><Text style={s.subtitle}>{subtitle}</Text></View><Ionicons name="chevron-forward" size={17} color="#AAA4AF"/></TouchableOpacity>;
 }
 const s=StyleSheet.create({
  promo:{backgroundColor:'#C9F5EA',borderRadius:24,padding:20,minHeight:165,flexDirection:'row',alignItems:'center',overflow:'hidden',position:'relative',gap:5,shadowColor:'#42796D',shadowOpacity:0.08,shadowRadius:14,elevation:2},

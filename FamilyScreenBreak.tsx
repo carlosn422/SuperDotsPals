@@ -1,3 +1,4 @@
+import {IconTile} from './IconTile';
 import React,{useCallback,useContext,useEffect,useMemo,useRef,useState} from 'react';
 import {ChartScrubContext} from './StressDashboard';
 import {ActionSheetIOS,ActivityIndicator,Alert,Animated,AppState,Modal,PanResponder,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View,useWindowDimensions} from 'react-native';
@@ -215,7 +216,7 @@ function TimerHero({remainingMs,grantedSec,endsAt,name,device,disabled,onAdd,onE
 /** Devices as a swipeable carousel, one card at a time. */
 function DevicesArea({family,now,width,childName,onOpen,onAll,onStart}:{family:ReturnType<typeof useFamilyDevices>;now:number;width:number;childName:(id:string)=>string;onOpen:(id:string)=>void;onAll:()=>void;onStart?:(d:FamilyDevice)=>void}){
  const [page,setPage]=useState(0);
- if(!family.devices.length)return <TouchableOpacity accessibilityRole="button" onPress={onAll} style={st.linkRow}><View style={[st.tile,{backgroundColor:TINTS[1]}]}><Ionicons name="add" size={22} color={TINT_INK[1]}/></View><Text style={[st.rowTitle,{flex:1}]}>Add a family device</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>;
+ if(!family.devices.length)return <TouchableOpacity accessibilityRole="button" onPress={onAll} style={st.linkRow}><IconTile icon="add" color={TINT_INK[1]}/><Text style={[st.rowTitle,{flex:1}]}>Add a family device</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>;
  return <View style={{gap:12}}>
   <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={{marginHorizontal:-20}} scrollEventThrottle={32} onScroll={e=>setPage(Math.round(e.nativeEvent.contentOffset.x/width))}>
    {family.devices.map(d=><View key={d.id} style={{width,paddingHorizontal:20}}><DeviceCard device={d} isDefault={family.defaultId===d.id} commands={family.commands} sessions={family.sessions} now={now} childName={childName} onOpen={()=>onOpen(d.id)} onStart={onStart}/></View>)}
@@ -460,7 +461,7 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
     <MemberWatch child={child} children={children} onChanged={onChanged} onRemoved={onRemoved}/>
    </ScrollView>
   </Modal>:<>
-  <TouchableOpacity accessibilityRole="button" onPress={onInsights} style={st.linkRow}><View style={[st.tile,{backgroundColor:TINTS[2]}]}><Ionicons name="bar-chart" size={21} color={TINT_INK[2]}/></View><Text style={[st.rowTitle,{flex:1}]}>Screen Time Insights</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>
+  <TouchableOpacity accessibilityRole="button" onPress={onInsights} style={st.linkRow}><IconTile icon="bar-chart" color={TINT_INK[2]}/><Text style={[st.rowTitle,{flex:1}]}>Screen Time Insights</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>
   <MemberWatch child={child} children={children} onChanged={onChanged} onRemoved={onRemoved}/>
   </>}
  </View>;

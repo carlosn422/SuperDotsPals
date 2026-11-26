@@ -1,3 +1,4 @@
+import {IconTile} from './IconTile';
 import React,{useEffect,useRef,useState} from 'react';
 import {AccessibilityInfo,Animated,Easing,StyleSheet,Switch,Text,TouchableOpacity,View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
@@ -32,7 +33,7 @@ export function CHeading({title,detail,action,onAction}:{title:string;detail?:st
 }
 export function CRow({icon,title,subtitle,right,onPress,tint=CT.primarySoft,color=CT.primary,last,leading}:{icon?:any;title:string;subtitle?:string;right?:React.ReactNode;onPress?:()=>void;tint?:string;color?:string;last?:boolean;leading?:React.ReactNode}){
  return <TouchableOpacity disabled={!onPress} onPress={onPress} accessibilityRole={onPress?'button':undefined} style={[cs.row,last&&{borderBottomWidth:0}]}>
-  {leading||(icon?<View style={[cs.rowIcon,{backgroundColor:tint}]}><Ionicons name={icon} size={20} color={color}/></View>:null)}
+  {leading||(icon?<IconTile icon={icon} color={color} size={40}/>:null)}
   <View style={{flex:1,gap:2}}><Text style={cs.rowTitle}>{title}</Text>{subtitle?<Text style={cs.rowSub}>{subtitle}</Text>:null}</View>
   {right!==undefined?right:onPress?<Ionicons name="chevron-forward" size={18} color={CT.primary}/>:null}
  </TouchableOpacity>;
