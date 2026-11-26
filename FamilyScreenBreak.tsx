@@ -342,7 +342,7 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
    {state&&!state.hasPlus&&!isPlus?<PlanNote state={state} daysLeft={trialDaysLeft} onUpgrade={()=>showPaywall('screenBreak')}/>:null}
    {inUse?null:<DeviceSelect options={deviceOptions} selected={target} defaultId={family.defaultId} onSelect={setPicked}/>}
    {remote?<RemoteTimer child={child} children={children} device={remote} family={family} minutes={minutes} setMinutes={setMinutes} onOpen={onOpen} onPlan={()=>showPaywall('screenBreak')}/>:mine?<View style={[st.card,st.heroCard,{alignItems:'center'}]}>
-    <SuperdotMascot id="joy" size={96}/><Text style={st.kicker}>Screen time left</Text>
+    <Text style={st.kicker}>Screen time left</Text>
     <Text style={st.timer} accessibilityRole="timer">{countdown(mine.deadline*1000-now)}</Text>
     <Text style={st.sub}>Ends at {clock(mine.deadline)} · {formatDuration(mine.grantedSeconds)} granted</Text>
     <TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={()=>{setExtra(15);setAdding(true)}} style={[st.cta,{alignSelf:'stretch',marginTop:6}]}><Text style={st.ctaText}>Add Time</Text></TouchableOpacity>
@@ -426,7 +426,7 @@ function RemoteTimer({child,children,device,family,minutes,setMinutes,onOpen,onP
   </View>
   {session&&session.child_id===child.id?<>
    <View style={{alignItems:'center',gap:4}}>
-    <SuperdotMascot id="joy" size={96}/><Text style={st.kicker}>Screen time left</Text>
+    <Text style={st.kicker}>Screen time left</Text>
     <Text style={st.timer} accessibilityRole="timer">{countdown(Date.parse(session.deadline_at)-now)}</Text>
     <Text style={st.sub}>Ends at {clock(Date.parse(session.deadline_at)/1000)} · {formatDuration(session.granted_seconds)} granted</Text>
    </View>
@@ -456,7 +456,7 @@ function timeColor(minutes:number){
  const mix=i<=0?TIME_STOPS[i<0?TIME_STOPS.length-1:0][1]:(()=>{const [m0,a]=TIME_STOPS[i-1],[m1,b]=TIME_STOPS[i],t=(minutes-m0)/(m1-m0);return a.map((v,k)=>v+(b[k]-v)*t)})();
  return '#'+mix.map(v=>Math.round(v).toString(16).padStart(2,'0')).join('');
 }
-const PRESETS=[15,30,45,60,90],ringPal=(m:number)=>m<=30?'calm':m<=75?'joy':m<=120?'fear':'tired';
+const PRESETS=[15,30,45,60,90];
 export function DurationRing({minutes,onChange,min,max,step=5,prefix=''}:{minutes:number;onChange:(n:number)=>void;min:number;max:number;step?:number;prefix?:string}){
  // The knob is wider than the ring, so the ring is inset by the knob's radius to keep it inside the view.
  const SIZE=230,LINE=18,KNOB=LINE*0.75,R=SIZE/2-KNOB-3,C=SIZE/2,CIRC=2*Math.PI*R;
@@ -501,8 +501,7 @@ export function DurationRing({minutes,onChange,min,max,step=5,prefix=''}:{minute
    <Circle cx={kx} cy={ky} r={KNOB} fill="#fff" stroke={timeColor(minutes)} strokeWidth={3}/>
   </Svg>
   <View pointerEvents="none" style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center'}]}>
-   <SuperdotMascot id={ringPal(minutes)} size={64}/>
-   <Text style={{fontSize:40,fontWeight:'900',color:T.ink}}>{prefix}{minutes}</Text>
+   <Text style={{fontSize:52,fontWeight:'900',color:T.ink}}>{prefix}{minutes}</Text>
    <Text style={st.sub}>{h?h+' hr'+(m?' '+m+' min':''):'min'}</Text>
   </View>
  </View>
