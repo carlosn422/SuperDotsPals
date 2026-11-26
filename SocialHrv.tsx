@@ -23,6 +23,13 @@ function useSocialData(){
  return {state,marks,byDay,refresh};
 }
 
+export function useScreenTimeToday(){
+ const {state,byDay}=useSocialData();
+ if(!socialTrackSupported||!state?.enabled)return null;
+ const used=ownerMinutesOn(byDay),limit=state.limitMinutes||0;
+ return {used:formatMins(used),detail:!limit?'No daily limit':used>=limit?'Limit reached':`${formatMins(Math.max(0,limit-used))} left of ${formatMins(limit)}`};
+}
+
 function useMoods(){
  const [moods,setMoods]=useState<MoodEntry[]>([]);
  useEffect(()=>{let alive=true;(async()=>{

@@ -6,6 +6,7 @@ import {Image as RNImage} from 'react-native';
 import {APP_THEME} from './MoodMascot';
 import {supabase} from './supabase';
 import {usePlus} from './PlusStore';
+import {useScreenTimeToday} from './SocialHrv';
 import {rowAmount,useDrinkGoals} from './Drinks';
 import HealthDataPanel,{HealthMiniStats,useSavedHealth} from './HealthDataPanel';
 import RecoveryInsights from './RecoveryInsights';
@@ -109,14 +110,17 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onCha
  const [day,setDay]=React.useState(0);
  const [pastAmounts,setPastAmounts]=React.useState({water:0,caffeine:0});
  const {goals:drinkGoals}=useDrinkGoals(usePlus().isPlus);
- const [activitySummary,setActivitySummary]=React.useState<{count:number;minutes:number}>({count:0,minutes:0});
+ const [activitySummary,setActivitySummary]=React.useState<{count:number;minutes:number;journal:number}>({count:0,minutes:0,journal:0});
+ const screenTime=useScreenTimeToday();
  React.useEffect(()=>{let active=true;(async()=>{
   const {data:{user}}=await supabase.auth.getUser();if(!user)return;
   const start=new Date();start.setDate(start.getDate()+day);start.setHours(0,0,0,0);
   const end=new Date(start);end.setDate(end.getDate()+1);
-  const {data,error}=await supabase.from('wellness_activities').select('duration_minutes').eq('user_id',user.id).gte('occurred_at',start.toISOString()).lt('occurred_at',end.toISOString());
+  const [{data,error},journal]=await Promise.all([
+   supabase.from('wellness_activities').select('duration_minutes').eq('user_id',user.id).gte('occurred_at',start.toISOString()).lt('occurred_at',end.toISOString()),
+   supabase.from('wellness_journal').select('id',{count:'exact',head:true}).eq('user_id',user.id).gte('occurred_at',start.toISOString()).lt('occurred_at',end.toISOString())]);
   if(error){console.warn('Loading recorded activities failed',error.message);return;}
-  if(active)setActivitySummary({count:data?.length||0,minutes:(data||[]).reduce((sum,r)=>sum+Number(r.duration_minutes||0),0)});
+  if(active)setActivitySummary({count:data?.length||0,minutes:(data||[]).reduce((sum,r)=>sum+Number(r.duration_minutes||0),0),journal:journal.count||0});
  })();return()=>{active=false}},[day]);
  React.useEffect(()=>{let alive=true;if(day===0)return;
  (async()=>{try{const {data:{user}}=await supabase.auth.getUser();if(!user)return;
@@ -129,12 +133,16 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onCha
  const shownWater=day===0?water:pastAmounts.water,shownCaffeine=day===0?caffeine:pastAmounts.caffeine;
  const dates=Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()+i-6);return d});
  const {isPlus:plusMember}=usePlus();
- const item=(icon:any,title:string,detail:string,tint:string,press?:()=>void,badge=false)=>(
- <TouchableOpacity disabled={!press} onPress={press} style={{backgroundColor:'#fff',borderRadius:18,paddingHorizontal:15,paddingVertical:16,flexDirection:'row',alignItems:'center',gap:13,borderWidth:1,borderColor:'#ECEAF2'}}>
-  <View style={{width:43,height:43,backgroundColor:tint,borderRadius:15,alignItems:'center',justifyContent:'center'}}><Ionicons name={icon} size={21} color={accent}/></View>
-  <View style={{flex:1,gap:3}}><View style={{flexDirection:'row',alignItems:'center',gap:6}}><Text style={{fontSize:15,fontWeight:'800',color:INK}}>{title}</Text>{badge?<PlusBadge/>:null}</View><Text style={{fontSize:12,color:MUTED}}>{detail}</Text></View>
-  {press?<Ionicons name="chevron-forward" size={18} color="#A6A1B5"/>:null}
- </TouchableOpacity>);
+ const onDay=day===0?'today':'that day';
+ const tile=(o:{title:string;stat:string;detail:string;tint:string;color:string;onPress:()=>void;icon?:any;pal?:string;plus?:boolean;play?:boolean})=>(
+  <TouchableOpacity key={o.title} accessibilityRole="button" accessibilityLabel={`${o.title}. ${o.stat}. ${o.detail}`} onPress={o.onPress} activeOpacity={0.85} style={{flexBasis:'46%',flexGrow:1,minHeight:150,backgroundColor:o.tint,borderRadius:24,padding:14,overflow:'hidden'}}>
+   {o.pal?<View style={{marginLeft:-4,marginTop:-4,marginBottom:4}}><SuperdotMascot id={o.pal} size={56} animate={false}/></View>:<View style={{width:50,height:50,borderRadius:25,backgroundColor:'#fff',alignItems:'center',justifyContent:'center',marginBottom:10}}><Ionicons name={o.icon} size={25} color={o.color}/></View>}
+   {o.plus?<View style={{position:'absolute',top:14,right:12}}><PlusBadge/></View>:null}
+   <Text style={{fontSize:16,fontWeight:'900',color:INK}} numberOfLines={1}>{o.title}</Text>
+   <Text style={{fontSize:14,fontWeight:'800',color:o.color,marginTop:2}} numberOfLines={1}>{o.stat}</Text>
+   <Text style={{fontSize:11,color:MUTED,marginTop:3,marginRight:o.play?46:34}} numberOfLines={2}>{o.detail}</Text>
+   <View style={{position:'absolute',right:10,bottom:10,width:o.play?42:30,height:o.play?42:30,borderRadius:21,backgroundColor:o.play?APP_THEME.primary:o.color,alignItems:'center',justifyContent:'center'}}><Ionicons name={o.play?'play':'chevron-forward'} size={o.play?18:16} color="#fff" style={o.play?{marginLeft:2}:undefined}/></View>
+  </TouchableOpacity>);
  return <View style={[s.page,{gap:15}]}>
   <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
    <View><Text style={{fontSize:29,fontWeight:'900',color:INK}}>Actions</Text><Text style={{color:MUTED,fontSize:12,marginTop:2}}>Actions to relieve stress and build healthy habits</Text></View>
@@ -164,11 +172,16 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onCha
    </View>
   </View>
   <View style={{gap:9}}><SectionHeading title="Mind & reflection"/>
-   <View style={{backgroundColor:"#FFFFFF",borderRadius:17,padding:13,borderWidth:1,borderColor:"#ECEAF2"}}><Text style={{color:INK,fontSize:13,fontWeight:"800"}}>Activities logged: {activitySummary.count}</Text><Text style={{color:MUTED,fontSize:12}}>{activitySummary.minutes} minutes recorded {day===0?"today":"on this day"}</Text></View>
-   {onSocial?item('phone-portrait-outline','Screen Time','Your app time, daily limit and stress','#EAF1FF',onSocial):null}
-   {item('book-outline','Your journal','Review your private reflections','#F4EBFF',onJournal)}
-   {item('chatbubble-ellipses-outline','Ask AI about your stress','Chat with MoodPals about your readings','#EFE9FF',onChat,!plusMember)}
-   {item('leaf-outline','Breathing break','Calm, box and unwind exercises','#E4F6EA',onBreathing)}
+   <View accessible accessibilityLabel={`${activitySummary.count} activities, ${activitySummary.minutes} minutes ${onDay}`} style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#FFFFFF',borderRadius:18,paddingVertical:10,paddingHorizontal:14,shadowColor:'#2D4A3E',shadowOpacity:0.06,shadowRadius:10,shadowOffset:{width:0,height:3},elevation:1}}>
+    <View style={{width:40,height:40,borderRadius:20,borderWidth:5,borderColor:activitySummary.count?APP_THEME.primary:'#D9F0E3',alignItems:'center',justifyContent:'center'}}><Ionicons name="leaf" size={15} color={APP_THEME.primary}/></View>
+    <View style={{flex:1}}><Text style={{fontSize:14,fontWeight:'900',color:INK}}>{activitySummary.count} {activitySummary.count===1?'activity':'activities'} · {activitySummary.minutes} min</Text><Text style={{fontSize:11,color:MUTED,marginTop:1}}>Recorded {onDay}</Text></View>
+   </View>
+   <View style={{flexDirection:'row',flexWrap:'wrap',gap:12}}>
+    {onSocial?tile({title:'Screen Time',icon:'phone-portrait',tint:'#EAF1FF',color:'#5B8DEF',onPress:onSocial,stat:screenTime?screenTime.used+' today':'Set up',detail:screenTime?screenTime.detail:'Track app time & stress'}):null}
+    {tile({title:'Journal',icon:'book',tint:'#F4EBFF',color:'#8A63D2',onPress:onJournal,stat:activitySummary.journal?activitySummary.journal+(activitySummary.journal===1?' entry':' entries'):'No entries',detail:'Your private reflections'})}
+    {tile({title:'Ask AI',icon:'chatbubble-ellipses',tint:'#F1ECFF',color:'#7B5CE6',onPress:onChat,plus:!plusMember,stat:'Your stress',detail:'Chat with your pal'})}
+    {tile({title:'Breathing',pal:'calm',tint:'#E4F6EA',color:'#2E9A6B',onPress:onBreathing,play:true,stat:'1 min calm',detail:'Box & unwind too'})}
+   </View>
   </View>
  </View>;
 }
