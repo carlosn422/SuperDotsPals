@@ -486,3 +486,5 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 @media(prefers-reduced-motion:reduce){.t-wstack img{animation:none;opacity:0}.t-wstack img:first-child{opacity:1}}
 .t-show .t-lock{animation:none;transform:translateY(calc((1 - var(--lk,0)) * 105%));transition:transform .25s ease-out}
 .t-show .t-vbar b{animation:none;width:calc(20% + var(--lk,0) * 72%)}
+@media(min-width:601px) and (max-height:620px){.t-devs,.t-pointer{display:none}.t-sticky{grid-template-areas:"left stage"}
+.t-slide .t-dev.t-ph{--w:calc((var(--vh,100vh) - var(--navh,64px) - 40px) / 2.16)}.t-slide .t-dev.t-tb{--w:calc((var(--vh,100vh) - var(--navh,64px) - 40px) * .75)}.t-slide .t-dev.t-wt{--w:calc((var(--vh,100vh) - var(--navh,64px) - 40px) * .85)}}
