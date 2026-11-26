@@ -198,10 +198,8 @@ export function BuddyCall({companion,name,onCall,onType}:{companion:string;name?
     </TouchableOpacity>
    </TouchableOpacity>
   </Modal>
-  <View style={b.bottom}>
-   <View style={b.quick}>{TOPICS.map(t=><TouchableOpacity key={t.l} accessibilityRole="button" accessibilityLabel={'Call about: '+t.l} onPress={()=>onCall(t.l)} style={b.q}><Text style={b.qText}>{t.e} {t.l}</Text></TouchableOpacity>)}</View>
-   <RoundButton icon="chatbubble-ellipses" label="Chat" tint="#8A63D2" bg="#F4EBFF" a11y="Type a message instead" onPress={onType}/>
-  </View>
+  <View style={b.quick}>{TOPICS.map(t=><TouchableOpacity key={t.l} accessibilityRole="button" accessibilityLabel={'Call about: '+t.l} onPress={()=>onCall(t.l)} style={b.q}><Text style={b.qText}>{t.e} {t.l}</Text></TouchableOpacity>)}</View>
+  <View style={b.fab}><RoundButton icon="chatbubble-ellipses" label="Chat" tint="#8A63D2" bg="#F4EBFF" a11y="Type a message instead" onPress={onType}/></View>
  </View>;
 }
 export function RoundButton({icon,label,tint,bg,a11y,onPress}:{icon:any;label:string;tint:string;bg:string;a11y:string;onPress:()=>void}){
@@ -211,7 +209,7 @@ export function RoundButton({icon,label,tint,bg,a11y,onPress}:{icon:any;label:st
  </TouchableOpacity>;
 }
 const b=StyleSheet.create({
- bottom:{flexDirection:'row',alignItems:'flex-end',gap:10},
+ fab:{position:'absolute',right:0,top:250},
  voice:{alignSelf:'center',flexDirection:'row',alignItems:'center',gap:5,backgroundColor:'#E4F6EA',borderRadius:14,paddingHorizontal:11,paddingVertical:6},voiceText:{fontSize:13,fontWeight:'800',color:'#2E8F64'},
  backdrop:{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(20,30,35,0.35)'},
  sheet:{backgroundColor:'#fff',borderTopLeftRadius:28,borderTopRightRadius:28,padding:20,paddingBottom:40,gap:12},
@@ -228,7 +226,7 @@ const b=StyleSheet.create({
  sayText:{fontSize:15,fontWeight:'800',color:APP_THEME.ink},
  tap:{position:'absolute',bottom:14,flexDirection:'row',alignItems:'center',gap:8,backgroundColor:'#34B37E',borderRadius:24,paddingHorizontal:20,paddingVertical:12,shadowColor:'#34B37E',shadowOpacity:0.35,shadowRadius:10,shadowOffset:{width:0,height:6}},
  tapText:{fontSize:16,fontWeight:'900',color:'#fff'},
- quick:{flex:1,flexDirection:'row',flexWrap:'wrap',gap:8},
+ quick:{flexDirection:'row',flexWrap:'wrap',justifyContent:'center',gap:8},
  q:{backgroundColor:'#fff',borderWidth:1,borderColor:'#DCEBE2',borderRadius:18,paddingHorizontal:13,paddingVertical:9},qText:{fontSize:14,fontWeight:'800',color:APP_THEME.ink},
 });
 const st=StyleSheet.create({
