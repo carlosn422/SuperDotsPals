@@ -302,6 +302,7 @@ function ChildApps({childId,start,end}:{childId:string;start:number;end:number})
   for(const m of socialMarks(start))if(m.member===childId&&m.at<end)by.set(m.app,(by.get(m.app)||0)+m.minutes);
   return [...by].map(([app,minutes])=>({app,minutes})).sort((a,b)=>b.minutes-a.minutes);
  },[childId,start,end]);
+ if(!rows.length)return null;
  const top=Math.max(1,...rows.map(r=>r.minutes));
  return <View style={st.card}>
   <Text style={st.kicker}>Apps</Text>
