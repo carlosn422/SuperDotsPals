@@ -9,8 +9,12 @@ import MainApp from './MainApp';
 import Onboarding,{DOTS} from './Onboarding';
 import {PlusProvider} from './PlusStore';
 import {PlusPaywallSheet} from './PlusPaywall';
+import SatelliteMode from './SatelliteMode';
+import {satelliteState,screenBreakSupported} from './modules/watch-link/screenBreak';
 export default function App(){
  const [editingProfile,setEditingProfile]=useState(false);
+ // Satellite mode: a family iPad / spare iPhone linked to a parent. It never shows the parent's account.
+ const [satellite,setSatellite]=useState(()=>!!satelliteState()?.linked);
  const [session,setSession]=useState<Session|null>(null),[ready,setReady]=useState(false),[onboarded,setOnboarded]=useState<boolean|null>(null),[theme,setTheme]=useState('grape'),[selectedCompanion,setSelectedCompanion]=useState('bloop');
  useEffect(()=>{supabase.auth.getSession().then(({data})=>{setSession(data.session);setReady(true)}).catch(()=>setReady(true));const {data:{subscription}}=supabase.auth.onAuthStateChange((_e,s)=>setSession(s));return()=>subscription.unsubscribe()},[]);
  useEffect(()=>{let active=true;if(!session?.user){setOnboarded(null);setEditingProfile(false);return;}setOnboarded(null);(async()=>{const [{data:p,error:e1},{data:t,error:e2}]=await Promise.all([supabase.from('profiles').select('onboarding_completed_at').eq('id',session.user.id).maybeSingle(),supabase.from('user_settings').select('theme,companion').eq('user_id',session.user.id).maybeSingle()]);if(!active)return;if(e1||e2){console.warn('Onboarding lookup failed:',e1?.message||e2?.message);setOnboarded(false);return;}setOnboarded(!!p?.onboarding_completed_at);setTheme(t?.theme||'grape');setSelectedCompanion(t?.companion||'bloop')})();return()=>{active=false}},[session?.user.id]);
@@ -28,5 +32,6 @@ export default function App(){
   return()=>listener.remove();
  },[session?.user.id]);
  async function complete(){const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data}=await supabase.from('user_settings').select('theme,companion').eq('user_id',user.id).maybeSingle();setTheme(data?.theme||'grape');setSelectedCompanion(data?.companion||'bloop');setOnboarded(true);setEditingProfile(false)}
- return <SafeAreaProvider>{!ready?<View style={{flex:1,justifyContent:'center',backgroundColor:'#F8F6FF'}}><ActivityIndicator color="#6536D9"/></View>:session?(onboarded===null?<View style={{flex:1,justifyContent:'center',backgroundColor:'#F8F6FF'}}><ActivityIndicator color="#6536D9"/></View>:(editingProfile||!onboarded)?<Onboarding editing={editingProfile} onCancel={()=>setEditingProfile(false)} done={()=>void complete()}/>:<PlusProvider><MainApp selectedTheme={theme} selectedCompanion={selectedCompanion} onEditProfile={()=>setEditingProfile(true)} onThemeChanged={(nextTheme,nextCompanion)=>{setTheme(nextTheme);setSelectedCompanion(nextCompanion)}}/><PlusPaywallSheet/></PlusProvider>):<AuthScreen/>}</SafeAreaProvider>;
+ if(satellite)return <SafeAreaProvider><SatelliteMode onExit={()=>setSatellite(false)}/></SafeAreaProvider>;
+ return <SafeAreaProvider>{!ready?<View style={{flex:1,justifyContent:'center',backgroundColor:'#F8F6FF'}}><ActivityIndicator color="#6536D9"/></View>:session?(onboarded===null?<View style={{flex:1,justifyContent:'center',backgroundColor:'#F8F6FF'}}><ActivityIndicator color="#6536D9"/></View>:(editingProfile||!onboarded)?<Onboarding editing={editingProfile} onCancel={()=>setEditingProfile(false)} done={()=>void complete()}/>:<PlusProvider><MainApp selectedTheme={theme} selectedCompanion={selectedCompanion} onEditProfile={()=>setEditingProfile(true)} onThemeChanged={(nextTheme,nextCompanion)=>{setTheme(nextTheme);setSelectedCompanion(nextCompanion)}}/><PlusPaywallSheet/></PlusProvider>):<AuthScreen onLinkDevice={screenBreakSupported?()=>setSatellite(true):undefined}/>}</SafeAreaProvider>;
 }

@@ -35,7 +35,7 @@ export function PageHero({title,highlight,detail,companion,accent,onPress,button
   {button?<TouchableOpacity accessibilityRole="button" onPress={onPress} style={[s.heroButton,{backgroundColor:accent}]}><Text style={{fontWeight:'900',fontSize:17,color:'#fff'}}>{button}  →</Text></TouchableOpacity>:null}
  </View>;
 }
-export function BrandHead(_:{companion:string}){return <View style={s.brand}><RNImage source={require('./assets/branding/moodpals-logo.png')} accessibilityRole="image" accessibilityLabel="MoodPals" style={{height:32,width:32*607/97}} resizeMode="contain"/></View>}
+export function BrandHead(_:{companion:string}){return <View style={s.brand}><RNImage source={require('./assets/branding/moodpals-logo.png')} accessibilityRole="image" accessibilityLabel="MoodPals" style={{height:48,width:48*3}} resizeMode="contain"/></View>}
 export function SectionHeading({title,detail}:{title:string;detail?:string}){return <View style={s.heading}><Text style={s.headingText}>{title}</Text>{detail?<Text style={s.headingDetail}>{detail}</Text>:null}</View>}
 export function PastelCard({title,detail,emoji,tint,onPress}:{title:string;detail:string;emoji:string;tint:string;onPress?:()=>void}){return <TouchableOpacity disabled={!onPress} onPress={onPress} style={[s.action,{backgroundColor:tint}]}><Text style={s.actionEmoji}>{emoji}</Text><View style={{flex:1,gap:5}}><Text style={s.actionTitle}>{title}</Text><Text style={s.actionText}>{detail}</Text></View><Ionicons name="chevron-forward" color={P} size={16}/></TouchableOpacity>}
 export function StatCard({title,value,detail,icon,tint,onPress}:{title:string;value:string;detail:string;icon:any;tint:string;onPress?:()=>void}){return <TouchableOpacity disabled={!onPress} onPress={onPress} style={s.stat}><View style={[s.statIcon,{backgroundColor:tint}]}><Ionicons name={icon} size={20} color={P}/></View><Text style={s.statTitle}>{title}</Text><Text style={s.statValue}>{value}</Text><Text style={s.statDetail}>{detail}</Text></TouchableOpacity>}
@@ -76,10 +76,15 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
  return <View style={[s.page,{gap:17}]}>
   <StressHero mood={companion} onCheckin={onCheckin} onHealthMood={onHealthMood} corner={isPlus?undefined:<UpgradePill compact/>}/>
   {dayRow}
-  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Breathing for Calm. Start a one-minute breathing exercise" onPress={onBreathing} style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#FFFAF2',borderRadius:22,paddingVertical:12,paddingHorizontal:14,borderWidth:1,borderColor:'#EAF3EC'}}>
-   <SuperdotMascot id="calm" size={54} animate={false}/>
-   <View style={{flex:1,gap:3}}><Text style={{fontWeight:'900',color:'#2E1F5E',fontSize:16}}>Breathing for Calm</Text><Text style={{color:'#8276A5',fontSize:12}}>A one-minute reset with your MoodPal</Text></View>
-   <View style={{flexDirection:'row',alignItems:'center',gap:5,backgroundColor:APP_THEME.primary,borderRadius:18,paddingHorizontal:13,minHeight:36}}><Ionicons name="play" size={14} color="#fff"/><Text style={{color:'#fff',fontWeight:'900',fontSize:13}}>Breathe</Text></View>
+  {screenCard}
+  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Breathing for Calm. Start a one-minute breathing exercise" onPress={onBreathing} activeOpacity={0.85} style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#FFFFFF',borderRadius:24,padding:17,shadowColor:'#2D4A3E',shadowOpacity:0.06,shadowRadius:14,shadowOffset:{width:0,height:5},elevation:2}}>
+   <View style={{width:78,height:78,borderRadius:39,borderWidth:9,borderColor:'rgba(58,170,176,0.18)',backgroundColor:'#E6F7F8',alignItems:'center',justifyContent:'center'}}><SuperdotMascot id="calm" size={48} animate={false}/></View>
+   <View style={{flex:1,gap:4}}>
+    <Text style={{fontSize:19,fontWeight:'800',color:INK}}>Breathing <Text style={{color:'#3AAAB0'}}>1 min</Text></Text>
+    <Text style={{fontSize:14,fontWeight:'800',color:'#3AAAB0'}}>For calm</Text>
+    <Text style={{fontSize:11,lineHeight:16,color:MUTED}}>A quick reset with your MoodPal.</Text>
+   </View>
+   <View style={{width:46,height:46,borderRadius:23,backgroundColor:APP_THEME.primary,alignItems:'center',justifyContent:'center'}}><Ionicons name="play" size={20} color="#fff" style={{marginLeft:3}}/></View>
   </TouchableOpacity>
   <EnergyCard/>
   <HrvTrendCard/>
@@ -95,7 +100,6 @@ export function WellnessToday({companion,accent,water,caffeine,mood,onCheckin,on
    </View>
   </View>
   {socialCard}
-  {screenCard}
   <InviteFriendsCard onInvite={onInvite}/>
   <RecoveryInsights companion={companion} onChat={onChat}/>
   <PlusOfferCard onAllPlans={onPlans}/>

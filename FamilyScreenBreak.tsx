@@ -1,18 +1,24 @@
+import {IconTile} from './IconTile';
 import React,{useCallback,useContext,useEffect,useMemo,useRef,useState} from 'react';
 import {ChartScrubContext} from './StressDashboard';
-import {ActivityIndicator,Alert,AppState,Modal,PanResponder,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native';
+import {ActionSheetIOS,ActivityIndicator,Alert,Animated,AppState,Modal,PanResponder,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View,useWindowDimensions} from 'react-native';
 import Svg,{Circle,Defs,Line,LinearGradient,Path,Stop} from 'react-native-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import {supabase} from './supabase';
 import {APP_THEME as T} from './MoodMascot';
+import {useReduceMotion} from './CircleComponents';
+import SuperdotMascot from './SuperdotMascot';
 import {usePlus} from './PlusStore';
+import {UpgradePill} from './TodayUpsell';
+import {SocialAppLabel,socialMarks} from './modules/watch-link/socialTrack';
 import {useIsGuest} from './Account';
 import {ManageFamilyProfile,familyCall,familyProfilesChanged,shortProfileName,useFamilyProfiles,type FamilyProfile} from './FamilyWatches';
 import {WatchColorGrid,WatchColorSheet,WatchImage,colorName,isWatchColor,type WatchColor} from './WatchArt';
 import {ackBreakSync,getBreakState,onBreakState,pendingBreakSync,pickBreakApps,requestScreenTimeAccess,screenBreakSupported,sendBreakCommand,setBreakChildren,setBreakEntitlement,type BreakAction,type BreakSession,type BreakState,type BreakSyncRow} from './modules/watch-link/screenBreak';
 import {configureSocialTrack,getSocialState} from './modules/watch-link/socialTrack';
+import {DeviceCard,DeviceDock,DeviceSelect,FamilyDevicesScreen,PHONE,cancelDeviceCommand,deviceCommand,deviceStatus,useDeviceNames,useFamilyDevices,type DeviceCommand,type FamilyDevice,type RemoteSession} from './FamilyDevices';
 import {comparison,formatDuration,observations,periodRange,periodStats,type BreakPeriod,type Bucket,type SessionRow} from './ScreenBreakInsights';
 
 export type FamilyChild={id:string;name:string;profile_user_id:string|null;watch_only?:boolean};
@@ -130,12 +136,17 @@ function HeaderLock(){
 
 // ---------- Screens ----------
 
-type Route={name:'list'}|{name:'child';id:string}|{name:'insights';id:string};
+type Route={name:'list'}|{name:'child';id:string}|{name:'insights';id:string}|{name:'devices';id?:string};
 
-export default function FamilyScreenBreak({onBack,backLabel='Settings',target,onAddWatch,embedded,footer}:{onBack?:()=>void;backLabel?:string;target?:{childId?:string;profileId?:string;add?:boolean;at:number}|null;onAddWatch?:()=>void;embedded?:boolean;footer?:React.ReactNode}){
+export default function FamilyScreenBreak({onBack,backLabel='Settings',target,onAddWatch,embedded,footer,onDock,onTimerStart}:{onDock?:(node:React.ReactNode)=>void;onTimerStart?:()=>void;onBack?:()=>void;backLabel?:string;target?:{childId?:string;profileId?:string;add?:boolean;at:number}|null;onAddWatch?:()=>void;embedded?:boolean;footer?:React.ReactNode}){
  const guest=useIsGuest();
  const [children,setChildren]=useState<FamilyChild[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
- const [route,setRoute]=useState<Route>({name:'list'}),[adding,setAdding]=useState(false);
+ const {width:screenW}=useWindowDimensions();
+ const [route,setRoute]=useState<Route>({name:'list'}),[adding,setAdding]=useState(false),[selected,setSelected]=useState<string|null>(null);
+ const select=(id:string)=>{setSelected(id);setRoute({name:'list'})};
+ const [startOn,setStartOn]=useState<FamilyDevice|null>(null);
+ const family=useFamilyDevices(screenBreakSupported&&!guest&&route.name==='list');
+ const dashNow=useNow(route.name==='list'&&family.devices.length>0);
  const load=useCallback(async()=>{
   try{const list=await loadChildren();setChildren(list);setError('');if(screenBreakSupported)setBreakChildren(list.filter(c=>!c.watch_only).map(c=>({id:c.id,name:c.name})))}
   catch{setError('Unable to load your family members. Check your connection.')}
@@ -144,45 +155,265 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  useEffect(()=>{if(guest){setLoading(false);return}void load();listeners.add(load);return()=>{listeners.delete(load)}},[load,guest]);
  useEffect(()=>{
   if(!target||loading)return;
-  if(target.add){setRoute({name:'list'});setAdding(true);return}
+  if(target.add){setRoute({name:'list'});tryAdd(true);return}
   const child=children.find(c=>c.id===target.childId||(!!target.profileId&&c.profile_user_id===target.profileId));
-  if(child)setRoute({name:'child',id:child.id});
+  if(child)select(child.id);
  },[target,loading,children]);
- const child=route.name!=='list'?children.find(c=>c.id===route.id):undefined;
+ const child=route.name==='child'||route.name==='insights'?children.find(c=>c.id===route.id):undefined;
  const members=children.filter(c=>!c.watch_only);
- if(route.name==='insights'&&child)return <InsightsScreen child={child} onBack={()=>setRoute({name:'child',id:child.id})}/>;
+ const {isPlus,showPaywall}=usePlus(),memberCap=isPlus?4:1;
+ const tryAdd=(open?:boolean)=>{
+  if(members.length<memberCap){setAdding(a=>open||!a);return}
+  setAdding(false);
+  if(!isPlus)showPaywall('family');
+  else Alert.alert('Family is full','Plus includes up to 4 family members.');
+ };
+ const current=members.find(c=>c.id===selected)||members[0];
+ const pager=useRef<ScrollView>(null),reduce=useReduceMotion();
+ const [section,setSection]=useState<'family'|'devices'>('family'),[insightsId,setInsightsId]=useState<string|null>(null);
+ const insightsChild=insightsId?children.find(c=>c.id===insightsId):undefined;
+ // The timer ring locks this pager while it's dragged, as well as the page behind it.
+ const parentScrub=useContext(ChartScrubContext),[scrub,setScrub]=useState(false);
+ const scrubCtx=useCallback((v:boolean)=>{setScrub(v);parentScrub(v)},[parentScrub]);
+ const index=Math.max(0,members.findIndex(c=>c.id===current?.id));
+ // Swipes already land on the page; taps jump there and fade the new profile in instead of sliding past blank pages.
+ const tapped=useRef(false),fade=useRef(new Animated.Value(1)).current;
+ useEffect(()=>{
+  pager.current?.scrollTo({x:index*screenW,animated:false});
+  if(!tapped.current)return;
+  tapped.current=false;
+  if(reduce)return;
+  fade.setValue(0);
+  Animated.timing(fade,{toValue:1,duration:260,useNativeDriver:true}).start();
+ },[index,screenW]);
+ // The member cards stay pinned above the tab bar (drawn by the host, outside this scroll view).
+ const [devSel,setDevSel]=useState<string|null>(null),[addingDevice,setAddingDevice]=useState(false),[watchesOpen,setWatchesOpen]=useState(false);
+ const showDock=!guest&&route.name==='list'&&!loading&&!error&&(section==='devices'||members.length>0);
+ const dockRow=section==='devices'?<DeviceDock devices={family.devices} defaultId={family.defaultId} sessions={family.sessions} selected={devSel} adding={addingDevice} onSelect={id=>{void Haptics.selectionAsync();setAddingDevice(false);setDevSel(id)}} onAdd={()=>setAddingDevice(a=>!a)}/>:<ProfileRow members={members} selected={current?.id} adding={adding} onSelect={id=>{setAdding(false);if(id!==current?.id)tapped.current=true;setSelected(id)}} onAdd={()=>tryAdd()} sessions={family.sessions}/>;
+ const dock=<View style={st.dockShell}><MintWave edge="bottom"/><View style={st.dockInner}>{dockRow}</View></View>;
+ const dockKey=section+'|'+devSel+'|'+addingDevice+'|'+family.defaultId+'|'+family.devices.map(d=>d.id+d.name+d.device_type).join()+'|'+members.map(c=>c.id+c.name).join()+'|'+current?.id+'|'+adding+'|'+family.sessions.map(x=>x.id+x.deadline_at+x.granted_seconds).join();
+ useEffect(()=>{onDock?.(showDock?dock:null)},[onDock,showDock,dockKey]);
+ useEffect(()=>()=>onDock?.(null),[onDock]);
+ const [breakState]=useBreakState();
+ const activeIds=[breakState?.session?.status==='active'?breakState.session.id:'',...family.sessions.filter(x=>Date.parse(x.deadline_at)>Date.now()).map(x=>x.id)].filter(Boolean);
+ const activeKey=activeIds.join(),seenActive=useRef<string[]|null>(null);
+ useEffect(()=>{const prev=seenActive.current;seenActive.current=activeIds;if(prev&&activeIds.some(id=>!prev.includes(id)))onTimerStart?.()},[activeKey]);
+ if(route.name==='devices')return <>
+  <FamilyDevicesScreen childName={id=>children.find(c=>c.id===id)?.name||'Someone'} onStart={members.length?setStartOn:undefined}/>
+  <StartTimerSheet device={startOn} members={members} onClose={()=>setStartOn(null)}/>
+ </>;
+ if(route.name==='insights'&&child)return <InsightsScreen child={child} onBack={()=>select(child.id)}/>;
  if(route.name==='child'&&child)return <ChildScreen child={child} children={children} onBack={()=>setRoute({name:'list'})} onInsights={()=>setRoute({name:'insights',id:child.id})} onChanged={()=>{void load();familyChildrenChanged()}} onRemoved={()=>{setRoute({name:'list'});void load()}} onAddWatch={onAddWatch} onOpen={id=>setRoute({name:'child',id})}/>;
  return <View style={{gap:14}}>
   {!embedded&&onBack?<Back label={backLabel} onPress={onBack}/>:null}
   <View style={[st.row,{paddingVertical:0}]}><Text style={st.title} accessibilityRole="header">Family</Text>{screenBreakSupported&&!guest?<HeaderLock/>:null}</View>
-  <Text style={st.sub}>Lend your iPhone with a Screen Break timer you control from MoodPals or your Apple Watch. Members don't need an account or a watch.</Text>
-  <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
-   <Text style={st.heading}>Members</Text>
-   {guest?null:<TouchableOpacity accessibilityRole="button" accessibilityLabel={adding?'Close add member':'Add member'} onPress={()=>setAdding(a=>!a)} style={st.addBtn}><Ionicons name={adding?'close':'add'} size={18} color="#fff"/><Text style={st.addBtnText}>{adding?'Close':'Add member'}</Text></TouchableOpacity>}
-  </View>
   {guest?<View style={st.card}><Text style={st.body}>Create a free account to add family members and use Screen Break.</Text></View>:<>
    {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
    {loading?<ActivityIndicator color={T.primary}/>:null}
-   {adding||(!loading&&!error&&!members.length)?<AddChild onAdded={id=>{setAdding(false);void load().then(()=>{if(id)setRoute({name:'child',id})});familyChildrenChanged()}}/>:null}
-   {members.length?<View style={[st.card,{paddingVertical:4,gap:0}]}>
-    {members.map((c,i)=><TouchableOpacity key={c.id} accessibilityRole="button" accessibilityLabel={'Open '+c.name} onPress={()=>setRoute({name:'child',id:c.id})} style={[st.row,i>0&&st.rowLine]}>
-     <View style={st.avatar}><Text style={st.avatarText}>{c.name.slice(0,1).toUpperCase()}</Text></View>
-     <View style={{flex:1}}><Text style={st.rowTitle}>{c.name}</Text><Text style={st.sub}>{c.profile_user_id?'Watch assigned':'No watch assigned'}</Text></View>
-     <ActiveBadge childId={c.id}/>
-     <Ionicons name="chevron-forward" size={18} color={T.muted}/>
-    </TouchableOpacity>)}
-   </View>:null}
+   {!loading&&!error?<TrialBanner/>:null}
+   {!loading&&!error?<View style={st.famSegment} accessibilityRole="tablist">{(['family','devices'] as const).map(k=><TouchableOpacity key={k} accessibilityRole="tab" accessibilityState={{selected:section===k}} onPress={()=>{if(section!==k){void Haptics.selectionAsync();setSection(k)}}} style={[st.segmentItem,section===k&&st.segmentOn]}><Ionicons name={k==='family'?'people':'tablet-portrait'} size={16} color={section===k?T.ink:T.muted}/><Text style={[st.segmentText,section===k&&{color:T.ink}]}>{k==='family'?'Family':'Devices'}</Text></TouchableOpacity>)}</View>:null}
+   {section==='devices'&&!loading&&!error?<FamilyDevicesScreen childName={id=>children.find(c=>c.id===id)?.name||'Someone'} onStart={members.length?setStartOn:undefined} selectedId={devSel} adding={addingDevice} onAddDone={()=>setAddingDevice(false)}/>:<>
+    {adding||(!loading&&!error&&!members.length)?<AddChild onAdded={id=>{setAdding(false);void load().then(()=>{if(id)setSelected(id)});familyChildrenChanged()}}/>:null}
+    {current&&!adding?<ChartScrubContext.Provider value={scrubCtx}><Animated.View style={{opacity:fade,transform:[{translateY:fade.interpolate({inputRange:[0,1],outputRange:[10,0]})}]}}><ScrollView ref={pager} horizontal pagingEnabled scrollEnabled={!scrub} showsHorizontalScrollIndicator={false} contentOffset={{x:index*screenW,y:0}} onMomentumScrollEnd={e=>{const c=members[Math.round(e.nativeEvent.contentOffset.x/screenW)];if(c&&c.id!==current.id){void Haptics.selectionAsync();setSelected(c.id)}}} style={{marginHorizontal:-20}}>
+     {members.map((c,i)=><View key={c.id} style={{width:screenW,paddingHorizontal:20}}>{Math.abs(i-index)<=1?<ChildScreen inline child={c} children={children} onBack={()=>{}} onInsights={()=>setInsightsId(c.id)} onChanged={()=>{void load();familyChildrenChanged()}} onRemoved={()=>{setSelected(null);void load()}} onAddWatch={onAddWatch} onOpen={select}/>:<View style={{minHeight:420}}/>}</View>)}
+    </ScrollView></Animated.View></ChartScrubContext.Provider>:null}
+    {!onDock&&!loading&&!error&&members.length?dock:null}
+   </>}
   </>}
-  {footer?<View style={{marginTop:10}}>{footer}</View>:null}
+  {footer&&section==='devices'?<TouchableOpacity accessibilityRole="button" onPress={()=>setWatchesOpen(true)} style={st.watchBtn}><IconTile icon="watch" color="#7B5CE6" size={44}/><Text style={[st.rowTitle,{flex:1}]}>Apple Watches</Text><Ionicons name="chevron-up" size={18} color="#7B5CE6"/></TouchableOpacity>:null}
+  <Modal visible={watchesOpen&&!!footer} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setWatchesOpen(false)}>
+   <ScrollView style={{flex:1,backgroundColor:T.background}} contentContainerStyle={{padding:20,paddingBottom:48,gap:14}} showsVerticalScrollIndicator={false}>
+    <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'}}/>
+    <View style={{flexDirection:'row',alignItems:'center',gap:12}}><Text style={[st.title,{flex:1}]} accessibilityRole="header">Apple Watches</Text><TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={()=>setWatchesOpen(false)} style={st.sheetClose}><Ionicons name="close" size={22} color={T.ink}/></TouchableOpacity></View>
+    {footer}
+   </ScrollView>
+  </Modal>
+  <StartTimerSheet device={startOn} members={members} onClose={()=>setStartOn(null)}/>
+  <Modal visible={!!insightsChild} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setInsightsId(null)}>
+   {insightsChild?<ChartScrubContext.Provider value={scrubCtx}><ScrollView style={{flex:1,backgroundColor:T.background}} contentContainerStyle={{padding:20,paddingBottom:48}} showsVerticalScrollIndicator={false}><InsightsScreen sheet child={insightsChild} onBack={()=>setInsightsId(null)}/></ScrollView></ChartScrubContext.Provider>:null}
+  </Modal>
  </View>;
 }
 
-function ActiveBadge({childId}:{childId:string}){
+const heroColor=(frac:number,ms:number)=>ms<=5*60000||frac<=.2?'#E5484D':frac<=.5?'#F2A93B':T.primary;
+/** Running timer: full-color card with the countdown, then who/where with a progress bar. */
+/** Soft mint wave that blends a section into the page background. */
+function MintWave({edge}:{edge:'top'|'bottom'}){
+ const id='mw'+edge,[w,setW]=useState(useWindowDimensions().width);
+ if(edge==='top'){const h=560,edgeD=`M${w} ${h-44} C${w*.84} ${h-24} ${w*.66} ${h-24} ${w*.5} ${h-34} S${w*.16} ${h-56} 0 ${h-36}`;
+  return <View style={StyleSheet.absoluteFill} onLayout={e=>setW(e.nativeEvent.layout.width)}><Svg width={w} height={h}>
+   <Defs><LinearGradient id={id} x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor="#B9E9CF" stopOpacity=".85"/><Stop offset=".5" stopColor="#E4F6EA" stopOpacity=".7"/><Stop offset="1" stopColor="#C8EED9" stopOpacity=".85"/></LinearGradient></Defs>
+   {[6,4,2].map((k,i)=><Path key={k} d={edgeD} transform={`translate(0,${k})`} stroke="#1D3B2F" strokeOpacity={[.025,.045,.07][i]} strokeWidth={4} fill="none"/>)}
+   <Path d={`M0 0 H${w} V${h-44} `+edgeD.slice(edgeD.indexOf('C'))+' Z'} fill={'url(#'+id+')'}/>
+   <Path d={edgeD} stroke="#FFFFFF" strokeWidth={1.5} fill="none"/>
+  </Svg></View>}
+ if(edge==='bottom')return <View style={st.dockWave} pointerEvents="none" onLayout={e=>setW(e.nativeEvent.layout.width)}><Svg width={w} height={420}>
+  <Defs><LinearGradient id={id} x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#FFFFFF" stopOpacity=".35"/><Stop offset=".22" stopColor="#E4F6EA" stopOpacity=".8"/><Stop offset=".5" stopColor={T.background} stopOpacity="1"/></LinearGradient></Defs>
+  {[6,4,2].map((k,i)=><Path key={k} d={`M0 17 C${w*.16} 7 ${w*.34} 7 ${w*.5} 13 S${w*.82} 21 ${w} 9`} transform={`translate(0,${-k})`} stroke="#1D3B2F" strokeOpacity={[.025,.045,.07][i]} strokeWidth={4} fill="none"/>)}
+  <Path d={`M0 17 C${w*.16} 7 ${w*.34} 7 ${w*.5} 13 S${w*.82} 21 ${w} 9 V420 H0 Z`} fill={'url(#'+id+')'}/>
+  <Path d={`M0 17 C${w*.16} 7 ${w*.34} 7 ${w*.5} 13 S${w*.82} 21 ${w} 9`} stroke="#FFFFFF" strokeWidth={1.5} fill="none"/>
+ </Svg></View>;
+ return <Svg width="100%" height="100%" viewBox="0 0 400 100" preserveAspectRatio="none" style={StyleSheet.absoluteFill} pointerEvents="none">
+  <Defs>{edge==='top'?<LinearGradient id={id} x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor="#B9E9CF" stopOpacity=".85"/><Stop offset=".5" stopColor="#E4F6EA" stopOpacity=".7"/><Stop offset="1" stopColor="#C8EED9" stopOpacity=".85"/></LinearGradient>
+   :<LinearGradient id={id} x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#FFFFFF" stopOpacity=".95"/><Stop offset="1" stopColor="#D6F1E1" stopOpacity="1"/></LinearGradient>}</Defs>
+  <Path d={edge==='top'?'M0 0 H400 V84 C300 100 170 66 0 94 Z':'M0 16 C110 -4 280 -4 400 18 V100 H0 Z'} fill={'url(#'+id+')'}/>
+ </Svg>;
+}
+
+function TimerHero({remainingMs,grantedSec,endsAt,name,device,disabled,onAdd,onEnd}:{remainingMs:number;grantedSec:number;endsAt:number;name:string;device:string;disabled:boolean;onAdd:()=>void;onEnd:()=>void}){
+ const frac=Math.max(0,Math.min(1,remainingMs/1000/Math.max(1,grantedSec))),color=heroColor(frac,remainingMs);
+ return <View style={{gap:12}}>
+  <View style={{alignItems:'center',paddingTop:0}}>
+   <View style={st.frost}>
+    <Text style={st.heroTime} accessibilityRole="timer">{countdown(remainingMs)}</Text>
+    <Text style={st.heroSub}>Ends {clock(endsAt)}</Text>
+   </View>
+   <View style={{flexDirection:'row',alignItems:'center',gap:24,marginTop:10}}>
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add time" disabled={disabled} onPress={onAdd} style={[st.heroRound,disabled&&{opacity:.5}]}><Ionicons name="add" size={24} color={T.primary}/></TouchableOpacity>
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel="End timer" disabled={disabled} onPress={onEnd} style={[st.heroMain,{backgroundColor:color,shadowColor:color},disabled&&{opacity:.5}]}><Ionicons name="stop" size={26} color="#fff"/></TouchableOpacity>
+   </View>
+  </View>
+  <View style={st.heroInfo}>
+   <Text style={st.heading} numberOfLines={1}>{name}</Text>
+   <Text style={st.sub} numberOfLines={1}>{device} · {formatDuration(grantedSec)}</Text>
+   <View style={{flexDirection:'row',justifyContent:'space-between',marginTop:4}}><Text style={{fontSize:13,fontWeight:'800',color}}>{formatDuration(Math.ceil(remainingMs/60000)*60)} left</Text><Text style={st.sub}>Ends {clock(endsAt)}</Text></View>
+   <View style={st.barTrack}><View style={[st.barFill,{width:`${frac*100}%`,backgroundColor:color}]}/></View>
+  </View>
+ </View>;
+}
+
+/** Devices as a swipeable carousel, one card at a time. */
+function DevicesArea({family,now,width,childName,onOpen,onAll,onStart}:{family:ReturnType<typeof useFamilyDevices>;now:number;width:number;childName:(id:string)=>string;onOpen:(id:string)=>void;onAll:()=>void;onStart?:(d:FamilyDevice)=>void}){
+ const [page,setPage]=useState(0);
+ if(!family.devices.length)return <TouchableOpacity accessibilityRole="button" onPress={onAll} style={st.linkRow}><IconTile icon="add" color={TINT_INK[1]}/><Text style={[st.rowTitle,{flex:1}]}>Add a family device</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>;
+ return <View style={{gap:12}}>
+  <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={{marginHorizontal:-20}} scrollEventThrottle={32} onScroll={e=>setPage(Math.round(e.nativeEvent.contentOffset.x/width))}>
+   {family.devices.map(d=><View key={d.id} style={{width,paddingHorizontal:20}}><DeviceCard device={d} isDefault={family.defaultId===d.id} commands={family.commands} sessions={family.sessions} now={now} childName={childName} onOpen={()=>onOpen(d.id)} onStart={onStart}/></View>)}
+  </ScrollView>
+  {family.devices.length>1?<View style={{flexDirection:'row',justifyContent:'center',gap:7}} accessibilityLabel={'Device '+(page+1)+' of '+family.devices.length}>{family.devices.map((d,i)=><View key={d.id} style={{width:8,height:8,borderRadius:4,backgroundColor:i===page?T.primary:'#CFD8D3'}}/>)}</View>:null}
+  <TouchableOpacity accessibilityRole="button" onPress={onAll} style={{alignSelf:'center',minHeight:44,justifyContent:'center'}}><Text style={st.link}>Manage devices</Text></TouchableOpacity>
+ </View>;
+}
+
+/** Apps this child used on this iPhone in the period (MoodPals tracking, 15-minute steps). */
+function ChildApps({childId,start,end}:{childId:string;start:number;end:number}){
+ const rows=useMemo(()=>{
+  const by=new Map<number,number>();
+  for(const m of socialMarks(start))if(m.member===childId&&m.at<end)by.set(m.app,(by.get(m.app)||0)+m.minutes);
+  return [...by].map(([app,minutes])=>({app,minutes})).sort((a,b)=>b.minutes-a.minutes);
+ },[childId,start,end]);
+ if(!rows.length)return null;
+ const top=Math.max(1,...rows.map(r=>r.minutes));
+ return <View style={st.card}>
+  <Text style={st.kicker}>Apps</Text>
+  {!rows.length?<Text style={st.sub}>No tracked app time yet.</Text>:rows.map((r,i)=>{const c=SERIES_COLORS[i%SERIES_COLORS.length];return <View key={r.app} style={{gap:6}}>
+   <View style={{flexDirection:'row',alignItems:'center',gap:10}}>{SocialAppLabel?<SocialAppLabel app={r.app} style={{height:26,flex:1}}/>:<Text style={[st.rowTitle,{flex:1}]}>{r.app<0?'Other apps & sites':'App '+(r.app+1)}</Text>}<Text style={[st.rowTitle,{color:c}]}>{formatDuration(r.minutes*60)}</Text></View>
+   <View style={st.barTrack}><View style={[st.barFill,{width:`${Math.max(4,r.minutes/top*100)}%`,backgroundColor:c}]}/></View>
+  </View>})}
+ </View>;
+}
+
+/** Family members as cards; a running timer shows as a ring of the time left. */
+function ProfileRow({members,selected,adding,onSelect,onAdd,sessions}:{members:FamilyChild[];selected?:string;adding:boolean;onSelect:(id:string)=>void;onAdd:()=>void;sessions:RemoteSession[]}){
+ const [state]=useBreakState();
+ const left=(id:string):number|null=>{
+  const now=Date.now(),s=state?.session;
+  if(s?.status==='active'&&s.childId===id&&s.deadline*1000>now)return Math.min(1,(s.deadline*1000-now)/1000/Math.max(1,s.grantedSeconds));
+  const r=sessions.find(x=>x.child_id===id&&Date.parse(x.deadline_at)>now);
+  return r?Math.min(1,(Date.parse(r.deadline_at)-now)/1000/Math.max(1,r.granted_seconds)):null;
+ };
+ useNow(members.some(c=>left(c.id)!==null));
+ return <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginTop:4}} contentContainerStyle={{gap:10,paddingVertical:4,paddingHorizontal:2}}>
+  {members.map((c,i)=><ProfileCard key={c.id} name={c.name} index={i} on={!adding&&c.id===selected} frac={left(c.id)} onPress={()=>{if(c.id!==selected||adding){void Haptics.selectionAsync();onSelect(c.id)}}}/>)}
+  <TouchableOpacity accessibilityRole="button" accessibilityLabel={adding?'Close add member':'Add member'} onPress={onAdd} style={[st.memberCard,{borderStyle:'dashed',borderWidth:2,borderColor:adding?T.primary:'#C9D6CF'}]}>
+   <View style={{width:46,height:46,alignItems:'center',justifyContent:'center'}}><Ionicons name={adding?'close':'add'} size={28} color={T.primary}/></View>
+   <Text style={[st.profileName,{color:T.ink}]}>{adding?'Close':'Add'}</Text>
+  </TouchableOpacity>
+ </ScrollView>;
+}
+function ProfileCard({name,index,on,frac,onPress}:{name:string;index:number;on:boolean;frac:number|null;onPress:()=>void}){
+ const k=index%TINTS.length,r=16,cc=2*Math.PI*r,color=frac===null?T.primary:heroColor(frac,Infinity),d=frac===null?36:26;
+ return <TouchableOpacity accessibilityRole="button" accessibilityLabel={name+(frac!==null?', timer running':'')} accessibilityState={{selected:on}} onPress={onPress} style={[st.memberCard,on&&{backgroundColor:T.primary,borderColor:T.primary}]}>
+  <View style={{width:38,height:38,alignItems:'center',justifyContent:'center'}}>
+   {frac!==null?<Svg width={38} height={38} style={StyleSheet.absoluteFill}><Circle cx={19} cy={19} r={r} stroke={on?'rgba(255,255,255,.35)':color+'33'} strokeWidth={3.5} fill="none"/><Circle cx={19} cy={19} r={r} stroke={on?'#fff':color} strokeWidth={3.5} fill="none" strokeLinecap="round" strokeDasharray={cc+' '+cc} strokeDashoffset={cc*(1-frac)} transform="rotate(-90 19 19)"/></Svg>:null}
+   <View style={{width:d,height:d,borderRadius:d/2,backgroundColor:on?'rgba(255,255,255,.25)':TINTS[k],alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:frac===null?17:13,fontWeight:'900',color:on?'#fff':TINT_INK[k]}}>{name.slice(0,1).toUpperCase()}</Text></View>
+  </View>
+  <Text style={[st.profileName,{color:on?'#fff':T.ink}]} numberOfLines={1}>{name}</Text>
+ </TouchableOpacity>;
+}
+
+/** Starting a timer from a device card: who and how long in one sheet. Members with a timer elsewhere can't be picked. */
+function StartTimerSheet({device,members,onClose}:{device:FamilyDevice|null;members:FamilyChild[];onClose:()=>void}){
+ const family=useFamilyDevices(!!device);
+ const [state]=useBreakState();
+ const {isPlus,showPaywall}=usePlus();
+ const [child,setChild]=useState<string|null>(null),[minutes,setMinutes]=useState(30),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ useEffect(()=>{
+  if(!device)return;
+  setChild(null);setError('');
+  void AsyncStorage.getItem(LAST_MINUTES_KEY).then(v=>{const n=Number(v);if(n>=5&&n<=180)setMinutes(Math.round(n/5)*5)});
+ },[device?.id]);
+ if(!device)return null;
+ const now=Date.now(),phone=state?.session?.status==='active'?state.session.childId:undefined;
+ const onPhone=device.id===PHONE,phoneRun=onPhone&&state?.session?.status==='active'?state.session:undefined;
+ const session=onPhone?(phoneRun?{child_id:phoneRun.childId,deadline_at:new Date(phoneRun.deadline).toISOString()}:undefined):family.sessions.find(x=>x.family_device_id===device.id&&Date.parse(x.deadline_at)>now);
+ const busyElsewhere=(id:string)=>id===phone||!!deviceInUse(id,family,now);
+ const sel=child&&!busyElsewhere(child)?child:members.find(c=>!busyElsewhere(c.id))?.id;
+ const who=(id:string)=>members.find(c=>c.id===id)?.name||'Someone';
+ const start=async()=>{
+  if(!sel)return;
+  setBusy(true);setError('');
+  try{
+   if(onPhone){
+    const reply=sendBreakCommand('start',{childId:sel,minutes,replace:!!session});
+    if(!reply.ok){if(reply.code==='plus')showPaywall('screenBreak');throw new Error(reply.error||'Something went wrong. Please try again.')}
+    void syncScreenBreak(isPlus);
+   }else await deviceCommand(device.id,'START_SESSION',{minutes,child:sel,replace:!!session});
+   void AsyncStorage.setItem(LAST_MINUTES_KEY,String(minutes));
+   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(()=>{});
+   onClose();
+  }catch(e:any){setError(e.message)}
+  finally{setBusy(false)}
+ };
+ return <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+  <View style={{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(29,43,51,0.3)'}}>
+   <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close"/>
+   <View style={[st.sheet,{alignItems:'center'}]}>
+    <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6'}}/>
+    <Text style={st.sheetTitle} numberOfLines={1}>Start timer on {device.name}</Text>
+    <View style={st.chips}>{members.map(c=><Chip key={c.id} label={c.name} on={c.id===sel} disabled={busyElsewhere(c.id)} onPress={()=>setChild(c.id)}/>)}</View>
+    {session?<ReplaceNote name={who(session.child_id)} ms={Date.parse(session.deadline_at)-now}/>:null}
+    <DurationRing minutes={minutes} onChange={setMinutes} min={5} max={180}/>
+    <TouchableOpacity accessibilityRole="button" disabled={busy||!sel} onPress={()=>void start()} style={[st.cta,{alignSelf:'stretch'},(busy||!sel)&&{opacity:.5}]}>{busy?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>Start {formatDuration(minutes*60)}</Text>}</TouchableOpacity>
+    {error?<Text style={[st.sub,{color:red,textAlign:'center'}]}>{error}</Text>:null}
+   </View>
+  </View>
+ </Modal>;
+}
+
+/** The family device a member's timer runs or is starting on. */
+function deviceInUse(childId:string,family:{sessions:RemoteSession[];commands:DeviceCommand[]},now=Date.now()){
+ return family.sessions.find(x=>x.child_id===childId&&Date.parse(x.deadline_at)>now)?.family_device_id
+  ||family.commands.find(c=>c.type==='START_SESSION'&&(c.status==='pending'||c.status==='delivered')&&c.child_id===childId)?.device_id;
+}
+
+const minLeft=(ms:number)=>Math.max(1,Math.ceil(ms/60000))+' min left';
+/** Shown above Start when another member's timer runs on the chosen device: starting ends it. */
+function ReplaceNote({name,ms}:{name:string;ms:number}){
+ return <View style={st.replaceNote} accessible accessibilityLabel={name+"'s timer is running, "+minLeft(ms)+'. Starting ends it.'}>
+  <Ionicons name="timer-outline" size={22} color="#B7791F"/>
+  <View style={{flex:1}}><Text style={st.rowTitle}>{name}'s timer is running</Text><Text style={st.sub}>{minLeft(ms)} · Starting ends it.</Text></View>
+ </View>;
+}
+
+function ActiveBadge({childId,remote}:{childId:string;remote?:RemoteSession}){
  const [state]=useBreakState();
  const s=state?.session;
- const now=useNow(!!s&&s.childId===childId&&s.status==='active');
- if(!s||s.childId!==childId||s.status!=='active'||s.deadline*1000<=now)return null;
- const left=Math.max(1,Math.ceil((s.deadline*1000-now)/60000));
+ const local=!!s&&s.childId===childId&&s.status==='active';
+ const now=useNow(local||!!remote);
+ const deadline=local?s!.deadline*1000:remote?Date.parse(remote.deadline_at):0;
+ if(deadline<=now)return null;
+ const left=Math.max(1,Math.ceil((deadline-now)/60000));
  return <View style={st.badge}><Text style={st.badgeText}>{left+' min left'}</Text></View>;
 }
 
@@ -206,12 +437,16 @@ function AddChild({onAdded}:{onAdded:(id?:string)=>void}){
  </View>;
 }
 
-function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAddWatch,onOpen}:{child:FamilyChild;children:FamilyChild[];onBack:()=>void;onInsights:()=>void;onChanged:()=>void;onRemoved:()=>void;onAddWatch?:()=>void;onOpen?:(id:string)=>void}){
+function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAddWatch,onOpen,inline}:{inline?:boolean;child:FamilyChild;children:FamilyChild[];onBack:()=>void;onInsights:()=>void;onChanged:()=>void;onRemoved:()=>void;onAddWatch?:()=>void;onOpen?:(id:string)=>void}){
+ const [watchOpen,setWatchOpen]=useState(false);
  const [state,setState]=useBreakState();
  const {isPlus,showPaywall}=usePlus();
  const [editing,setEditing]=useState(false);
  const [busy,setBusy]=useState<string|null>(null),[error,setError]=useState(''),[minutes,setMinutes]=useState(30),[adding,setAdding]=useState(false),[extra,setExtra]=useState(15);
  useEffect(()=>{void AsyncStorage.getItem(LAST_MINUTES_KEY).then(v=>{const n=Number(v);if(n>=5&&n<=180)setMinutes(Math.round(n/5)*5)})},[]);
+ const family=useFamilyDevices(screenBreakSupported);
+ // The default device is preselected; picking another only applies to this timer.
+ const [picked,setPicked]=useState<string|null>(null);
  const session=state?.session;
  // A session whose member record was replaced (same name, old id) is still controllable from that member.
  const orphan=!!session&&!children.some(c=>c.id===session.childId)&&session.childName===child.name;
@@ -220,15 +455,25 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
  const running=session&&session.status==='active'&&session.deadline*1000>now?session:null;
  const mine=running&&(running.childId===child.id||orphan)?running:null;
  const other=running&&running.childId!==child.id&&!orphan?running:null;
+ // One device per member: a running (or starting) timer pins the member to its device.
+ const busyOn=deviceInUse(child.id,family);
+ const inUse=mine?PHONE:family.devices.some(d=>d.id===busyOn)?busyOn:undefined;
+ const usable=(id:string)=>id===PHONE||family.devices.some(d=>d.id===id&&d.status==='active');
+ const target=inUse||(picked&&usable(picked)?picked:usable(family.defaultId)?family.defaultId:PHONE);
+ const remote=target!==PHONE?family.devices.find(d=>d.id===target):undefined;
+ const t=Date.now(),nameOf=(id:string)=>children.find(c=>c.id===id)?.name||'Someone';
+ const deviceOptions=[{id:PHONE,name:'This iPhone',busy:other?other.childName+' · '+minLeft(other.deadline*1000-t):undefined},
+  ...family.devices.filter(d=>d.status==='active').map(d=>{const x=family.sessions.find(y=>y.family_device_id===d.id&&Date.parse(y.deadline_at)>t);
+   return {id:d.id,name:d.name,tablet:d.device_type==='ipad',busy:x?nameOf(x.child_id)+' · '+minLeft(Date.parse(x.deadline_at)-t):undefined,note:d.auth_status!=='approved'||!d.selection_count?'Finish setup on the device':undefined}})];
  const lock=useRef(false);
  const refresh=()=>setState(getBreakState());
  useEffect(()=>{void syncScreenBreak(isPlus).then(refresh)},[child.id]);
 
- function run(action:BreakAction,extra:{minutes?:number}={}){
+ function run(action:BreakAction,extra:{minutes?:number;replace?:boolean}={}){
   if(lock.current)return;
   lock.current=true;setBusy(action);setError('');
   try{
-   const reply=sendBreakCommand(action,{childId:child.id,minutes:extra.minutes,session:action==='start'?undefined:mine||undefined});
+   const reply=sendBreakCommand(action,{childId:child.id,minutes:extra.minutes,replace:extra.replace,session:action==='start'?undefined:mine||undefined});
    if(reply.state)setState(reply.state);
    if(!reply.ok){
     if(reply.code==='plus')showPaywall('screenBreak');
@@ -249,20 +494,23 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
  const trialDaysLeft=state?.trialEndsAt?Math.max(0,Math.ceil((state.trialEndsAt*1000-Date.now())/864e5)):null;
 
  return <View style={{gap:14}}>
-  <Back label="Family" onPress={onBack}/>
-  <View style={{flexDirection:'row',alignItems:'center',gap:12}}>
+  {inline?null:<Back label="Family" onPress={onBack}/>}
+  {inline?<View style={{alignItems:'center',gap:8,paddingTop:0}}>
+   <View style={st.waveBack} pointerEvents="none"><MintWave edge="top"/></View>
+   <Text style={[st.heroTitle,{textAlign:'center',fontSize:30,lineHeight:36,color:'#0F4D3A'}]} numberOfLines={1} accessibilityRole="header">{child.name}</Text>
+   <View style={{flexDirection:'row',justifyContent:'center',gap:18}}>
+    {([['bar-chart','Insights',onInsights],...(state?.selectionCount?[['apps','Apps',()=>void pick()]]:[]),['watch','Watch',()=>setWatchOpen(true)],['create','Edit',()=>setEditing(true)]] as [any,string,()=>void][]).map(([icon,label,fn])=><TouchableOpacity key={label} accessibilityRole="button" accessibilityLabel={label+' for '+child.name} onPress={()=>{void Haptics.selectionAsync();fn()}} style={{alignItems:'center',gap:3}}><View style={st.roundBtn}><Ionicons name={icon} size={19} color={T.primary}/></View><Text style={st.roundLabel}>{label}</Text></TouchableOpacity>)}
+   </View>
+  </View>:<View style={{flexDirection:'row',alignItems:'center',gap:12}}>
    <View style={[st.avatar,{width:52,height:52,borderRadius:26}]}><Text style={[st.avatarText,{fontSize:22}]}>{child.name.slice(0,1).toUpperCase()}</Text></View>
    <Text style={[st.title,{flex:1}]} numberOfLines={1}>{child.name}</Text>
    <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Edit '+child.name} onPress={()=>setEditing(true)} style={st.editBtn}><Text style={st.editBtnText}>Edit</Text></TouchableOpacity>
-  </View>
+  </View>}
   <EditMemberSheet visible={editing} child={child} children={children} onClose={()=>setEditing(false)} onChanged={onChanged} onRemoved={()=>{setEditing(false);onRemoved()}}/>
   {!screenBreakSupported?<View style={st.card}><Text style={st.body}>Screen Break needs the latest MoodPals build on this iPhone.</Text></View>:<>
-   {state&&!state.hasPlus&&!isPlus?<PlanNote state={state} daysLeft={trialDaysLeft} onUpgrade={()=>showPaywall('screenBreak')}/>:null}
-   {mine?<View style={[st.card,{alignItems:'center'}]}>
-    <Text style={st.kicker}>Screen time left</Text>
-    <Text style={st.timer} accessibilityRole="timer">{countdown(mine.deadline*1000-now)}</Text>
-    <Text style={st.sub}>Ends at {clock(mine.deadline)} · {formatDuration(mine.grantedSeconds)} granted</Text>
-    <TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={()=>{setExtra(15);setAdding(true)}} style={[st.cta,{alignSelf:'stretch',marginTop:6}]}><Text style={st.ctaText}>Add Time</Text></TouchableOpacity>
+   {inUse?null:<DeviceSelect options={deviceOptions} selected={target} defaultId={family.defaultId} onSelect={setPicked}/>}
+   {remote?<RemoteTimer child={child} children={children} device={remote} family={family} minutes={minutes} setMinutes={setMinutes} onOpen={onOpen} onPlan={()=>showPaywall('screenBreak')}/>:mine?<View>
+    <TimerHero remainingMs={mine.deadline*1000-now} grantedSec={mine.grantedSeconds} endsAt={mine.deadline} name={child.name} device="This iPhone" disabled={!!busy} onAdd={()=>{setExtra(15);setAdding(true)}} onEnd={()=>run('cancel')}/>
     <Modal visible={adding} transparent animationType="slide" onRequestClose={()=>setAdding(false)}>
      <View style={{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(29,43,51,0.3)'}}>
       <TouchableOpacity style={StyleSheet.absoluteFill} onPress={()=>setAdding(false)} accessibilityLabel="Close"/>
@@ -274,50 +522,107 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
       </View>
      </View>
     </Modal>
-    {/* Stop ends the timer, keeps only the time used and leaves the apps open. */}
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Stop '+child.name+"'s timer"} disabled={!!busy} onPress={()=>run('cancel')} style={[st.ghost,{alignSelf:'stretch',marginTop:6}]}><Text style={[st.ghostText,{color:red}]}>Stop</Text></TouchableOpacity>
    </View>:<View style={st.card}>
     <Text style={st.heading}>Screen Break</Text>
-    {other?<View style={[st.setupDone,{flexDirection:'column',alignItems:'stretch',gap:10,paddingVertical:14}]}>
-     <Text style={[st.body,{textAlign:'center'}]}>A timer is running for {other.childName} · {Math.max(1,Math.ceil((other.deadline*1000-now)/60000))} min left</Text>
-     {children.some(c=>c.id===other.childId)&&onOpen?<TouchableOpacity accessibilityRole="button" onPress={()=>onOpen(other.childId)} style={st.cta}><Text style={st.ctaText}>Go to {other.childName}</Text></TouchableOpacity>:null}
-    </View>:null}
+    {other?<ReplaceNote name={other.childName} ms={other.deadline*1000-now}/>:null}
     {!state?.authorized?<View style={{gap:10}}>
      <Text style={st.kicker}>Step 1 of 2</Text>
      <Text style={st.rowTitle}>Allow Screen Time access</Text>
-     <Text style={st.sub}>Lets MoodPals pause the apps you choose when time is up.</Text>
      <TouchableOpacity accessibilityRole="button" disabled={busy==='auth'} onPress={()=>void authorize()} style={st.cta}>{busy==='auth'?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>Allow Screen Time Access</Text>}</TouchableOpacity>
     </View>:!(state?.selectionCount||0)?<View style={{gap:10}}>
      <Text style={st.kicker}>Step 2 of 2</Text>
      <Text style={st.rowTitle}>Choose apps to pause</Text>
-     <Text style={st.sub}>Pick the apps, categories or websites to pause when time is up.</Text>
      <TouchableOpacity accessibilityRole="button" disabled={busy==='pick'} onPress={()=>void pick()} style={st.cta}>{busy==='pick'?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>Choose Apps to Pause</Text>}</TouchableOpacity>
-    </View>:<TouchableOpacity accessibilityRole="button" accessibilityLabel={'Setup complete, '+state.selectionCount+' selected. Edit apps'} onPress={()=>void pick()} style={st.setupDone}>
+    </View>:inline?null:<TouchableOpacity accessibilityRole="button" accessibilityLabel={'Setup complete, '+state.selectionCount+' selected. Edit apps'} onPress={()=>void pick()} style={st.setupDone}>
      <Ionicons name="checkmark-circle" size={22} color={T.primary}/>
      <Text style={[st.body,{flex:1}]}>Setup complete · {state.selectionCount} to pause</Text>
      <Text style={st.link}>Edit apps</Text>
     </TouchableOpacity>}
-    {ready&&!other?<>
-    <Text style={[st.rowTitle,{marginTop:8,textAlign:'center'}]}>How long can {child.name} use the phone?</Text>
+    {ready?<>
     <DurationRing minutes={minutes} onChange={setMinutes} min={5} max={180}/>
-    <TouchableOpacity accessibilityRole="button" disabled={!ready||!validMinutes||!!busy||!!other} onPress={()=>{void AsyncStorage.setItem(LAST_MINUTES_KEY,String(chosen));run('start',{minutes:chosen})}} style={[st.cta,(!ready||!validMinutes||!!busy||!!other)&&{opacity:0.5}]}><Text style={st.ctaText}>Start</Text></TouchableOpacity>
-    <Text style={[st.sub,{textAlign:'center'}]}>Your Apple Watch reminds you 5 minutes before and lets you manage it.</Text>
+    <TouchableOpacity accessibilityRole="button" disabled={!ready||!validMinutes||!!busy} onPress={()=>{void AsyncStorage.setItem(LAST_MINUTES_KEY,String(chosen));run('start',{minutes:chosen,replace:!!other})}} style={[st.cta,(!ready||!validMinutes||!!busy)&&{opacity:0.5}]}><Text style={st.ctaText}>Start</Text></TouchableOpacity>
     </>:null}
     {state?.entitlementKnown&&!state.allowed&&!state.hasPlus&&!isPlus&&!other?<TouchableOpacity accessibilityRole="button" accessibilityLabel="Free trial ended. See MoodPals Plus" onPress={()=>showPaywall('screenBreak')} style={st.gate}>
      <View style={st.gatePill}><Ionicons name="lock-closed" size={16} color="#fff"/><Text style={st.ctaText}>Get MoodPals Plus</Text></View>
     </TouchableOpacity>:null}
    </View>}
-   {busy&&busy!=='auth'&&busy!=='pick'?<ActivityIndicator color={T.primary}/>:null}
+   {remote?null:<>{busy&&busy!=='auth'&&busy!=='pick'?<ActivityIndicator color={T.primary}/>:null}
    {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
-   {state&&!state.authorized&&mine?<Text style={[st.sub,{color:red}]}>Screen Time access was turned off, so apps can't be paused. Allow access again to restore the break.</Text>:null}
+   {state&&!state.authorized&&mine?<Text style={[st.sub,{color:red}]}>Screen Time access was turned off, so apps can't be paused. Allow access again to restore the break.</Text>:null}</>}
   </>}
-  <TouchableOpacity accessibilityRole="button" onPress={onInsights} style={st.linkRow}><Ionicons name="bar-chart-outline" size={20} color={T.primary}/><Text style={[st.rowTitle,{flex:1}]}>Screen Time Insights</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>
+  {inline?<Modal visible={watchOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setWatchOpen(false)}>
+   <ScrollView contentContainerStyle={{padding:20,gap:14}}>
+    <TouchableOpacity accessibilityRole="button" onPress={()=>setWatchOpen(false)} style={{alignSelf:'flex-end',minHeight:44,justifyContent:'center'}}><Text style={st.link}>Done</Text></TouchableOpacity>
+    <MemberWatch child={child} children={children} onChanged={onChanged} onRemoved={onRemoved}/>
+   </ScrollView>
+  </Modal>:<>
+  <TouchableOpacity accessibilityRole="button" onPress={onInsights} style={st.linkRow}><IconTile icon="bar-chart" color={TINT_INK[2]}/><Text style={[st.rowTitle,{flex:1}]}>Screen Time Insights</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>
   <MemberWatch child={child} children={children} onChanged={onChanged} onRemoved={onRemoved}/>
+  </>}
+  {inline?<ChildStats child={child} onPress={onInsights}/>:null}
+ </View>;
+}
+
+type FamilyDevicesData=ReturnType<typeof useFamilyDevices>;
+/** Timer for a family device (iPad / spare iPhone). Shows a session only once the device acknowledged it. */
+function RemoteTimer({child,children,device,family,minutes,setMinutes,onOpen,onPlan}:{child:FamilyChild;children:FamilyChild[];device:FamilyDevice;family:FamilyDevicesData;minutes:number;setMinutes:(n:number)=>void;onOpen?:(id:string)=>void;onPlan:()=>void}){
+ const [busy,setBusy]=useState(false),[error,setError]=useState(''),[extra,setExtra]=useState(15),[adding,setAdding]=useState(false);
+ const now=useNow(true);
+ const session=family.sessions.find(x=>x.family_device_id===device.id&&Date.parse(x.deadline_at)>now);
+ const status=deviceStatus(device,family.commands,family.sessions,now);
+ const failed=family.commands.find(c=>c.device_id===device.id&&(c.status==='rejected'||c.status==='expired')&&now-Date.parse(c.updated_at||c.created_at)<120000);
+ const who=(id:string)=>children.find(c=>c.id===id)?.name||'Someone';
+ const act=async(type:string,opts:{minutes?:number;child?:string;replace?:boolean}={})=>{
+  setBusy(true);setError('');
+  try{await deviceCommand(device.id,type,opts);void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(()=>{})}
+  catch(e:any){if(/trial|Plus/i.test(e.message))onPlan();setError(e.message)}
+  finally{setBusy(false)}
+ };
+ const extendSheet=session?<Modal visible={adding} transparent animationType="slide" onRequestClose={()=>setAdding(false)}>
+  <View style={{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(29,43,51,0.3)'}}>
+   <TouchableOpacity style={StyleSheet.absoluteFill} onPress={()=>setAdding(false)} accessibilityLabel="Close"/>
+   <View style={[st.sheet,{alignItems:'center'}]}>
+    <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6'}}/>
+    <Text style={st.sheetTitle}>Add time for {who(session.child_id)}</Text>
+    <DurationRing minutes={extra} onChange={setExtra} min={5} max={120} prefix="+"/>
+    <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>{setAdding(false);void act('EXTEND_SESSION',{minutes:extra})}} style={[st.cta,{alignSelf:'stretch'}]}><Text style={st.ctaText}>Add {formatDuration(extra*60)}</Text></TouchableOpacity>
+   </View>
+  </View>
+ </Modal>:null;
+ const pendingStart=status.pending?.type==='START_SESSION'?status.pending:undefined;
+ return <View style={[st.card,{alignItems:'stretch'}]}>
+  <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
+   <Text style={[st.heading,{flex:1}]} numberOfLines={1}>{device.name}</Text>
+   <Text style={[st.sub,{color:status.tone==='warn'?'#B7791F':T.primary,fontWeight:'800'}]}>{status.label}</Text>
+  </View>
+  {session&&session.child_id===child.id?<>
+   <TimerHero remainingMs={Date.parse(session.deadline_at)-now} grantedSec={session.granted_seconds} endsAt={Date.parse(session.deadline_at)/1000} name={child.name} device={device.name} disabled={busy||!!status.pending} onAdd={()=>{setExtra(15);setAdding(true)}} onEnd={()=>void act('END_SESSION')}/>
+   {extendSheet}
+  </>:pendingStart?<View style={{alignItems:'center',gap:10}}>
+   <ActivityIndicator color={T.primary}/>
+   <Text style={[st.body,{textAlign:'center'}]}>{status.label==='Waiting for device connection'?'Waiting for '+device.name+' to connect…':'Starting '+(pendingStart.minutes||0)+' min for '+who(pendingStart.child_id||'')+'…'}</Text>
+   <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>{setBusy(true);void cancelDeviceCommand(pendingStart.id).catch(e=>setError(e.message)).finally(()=>setBusy(false))}} style={[st.ghost,{alignSelf:'stretch'}]}><Text style={st.ghostText}>Cancel</Text></TouchableOpacity>
+  </View>:device.auth_status!=='approved'||!device.selection_count?<Text style={st.body}>Finish setup on {device.name}: allow Screen Time and choose the apps to pause.</Text>:<>
+   {session?<ReplaceNote name={who(session.child_id)} ms={Date.parse(session.deadline_at)-now}/>:null}
+   <DurationRing minutes={minutes} onChange={setMinutes} min={5} max={180}/>
+   <TouchableOpacity accessibilityRole="button" disabled={busy||!!status.pending} onPress={()=>{void AsyncStorage.setItem(LAST_MINUTES_KEY,String(minutes));void act('START_SESSION',{minutes,child:child.id,replace:!!session})}} style={[st.cta,(busy||!!status.pending)&&{opacity:.5}]}>{busy?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>Start</Text>}</TouchableOpacity>
+  </>}
+  {status.pending&&!pendingStart?<Text style={[st.sub,{textAlign:'center'}]}>{status.label}…</Text>:null}
+  {failed?<Text style={[st.sub,{color:red,textAlign:'center'}]}>{failed.error||'The device couldn’t do that.'}</Text>:null}
+  {error?<Text style={[st.sub,{color:red,textAlign:'center'}]}>{error}</Text>:null}
  </View>;
 }
 
 // Circular duration dial, same as the Apple Watch: drag around the ring in 5-minute steps.
-function DurationRing({minutes,onChange,min,max,step=5,prefix=''}:{minutes:number;onChange:(n:number)=>void;min:number;max:number;step?:number;prefix?:string}){
+// Ring color by time given: green while it's a modest amount, then amber, then red.
+const TIME_STOPS:[number,[number,number,number]][]=[[45,[52,179,126]],[90,[242,179,61]],[150,[229,72,77]]];
+function timeColor(minutes:number){
+ const i=TIME_STOPS.findIndex(([m])=>minutes<=m);
+ const mix=i<=0?TIME_STOPS[i<0?TIME_STOPS.length-1:0][1]:(()=>{const [m0,a]=TIME_STOPS[i-1],[m1,b]=TIME_STOPS[i],t=(minutes-m0)/(m1-m0);return a.map((v,k)=>v+(b[k]-v)*t)})();
+ return '#'+mix.map(v=>Math.round(v).toString(16).padStart(2,'0')).join('');
+}
+const PRESETS=[15,30,45,60,90];
+export function DurationRing({minutes,onChange,min,max,step=5,prefix=''}:{minutes:number;onChange:(n:number)=>void;min:number;max:number;step?:number;prefix?:string}){
  // The knob is wider than the ring, so the ring is inset by the knob's radius to keep it inside the view.
  const SIZE=230,LINE=18,KNOB=LINE*0.75,R=SIZE/2-KNOB-3,C=SIZE/2,CIRC=2*Math.PI*R;
  const frac=(minutes-min)/(max-min);
@@ -346,29 +651,38 @@ function DurationRing({minutes,onChange,min,max,step=5,prefix=''}:{minutes:numbe
   onPanResponderRelease:()=>setScrubbing(false),
   onPanResponderTerminate:()=>setScrubbing(false),
  }),[min,max,step,setScrubbing]);
- const angle=frac*2*Math.PI,kx=C+R*Math.sin(angle),ky=C-R*Math.cos(angle);
+ const ring=timeColor(minutes),angle=frac*2*Math.PI,kx=C+R*Math.sin(angle),ky=C-R*Math.cos(angle);
  const h=Math.floor(minutes/60),m=minutes%60;
- return <View style={{width:SIZE,height:SIZE,alignSelf:'center',marginVertical:6}} {...pan.panHandlers}
+ return <View style={{alignSelf:'stretch',alignItems:'center',gap:12}}><View style={{width:SIZE,height:SIZE,alignSelf:'center',marginVertical:6}} {...pan.panHandlers}
   accessible accessibilityRole="adjustable" accessibilityLabel="Duration" accessibilityValue={{text:prefix+formatDuration(minutes*60)}}
   accessibilityActions={[{name:'increment'},{name:'decrement'}]} onAccessibilityAction={e=>set(minutes+(e.nativeEvent.actionName==='increment'?step:-step))}>
   <Svg width={SIZE} height={SIZE} pointerEvents="none">
-   <Circle cx={C} cy={C} r={R} stroke={T.primarySoft} strokeWidth={LINE} fill="none"/>
-   <Circle cx={C} cy={C} r={R} stroke={T.primary} strokeWidth={LINE} fill="none" strokeLinecap="round" strokeDasharray={CIRC+' '+CIRC} strokeDashoffset={CIRC*(1-Math.max(0.002,frac))} transform={'rotate(-90 '+C+' '+C+')'}/>
-   <Circle cx={kx} cy={ky} r={KNOB} fill="#fff" stroke={T.primary} strokeWidth={3}/>
+   <Circle cx={C} cy={C} r={R} stroke={ring+'2E'} strokeWidth={LINE} fill="none"/>
+   <Circle cx={C} cy={C} r={R} stroke={ring} strokeWidth={LINE} fill="none" strokeLinecap="round" strokeDasharray={frac*CIRC+' '+CIRC} transform={'rotate(-90 '+C+' '+C+')'}/>
+   <Circle cx={kx} cy={ky} r={KNOB} fill="#fff" stroke={ring} strokeWidth={3}/>
   </Svg>
   <View pointerEvents="none" style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center'}]}>
    <Text style={{fontSize:52,fontWeight:'900',color:T.ink}}>{prefix}{minutes}</Text>
    <Text style={st.sub}>{h?h+' hr'+(m?' '+m+' min':''):'min'}</Text>
   </View>
+ </View>
+ <View style={st.presets}>{PRESETS.filter(n=>n>=min&&n<=max).map(n=>{const on=n===minutes,c=timeColor(n),r=13,cc=2*Math.PI*r;return <TouchableOpacity key={n} accessibilityRole="button" accessibilityLabel={prefix+formatDuration(n*60)} accessibilityState={{selected:on}} onPress={()=>set(n)} style={[st.preset,on&&{backgroundColor:c,borderColor:c}]}>
+  <Svg width={34} height={34}><Circle cx={17} cy={17} r={r} stroke={on?'rgba(255,255,255,.35)':c+'33'} strokeWidth={4} fill="none"/><Circle cx={17} cy={17} r={r} stroke={on?'#fff':c} strokeWidth={4} fill="none" strokeLinecap="round" strokeDasharray={cc+' '+cc} strokeDashoffset={cc*(1-(n-min)/(max-min))} transform="rotate(-90 17 17)"/></Svg>
+  <Text style={[st.presetText,{color:on?'#fff':T.ink}]}>{prefix}{n<60?n+'m':n/60+'h'}</Text>
+ </TouchableOpacity>})}</View>
  </View>;
 }
 
-function PlanNote({state,daysLeft,onUpgrade}:{state:BreakState;daysLeft:number|null;onUpgrade:()=>void}){
- if(!state.entitlementKnown)return null;
- const text=state.trialAvailable?'14 days free: your trial starts with the first Screen Break or when you turn on Screen Time & Stress.':state.allowed?'Free trial: '+daysLeft+' day'+(daysLeft===1?'':'s')+' left.':'Your 14-day free trial has ended. Your history stays here, and you can always stop a timer or unlock.';
- return <TouchableOpacity accessibilityRole="button" onPress={onUpgrade} style={st.note}>
-  <Ionicons name="sparkles-outline" size={18} color={T.primary}/><Text style={[st.sub,{flex:1,color:T.ink}]}>{text}</Text>
-  {!state.allowed||!state.trialAvailable?<Text style={{color:T.primary,fontWeight:'900',fontSize:12}}>Plus</Text>:null}
+/** Trial status above the Family / Devices tabs, with the Upgrade pill. */
+function TrialBanner(){
+ const [state]=useBreakState(),{isPlus,showPaywall}=usePlus();
+ if(!state?.entitlementKnown||state.hasPlus||isPlus)return null;
+ const days=state.trialEndsAt?Math.max(0,Math.ceil((state.trialEndsAt*1000-Date.now())/864e5)):null;
+ const [title,sub]=state.trialAvailable?['14 days free','Starts with your first timer']:state.allowed&&days!==null?[days+' day'+(days===1?'':'s')+' left','Free trial']:['Free trial ended','Timers can still be stopped'];
+ return <TouchableOpacity accessibilityRole="button" accessibilityLabel={title+'. '+sub+'. Upgrade to MoodPals Plus'} activeOpacity={0.85} onPress={()=>showPaywall('screenBreak')} style={st.trialBanner}>
+  <Ionicons name="sparkles" size={18} color="#7B5CE6"/>
+  <Text style={{flex:1,fontSize:14,color:'#6B5AA6',fontWeight:'600'}} numberOfLines={1}><Text style={st.trialTitle}>{title}</Text>{'  ·  '+sub}</Text>
+  <UpgradePill compact/>
  </TouchableOpacity>;
 }
 
@@ -653,7 +967,7 @@ function periodTitle(period:BreakPeriod,anchor:Date){
 function fromSync(r:BreakSyncRow):SessionRow{return {id:r.id,child_id:r.child_id,started_at:r.started_at,deadline_at:r.deadline_at,ended_at:r.ended_at||null,granted_seconds:r.granted_seconds,status:r.status,version:r.version}}
 function fromNative(s:BreakSession):SessionRow{return {id:s.id,child_id:s.childId,started_at:new Date(s.startedAt*1000).toISOString(),deadline_at:new Date(s.deadline*1000).toISOString(),ended_at:s.endedAt?new Date(s.endedAt*1000).toISOString():null,granted_seconds:s.grantedSeconds,status:s.status,version:s.version}}
 
-function InsightsScreen({child,onBack}:{child:FamilyChild;onBack:()=>void}){
+function InsightsScreen({child,onBack,sheet}:{child:FamilyChild;onBack:()=>void;sheet?:boolean}){
  const [period,setPeriod]=useState<BreakPeriod>('week');
  const [anchor,setAnchor]=useState(()=>new Date());
  const [rows,setRows]=useState<SessionRow[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
@@ -666,7 +980,7 @@ function InsightsScreen({child,onBack}:{child:FamilyChild;onBack:()=>void}){
  const isCurrent=range.start<=new Date()&&new Date()<range.end;
  useEffect(()=>{
   let live=true;setLoading(true);setError('');
-  void supabase.from('screen_break_sessions').select('id,child_id,started_at,deadline_at,ended_at,granted_seconds,status,version')
+  void supabase.from('screen_break_sessions').select('id,child_id,family_device_id,started_at,deadline_at,ended_at,granted_seconds,status,version')
    .eq('child_id',child.id).lt('started_at',range.end.toISOString()).gte('deadline_at',previous.start.toISOString()).order('started_at').limit(2000)
    .then(({data,error:e})=>{if(!live)return;setLoading(false);if(e)setError('Unable to load session history. Showing sessions saved on this iPhone.');setRows((data as SessionRow[])||[])});
   return()=>{live=false};
@@ -677,18 +991,32 @@ function InsightsScreen({child,onBack}:{child:FamilyChild;onBack:()=>void}){
   if(state?.session&&state.session.childId===child.id)local.push(fromNative(state.session));
   return [...rows,...local];
  },[rows,state,child.id]);
- const stats=useMemo(()=>periodStats(all,period,anchor,new Date(now)),[all,period,anchor,Math.floor(now/60000)]);
+ const family=useFamilyDevices();
+ const deviceName=useDeviceNames(family.devices);
+ const [device,setDevice]=useState<string>('all');
+ const deviceKey=(r:SessionRow)=>r.family_device_id||PHONE;
+ const shown=useMemo(()=>device==='all'?all:all.filter(r=>deviceKey(r)===device),[all,device]);
+ const stats=useMemo(()=>periodStats(shown,period,anchor,new Date(now)),[shown,period,anchor,Math.floor(now/60000)]);
+ const byDevice=useMemo(()=>{
+  const keys=[...new Set(all.map(deviceKey))];
+  return keys.map(k=>{const p=periodStats(all.filter(r=>deviceKey(r)===k),period,anchor,new Date(now));return {key:k,name:k===PHONE?'This iPhone':deviceName(k),seconds:p.seconds,sessions:p.sessions,buckets:p.buckets}}).filter(x=>x.seconds>0||x.sessions>0).sort((a,b)=>b.seconds-a.seconds);
+ },[all,period,anchor,deviceName,Math.floor(now/60000)]);
+ const deviceTotal=useMemo(()=>byDevice.reduce((t,d)=>({seconds:t.seconds+d.seconds,sessions:t.sessions+d.sessions}),{seconds:0,sessions:0}),[byDevice]);
  const compare=comparison(stats);
  const notes=observations(stats,period);
  const startOfTimes=periodRange(period,new Date()).start;
  return <View style={{gap:14}}>
-  <Back label={child.name} onPress={onBack}/>
-  <Text style={st.title}>Screen Time Insights</Text>
+  {sheet?<View style={{gap:10}}>
+   <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'}}/>
+   <View style={{flexDirection:'row',alignItems:'center',gap:12}}><IconTile icon="bar-chart" color={TINT_INK[2]}/><Text style={[st.title,{flex:1}]} numberOfLines={1}>{child.name}</Text>
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={onBack} style={st.moreBtn}><Ionicons name="close" size={22} color={T.ink}/></TouchableOpacity></View>
+  </View>:<><Back label={child.name} onPress={onBack}/><Text style={st.title}>Screen Time Insights</Text></>}
   <View style={st.segment}>{PERIODS.map(p=><TouchableOpacity key={p.key} accessibilityRole="tab" accessibilityState={{selected:period===p.key}} onPress={()=>{setPeriod(p.key);setAnchor(new Date())}} style={[st.segBtn,period===p.key&&st.segOn]}><Text style={[st.segText,period===p.key&&{color:'#fff'}]}>{p.label}</Text></TouchableOpacity>)}</View>
   <PeriodPicker period={period} anchor={anchor} onPick={setAnchor}/>
+  {family.devices.length?<View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{[{id:'all',name:'All devices'},{id:PHONE,name:'This iPhone'},...family.devices.map(d=>({id:d.id,name:d.name}))].map(o=><Chip key={o.id} label={o.name} on={device===o.id} onPress={()=>setDevice(o.id)}/>)}</View>:null}
   {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
   {loading?<ActivityIndicator color={T.primary}/>:null}
-  <View style={st.note}><Ionicons name="bar-chart-outline" size={18} color={T.primary}/><Text style={[st.sub,{color:T.ink,flex:1}]}>{child.name}'s time in your tracked apps is in Actions › Screen Time & Stress: choose {child.name} above the chart.</Text></View>
+  <ChildApps childId={child.id} start={range.start.getTime()} end={range.end.getTime()}/>
   <View style={st.grid}>
    <Stat label="Screen Break Time" value={formatDuration(stats.seconds)} sub={'Recorded sessions for '+child.name}/>
    <Stat label="Daily Average" value={formatDuration(stats.dailyAverage)} sub={'Over '+stats.days+' day'+(stats.days===1?'':'s')}/>
@@ -702,9 +1030,17 @@ function InsightsScreen({child,onBack}:{child:FamilyChild;onBack:()=>void}){
   </View>
   <View style={st.card}>
    <Text style={st.kicker}>{({day:'Sessions by hour',week:'Sessions by day',month:'Sessions by week',year:'Sessions by month'} as const)[period]}</Text>
-   {stats.hasData?<SessionLineChart period={period} buckets={stats.buckets}/>:<Text style={st.body}>No Screen Break sessions for {child.name} in this period.</Text>}
+   {stats.hasData?<StackedBars period={period} series={device==='all'&&byDevice.length>1?byDevice:[{key:'one',name:child.name,buckets:stats.buckets}]}/>:<Text style={st.body}>No Screen Break sessions for {child.name} in this period.</Text>}
    {stats.highest&&period!=='day'?<Text style={st.sub}>Longest: {period==='week'?stats.highest.start.toLocaleDateString(undefined,{weekday:'long'}):period==='month'?'Week '+stats.highest.label.replace('Wk ',''):stats.highest.start.toLocaleDateString(undefined,{month:'long'})} · {formatDuration(stats.highest.seconds)}</Text>:null}
   </View>
+  {device==='all'&&(family.devices.length>0||byDevice.some(d=>d.key!==PHONE))&&byDevice.length>0?<View style={st.card}>
+   <Text style={st.kicker}>By device</Text>
+   {[...byDevice,{key:'total',name:'Total',seconds:deviceTotal.seconds,sessions:deviceTotal.sessions}].map(d=><View key={d.key} style={[{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},d.key==='total'?{borderTopWidth:1,borderTopColor:T.border,paddingTop:8}:null]}>
+    <View style={{flex:1}}><Text style={[st.body,d.key==='total'?{fontWeight:'800'}:null]}>{d.name}</Text><Text style={st.sub}>{d.sessions} session{d.sessions===1?'':'s'}</Text></View>
+    <Text style={[st.body,{fontWeight:'800'}]}>{formatDuration(d.seconds)}</Text>
+   </View>)}
+   {deviceTotal.seconds>stats.seconds?<Text style={st.sub}>Sessions that ran on two devices at once count once in Screen Break Time.</Text>:null}
+  </View>:null}
   {allowed&&notes.length?<View style={st.card}>{notes.map(n=><Text key={n} style={st.body}>• {n}</Text>)}</View>:null}
   <Text style={st.sub}>Screen Break Time is the time inside {child.name}'s sessions, from start until the session ended, was canceled or reached its time. Time Granted is what you allowed. Neither is measured phone use.</Text>
  </View>;
@@ -718,6 +1054,67 @@ function bucketName(period:BreakPeriod,b:Bucket){
 }
 
 // Line graph of recorded Screen Break time. Press and drag along it to read the time at each point.
+const SERIES_COLORS=[T.primary,'#4A8CFF','#F2A93B','#E5484D','#9B7BC8','#2A9DA8'];
+/** Colored stacked bars, one color per device; tap a bar for its time. */
+/** This week and today for one child, Actions-card style. */
+function ChildStats({child,onPress}:{child:FamilyChild;onPress:()=>void}){
+ const [state]=useBreakState();
+ const [rows,setRows]=useState<SessionRow[]>([]);
+ const week=periodRange('week',new Date()),ws=week.start.getTime();
+ useEffect(()=>{let live=true;void supabase.from('screen_break_sessions').select('id,child_id,family_device_id,started_at,deadline_at,ended_at,granted_seconds,status,version').eq('child_id',child.id).gte('deadline_at',new Date(ws).toISOString()).order('started_at').limit(500).then(({data})=>{if(live)setRows((data as SessionRow[])||[])});return()=>{live=false}},[child.id,ws,state?.session?.version]);
+ const all=useMemo(()=>{const local=pendingBreakSync().filter(r=>r.child_id===child.id).map(fromSync);if(state?.session&&state.session.childId===child.id)local.push(fromNative(state.session));return [...rows,...local]},[rows,state,child.id]);
+ const now=new Date(),day=periodStats(all,'day',now,now),wk=periodStats(all,'week',now,now);
+ const top=useMemo(()=>{const by=new Map<number,number>();for(const m of socialMarks(ws))if(m.member===child.id)by.set(m.app,(by.get(m.app)||0)+m.minutes);return [...by].sort((a,b)=>b[1]-a[1])[0]},[child.id,ws]);
+ const peak=Math.max(60,...wk.buckets.map(b=>b.seconds));
+ const val=(label:string,value:string,color:string)=><View style={{gap:2}}><Text style={{fontSize:12,fontWeight:'800',color}}>{label}</Text><Text style={st.statNum}>{value}</Text></View>;
+ const head=(icon:any,color:string,title:string)=><View style={{flexDirection:'row',alignItems:'center',gap:7}}><Ionicons name={icon} size={18} color={color}/><Text style={st.statHead}>{title}</Text></View>;
+ return <View style={{gap:12}}>
+  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open Insights" onPress={onPress} activeOpacity={0.7} style={st.statBox}>
+   <View style={{flex:1,gap:10}}>
+    {head('calendar','#4A8CFF','This week')}
+    <View style={{flexDirection:'row',gap:18}}>{val('Time',formatDuration(wk.seconds),T.primary)}{val('Sessions',String(wk.sessions),'#4A8CFF')}{val('Daily avg',formatDuration(wk.dailyAverage),'#F2A93B')}</View>
+   </View>
+   <View style={{flexDirection:'row',alignItems:'flex-end',gap:4,height:56}} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">{wk.buckets.map((b,i)=><View key={i} style={{width:7,height:Math.max(5,56*b.seconds/peak),borderRadius:4,backgroundColor:b.seconds?T.primary:'#E3EEE8'}}/>)}</View>
+  </TouchableOpacity>
+  <View style={{flexDirection:'row',gap:12}}>
+   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open Insights" onPress={onPress} activeOpacity={0.7} style={[st.statBox,{flex:1,flexDirection:'column',alignItems:'flex-start'}]}>
+    {head('sunny','#F2A93B','Today')}
+    <Text style={st.statBig}>{formatDuration(day.seconds)}</Text>
+    <View style={[st.statOrb,{backgroundColor:'#FFF7E8'}]}><Ionicons name="hourglass" size={24} color="#F2A93B"/></View>
+   </TouchableOpacity>
+   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open Insights" onPress={onPress} activeOpacity={0.7} style={[st.statBox,{flex:1,flexDirection:'column',alignItems:'flex-start'}]}>
+    {head('apps','#9B7BC8','Top app')}
+    {top?<><View style={{height:26,alignSelf:'stretch'}}>{SocialAppLabel?<SocialAppLabel app={top[0]} style={{height:26,flex:1}}/>:<Text style={st.rowTitle}>App</Text>}</View><Text style={st.statBig}>{formatDuration(top[1]*60)}</Text></>:<Text style={{fontSize:17,fontWeight:'700',color:T.muted,marginTop:6}}>None yet</Text>}
+    {top?null:<View style={[st.statOrb,{backgroundColor:'#F4EBFF'}]}><Ionicons name="apps" size={24} color="#9B7BC8"/></View>}
+   </TouchableOpacity>
+  </View>
+ </View>;
+}
+
+function StackedBars({period,series}:{period:BreakPeriod;series:{key:string;name:string;buckets:Bucket[]}[]}){
+ const [picked,setPicked]=useState<number|null>(null),[width,setWidth]=useState(0);
+ const H=140,n=series[0]?.buckets.length||0;
+ const totals=Array.from({length:n},(_,i)=>series.reduce((t,x)=>t+(x.buckets[i]?.seconds||0),0));
+ const peak=Math.max(60,...totals),total=totals.reduce((a,b)=>a+b,0);
+ const gap=n>12?3:6,bw=n?Math.max(4,(width-gap*(n-1))/n):0;
+ const sel=picked!==null?picked:null;
+ return <View style={{gap:10}}>
+  <View>
+   <Text style={st.statValue}>{formatDuration(sel!==null?totals[sel]:total)}</Text>
+   <Text style={st.sub}>{sel!==null?bucketName(period,series[0].buckets[sel]):'Total'}</Text>
+  </View>
+  <View onLayout={e=>setWidth(e.nativeEvent.layout.width)} style={{height:H,flexDirection:'row',alignItems:'flex-end',gap}}>
+   {width?totals.map((t,i)=><TouchableOpacity key={i} accessibilityRole="button" accessibilityLabel={bucketName(period,series[0].buckets[i])+', '+formatDuration(t)} onPress={()=>{void Haptics.selectionAsync();setPicked(p=>p===i?null:i)}} style={{width:bw,height:H,justifyContent:'flex-end'}}>
+    <View style={{height:Math.max(4,H*t/peak),borderRadius:Math.min(6,bw/2),overflow:'hidden',backgroundColor:t?undefined:'#EEF2F0',opacity:sel===null||sel===i?1:.35,flexDirection:'column-reverse'}}>
+     {t?series.map((x,k)=>{const v=x.buckets[i]?.seconds||0;return v?<View key={x.key} style={{flex:v,backgroundColor:SERIES_COLORS[k%SERIES_COLORS.length]}}/>:null}):null}
+    </View>
+   </TouchableOpacity>):null}
+  </View>
+  <View style={{flexDirection:'row',justifyContent:'space-between'}}>{[0,Math.floor((n-1)/2),n-1].filter((v,i,a)=>n&&a.indexOf(v)===i).map(i=><Text key={i} style={st.axis}>{series[0].buckets[i].label}</Text>)}</View>
+  {series.length>1?<View style={{flexDirection:'row',flexWrap:'wrap',gap:12}}>{series.map((x,k)=><View key={x.key} style={{flexDirection:'row',alignItems:'center',gap:6}}><View style={{width:10,height:10,borderRadius:5,backgroundColor:SERIES_COLORS[k%SERIES_COLORS.length]}}/><Text style={[st.sub,{fontWeight:'700'}]}>{x.name}</Text></View>)}</View>:null}
+ </View>;
+}
+
 function SessionLineChart({period,buckets}:{period:BreakPeriod;buckets:Bucket[]}){
  const [width,setWidth]=useState(0),[picked,setPicked]=useState<number|null>(null);
  const H=120,pad=8,n=buckets.length;
@@ -805,7 +1202,50 @@ function Back({label,onPress}:{label:string;onPress:()=>void}){
  return <TouchableOpacity accessibilityRole="button" onPress={onPress} style={st.back}><Ionicons name="chevron-back" size={18} color={T.primary}/><Text style={{color:T.primary,fontWeight:'800'}}>{label}</Text></TouchableOpacity>;
 }
 
+const TINTS=['#E4F6EA','#EAF1FF','#F4EBFF','#FFF7E8','#FDECE8'],TINT_INK=['#23966A','#4A8CFF','#9B7BC8','#C98A0B','#DA4B31'];
 const st=StyleSheet.create({
+ hero:{borderRadius:23,backgroundColor:'#E8F5EF',padding:18,flexDirection:'row',alignItems:'center',gap:12},
+ heroKicker:{fontSize:11,letterSpacing:1,fontWeight:'900',color:'#3B8A6A'},
+ heroTitle:{fontSize:22,lineHeight:27,fontWeight:'900',color:T.ink},
+ heroCard:{backgroundColor:'#E8F5EF',borderColor:'#E8F5EF'},
+ famSegment:{flexDirection:'row',backgroundColor:'#E6EEEA',borderRadius:14,padding:3},
+ segmentItem:{flex:1,minHeight:40,borderRadius:11,flexDirection:'row',gap:6,alignItems:'center',justifyContent:'center'},
+ segmentOn:{backgroundColor:'#fff',shadowColor:'#000',shadowOpacity:.08,shadowRadius:4,shadowOffset:{width:0,height:1}},
+ segmentText:{fontSize:15,fontWeight:'800',color:T.muted},
+ moreBtn:{width:44,height:44,borderRadius:22,backgroundColor:T.primarySoft,alignItems:'center',justifyContent:'center'},
+ memberCard:{width:70,paddingVertical:7,borderRadius:18,alignItems:'center',gap:6,backgroundColor:'rgba(255,255,255,.8)',borderWidth:1,borderColor:'#fff'},
+ watchBtn:{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#F4EBFF',borderRadius:22,padding:12,minHeight:64},
+ sheetClose:{width:40,height:40,borderRadius:20,backgroundColor:'#fff',alignItems:'center',justifyContent:'center'},
+ dockShell:{paddingTop:18,paddingHorizontal:20,paddingBottom:0,gap:8},
+ dockWave:{position:'absolute',top:0,left:0,right:0,bottom:0,overflow:'hidden'},
+ dockHead:{flexDirection:'row',alignItems:'center',gap:7,paddingHorizontal:4},
+ dockLabel:{color:'#0F4D3A',fontSize:17,fontWeight:'900'},
+ dockInner:{},
+ waveBack:{position:'absolute',top:-10,left:-20,right:-20,height:560},
+ roundBtn:{width:44,height:44,borderRadius:22,backgroundColor:'#fff',borderWidth:2,borderColor:'#D5EEDF',alignItems:'center',justifyContent:'center'},
+ roundLabel:{fontSize:12,fontWeight:'800',color:T.ink},
+ statBox:{backgroundColor:'#fff',borderRadius:24,padding:16,gap:10,flexDirection:'row',alignItems:'center',shadowColor:'#2D4A3E',shadowOpacity:.06,shadowRadius:12,shadowOffset:{width:0,height:4}},
+ statHead:{fontSize:17,fontWeight:'900',color:T.ink},
+ statNum:{fontSize:20,fontWeight:'900',color:T.ink},
+ statBig:{fontSize:26,fontWeight:'900',color:T.ink},
+ statOrb:{width:52,height:52,borderRadius:26,alignItems:'center',justifyContent:'center',alignSelf:'center'},
+ profile:{width:58,height:58,borderRadius:29,alignItems:'center',justifyContent:'center'},
+ profileName:{fontSize:12,fontWeight:'800',color:T.muted,maxWidth:60},
+ profileTimer:{position:'absolute',right:2,bottom:2,width:22,height:22,borderRadius:11,backgroundColor:T.primary,borderWidth:2,borderColor:'#fff',alignItems:'center',justifyContent:'center'},
+ tile:{width:43,height:43,borderRadius:15,alignItems:'center',justifyContent:'center'},
+ presets:{flexDirection:'row',flexWrap:'wrap',justifyContent:'center',gap:8},
+ preset:{width:58,paddingVertical:9,borderRadius:16,alignItems:'center',gap:4,backgroundColor:'#fff',borderWidth:1,borderColor:'#E6EEEA'},
+ presetText:{fontSize:13,fontWeight:'800'},
+ timerHero:{borderRadius:28,paddingTop:34,paddingBottom:44,alignItems:'center',overflow:'hidden'},
+ blob:{position:'absolute',top:16,width:250,height:150,borderRadius:110,backgroundColor:'rgba(255,255,255,.16)',transform:[{rotate:'-8deg'}]},
+ heroTime:{fontSize:54,fontWeight:'900',color:'#0F4D3A',fontVariant:['tabular-nums'],letterSpacing:-1},
+ heroSub:{fontSize:15,fontWeight:'700',color:'#5E7F70'},
+ heroRound:{width:42,height:42,borderRadius:21,borderWidth:2,borderColor:'#9ED9BC',backgroundColor:'rgba(255,255,255,.6)',alignItems:'center',justifyContent:'center'},
+ heroMain:{width:56,height:56,borderRadius:28,alignItems:'center',justifyContent:'center',borderWidth:3,borderColor:'#fff',shadowOpacity:.35,shadowRadius:12,shadowOffset:{width:0,height:5}},
+ frost:{paddingHorizontal:40,paddingVertical:14,borderRadius:999,backgroundColor:'rgba(255,255,255,.55)',borderWidth:1.5,borderColor:'rgba(255,255,255,.95)',alignItems:'center',shadowColor:'#34B37E',shadowOpacity:.16,shadowRadius:24,shadowOffset:{width:0,height:8}},
+ heroInfo:{backgroundColor:'#fff',borderRadius:22,padding:16,gap:6,shadowColor:'#1D2B33',shadowOpacity:.08,shadowRadius:12,shadowOffset:{width:0,height:4}},
+ barTrack:{height:8,borderRadius:4,backgroundColor:'#EEF2F0',overflow:'hidden',marginTop:4},
+ barFill:{height:8,borderRadius:4},
  back:{flexDirection:'row',alignItems:'center',gap:4,marginBottom:4},
  title:{fontSize:28,fontWeight:'900',color:T.ink},
  gate:{position:'absolute',top:0,left:0,right:0,bottom:0,borderRadius:20,backgroundColor:'rgba(244,247,245,0.72)',alignItems:'center',justifyContent:'center'},
@@ -848,6 +1288,8 @@ const st=StyleSheet.create({
 
  small:{borderRadius:14,paddingHorizontal:16,paddingVertical:10,minHeight:44,justifyContent:'center',backgroundColor:T.primarySoft,alignItems:'center'},
  smallText:{fontSize:13,fontWeight:'800',color:T.primary},
+ trialBanner:{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:'#F1ECFF',borderRadius:16,paddingVertical:8,paddingLeft:14,paddingRight:8,borderWidth:1,borderColor:'#D9CCFA'},
+ trialTitle:{fontSize:15,fontWeight:'900',color:'#4B3A99'},
  note:{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:T.primarySoft,borderRadius:16,padding:12},
  link:{color:T.primary,fontWeight:'800',fontSize:14},
  linkRow:{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:T.surface,borderRadius:18,padding:16,borderWidth:1,borderColor:T.border},
@@ -866,6 +1308,7 @@ const st=StyleSheet.create({
  calDay:{width:34,height:34,borderRadius:17,alignItems:'center',justifyContent:'center'},
  addBtn:{flexDirection:'row',alignItems:'center',gap:6,backgroundColor:T.primary,paddingHorizontal:18,minHeight:44,borderRadius:22},
  addBtnText:{color:'#fff',fontWeight:'900',fontSize:15},
+ replaceNote:{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#FDF3E1',borderRadius:16,padding:14},
  sheet:{backgroundColor:'#fff',borderTopLeftRadius:28,borderTopRightRadius:28,padding:22,paddingBottom:40,gap:14},
  sheetTitle:{fontSize:22,fontWeight:'900',color:T.ink},
  codeInput:{borderWidth:1.5,borderColor:T.border,borderRadius:18,minHeight:64,fontSize:30,fontWeight:'900',letterSpacing:10,textAlign:'center',color:T.ink,backgroundColor:'#fff'},
