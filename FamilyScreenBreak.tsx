@@ -138,7 +138,7 @@ function HeaderLock(){
 
 type Route={name:'list'}|{name:'child';id:string}|{name:'insights';id:string}|{name:'devices';id?:string};
 
-export default function FamilyScreenBreak({onBack,backLabel='Settings',target,onAddWatch,embedded,footer,onDock}:{onDock?:(node:React.ReactNode)=>void;onBack?:()=>void;backLabel?:string;target?:{childId?:string;profileId?:string;add?:boolean;at:number}|null;onAddWatch?:()=>void;embedded?:boolean;footer?:React.ReactNode}){
+export default function FamilyScreenBreak({onBack,backLabel='Settings',target,onAddWatch,embedded,footer,onDock,onTimerStart}:{onDock?:(node:React.ReactNode)=>void;onTimerStart?:()=>void;onBack?:()=>void;backLabel?:string;target?:{childId?:string;profileId?:string;add?:boolean;at:number}|null;onAddWatch?:()=>void;embedded?:boolean;footer?:React.ReactNode}){
  const guest=useIsGuest();
  const [children,setChildren]=useState<FamilyChild[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const {width:screenW}=useWindowDimensions();
@@ -187,6 +187,10 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  const dockKey=section+'|'+devSel+'|'+addingDevice+'|'+family.defaultId+'|'+family.devices.map(d=>d.id+d.name+d.device_type).join()+'|'+members.map(c=>c.id+c.name).join()+'|'+current?.id+'|'+adding+'|'+family.sessions.map(x=>x.id+x.deadline_at+x.granted_seconds).join();
  useEffect(()=>{onDock?.(showDock?dock:null)},[onDock,showDock,dockKey]);
  useEffect(()=>()=>onDock?.(null),[onDock]);
+ const [breakState]=useBreakState();
+ const activeIds=[breakState?.session?.status==='active'?breakState.session.id:'',...family.sessions.filter(x=>Date.parse(x.deadline_at)>Date.now()).map(x=>x.id)].filter(Boolean);
+ const activeKey=activeIds.join(),seenActive=useRef<string[]|null>(null);
+ useEffect(()=>{const prev=seenActive.current;seenActive.current=activeIds;if(prev&&activeIds.some(id=>!prev.includes(id)))onTimerStart?.()},[activeKey]);
  if(route.name==='devices')return <>
   <FamilyDevicesScreen childName={id=>children.find(c=>c.id===id)?.name||'Someone'} onStart={members.length?setStartOn:undefined}/>
   <StartTimerSheet device={startOn} members={members} onClose={()=>setStartOn(null)}/>
@@ -229,6 +233,13 @@ const heroColor=(frac:number,ms:number)=>ms<=5*60000||frac<=.2?'#E5484D':frac<=.
 /** Soft mint wave that blends a section into the page background. */
 function MintWave({edge}:{edge:'top'|'bottom'}){
  const id='mw'+edge,[w,setW]=useState(useWindowDimensions().width);
+ if(edge==='top'){const h=560,edgeD=`M${w} ${h-44} C${w*.84} ${h-24} ${w*.66} ${h-24} ${w*.5} ${h-34} S${w*.16} ${h-56} 0 ${h-36}`;
+  return <View style={StyleSheet.absoluteFill} onLayout={e=>setW(e.nativeEvent.layout.width)}><Svg width={w} height={h}>
+   <Defs><LinearGradient id={id} x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor="#B9E9CF" stopOpacity=".85"/><Stop offset=".5" stopColor="#E4F6EA" stopOpacity=".7"/><Stop offset="1" stopColor="#C8EED9" stopOpacity=".85"/></LinearGradient></Defs>
+   {[6,4,2].map((k,i)=><Path key={k} d={edgeD} transform={`translate(0,${k})`} stroke="#1D3B2F" strokeOpacity={[.025,.045,.07][i]} strokeWidth={4} fill="none"/>)}
+   <Path d={`M0 0 H${w} V${h-44} `+edgeD.slice(edgeD.indexOf('C'))+' Z'} fill={'url(#'+id+')'}/>
+   <Path d={edgeD} stroke="#FFFFFF" strokeWidth={1.5} fill="none"/>
+  </Svg></View>}
  if(edge==='bottom')return <View style={st.dockWave} pointerEvents="none" onLayout={e=>setW(e.nativeEvent.layout.width)}><Svg width={w} height={420}>
   <Defs><LinearGradient id={id} x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#FFFFFF" stopOpacity=".35"/><Stop offset=".22" stopColor="#E4F6EA" stopOpacity=".8"/><Stop offset=".5" stopColor={T.background} stopOpacity="1"/></LinearGradient></Defs>
   {[6,4,2].map((k,i)=><Path key={k} d={`M0 17 C${w*.16} 7 ${w*.34} 7 ${w*.5} 13 S${w*.82} 21 ${w} 9`} transform={`translate(0,${-k})`} stroke="#1D3B2F" strokeOpacity={[.025,.045,.07][i]} strokeWidth={4} fill="none"/>)}
@@ -478,7 +489,6 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
   {inline?null:<Back label="Family" onPress={onBack}/>}
   {inline?<View style={{alignItems:'center',gap:12,paddingTop:6}}>
    <View style={st.waveBack} pointerEvents="none"><MintWave edge="top"/></View>
-   <View style={{flexDirection:'row',alignItems:'center',gap:6}}><Ionicons name="people" size={16} color={T.primary}/><Text style={{fontSize:15,fontWeight:'800',color:T.primary}}>Family</Text></View>
    <Text style={[st.heroTitle,{textAlign:'center',fontSize:30,lineHeight:36,color:'#0F4D3A'}]} numberOfLines={1} accessibilityRole="header">{child.name}</Text>
    <View style={{flexDirection:'row',justifyContent:'center',gap:20}}>
     {([['bar-chart','Insights',onInsights],...(state?.selectionCount?[['apps','Apps',()=>void pick()]]:[]),['watch','Watch',()=>setWatchOpen(true)],['create','Edit',()=>setEditing(true)]] as [any,string,()=>void][]).map(([icon,label,fn])=><TouchableOpacity key={label} accessibilityRole="button" accessibilityLabel={label+' for '+child.name} onPress={()=>{void Haptics.selectionAsync();fn()}} style={{alignItems:'center',gap:5}}><View style={st.roundBtn}><Ionicons name={icon} size={22} color={T.primary}/></View><Text style={st.roundLabel}>{label}</Text></TouchableOpacity>)}
