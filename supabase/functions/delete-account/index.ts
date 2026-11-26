@@ -67,6 +67,13 @@ Deno.serve(async req=>{
    const {error:e}=await admin.auth.admin.deleteUser(id);
    if(e&&!/not.?found/i.test(e.message)){console.error("delete-account family",e.message);return out({error:"Could not delete the account."},500);}
   }
+  // Family devices (iPads / spare iPhones) have their own logins; remove them with the account.
+  const {data:devices,error:devError}=await admin.from("family_devices").select("auth_user_id").eq("owner_id",user.id).not("auth_user_id","is",null);
+  if(devError)return out({error:"Could not delete the account."},500);
+  for(const {auth_user_id:id} of devices||[]){
+   const {error:e}=await admin.auth.admin.deleteUser(id);
+   if(e&&!/not.?found/i.test(e.message)){console.error("delete-account device",e.message);return out({error:"Could not delete the account."},500);}
+  }
   const own=await Promise.all([
    admin.from("watch_pairing_requests").update({status:"expired",login_token_hash:null}).eq("owner_id",user.id),
    admin.from("connected_devices").update({revoked_at:now}).eq("user_id",user.id),

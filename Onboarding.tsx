@@ -128,7 +128,7 @@ function GoalCard({g,on,onPress}:{g:typeof GOALS[number];on:boolean;onPress:()=>
 }
 
 export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;editing?:boolean;onCancel?:()=>void}){
- const [i,setI]=useState(0),[goals,setGoals]=useState<GoalId[]>([]),[t,setT]=useState<Targets>(DEFAULT_TARGETS);
+ const [i,setI]=useState(0),[goals,setGoals]=useState<GoalId[]>(editing?[]:['water','social']),[t,setT]=useState<Targets>(DEFAULT_TARGETS);
  const [mood,setMood]=useState<number|null>(null),[checkinReminder,setCheckinReminder]=useState(false),[fromPlan,setFromPlan]=useState(false);
  // What was saved before an edit, so only changed answers are applied and older text answers are kept.
  const [loaded,setLoaded]=useState<{goals:GoalId[];t:Targets;checkin:boolean;hour:number;legacy:string[]}|null>(null);
@@ -154,6 +154,8 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
 
  const steps=useMemo<Step[]>(()=>{
   const has=(g:GoalId)=>goals.includes(g);
+  // New accounts get a short setup (water, social media, Apple Health); the rest has defaults and is editable later.
+  if(!editing)return ['welcome','water','socialNow','socialGoal','health','plan'];
   return ['welcome','goals',...(has('water')?['water' as const]:[]),...(has('social')?['socialNow' as const,'socialGoal' as const]:[]),...(has('sleep')?['sleep' as const]:[]),
    ...(has('move')?['move' as const]:[]),...(has('mindful')||has('stress')?['mindful' as const]:[]),...(editing?[]:['feeling' as const]),'health','reminders','plan'];
  },[goals,editing]);
@@ -269,7 +271,7 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
     {has('move')?planRow('walk-outline','Step goal',t.steps.toLocaleString()+' steps','move'):null}
     {has('mindful')||has('stress')?planRow('leaf-outline','Mindful minutes',t.mindfulness+' min a day','mindful'):null}
     {!editing&&mood!==null?planRow('happy-outline','First check-in',MOODS[mood].mood,'feeling'):null}
-    {planRow('notifications-outline','Reminders',checkinReminder?'Daily check-in':'Off','reminders')}
+    {editing?planRow('notifications-outline','Reminders',checkinReminder?'Daily check-in':'Off','reminders'):null}
     {!goals.length?planRow('sparkles-outline','Goals','None picked yet','goals'):null}
    </View>
    {has('social')?<Text style={s.hint}>Your Screen Time limit starts once you choose apps in Screen Time.</Text>:null}</>;

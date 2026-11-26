@@ -68,7 +68,8 @@ export default function MoodCheckinWizard({color,onSaved,onExploreAI,onDone,onJo
     </TouchableOpacity>)}
    </View>
    {mood?<View style={{flexDirection:'row',alignItems:'center',padding:9,gap:10,backgroundColor:'#F8F6FC',borderRadius:13}}><SuperdotMascot id={mood} size={44}/><View style={{flex:1}}><Text style={{fontWeight:'800',color:'#332655',fontSize:13}}>{moodLabel(mood)}</Text><Text style={{fontSize:11,color:'#817892'}}>Your MoodPal reflects how you feel.</Text></View></View>:null}
-   {primary('Continue →',()=>changeStep(1),!mood)}
+   {primary('Save mood',()=>void save(false),!mood)}
+   {mood?secondary('Add details',()=>changeStep(1)):null}
   </View>:null}
   {step===1?<View style={{gap:13,alignItems:'stretch'}}>
    <View style={{alignItems:'center',paddingTop:9}}><SuperdotMascot id={mood} size={116}/></View>

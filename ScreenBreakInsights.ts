@@ -1,7 +1,7 @@
 // Screen Break session history math. Durations are seconds; timestamps are UTC ISO strings from Supabase,
 // and day/week/month/year boundaries use this iPhone's local calendar (DST-safe: built from calendar fields).
 export type BreakPeriod='day'|'week'|'month'|'year';
-export type SessionRow={id:string;child_id:string;started_at:string;deadline_at:string;ended_at:string|null;granted_seconds:number;status:'active'|'restricted'|'released'|'canceled';version:number};
+export type SessionRow={id:string;child_id:string;family_device_id?:string|null;started_at:string;deadline_at:string;ended_at:string|null;granted_seconds:number;status:'active'|'restricted'|'released'|'canceled';version:number};
 export type Range={start:Date;end:Date};
 export type Bucket={label:string;seconds:number;start:Date};
 export type PeriodStats={range:Range;previous:Range;seconds:number;previousSeconds:number;previousHasData:boolean;sessions:number;completed:number;grantedSeconds:number;dailyAverage:number;days:number;buckets:Bucket[];highest:Bucket|null;hasData:boolean};

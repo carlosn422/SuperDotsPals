@@ -9,6 +9,7 @@ import {requestScreenTimeAccess} from './modules/watch-link/screenBreak';
 import {SocialAppLabel,configureSocialTrack,getSocialState,pickTrackedApps,socialDaily,socialMarks,socialTrackSupported,type DailyUse,type SocialMark,type SocialState} from './modules/watch-link/socialTrack';
 import {getBreakState} from './modules/watch-link/screenBreak';
 import {usePlus} from './PlusStore';
+import {UpgradePill} from './TodayUpsell';
 import {CustomDurationSheet,startScreenTimeTrial,syncScreenBreak,type Entitlement} from './FamilyScreenBreak';
 import {LOOKBACK_DAYS,OWNER,appInsights,appsFor,formatMins,insightLine,ownerMinutesOn,usageBuckets,usageByDay,type MoodEntry,type UsageBucket,type UsagePeriod} from './SocialHrvInsights';
 
@@ -93,11 +94,11 @@ export function SocialHrvScreen(){
 
 function TrialNote({ent,onUpgrade}:{ent:Entitlement;onUpgrade:()=>void}){
  const days=ent.trial_ends_at?Math.max(0,Math.ceil((Date.parse(ent.trial_ends_at)-Date.now())/864e5)):0;
- const ended=!ent.trial_available&&!ent.allowed;
- const text=ent.trial_available?'14 days free: your trial starts when you turn on tracking. Screen Break uses the same trial.':ent.allowed?`Free trial: ${days} ${days===1?'day':'days'} left.`:'Your 14-day free trial has ended. Your history stays here. MoodPals Plus keeps tracking and daily limits on.';
- return <TouchableOpacity accessibilityRole="button" onPress={onUpgrade} style={st.trial}>
-  <View style={st.row}><Ionicons name="sparkles-outline" size={18} color={T.primary}/><Text style={[st.sub,{flex:1,color:T.ink}]}>{text}</Text>{!ent.trial_available&&!ended?<Text style={st.plusTag}>Plus</Text>:null}</View>
-  {ended?<View style={st.cta}><Text style={st.ctaText}>Get MoodPals Plus</Text></View>:null}
+ const [title,sub]=ent.trial_available?['14 days free','Starts when you turn on tracking']:ent.allowed?[days+' '+(days===1?'day':'days')+' left','Free trial']:['Free trial ended','Your history stays here'];
+ return <TouchableOpacity accessibilityRole="button" accessibilityLabel={title+'. '+sub+'. Upgrade to MoodPals Plus'} activeOpacity={0.85} onPress={onUpgrade} style={st.trial}>
+  <Ionicons name="sparkles" size={18} color="#7B5CE6"/>
+  <Text style={{flex:1,fontSize:14,color:'#6B5AA6',fontWeight:'600'}} numberOfLines={1}><Text style={{fontSize:15,fontWeight:'900',color:'#4B3A99'}}>{title}</Text>{'  ·  '+sub}</Text>
+  <UpgradePill compact/>
  </TouchableOpacity>;
 }
 
@@ -240,14 +241,27 @@ export function SocialHrvTodayCard({onOpen}:{onOpen:()=>void}){
  if(!socialTrackSupported||!state?.enabled)return null;
  const used=ownerMinutesOn(byDay);
  const flagged=insights.find(i=>!i.learning&&i.delta!==undefined&&i.delta>=8);
- return <TouchableOpacity accessibilityRole="button" onPress={onOpen} style={st.card}>
-  <View style={st.row}><Ionicons name="phone-portrait-outline" size={20} color={T.primary}/><Text style={[st.heading,{flex:1}]}>Screen Time</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></View>
-  <Text style={st.body}>{formatMins(used)} in tracked apps today{state.limitMinutes?` of ${formatMins(state.limitMinutes)}`:''}</Text>
-  {flagged?<View style={st.row}><Text style={st.sub}>Higher stress after:</Text><AppName app={flagged.app}/></View>:<Text style={st.sub}>{insights.some(i=>!i.learning)?'No app stands out for stress right now.':'Still learning your patterns.'}</Text>}
+ const limit=state.limitMinutes||0,p=limit?Math.min(1,used/limit):used?1:0;
+ const color=!limit?'#5B8DEF':used>=limit?'#EE6F86':used>=limit*.75?'#F2A56F':'#34B37E';
+ const label=!limit?'No daily limit':used>=limit?'Limit reached':`${formatMins(Math.max(0,limit-used))} left of ${formatMins(limit)}`;
+ const size=78,sw=9,r=(size-sw)/2,c=2*Math.PI*r;
+ const note=flagged?null:insights.some(i=>!i.learning)?'No app stands out for stress right now.':'Be healthy and manage your screen time.';
+ return <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Screen Time, ${formatMins(used)} today. ${label}`} onPress={onOpen} activeOpacity={0.85} style={st.todayCard}>
+  <View style={{width:size,height:size,alignItems:'center',justifyContent:'center'}}>
+   <Svg width={size} height={size} style={{position:'absolute'}}><Circle cx={size/2} cy={size/2} r={r} stroke={color} strokeOpacity={0.18} strokeWidth={sw} fill="none"/>{p>0?<Circle cx={size/2} cy={size/2} r={r} stroke={color} strokeWidth={sw} fill="none" strokeLinecap="round" strokeDasharray={`${c*p} ${c}`} transform={`rotate(-90 ${size/2} ${size/2})`}/>:null}</Svg>
+   <Ionicons name="phone-portrait" size={28} color={color}/>
+  </View>
+  <View style={{flex:1,gap:4}}>
+   <Text style={{fontSize:19,fontWeight:'800',color:T.ink}}>Screen Time <Text style={{color}}>{formatMins(used)}</Text></Text>
+   <Text style={{fontSize:14,fontWeight:'800',color}}>{label}</Text>
+   {flagged?<View style={st.row}><Text style={st.sub}>Higher stress after:</Text><AppName app={flagged.app}/></View>:<Text style={{fontSize:11,lineHeight:16,color:T.muted}}>{note}</Text>}
+  </View>
+  <Ionicons name="chevron-forward" size={18} color={T.muted}/>
  </TouchableOpacity>;
 }
 
 const st=StyleSheet.create({
+ todayCard:{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#FFFFFF',borderRadius:24,padding:17,shadowColor:'#2D4A3E',shadowOpacity:0.06,shadowRadius:14,shadowOffset:{width:0,height:5},elevation:2},
  title:{fontSize:30,fontWeight:'900',color:T.ink},
  heading:{fontSize:16,fontWeight:'900',color:T.ink},
  rowTitle:{fontSize:15,fontWeight:'800',color:T.ink},
@@ -255,7 +269,7 @@ const st=StyleSheet.create({
  sub:{fontSize:12,fontWeight:'600',color:T.muted,lineHeight:17},
  note:{fontSize:11,color:T.muted,lineHeight:16,textAlign:'center',paddingHorizontal:10},
  link:{fontSize:14,fontWeight:'800',color:T.primary},
- trial:{gap:10,backgroundColor:'#EAF7EF',borderRadius:16,padding:12,borderWidth:1,borderColor:'#D3EEDC'},
+ trial:{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:'#F1ECFF',borderRadius:16,paddingVertical:8,paddingLeft:14,paddingRight:8,borderWidth:1,borderColor:'#D9CCFA'},
  plusTag:{color:T.primary,fontWeight:'900',fontSize:12},
  card:{backgroundColor:T.surface,borderRadius:20,padding:16,gap:10,borderWidth:1,borderColor:T.border},
  row:{flexDirection:'row',alignItems:'center',gap:8},

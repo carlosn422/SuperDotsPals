@@ -46,6 +46,45 @@ public class ScreenBreakModule: Module {
       return AuthorizationCenter.shared.authorizationStatus == .approved
     }
 
+    /// Satellite mode (a family iPad or spare iPhone). Credentials live only in the Keychain.
+    Function("satelliteState") { () -> [String: Any] in
+      SatelliteLink.shared.state()
+    }
+
+    Function("satelliteSaveCredentials") { (credentials: [String: Any]) -> Bool in
+      SatelliteLink.shared.saveCredentials(credentials)
+    }
+
+    AsyncFunction("satelliteSync") { (reason: String) async -> [String: Any] in
+      await SatelliteLink.shared.sync(reason)
+    }
+
+    AsyncFunction("satelliteAccessToken") { () async throws -> String in
+      try await SatelliteLink.shared.accessToken()
+    }
+
+    Function("satelliteReset") {
+      SatelliteLink.shared.resetUnlinked()
+    }
+
+    Function("satelliteRecover") { (code: String) -> [String: Any] in
+      SatelliteLink.shared.recover(code)
+    }
+
+    /// Family Sharing child authorization is stronger (the child can't remove it); individual is the fallback.
+    AsyncFunction("requestSatelliteAuthorization") { (kind: String) async throws -> Bool in
+      try await AuthorizationCenter.shared.requestAuthorization(for: kind == "child" ? .child : .individual)
+      let approved = AuthorizationCenter.shared.authorizationStatus == .approved
+      if approved { SatelliteLink.shared.setAuthKind(kind == "child" ? "child" : "individual") }
+      ScreenBreakEngine.shared.selectionChanged()
+      return approved
+    }
+
+    /// Face ID / passcode of this device before sensitive family-device changes.
+    AsyncFunction("authenticateGuardian") { (reason: String) async -> Bool in
+      await SatelliteLink.authenticateGuardian(reason)
+    }
+
     /// Apple's app picker. Returns the number of chosen apps, categories and websites, or nil when cancelled.
     AsyncFunction("pickApps") { (promise: Promise) in
       guard let presenter = self.appContext?.utilities?.currentViewController() else {

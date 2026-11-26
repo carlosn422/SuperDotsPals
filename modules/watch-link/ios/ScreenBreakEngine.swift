@@ -235,10 +235,21 @@ final class ScreenBreakEngine {
     guard (Self.minMinutes...Self.maxMinutes).contains(minutes) else {
       throw ScreenBreakError(code: "invalid", message: "Choose between 1 minute and 12 hours.")
     }
-    if let current = ScreenBreakShared.loadSession(), current.isActive {
-      throw ScreenBreakError(code: "busy", message: "\(current.childName)'s Screen Break is already running on this iPhone.")
-    }
     let now = Date()
+    // "replace" (the parent confirmed) ends another member's running timer; their time so far is kept.
+    var replaced: ScreenBreakSession?
+    if let current = ScreenBreakShared.loadSession(), current.isActive {
+      guard command["replace"] as? Bool == true, current.childId != child.id else {
+        throw ScreenBreakError(code: "busy", message: "\(current.childName)'s Screen Break is already running on this iPhone.")
+      }
+      var ended = current
+      ended.status = "canceled"
+      ended.endReason = "canceled"
+      ended.endedAt = now
+      ended.version += 1
+      ended.updatedAt = now
+      replaced = ended
+    }
     guard var entitlement = loadEntitlement() else {
       throw ScreenBreakError(code: "entitlement", message: "Open MoodPals on your iPhone once while online, then try again.")
     }
@@ -246,10 +257,12 @@ final class ScreenBreakEngine {
       throw ScreenBreakError(code: "plus", message: "Your 14-day free trial has ended. MoodPals Plus keeps Screen Break on.")
     }
     var session = ScreenBreakSession(
-      id: UUID().uuidString.lowercased(), childId: child.id, childName: child.name, deviceId: deviceId,
+      id: (command["sessionId"] as? String).flatMap { UUID(uuidString: $0)?.uuidString.lowercased() } ?? UUID().uuidString.lowercased(),
+      childId: child.id, childName: child.name, deviceId: deviceId,
       startedAt: now, deadline: now.addingTimeInterval(TimeInterval(minutes * 60)), grantedSeconds: minutes * 60,
       status: "active", endReason: nil, endedAt: nil, version: 1, updatedAt: now)
     try schedule(session)
+    if let replaced { ScreenBreakShared.enqueueSync(replaced) }
     // Starting while a finished break is still on replaces it: the old break is released.
     if var previous = ScreenBreakShared.loadSession(), previous.isRestricted {
       previous.status = "released"
