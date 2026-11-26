@@ -480,3 +480,7 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 .t-wt::after{content:"";position:absolute;right:calc(var(--w)*-.05);top:24%;width:calc(var(--w)*.07);height:calc(var(--w)*.2);background:#2c2c2e;border-radius:calc(var(--w)*.04)}
 .t-slide .t-dev.t-wt{--w:min(250px,calc((var(--vh,100vh) - var(--navh,64px) - 260px) * .85))}
 @media(max-width:600px){.t-devs .t-dev.t-wt{--w:9vw}.t-slide .t-dev.t-wt{--w:min(46vw,calc((var(--vh,100svh) - 400px) * .85))}}
+.t-wstack{display:grid}.t-wstack img{grid-area:1/1;animation:t-wfade 9s infinite}
+.t-wstack img:nth-child(2){animation-delay:-6s}.t-wstack img:nth-child(3){animation-delay:-3s}
+@keyframes t-wfade{0%,30%{opacity:1}36%,94%{opacity:0}100%{opacity:1}}
+@media(prefers-reduced-motion:reduce){.t-wstack img{animation:none;opacity:0}.t-wstack img:first-child{opacity:1}}
