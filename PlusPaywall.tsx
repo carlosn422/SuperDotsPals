@@ -56,7 +56,7 @@ export function PlusPaywallSheet({nested=false}:{nested?:boolean}){
   <ScrollView style={{flex:1,backgroundColor:T.background}} contentContainerStyle={s.sheet} keyboardShouldPersistTaps="handled">
    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={hidePaywall} style={s.close}><Ionicons name="close" size={24} color={T.muted}/></TouchableOpacity>
    {creating?<View style={{alignSelf:'stretch'}}><CreateAccountScreen accent={T.primary} backLabel="MoodPals Plus" onBack={()=>setCreating(false)}/></View>:<>
-   <Image source={CALM} style={s.mascot} accessibilityIgnoresInvertColors/>
+   <Image source={require('./assets/branding/moodpals-logo.png')} accessibilityLabel="MoodPals" style={s.mascot} resizeMode="contain" accessibilityIgnoresInvertColors/>
    <Text style={s.kicker}>MoodPals Plus</Text>
    <Text style={s.title}>{feature.title}</Text>
    <Text style={s.body}>{feature.body}</Text>
@@ -125,7 +125,7 @@ const s=StyleSheet.create({
  emailBtn:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,height:52,borderRadius:16,borderWidth:1.5,borderColor:T.border,backgroundColor:'#fff'},emailText:{fontSize:16,fontWeight:'800',color:T.ink},
  sheet:{padding:22,paddingBottom:44,alignItems:'center',gap:14},
  close:{alignSelf:'flex-end',padding:4},
- mascot:{width:132,height:132,marginTop:-18},
+ mascot:{width:204,height:68,marginTop:4,marginBottom:6},
  kicker:{fontSize:12,fontWeight:'900',color:T.primary,letterSpacing:1,textTransform:'uppercase'},
  title:{fontSize:26,fontWeight:'900',color:T.ink,textAlign:'center'},
  body:{fontSize:15,color:T.muted,textAlign:'center',lineHeight:21,paddingHorizontal:10},
