@@ -1,3 +1,4 @@
+import SuperdotMascot from './SuperdotMascot';
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {ActionSheetIOS,ActivityIndicator,Alert,Modal,ScrollView,Share,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
@@ -43,8 +44,9 @@ export default function CircleNavigator({initial=[{name:'home'}],exitLabel='Sett
  const isHome=(route.name==='home'||route.name==='today')&&stack.length===1;
  const pendingRequests=store.requests.filter(r=>r.direction==='incoming'&&r.status==='pending').length;
  const body=<View style={{gap:14}}>
-  {isHome?<View style={{flexDirection:'row',alignItems:'center',gap:8}}>
-   <View style={{flex:1}}><Text style={[cs.title,{textAlign:'left'}]} accessibilityRole="header">Circle</Text><Text style={[cs.muted,{fontSize:14}]}>Stay connected through moods.</Text></View>
+  {isHome?<View style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#E8F5EF',borderRadius:23,padding:18}}>
+   <SuperdotMascot id="joy" size={72}/>
+   <View style={{flex:1,gap:4}}><Text style={{fontSize:11,letterSpacing:1,fontWeight:'900',color:'#3B8A6A'}}>MY CIRCLE</Text><Text style={{fontSize:26,fontWeight:'900',color:CT.ink}} accessibilityRole="header">Circle</Text></View>
    <HeaderButton icon="notifications-outline" label={pendingRequests?pendingRequests+' friend requests':'Requests and invites'} dot={pendingRequests>0} onPress={()=>push({name:'requests'})}/>
   </View>:
   <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center', position: 'relative'}}>

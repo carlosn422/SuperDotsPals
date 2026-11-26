@@ -38,8 +38,12 @@ export function WatchThemesCard({onOpen}:{onOpen:()=>void}){
  </View>;
 }
 type SettingIcon='heart-outline'|'notifications-outline'|'shield-checkmark-outline'|'help-circle-outline'|'git-network-outline'|'person-circle-outline'|'people-outline'|'watch-outline'|'sparkles-outline'|'logo-apple'|'hourglass-outline';
-export function SettingsItem({title,subtitle,status,icon,onPress,accent='#7139E9'}:{title:string;subtitle:string;status?:string;icon:SettingIcon;onPress:()=>void;accent?:string}){
- return <TouchableOpacity onPress={onPress} accessibilityRole="button" style={s.settingRow}><View style={[s.iconBadge,{backgroundColor:'#F1EFF5'}]}><Ionicons name={icon} size={23} color={accent}/></View><View style={{flex:1,gap:3}}><Text style={s.title}>{title}</Text><Text style={s.subtitle}>{subtitle}</Text>{status?<Text style={s.micro}>{status}</Text>:null}</View><Ionicons name="chevron-forward" size={17} color="#AAA4AF"/></TouchableOpacity>;
+// Same pastel tiles as the Actions cards, so each setting is easy to spot by color.
+const TILE_TINTS:[string,string][]=[['#E4F6EA','#23966A'],['#EAF1FF','#4A8CFF'],['#F4EBFF','#9B7BC8'],['#FFF7E8','#C98A0B'],['#FDECE8','#DA4B31'],['#E6F7F8','#2A9DA8']];
+const ICON_TILE:Partial<Record<string,number>>={'sparkles-outline':2,'hourglass-outline':0,'watch-outline':1,'heart-outline':4,'notifications-outline':3,'people-outline':5,'person-circle-outline':2,'shield-checkmark-outline':1,'help-circle-outline':3};
+export function SettingsItem({title,subtitle,icon,onPress}:{title:string;subtitle:string;status?:string;icon:SettingIcon;onPress:()=>void;accent?:string}){
+ const tile=ICON_TILE[icon]??[...title].reduce((n,c)=>n+c.charCodeAt(0),0)%TILE_TINTS.length;
+ return <TouchableOpacity onPress={onPress} accessibilityRole="button" style={s.settingRow}><View style={[s.iconBadge,{backgroundColor:TILE_TINTS[tile][0]}]}><Ionicons name={icon} size={23} color={TILE_TINTS[tile][1]}/></View><View style={{flex:1,gap:3}}><Text style={s.title}>{title}</Text><Text style={s.subtitle}>{subtitle}</Text></View><Ionicons name="chevron-forward" size={17} color="#AAA4AF"/></TouchableOpacity>;
 }
 const s=StyleSheet.create({
  promo:{backgroundColor:'#C9F5EA',borderRadius:24,padding:20,minHeight:165,flexDirection:'row',alignItems:'center',overflow:'hidden',position:'relative',gap:5,shadowColor:'#42796D',shadowOpacity:0.08,shadowRadius:14,elevation:2},
