@@ -212,7 +212,12 @@ const heroColor=(frac:number,ms:number)=>ms<=5*60000||frac<=.2?'#E5484D':frac<=.
 /** Running timer: full-color card with the countdown, then who/where with a progress bar. */
 /** Soft mint wave that blends a section into the page background. */
 function MintWave({edge}:{edge:'top'|'bottom'}){
- const id='mw'+edge;
+ const id='mw'+edge,{width:w}=useWindowDimensions();
+ if(edge==='bottom')return <View style={st.dockWave} pointerEvents="none"><Svg width={w} height={420}>
+  <Defs><LinearGradient id={id} x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#FFFFFF" stopOpacity=".55"/><Stop offset=".25" stopColor="#E4F6EA" stopOpacity=".9"/><Stop offset="1" stopColor="#D6F1E1" stopOpacity="1"/></LinearGradient></Defs>
+  <Path d={`M0 34 C${w*.28} -6 ${w*.6} -4 ${w} 30 V420 H0 Z`} fill={'url(#'+id+')'}/>
+  <Path d={`M0 34 C${w*.28} -6 ${w*.6} -4 ${w} 30`} stroke="#FFFFFF" strokeWidth={1.5} fill="none"/>
+ </Svg></View>;
  return <Svg width="100%" height="100%" viewBox="0 0 400 100" preserveAspectRatio="none" style={StyleSheet.absoluteFill} pointerEvents="none">
   <Defs>{edge==='top'?<LinearGradient id={id} x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor="#B9E9CF" stopOpacity=".85"/><Stop offset=".5" stopColor="#E4F6EA" stopOpacity=".7"/><Stop offset="1" stopColor="#C8EED9" stopOpacity=".85"/></LinearGradient>
    :<LinearGradient id={id} x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#FFFFFF" stopOpacity=".95"/><Stop offset="1" stopColor="#D6F1E1" stopOpacity="1"/></LinearGradient>}</Defs>
@@ -1168,7 +1173,8 @@ const st=StyleSheet.create({
  segmentText:{fontSize:15,fontWeight:'800',color:T.muted},
  moreBtn:{width:44,height:44,borderRadius:22,backgroundColor:T.primarySoft,alignItems:'center',justifyContent:'center'},
  memberCard:{width:84,paddingVertical:12,borderRadius:20,alignItems:'center',gap:8,backgroundColor:'rgba(255,255,255,.8)',borderWidth:1,borderColor:'#fff'},
- dockShell:{marginHorizontal:-20,paddingHorizontal:20,paddingTop:22,gap:8},
+ dockShell:{paddingTop:30,gap:8},
+ dockWave:{position:'absolute',top:0,left:-32,right:-32,bottom:-200},
  dockHead:{flexDirection:'row',alignItems:'center',gap:7,paddingHorizontal:4},
  dockLabel:{color:'#0F4D3A',fontSize:17,fontWeight:'900'},
  dockInner:{},
