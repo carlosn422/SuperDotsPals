@@ -1,6 +1,7 @@
 import {IconTile} from './IconTile';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {ActionSheetIOS,ActivityIndicator,Alert,Modal,ScrollView,StyleSheet,Switch,Text,TextInput,TouchableOpacity,View} from 'react-native';
+import Svg,{Circle} from 'react-native-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {supabase} from './supabase';
 import {APP_THEME as T} from './MoodMascot';
@@ -113,18 +114,25 @@ export function DeviceSelect({options,selected,defaultId,onSelect}:{options:Devi
  </>;
 }
 
-type DeviceSheet={kind:'all'}|{kind:'device';id:string;fromAll:boolean}|null;
-/** All devices on one screen: up to two cards, the rest in a slide-up list; a device's settings slide up too. */
-export function FamilyDevicesScreen({childName,onStart}:{childName:(id:string)=>string;onStart?:(device:FamilyDevice)=>void}){
+/** Default device first, then the other family devices, then This iPhone. */
+export function deviceOrder(devices:FamilyDevice[],defaultId:string):string[]{
+ const ids=devices.map(d=>d.id);
+ return defaultId===PHONE?[PHONE,...ids]:[...ids.filter(id=>id===defaultId),...ids.filter(id=>id!==defaultId),PHONE];
+}
+
+/** The selected device's card; its settings slide up. Devices are picked from DeviceDock. */
+export function FamilyDevicesScreen({childName,onStart,selectedId,adding,onAddDone}:{childName:(id:string)=>string;onStart?:(device:FamilyDevice)=>void;selectedId?:string|null;adding?:boolean;onAddDone?:()=>void}){
  const {devices,defaultId,commands,sessions,loaded}=useFamilyDevices();
- const [adding,setAdding]=useState(false),[sheet,setSheet]=useState<DeviceSheet>(null),[now,setNow]=useState(Date.now());
+ const [sheet,setSheet]=useState<string|null>(null),[now,setNow]=useState(Date.now());
  useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),15000);return()=>clearInterval(t)},[]);
- const open=sheet?.kind==='device'?devices.find(d=>d.id===sheet.id):undefined;
- useEffect(()=>{if(sheet?.kind==='device'&&loaded&&!open)setSheet(null)},[sheet,loaded,open]);
- // Close the sheet first so the timer sheet isn't stacked on top of it.
- const startFromSheet=onStart?(d:FamilyDevice)=>{setSheet(null);setTimeout(()=>onStart(d),400)}:undefined;
- const card=(d:FamilyDevice,inSheet:boolean)=><DeviceCard key={d.id} device={d} isDefault={defaultId===d.id} commands={commands} sessions={sessions} now={now} childName={childName} onOpen={()=>setSheet({kind:'device',id:d.id,fromAll:inSheet})} onStart={inSheet?startFromSheet:onStart}/>;
- const phone=<React.Fragment key="phone">
+ const open=devices.find(d=>d.id===sheet);
+ useEffect(()=>{if(sheet&&loaded&&!open)setSheet(null)},[sheet,loaded,open]);
+ const id=selectedId&&(selectedId===PHONE||devices.some(d=>d.id===selectedId))?selectedId:deviceOrder(devices,defaultId)[0];
+ const d=devices.find(x=>x.id===id);
+ return <View style={{gap:14}}>
+  {adding?<AddDevice onDone={()=>onAddDone?.()}/>:null}
+  {!loaded?<ActivityIndicator color={T.primary}/>:null}
+  {!adding?d?<DeviceCard device={d} isDefault={defaultId===d.id} commands={commands} sessions={sessions} now={now} childName={childName} onOpen={()=>setSheet(d.id)} onStart={onStart}/>:<>
   <View style={s.card}>
    <View style={s.deviceRow}>
     <IconTile icon="phone-portrait" color="#4A8CFF" size={52}/>
@@ -135,29 +143,40 @@ export function FamilyDevicesScreen({childName,onStart}:{childName:(id:string)=>
     {defaultId===PHONE?null:<TouchableOpacity accessibilityRole="button" accessibilityLabel="Make This iPhone the default device" onPress={()=>void rpc('family_device_clear_default',{}).catch(e=>Alert.alert('Family Devices',e.message))} style={s.textBtn}><Text style={s.link}>Make default</Text></TouchableOpacity>}
    </View>
   </View>
- </React.Fragment>;
- const items=[...devices.map(d=>({id:d.id,node:card(d,false)})),{id:PHONE,node:phone}];
- return <View style={{gap:14}}>
-  <View style={{flexDirection:'row',justifyContent:'flex-end'}}>
-   <TouchableOpacity accessibilityRole="button" onPress={()=>setAdding(a=>!a)} style={s.tonalPill}><Ionicons name={adding?'close':'add'} size={18} color={T.primary}/><Text style={s.tonalText}>{adding?'Close':'Add device'}</Text></TouchableOpacity>
-  </View>
-  {adding?<AddDevice onDone={()=>setAdding(false)}/>:null}
-  {!loaded?<ActivityIndicator color={T.primary}/>:null}
-  {items.slice(0,2).map(x=>x.node)}
-  {items.length>2?<TouchableOpacity accessibilityRole="button" onPress={()=>setSheet({kind:'all'})} style={s.showAll}><Text style={s.link}>Show all ({items.length})</Text><Ionicons name="chevron-up" size={16} color={T.primary}/></TouchableOpacity>:null}
+  </>:null}
   {loaded&&!devices.length&&!adding?<Text style={s.sub}>No family devices yet. On the iPad, install MoodPals and tap “Link as a Family Device.”</Text>:null}
-  <Modal visible={!!sheet} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setSheet(null)}>
+  <Modal visible={!!open} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setSheet(null)}>
    <ScrollView style={{flex:1,backgroundColor:T.background}} contentContainerStyle={{padding:20,paddingBottom:48,gap:14}} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
     <View style={s.grabber}/>
-    {open&&sheet?.kind==='device'?<DeviceSettings device={open} isDefault={defaultId===open.id} now={now} backLabel={sheet.fromAll?'All devices':undefined} onBack={()=>setSheet({kind:'all'})} onClose={()=>setSheet(null)}/>
-    :sheet?.kind==='all'?<>
-     <View style={{flexDirection:'row',alignItems:'center',gap:12}}><Text style={[s.title,{flex:1}]} accessibilityRole="header">All devices</Text><TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={()=>setSheet(null)} style={s.closeBtn}><Ionicons name="close" size={22} color={T.ink}/></TouchableOpacity></View>
-     {devices.map(d=>card(d,true))}
-     {phone}
-    </>:null}
+    {open?<DeviceSettings device={open} isDefault={defaultId===open.id} now={now} onBack={()=>setSheet(null)} onClose={()=>setSheet(null)}/>:null}
    </ScrollView>
   </Modal>
  </View>;
+}
+
+/** Device cards pinned above the tab bar, like the member cards; a running timer shows as a ring of the time left. */
+export function DeviceDock({devices,defaultId,sessions,selected,adding,onSelect,onAdd}:{devices:FamilyDevice[];defaultId:string;sessions:RemoteSession[];selected?:string|null;adding:boolean;onSelect:(id:string)=>void;onAdd:()=>void}){
+ const order=deviceOrder(devices,defaultId),cur=selected&&order.includes(selected)?selected:order[0],now=Date.now();
+ const [,tick]=useState(0);
+ useEffect(()=>{if(!sessions.length)return;const t=setInterval(()=>tick(n=>n+1),5000);return()=>clearInterval(t)},[sessions.length]);
+ return <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginTop:4}} contentContainerStyle={{gap:10,paddingVertical:4,paddingHorizontal:2}}>
+  {order.map(id=>{
+   const d=devices.find(x=>x.id===id),on=!adding&&id===cur,name=d?d.name:'This iPhone';
+   const run=d?sessions.find(x=>x.family_device_id===d.id&&Date.parse(x.deadline_at)>now):undefined;
+   const frac=run?Math.min(1,(Date.parse(run.deadline_at)-now)/1000/Math.max(1,run.granted_seconds)):null;
+   const color=frac===null?T.primary:frac<=.2?'#E5484D':frac<=.5?'#F2A93B':T.primary,r=20,cc=2*Math.PI*r;
+   return <TouchableOpacity key={id} accessibilityRole="button" accessibilityLabel={name+(frac!==null?', timer running':'')+(defaultId===id?', default':'')} accessibilityState={{selected:on}} onPress={()=>onSelect(id)} style={[s.dockCard,on&&{backgroundColor:T.primary,borderColor:T.primary}]}>
+    <View style={{width:46,height:46,alignItems:'center',justifyContent:'center'}}>
+     {frac!==null?<Svg width={46} height={46} style={StyleSheet.absoluteFill}><Circle cx={23} cy={23} r={r} stroke={on?'rgba(255,255,255,.35)':color+'33'} strokeWidth={4} fill="none"/><Circle cx={23} cy={23} r={r} stroke={on?'#fff':color} strokeWidth={4} fill="none" strokeLinecap="round" strokeDasharray={cc+' '+cc} strokeDashoffset={cc*(1-frac)} transform="rotate(-90 23 23)"/></Svg>:null}
+     {on?<Ionicons name={d?.device_type==='ipad'?'tablet-landscape':'phone-portrait'} size={frac===null?26:18} color="#fff"/>:<IconTile icon={d?.device_type==='ipad'?'tablet-landscape':'phone-portrait'} color="#4A8CFF" size={frac===null?44:32}/>}
+    </View>
+    <Text style={[s.dockName,{color:on?'#fff':T.ink}]} numberOfLines={1}>{name}</Text>
+   </TouchableOpacity>})}
+  <TouchableOpacity accessibilityRole="button" accessibilityLabel={adding?'Close add device':'Add device'} onPress={onAdd} style={[s.dockCard,{borderStyle:'dashed',borderWidth:2,borderColor:adding?T.primary:'#C9D6CF'}]}>
+   <View style={{width:46,height:46,alignItems:'center',justifyContent:'center'}}><Ionicons name={adding?'close':'add'} size={28} color={T.primary}/></View>
+   <Text style={[s.dockName,{color:T.ink}]}>{adding?'Close':'Add'}</Text>
+  </TouchableOpacity>
+ </ScrollView>;
 }
 
 const OK='#2FB574',PAUSED='#C2413A';
@@ -306,6 +325,8 @@ const s=StyleSheet.create({
  select:{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#fff',borderRadius:18,borderWidth:1.5,borderColor:T.border,paddingHorizontal:14,paddingVertical:10,minHeight:64},
  selectLink:{fontSize:15,fontWeight:'800',color:T.primary},
  sheet:{backgroundColor:'#fff',borderTopLeftRadius:28,borderTopRightRadius:28,padding:22,paddingBottom:40,gap:10,maxHeight:'85%'},
+ dockCard:{width:84,paddingVertical:12,borderRadius:20,alignItems:'center',gap:8,backgroundColor:'#fff',borderWidth:1,borderColor:'#E6EEEA'},
+ dockName:{fontSize:13,fontWeight:'800',maxWidth:72},
  showAll:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6,alignSelf:'center',minHeight:44,paddingHorizontal:16},
  closeBtn:{width:40,height:40,borderRadius:20,backgroundColor:'#fff',alignItems:'center',justifyContent:'center'},
  grabber:{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'},

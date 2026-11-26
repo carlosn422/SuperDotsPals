@@ -18,7 +18,7 @@ import {ManageFamilyProfile,familyCall,familyProfilesChanged,shortProfileName,us
 import {WatchColorGrid,WatchColorSheet,WatchImage,colorName,isWatchColor,type WatchColor} from './WatchArt';
 import {ackBreakSync,getBreakState,onBreakState,pendingBreakSync,pickBreakApps,requestScreenTimeAccess,screenBreakSupported,sendBreakCommand,setBreakChildren,setBreakEntitlement,type BreakAction,type BreakSession,type BreakState,type BreakSyncRow} from './modules/watch-link/screenBreak';
 import {configureSocialTrack,getSocialState} from './modules/watch-link/socialTrack';
-import {DeviceCard,DeviceSelect,FamilyDevicesScreen,PHONE,cancelDeviceCommand,deviceCommand,deviceStatus,useDeviceNames,useFamilyDevices,type DeviceCommand,type FamilyDevice,type RemoteSession} from './FamilyDevices';
+import {DeviceCard,DeviceDock,DeviceSelect,FamilyDevicesScreen,PHONE,cancelDeviceCommand,deviceCommand,deviceStatus,useDeviceNames,useFamilyDevices,type DeviceCommand,type FamilyDevice,type RemoteSession} from './FamilyDevices';
 import {comparison,formatDuration,observations,periodRange,periodStats,type BreakPeriod,type Bucket,type SessionRow} from './ScreenBreakInsights';
 
 export type FamilyChild={id:string;name:string;profile_user_id:string|null;watch_only?:boolean};
@@ -171,9 +171,10 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  const index=Math.max(0,members.findIndex(c=>c.id===current?.id));
  useEffect(()=>{pager.current?.scrollTo({x:index*screenW,animated:!reduce})},[index,screenW]);
  // The member cards stay pinned above the tab bar (drawn by the host, outside this scroll view).
- const showDock=!guest&&route.name==='list'&&section==='family'&&!loading&&!error&&members.length>0;
- const dock=<ProfileRow members={members} selected={current?.id} adding={adding} onSelect={id=>{setAdding(false);setSelected(id)}} onAdd={()=>setAdding(a=>!a)} sessions={family.sessions}/>;
- const dockKey=members.map(c=>c.id+c.name).join()+'|'+current?.id+'|'+adding+'|'+family.sessions.map(x=>x.id+x.deadline_at+x.granted_seconds).join();
+ const [devSel,setDevSel]=useState<string|null>(null),[addingDevice,setAddingDevice]=useState(false);
+ const showDock=!guest&&route.name==='list'&&!loading&&!error&&(section==='devices'||members.length>0);
+ const dock=section==='devices'?<DeviceDock devices={family.devices} defaultId={family.defaultId} sessions={family.sessions} selected={devSel} adding={addingDevice} onSelect={id=>{void Haptics.selectionAsync();setAddingDevice(false);setDevSel(id)}} onAdd={()=>setAddingDevice(a=>!a)}/>:<ProfileRow members={members} selected={current?.id} adding={adding} onSelect={id=>{setAdding(false);setSelected(id)}} onAdd={()=>setAdding(a=>!a)} sessions={family.sessions}/>;
+ const dockKey=section+'|'+devSel+'|'+addingDevice+'|'+family.defaultId+'|'+family.devices.map(d=>d.id+d.name+d.device_type).join()+'|'+members.map(c=>c.id+c.name).join()+'|'+current?.id+'|'+adding+'|'+family.sessions.map(x=>x.id+x.deadline_at+x.granted_seconds).join();
  useEffect(()=>{onDock?.(showDock?dock:null)},[onDock,showDock,dockKey]);
  useEffect(()=>()=>onDock?.(null),[onDock]);
  if(route.name==='devices')return <>
@@ -190,7 +191,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
    {loading?<ActivityIndicator color={T.primary}/>:null}
    {!loading&&!error?<TrialBanner/>:null}
    {!loading&&!error?<View style={st.famSegment} accessibilityRole="tablist">{(['family','devices'] as const).map(k=><TouchableOpacity key={k} accessibilityRole="tab" accessibilityState={{selected:section===k}} onPress={()=>{if(section!==k){void Haptics.selectionAsync();setSection(k)}}} style={[st.segmentItem,section===k&&st.segmentOn]}><Ionicons name={k==='family'?'people':'tablet-portrait'} size={16} color={section===k?T.ink:T.muted}/><Text style={[st.segmentText,section===k&&{color:T.ink}]}>{k==='family'?'Family':'Devices'}</Text></TouchableOpacity>)}</View>:null}
-   {section==='devices'&&!loading&&!error?<FamilyDevicesScreen childName={id=>children.find(c=>c.id===id)?.name||'Someone'} onStart={members.length?setStartOn:undefined}/>:<>
+   {section==='devices'&&!loading&&!error?<FamilyDevicesScreen childName={id=>children.find(c=>c.id===id)?.name||'Someone'} onStart={members.length?setStartOn:undefined} selectedId={devSel} adding={addingDevice} onAddDone={()=>setAddingDevice(false)}/>:<>
     {adding||(!loading&&!error&&!members.length)?<AddChild onAdded={id=>{setAdding(false);void load().then(()=>{if(id)setSelected(id)});familyChildrenChanged()}}/>:null}
     {current&&!adding?<ChartScrubContext.Provider value={scrubCtx}><ScrollView ref={pager} horizontal pagingEnabled scrollEnabled={!scrub} showsHorizontalScrollIndicator={false} contentOffset={{x:index*screenW,y:0}} onMomentumScrollEnd={e=>{const c=members[Math.round(e.nativeEvent.contentOffset.x/screenW)];if(c&&c.id!==current.id){void Haptics.selectionAsync();setSelected(c.id)}}} style={{marginHorizontal:-20}}>
      {members.map(c=><View key={c.id} style={{width:screenW,paddingHorizontal:20}}>{c.id===current.id?<ChildScreen inline child={c} children={children} onBack={()=>{}} onInsights={()=>setInsightsId(c.id)} onChanged={()=>{void load();familyChildrenChanged()}} onRemoved={()=>{setSelected(null);void load()}} onAddWatch={onAddWatch} onOpen={select}/>:<View style={{minHeight:420}}/>}</View>)}
