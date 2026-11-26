@@ -187,8 +187,28 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
     </ScrollView></ChartScrubContext.Provider>:null}
    </>}
   </>}
-  {footer?<View style={{marginTop:10}}>{footer}</View>:null}
+  {footer&&section==='devices'?<View style={{marginTop:10}}>{footer}</View>:null}
   <StartTimerSheet device={startOn} members={members} onClose={()=>setStartOn(null)}/>
+ </View>;
+}
+
+const heroColor=(frac:number,ms:number)=>ms<=5*60000||frac<=.2?'#E5484D':frac<=.5?'#F2A93B':T.primary;
+/** Running timer: full-color card with the countdown, then who/where with a progress bar. */
+function TimerHero({remainingMs,grantedSec,endsAt,name,device,disabled,onAdd,onEnd}:{remainingMs:number;grantedSec:number;endsAt:number;name:string;device:string;disabled:boolean;onAdd:()=>void;onEnd:()=>void}){
+ const frac=Math.max(0,Math.min(1,remainingMs/1000/Math.max(1,grantedSec))),color=heroColor(frac,remainingMs);
+ const round=(icon:any,label:string,onPress:()=>void)=><TouchableOpacity accessibilityRole="button" accessibilityLabel={label} disabled={disabled} onPress={onPress} style={[st.heroRound,disabled&&{opacity:.5}]}><Ionicons name={icon} size={24} color="#fff"/></TouchableOpacity>;
+ return <View>
+  <View style={[st.timerHero,{backgroundColor:color}]}>
+   <View style={st.blob}/>
+   <Text style={st.heroTime} accessibilityRole="timer">{countdown(remainingMs)}</Text>
+   <Text style={st.heroSub}>Ends {clock(endsAt)}</Text>
+   <View style={{flexDirection:'row',gap:22,marginTop:18}}>{round('add','Add time',onAdd)}{round('stop','End timer',onEnd)}</View>
+  </View>
+  <View style={st.heroInfo}>
+   <Text style={st.heading} numberOfLines={1}>{name}</Text>
+   <Text style={st.sub} numberOfLines={1}>{device} · {formatDuration(grantedSec)}</Text>
+   <View style={st.barTrack}><View style={[st.barFill,{width:`${frac*100}%`,backgroundColor:color}]}/></View>
+  </View>
  </View>;
 }
 
@@ -393,11 +413,8 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
   {!screenBreakSupported?<View style={st.card}><Text style={st.body}>Screen Break needs the latest MoodPals build on this iPhone.</Text></View>:<>
    {state&&!state.hasPlus&&!isPlus?<PlanNote state={state} daysLeft={trialDaysLeft} onUpgrade={()=>showPaywall('screenBreak')}/>:null}
    {inUse?null:<DeviceSelect options={deviceOptions} selected={target} defaultId={family.defaultId} onSelect={setPicked}/>}
-   {remote?<RemoteTimer child={child} children={children} device={remote} family={family} minutes={minutes} setMinutes={setMinutes} onOpen={onOpen} onPlan={()=>showPaywall('screenBreak')}/>:mine?<View style={[st.card,st.heroCard,{alignItems:'center'}]}>
-    <Text style={st.kicker}>Screen time left</Text>
-    <Text style={st.timer} accessibilityRole="timer">{countdown(mine.deadline*1000-now)}</Text>
-    <Text style={st.sub}>Ends at {clock(mine.deadline)} · {formatDuration(mine.grantedSeconds)} granted</Text>
-    <TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={()=>{setExtra(15);setAdding(true)}} style={[st.cta,{alignSelf:'stretch',marginTop:6}]}><Text style={st.ctaText}>Add Time</Text></TouchableOpacity>
+   {remote?<RemoteTimer child={child} children={children} device={remote} family={family} minutes={minutes} setMinutes={setMinutes} onOpen={onOpen} onPlan={()=>showPaywall('screenBreak')}/>:mine?<View>
+    <TimerHero remainingMs={mine.deadline*1000-now} grantedSec={mine.grantedSeconds} endsAt={mine.deadline} name={child.name} device="This iPhone" disabled={!!busy} onAdd={()=>{setExtra(15);setAdding(true)}} onEnd={()=>run('cancel')}/>
     <Modal visible={adding} transparent animationType="slide" onRequestClose={()=>setAdding(false)}>
      <View style={{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(29,43,51,0.3)'}}>
       <TouchableOpacity style={StyleSheet.absoluteFill} onPress={()=>setAdding(false)} accessibilityLabel="Close"/>
@@ -409,8 +426,6 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
       </View>
      </View>
     </Modal>
-    {/* Stop ends the timer, keeps only the time used and leaves the apps open. */}
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Stop '+child.name+"'s timer"} disabled={!!busy} onPress={()=>run('cancel')} style={[st.ghost,{alignSelf:'stretch',marginTop:6}]}><Text style={[st.ghostText,{color:red}]}>Stop</Text></TouchableOpacity>
    </View>:<View style={st.card}>
     <Text style={st.heading}>Screen Break</Text>
     {other?<ReplaceNote name={other.childName} ms={other.deadline*1000-now}/>:null}
@@ -484,13 +499,7 @@ function RemoteTimer({child,children,device,family,minutes,setMinutes,onOpen,onP
    <Text style={[st.sub,{color:status.tone==='warn'?'#B7791F':T.primary,fontWeight:'800'}]}>{status.label}</Text>
   </View>
   {session&&session.child_id===child.id?<>
-   <View style={{alignItems:'center',gap:4}}>
-    <Text style={st.kicker}>Screen time left</Text>
-    <Text style={st.timer} accessibilityRole="timer">{countdown(Date.parse(session.deadline_at)-now)}</Text>
-    <Text style={st.sub}>Ends at {clock(Date.parse(session.deadline_at)/1000)} · {formatDuration(session.granted_seconds)} granted</Text>
-   </View>
-   <TouchableOpacity accessibilityRole="button" disabled={busy||!!status.pending} onPress={()=>{setExtra(15);setAdding(true)}} style={[st.cta,(busy||!!status.pending)&&{opacity:.5}]}><Text style={st.ctaText}>Add Time</Text></TouchableOpacity>
-   <TouchableOpacity accessibilityRole="button" disabled={busy||!!status.pending} onPress={()=>void act('END_SESSION')} style={[st.ghost,(busy||!!status.pending)&&{opacity:.5}]}><Text style={[st.ghostText,{color:red}]}>End Now</Text></TouchableOpacity>
+   <TimerHero remainingMs={Date.parse(session.deadline_at)-now} grantedSec={session.granted_seconds} endsAt={Date.parse(session.deadline_at)/1000} name={child.name} device={device.name} disabled={busy||!!status.pending} onAdd={()=>{setExtra(15);setAdding(true)}} onEnd={()=>void act('END_SESSION')}/>
    {extendSheet}
   </>:pendingStart?<View style={{alignItems:'center',gap:10}}>
    <ActivityIndicator color={T.primary}/>
@@ -564,7 +573,10 @@ export function DurationRing({minutes,onChange,min,max,step=5,prefix=''}:{minute
    <Text style={st.sub}>{h?h+' hr'+(m?' '+m+' min':''):'min'}</Text>
   </View>
  </View>
- <View style={st.presets}>{PRESETS.filter(n=>n>=min&&n<=max).map(n=><TouchableOpacity key={n} accessibilityRole="button" accessibilityLabel={prefix+formatDuration(n*60)} accessibilityState={{selected:n===minutes}} onPress={()=>set(n)} style={[st.preset,n===minutes&&st.presetOn]}><Text style={[st.presetText,n===minutes&&{color:'#fff'}]}>{prefix}{n<60?n+'m':n/60+'h'}</Text></TouchableOpacity>)}</View>
+ <View style={st.presets}>{PRESETS.filter(n=>n>=min&&n<=max).map(n=>{const on=n===minutes,c=timeColor(n),r=13,cc=2*Math.PI*r;return <TouchableOpacity key={n} accessibilityRole="button" accessibilityLabel={prefix+formatDuration(n*60)} accessibilityState={{selected:on}} onPress={()=>set(n)} style={[st.preset,on&&{backgroundColor:c,borderColor:c}]}>
+  <Svg width={34} height={34}><Circle cx={17} cy={17} r={r} stroke={on?'rgba(255,255,255,.35)':c+'33'} strokeWidth={4} fill="none"/><Circle cx={17} cy={17} r={r} stroke={on?'#fff':c} strokeWidth={4} fill="none" strokeLinecap="round" strokeDasharray={cc+' '+cc} strokeDashoffset={cc*(1-(n-min)/(max-min))} transform="rotate(-90 17 17)"/></Svg>
+  <Text style={[st.presetText,{color:on?'#fff':T.ink}]}>{prefix}{n<60?n+'m':n/60+'h'}</Text>
+ </TouchableOpacity>})}</View>
  </View>;
 }
 
@@ -1045,9 +1057,16 @@ const st=StyleSheet.create({
  profileTimer:{position:'absolute',right:2,bottom:2,width:22,height:22,borderRadius:11,backgroundColor:T.primary,borderWidth:2,borderColor:'#fff',alignItems:'center',justifyContent:'center'},
  tile:{width:43,height:43,borderRadius:15,alignItems:'center',justifyContent:'center'},
  presets:{flexDirection:'row',flexWrap:'wrap',justifyContent:'center',gap:8},
- preset:{minWidth:52,minHeight:40,borderRadius:20,paddingHorizontal:12,alignItems:'center',justifyContent:'center',backgroundColor:T.primarySoft},
- presetOn:{backgroundColor:T.primary},
- presetText:{fontSize:15,fontWeight:'800',color:T.primary},
+ preset:{width:58,paddingVertical:9,borderRadius:16,alignItems:'center',gap:4,backgroundColor:'#fff',borderWidth:1,borderColor:'#E6EEEA'},
+ presetText:{fontSize:13,fontWeight:'800'},
+ timerHero:{borderRadius:28,paddingTop:34,paddingBottom:44,alignItems:'center',overflow:'hidden'},
+ blob:{position:'absolute',top:16,width:250,height:150,borderRadius:110,backgroundColor:'rgba(255,255,255,.16)',transform:[{rotate:'-8deg'}]},
+ heroTime:{fontSize:60,fontWeight:'900',color:'#fff',fontVariant:['tabular-nums'],letterSpacing:-1},
+ heroSub:{fontSize:15,fontWeight:'700',color:'rgba(255,255,255,.85)'},
+ heroRound:{width:54,height:54,borderRadius:27,borderWidth:2,borderColor:'rgba(255,255,255,.7)',alignItems:'center',justifyContent:'center'},
+ heroInfo:{backgroundColor:'#fff',borderRadius:20,padding:16,gap:6,marginTop:-26,marginHorizontal:12,shadowColor:'#1D2B33',shadowOpacity:.08,shadowRadius:12,shadowOffset:{width:0,height:4}},
+ barTrack:{height:8,borderRadius:4,backgroundColor:'#EEF2F0',overflow:'hidden',marginTop:4},
+ barFill:{height:8,borderRadius:4},
  back:{flexDirection:'row',alignItems:'center',gap:4,marginBottom:4},
  title:{fontSize:28,fontWeight:'900',color:T.ink},
  gate:{position:'absolute',top:0,left:0,right:0,bottom:0,borderRadius:20,backgroundColor:'rgba(244,247,245,0.72)',alignItems:'center',justifyContent:'center'},
