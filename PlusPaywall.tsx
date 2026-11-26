@@ -25,7 +25,7 @@ const TERMS='Payment is charged to your Apple Account when you confirm. The subs
 
 // iOS can't present a second modal from the root while a sheet (e.g. Circle) is up, so open sheets mount a nested copy that takes over.
 export function PlusPaywallSheet({nested=false}:{nested?:boolean}){
- const {paywall,hidePaywall,purchase,restore,isPlus,prices,nestedPaywalls,setNestedPaywalls}=usePlus();
+ const {paywall,hidePaywall,purchase,restore,isPlus,prices,available,plansLoaded,nestedPaywalls,setNestedPaywalls}=usePlus();
  useEffect(()=>{if(!nested)return;setNestedPaywalls(n=>n+1);return()=>setNestedPaywalls(n=>n-1)},[nested]);
  const [plan,setPlan]=useState<PlusPlan>('annual');
  const [busy,setBusy]=useState(false);
@@ -61,18 +61,20 @@ export function PlusPaywallSheet({nested=false}:{nested?:boolean}){
    <Text style={s.title}>{feature.title}</Text>
    <Text style={s.body}>{feature.body}</Text>
    <View style={s.card}>{BENEFITS.map(b=><View key={b.text} style={s.benefit}><View style={s.benefitIcon}><Ionicons name={b.icon} size={17} color={T.primary}/></View><Text style={s.benefitText}>{b.text}</Text></View>)}</View>
-   <View style={{gap:10,alignSelf:'stretch'}}>{(['annual','monthly'] as PlusPlan[]).map(p=>{const x=prices[p],on=plan===p,yearly=p==='annual',ribbon=yearly?['Best value',x.note].filter(Boolean).join(' · '):'';const big=yearly?x.perMonth:x.price;return <TouchableOpacity key={p} accessibilityRole="radio" accessibilityState={{checked:on}} accessibilityLabel={`${x.label}, ${x.price} per ${x.period}${ribbon?'. '+ribbon:''}`} onPress={()=>setPlan(p)} style={[s.plan,on&&s.planOn,yearly&&{marginTop:8,paddingTop:19}]}>
-    {ribbon?<View style={s.ribbon}><Text style={s.ribbonText}>{ribbon.toUpperCase()}</Text></View>:null}
-    <Ionicons name={on?'checkmark-circle':'ellipse-outline'} size={24} color={on?T.primary:'#B8C4BE'}/>
-    <View style={{flex:1}}><Text style={s.planLabel}>{x.label}</Text><Text style={s.planSub} numberOfLines={1}>{yearly?`${x.price} / year`:'Billed monthly'}</Text></View>
-    {big?<Text style={s.planPrice}>{big}<Text style={s.planPer}>/mo</Text></Text>:<Text style={s.planPrice}>{x.price}<Text style={s.planPer}>/{x.period==='year'?'yr':'mo'}</Text></Text>}
+   <View style={{gap:10,alignSelf:'stretch'}}>{(['annual','monthly','weekly'] as PlusPlan[]).filter(p=>PLUS_MOCKUP||!plansLoaded||available.includes(p)).map(p=>{const x=prices[p],on=plan===p,top=p==='annual';return <TouchableOpacity key={p} accessibilityRole="radio" accessibilityState={{checked:on}} accessibilityLabel={`${x.label}, ${x.price} per ${x.period}${x.perDay?`, about ${x.perDay} per day`:''}${top?'. Most popular':''}`} onPress={()=>setPlan(p)} style={[s.plan,on&&s.planOn,top&&s.planTop]}>
+    {top?<View style={[s.popular,on&&{backgroundColor:T.primary}]}><Text style={s.popularText}>Most Popular</Text></View>:null}
+    <View style={s.planRow}>
+     <Ionicons name={on?'checkmark-circle':'ellipse-outline'} size={24} color={on?T.primary:'#B8C4BE'}/>
+     <View style={{flex:1}}><Text style={s.planLabel}>{x.label}</Text><Text style={s.planSub} numberOfLines={1}>{x.price}</Text></View>
+     <View style={{alignItems:'flex-end'}}><Text style={s.planPrice}>{x.perDay??x.price}</Text><Text style={s.planPer}>{x.perDay?'per day':'per '+x.period}</Text></View>
+    </View>
    </TouchableOpacity>})}</View>
    {guest&&!isPlus?<View style={s.account}>
     <Text style={s.accountTitle}>Create a free account to subscribe</Text>
     <Text style={s.accountBody}>Your subscription is saved to your MoodPals account, so it stays with you on every device. Everything you saved as a guest is kept.</Text>
     {appleOk?<AppleAuthentication.AppleAuthenticationButton buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE} buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK} cornerRadius={16} style={{height:52,alignSelf:'stretch',opacity:busy?0.6:1}} onPress={()=>{if(!busy)void continueWithApple()}}/>:null}
     <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>setCreating(true)} style={s.emailBtn}><Ionicons name="mail-outline" size={19} color={T.ink}/><Text style={s.emailText}>Continue with Email</Text></TouchableOpacity>
-   </View>:<TouchableOpacity accessibilityRole="button" disabled={busy||isPlus} onPress={()=>void buy()} style={[s.cta,(busy||isPlus)&&{opacity:0.6}]}><Text style={s.ctaText}>{isPlus?'You have Plus':`Continue · ${prices[plan].price}/${prices[plan].period}`}</Text></TouchableOpacity>}
+   </View>:<TouchableOpacity accessibilityRole="button" disabled={busy||isPlus} onPress={()=>void buy()} style={[s.cta,(busy||isPlus)&&{opacity:0.6}]}><Text style={s.ctaText}>{isPlus?'You have Plus':'Subscribe'}</Text></TouchableOpacity>}
    <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>void onRestore()}><Text style={s.restore}>Restore Purchases</Text></TouchableOpacity>
    <Text style={s.terms}>{TERMS}</Text>
    <View style={{flexDirection:'row',gap:18}}><Text style={s.link} onPress={()=>void Linking.openURL(TERMS_URL)}>Terms of Use</Text><Text style={s.link} onPress={()=>void Linking.openURL(PRIVACY_URL)}>Privacy Policy</Text></View>
@@ -98,7 +100,7 @@ export function PlusSettingsScreen({onBack,accent}:{onBack:()=>void;accent:strin
   <TouchableOpacity style={s.back} onPress={onBack}><Ionicons name="chevron-back" size={18} color={accent}/><Text style={{color:accent,fontWeight:'800'}}>Settings</Text></TouchableOpacity>
   <View style={[s.card,{flexDirection:'row',alignItems:'center',gap:14}]}>
    <Image source={CALM} style={{width:64,height:64}}/>
-   <View style={{flex:1,gap:3}}><Text style={s.planLabel}>{isPlus?'MoodPals Plus':'MoodPals Free'}</Text><Text style={s.planSub}>{isPlus&&plan?`${prices[plan].label} · ${prices[plan].price}/${prices[plan].period}`:'No account needed to upgrade'}</Text></View>
+   <View style={{flex:1,gap:3}}><Text style={s.planLabel}>{isPlus?'MoodPals Plus':'MoodPals Free'}</Text><Text style={s.planSub}>{isPlus&&plan?`${prices[plan].label} plan`:'No account needed to upgrade'}</Text></View>
   </View>
   <View style={s.card}>
    <View style={s.row}><Text style={[s.cell,{flex:1.6}]}/><Text style={s.head}>Free</Text><Text style={[s.head,{color:T.primary}]}>Plus</Text></View>
@@ -134,8 +136,10 @@ const s=StyleSheet.create({
  benefit:{flexDirection:'row',alignItems:'center',gap:12},
  benefitIcon:{width:32,height:32,borderRadius:11,backgroundColor:T.primarySoft,alignItems:'center',justifyContent:'center'},
  benefitText:{flex:1,fontSize:14,fontWeight:'700',color:T.ink},
- plan:{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:T.surface,borderRadius:18,padding:15,borderWidth:2,borderColor:T.border},
- planOn:{borderColor:T.primary,backgroundColor:'#F7FDF9'},
+ plan:{backgroundColor:T.surface,borderRadius:22,borderWidth:2,borderColor:T.border,overflow:'hidden'},
+ planOn:{borderColor:T.primary,backgroundColor:'#F7FDF9'},planTop:{borderColor:'#8FCBAE'},
+ planRow:{flexDirection:'row',alignItems:'center',gap:12,padding:15},
+ popular:{backgroundColor:'#8FCBAE',paddingVertical:4,alignItems:'center'},popularText:{color:'#fff',fontSize:11,fontWeight:'900',letterSpacing:0.4},
  planLabel:{fontSize:16,fontWeight:'900',color:T.ink},
  planSub:{fontSize:13,color:T.muted,marginTop:2},
  badge:{backgroundColor:T.primary,borderRadius:10,paddingHorizontal:9,paddingVertical:4},

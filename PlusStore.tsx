@@ -11,13 +11,20 @@ export const PLUS_ENTITLEMENT='plus';
 export const FREE_HEALTH_DAYS=7;
 export const PLUS_HEALTH_DAYS=30;
 
-export type PlusPlan='monthly'|'annual';
+export type PlusPlan='weekly'|'monthly'|'annual';
+// RevenueCat offering for this release's prices. Older app versions keep using the current (legacy) offering.
+export const PLUS_OFFERING='plus_v2';
 export type PlusFeature='general'|'trends'|'customization'|'circles'|'reflections'|'family'|'health'|'hydration'|'screenBreak'|'screenTime';
-export type PlusPrice={price:string;period:string;label:string;note?:string;perMonth?:string};
+export type PlusPrice={price:string;period:string;label:string;note?:string;perMonth?:string;perDay?:string};
 
 export const PLUS_PRICES:Record<PlusPlan,PlusPrice>={
- monthly:{price:'$1.99',period:'month',label:'Monthly'},
- annual:{price:'$19.99',period:'year',label:'Yearly',note:'Save 16%',perMonth:'$1.67'},
+ weekly:{price:'$6.99',period:'week',label:'Weekly',perDay:'$1'},
+ monthly:{price:'$12.99',period:'month',label:'Monthly',perDay:'$0.43'},
+ annual:{price:'$29.99',period:'year',label:'Annual',perDay:'$0.08'},
+};
+const PLAN_DAYS:Record<PlusPlan,number>={weekly:7,monthly:30,annual:365};
+const perDay=(price:number,currency:string,days:number)=>{
+ try{return new Intl.NumberFormat(undefined,{style:'currency',currency,minimumFractionDigits:2,maximumFractionDigits:2}).format(price/days).replace(/[.,]00(?=\D*$)/,'')}catch{return undefined}
 };
 
 export const FEATURE_COPY:Record<PlusFeature,{title:string;body:string}>={
@@ -49,7 +56,7 @@ export const PLAN_FEATURES:{label:string;free:string|boolean;plus:string|boolean
 ];
 
 type PlusState={
- isPlus:boolean;plusKnown:boolean;plan:PlusPlan|null;prices:Record<PlusPlan,PlusPrice>;
+ isPlus:boolean;plusKnown:boolean;plan:PlusPlan|null;prices:Record<PlusPlan,PlusPrice>;available:PlusPlan[];plansLoaded:boolean;
  paywall:{feature:PlusFeature}|null;
  showPaywall:(feature?:PlusFeature)=>void;hidePaywall:()=>void;nestedPaywalls:number;setNestedPaywalls:React.Dispatch<React.SetStateAction<number>>;
  purchase:(plan:PlusPlan)=>Promise<boolean>;restore:()=>Promise<boolean>;resetToFree:()=>void;
@@ -57,7 +64,7 @@ type PlusState={
 const Ctx=createContext<PlusState|null>(null);
 
 let configured=false;
-const planFor=(productId:string):PlusPlan=>/annual|year/i.test(productId)?'annual':'monthly';
+const planFor=(productId:string):PlusPlan=>/annual|year/i.test(productId)?'annual':/week/i.test(productId)?'weekly':'monthly';
 const activePlan=(info:CustomerInfo):PlusPlan|null=>{
  const e=info.entitlements.active[PLUS_ENTITLEMENT];
  return e?planFor(e.productIdentifier):null;
@@ -90,15 +97,15 @@ export function PlusProvider({children}:{children:React.ReactNode}){
     }
     Purchases.addCustomerInfoUpdateListener(apply);
     apply(await Purchases.getCustomerInfo());
-    const current=(await Purchases.getOfferings()).current;
-    if(!current||!active)return;
-    const monthly=current.monthly,annual=current.annual;
-    setPackages({...(monthly?{monthly}:{}),...(annual?{annual}:{})});
-    const save=monthly&&annual&&monthly.product.price>0?Math.round((1-annual.product.price/(monthly.product.price*12))*100):0;
-    setPrices({
-     monthly:{...PLUS_PRICES.monthly,price:monthly?.product.priceString??PLUS_PRICES.monthly.price},
-     annual:{...PLUS_PRICES.annual,price:annual?.product.priceString??PLUS_PRICES.annual.price,note:save>0?`Save ${save}%`:undefined,perMonth:annual?(annual.product.pricePerMonthString??undefined):PLUS_PRICES.annual.perMonth},
-    });
+    const offerings=await Purchases.getOfferings();
+    const offer=offerings.all[PLUS_OFFERING]??offerings.current;
+    if(!offer||!active)return;
+    const pkgs:Partial<Record<PlusPlan,PurchasesPackage>>={};
+    if(offer.weekly)pkgs.weekly=offer.weekly;if(offer.monthly)pkgs.monthly=offer.monthly;if(offer.annual)pkgs.annual=offer.annual;
+    setPackages(pkgs);
+    const next={...PLUS_PRICES};
+    (Object.keys(pkgs) as PlusPlan[]).forEach(k=>{const pr=pkgs[k]!.product;next[k]={...PLUS_PRICES[k],price:pr.priceString,perDay:perDay(pr.price,pr.currencyCode,PLAN_DAYS[k])??PLUS_PRICES[k].perDay}});
+    setPrices(next);
    }catch(e:any){
     console.warn('RevenueCat sync failed:',e?.message||e);
    }
@@ -136,7 +143,8 @@ export function PlusProvider({children}:{children:React.ReactNode}){
   }
  },[plan]);
  const resetToFree=useCallback(()=>{if(PLUS_MOCKUP)setPlan(null)},[]);
- const value=useMemo(()=>({isPlus:plan!==null,plusKnown,plan,prices,paywall,showPaywall,hidePaywall,nestedPaywalls,setNestedPaywalls,purchase,restore,resetToFree}),[plan,plusKnown,prices,paywall,showPaywall,hidePaywall,nestedPaywalls,purchase,restore,resetToFree]);
+ const available=useMemo(()=>Object.keys(packages) as PlusPlan[],[packages]),plansLoaded=available.length>0;
+ const value=useMemo(()=>({isPlus:plan!==null,plusKnown,plan,prices,available,plansLoaded,paywall,showPaywall,hidePaywall,nestedPaywalls,setNestedPaywalls,purchase,restore,resetToFree}),[plan,plusKnown,prices,available,plansLoaded,paywall,showPaywall,hidePaywall,nestedPaywalls,purchase,restore,resetToFree]);
  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
