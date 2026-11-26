@@ -215,9 +215,9 @@ function MintWave({edge}:{edge:'top'|'bottom'}){
  const id='mw'+edge,[w,setW]=useState(useWindowDimensions().width);
  if(edge==='bottom')return <View style={st.dockWave} pointerEvents="none" onLayout={e=>setW(e.nativeEvent.layout.width)}><Svg width={w} height={420}>
   <Defs><LinearGradient id={id} x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#FFFFFF" stopOpacity=".35"/><Stop offset=".22" stopColor="#E4F6EA" stopOpacity=".8"/><Stop offset=".5" stopColor={T.background} stopOpacity="1"/></LinearGradient></Defs>
-  {[6,4,2].map((k,i)=><Path key={k} d={`M0 24 C${w*.16} 12 ${w*.34} 12 ${w*.5} 20 S${w*.82} 30 ${w} 14`} transform={`translate(0,${-k})`} stroke="#1D3B2F" strokeOpacity={[.025,.045,.07][i]} strokeWidth={4} fill="none"/>)}
-  <Path d={`M0 24 C${w*.16} 12 ${w*.34} 12 ${w*.5} 20 S${w*.82} 30 ${w} 14 V420 H0 Z`} fill={'url(#'+id+')'}/>
-  <Path d={`M0 24 C${w*.16} 12 ${w*.34} 12 ${w*.5} 20 S${w*.82} 30 ${w} 14`} stroke="#FFFFFF" strokeWidth={1.5} fill="none"/>
+  {[6,4,2].map((k,i)=><Path key={k} d={`M0 17 C${w*.16} 7 ${w*.34} 7 ${w*.5} 13 S${w*.82} 21 ${w} 9`} transform={`translate(0,${-k})`} stroke="#1D3B2F" strokeOpacity={[.025,.045,.07][i]} strokeWidth={4} fill="none"/>)}
+  <Path d={`M0 17 C${w*.16} 7 ${w*.34} 7 ${w*.5} 13 S${w*.82} 21 ${w} 9 V420 H0 Z`} fill={'url(#'+id+')'}/>
+  <Path d={`M0 17 C${w*.16} 7 ${w*.34} 7 ${w*.5} 13 S${w*.82} 21 ${w} 9`} stroke="#FFFFFF" strokeWidth={1.5} fill="none"/>
  </Svg></View>;
  return <Svg width="100%" height="100%" viewBox="0 0 400 100" preserveAspectRatio="none" style={StyleSheet.absoluteFill} pointerEvents="none">
   <Defs>{edge==='top'?<LinearGradient id={id} x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor="#B9E9CF" stopOpacity=".85"/><Stop offset=".5" stopColor="#E4F6EA" stopOpacity=".7"/><Stop offset="1" stopColor="#C8EED9" stopOpacity=".85"/></LinearGradient>
@@ -1174,7 +1174,7 @@ const st=StyleSheet.create({
  segmentText:{fontSize:15,fontWeight:'800',color:T.muted},
  moreBtn:{width:44,height:44,borderRadius:22,backgroundColor:T.primarySoft,alignItems:'center',justifyContent:'center'},
  memberCard:{width:70,paddingVertical:9,borderRadius:18,alignItems:'center',gap:6,backgroundColor:'rgba(255,255,255,.8)',borderWidth:1,borderColor:'#fff'},
- dockShell:{paddingTop:34,paddingHorizontal:20,paddingBottom:2,gap:8},
+ dockShell:{paddingTop:22,paddingHorizontal:20,paddingBottom:2,gap:8},
  dockWave:{position:'absolute',top:0,left:0,right:0,bottom:0,overflow:'hidden'},
  dockHead:{flexDirection:'row',alignItems:'center',gap:7,paddingHorizontal:4},
  dockLabel:{color:'#0F4D3A',fontSize:17,fontWeight:'900'},
