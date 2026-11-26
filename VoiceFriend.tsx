@@ -1,6 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {Modal,View,Text,TouchableOpacity,StyleSheet,Animated,Easing,ActivityIndicator} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as Haptics from 'expo-haptics';
 import {AudioContext,AudioRecorder,AudioManager} from 'react-native-audio-api';
 import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
@@ -50,7 +51,7 @@ export default function VoiceFriend({visible,onClose,companion='calm'}:{visible:
   a.start();return()=>a.stop()},[phase,reduce]);
 
  useEffect(()=>{if(!visible)return;
-  let alive=true,ws:WebSocket|null=null,ctx:AudioContext|null=null,recorder:AudioRecorder|null=null,timer:any=null,decoding=Promise.resolve(),turn=0,playEnd=0;
+  let alive=true,ws:WebSocket|null=null,ctx:AudioContext|null=null,recorder:AudioRecorder|null=null,timer:any=null,decoding=Promise.resolve(),turn=0,playEnd=0,lastChunk=0,hangup:any=null;
   setPhase('connecting');setCaption('');setError('');setSaved(null);setMuted(false);
   const fail=(m:string)=>{if(!alive)return;setError(m);setPhase('error')};
   (async()=>{
@@ -88,7 +89,7 @@ export default function VoiceFriend({visible,onClose,companion='calm'}:{visible:
       if(sc.interrupted){turn++;queue.clearBuffers();playEnd=0;setPhase('listening')}
       const id=turn;
       for(const p of sc.modelTurn?.parts||[])if(p.inlineData?.data){
-       const chunk=p.inlineData.data;setPhase('speaking');
+       const chunk=p.inlineData.data;lastChunk=Date.now();setPhase('speaking');
        decoding=decoding.then(async()=>{if(id!==turn||!ctx)return;const b=await ctx.decodePCMInBase64(chunk,24000,1);if(id===turn&&ctx){queue.enqueueBuffer(b);playEnd=Math.max(playEnd,ctx.currentTime)+b.duration}}).catch(()=>{});
       }
       if(sc.inputTranscription?.text)setCaption('');
@@ -97,6 +98,12 @@ export default function VoiceFriend({visible,onClose,companion='calm'}:{visible:
      }
      if(m.toolCall){
       const responses=await Promise.all((m.toolCall.functionCalls||[]).map(async(f:any)=>{
+       if(f.name==='end_call'){
+        // Hang up once the goodbye has finished playing, like a real call.
+        const started=Date.now();
+        if(!hangup)hangup=setInterval(()=>{if(!alive||!ctx)return;const idle=Date.now()-lastChunk>900&&ctx.currentTime>playEnd+0.4;if(idle||Date.now()-started>10000){clearInterval(hangup);void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);onClose()}},250);
+        return {id:f.id,name:f.name,response:{result:'hanging up'}};
+       }
        if(f.name!=='save_journal_entry')return {id:f.id,name:f.name,response:{error:'unknown tool'}};
        try{
         const {data:{user}}=await supabase.auth.getUser();if(!user)throw Error('signed out');
@@ -112,7 +119,7 @@ export default function VoiceFriend({visible,onClose,companion='calm'}:{visible:
     };
    }catch(e:any){fail(e?.message||'Could not start the call.')}
   })();
-  return()=>{alive=false;clearTimeout(timer);try{recorder?.clearOnAudioReady();void recorder?.stop()}catch{}try{ws?.close()}catch{}void ctx?.close().catch(()=>{});void AudioManager.setAudioSessionActivity(false).catch(()=>{})};
+  return()=>{alive=false;clearTimeout(timer);clearInterval(hangup);try{recorder?.clearOnAudioReady();void recorder?.stop()}catch{}try{ws?.close()}catch{}void ctx?.close().catch(()=>{});void AudioManager.setAudioSessionActivity(false).catch(()=>{})};
  },[visible]);
 
  async function undo(){if(!saved)return;const id=saved.id;setSaved(null);await supabase.from('wellness_journal').delete().eq('id',id)}

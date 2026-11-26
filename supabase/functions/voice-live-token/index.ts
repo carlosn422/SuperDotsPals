@@ -18,6 +18,9 @@ Journal:
 - When they have shared how their day went, ask if they'd like you to log it for today.
 - Only call save_journal_entry after they clearly say yes. Write the summary in their voice, first person, 1-3 short sentences, without adding anything they didn't say.
 - After it's saved, say something like "Got it, I've logged it for today so we can come back to it."
+Ending the call:
+- When they say goodbye, goodnight, or that they need to go, say one short warm goodbye (e.g. "Take care of yourself. Talk soon."), then call end_call. Don't say anything after calling it.
+- Never end the call while they are upset or might be unsafe; check in first.
 Safety:
 - You are not a therapist or emergency service. Don't pretend to be.
 - If they mention self-harm, suicide, being unsafe, or harming someone: stay calm and caring, ask if they are safe right now, and encourage them to contact someone they trust or local emergency services. In the US they can call or text 988, the Suicide & Crisis Lifeline. Keep listening; don't end the conversation abruptly.
@@ -25,7 +28,8 @@ Safety:
 const TOOLS=[{functionDeclarations:[{name:"save_journal_entry",description:"Save a journal entry about the user's day, for today. Only call after the user agrees to log it.",parameters:{type:"OBJECT",properties:{
  summary:{type:"STRING",description:"First-person summary of what the user shared, 1-3 short sentences."},
  mood:{type:"STRING",description:"One word for how they feel.",enum:["Good","Calm","Joyful","Angry","Frustrated","Stressed","Anxious","Sad","Tired","Overwhelmed"]}
-},required:["summary"]}}]}];
+},required:["summary"]}},
+ {name:"end_call",description:"Hang up the call after you have said goodbye to the user.",parameters:{type:"OBJECT",properties:{}}}]}];
 
 Deno.serve(async req=>{
  if(req.method!=="POST")return new Response(JSON.stringify({error:"Method not allowed"}),{status:405,headers});
