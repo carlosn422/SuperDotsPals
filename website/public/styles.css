@@ -429,3 +429,14 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 .t-dev .t-frame,.t-dev.t-tb .t-frame{padding:calc(var(--w)*.022);border-radius:calc(var(--w)*.15);box-shadow:0 0 0 1px #2c2c2e inset,0 18px 34px rgba(43,30,69,.2)}
 .t-dev .t-frame img,.t-dev.t-tb .t-frame img{border-radius:calc(var(--w)*.13)}
 .t-dev.t-tb .t-frame{border-radius:calc(var(--w)*.06)}.t-dev.t-tb .t-frame img{border-radius:calc(var(--w)*.045)}
+.t-carousel{display:none}
+@media(max-width:600px){
+.t-devs{padding:20px 0 26px}
+.t-pointer,.t-panels{display:none}
+.t-carousel{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:16px;padding:6px 11% 20px;scrollbar-width:none}
+.t-carousel::-webkit-scrollbar{display:none}
+.t-slide{flex:0 0 78%;scroll-snap-align:center;display:flex;flex-direction:column;align-items:center;gap:18px}
+.t-slide .t-dev{transform:none;filter:none;cursor:default}
+.t-slide .t-dev.t-ph{--w:min(58vw,230px)}.t-slide .t-dev.t-tb{--w:min(76vw,300px)}
+.t-cap{flex:1;width:100%;box-sizing:border-box;background:var(--card);border-radius:24px;padding:20px;box-shadow:0 10px 30px rgba(43,30,69,.08);text-align:center}
+.t-cap h3{margin:6px 0;font-size:22px}.t-cap p{margin:0 0 10px;color:var(--muted)}}
