@@ -15,7 +15,7 @@ export type PlusPlan='weekly'|'monthly'|'annual';
 // Extra call minutes, sold as consumables from their own RevenueCat offering.
 export type MinutePackId='minutes_10'|'minutes_30'|'minutes_60';
 export const MINUTES_OFFERING='voice_minutes';
-export const MINUTE_PACKS:{id:MinutePackId;minutes:number;price:string}[]=[{id:'minutes_10',minutes:10,price:'$0.99'},{id:'minutes_30',minutes:30,price:'$2.99'},{id:'minutes_60',minutes:60,price:'$3.99'}];
+export const MINUTE_PACKS:{id:MinutePackId;minutes:number;price:string}[]=[{id:'minutes_10',minutes:10,price:'$1.99'},{id:'minutes_30',minutes:30,price:'$4.99'},{id:'minutes_60',minutes:60,price:'$6.99'}];
 const MINUTE_PRICES=Object.fromEntries(MINUTE_PACKS.map(p=>[p.id,p.price])) as Record<MinutePackId,string>;
 // RevenueCat offering for this release's prices. Older app versions keep using the current (legacy) offering.
 export const PLUS_OFFERING='plus_v2';
