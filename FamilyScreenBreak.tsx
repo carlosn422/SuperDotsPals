@@ -680,9 +680,9 @@ function TrialBanner(){
  const days=state.trialEndsAt?Math.max(0,Math.ceil((state.trialEndsAt*1000-Date.now())/864e5)):null;
  const [title,sub]=state.trialAvailable?['14 days free','Starts with your first timer']:state.allowed&&days!==null?[days+' day'+(days===1?'':'s')+' left','Free trial']:['Free trial ended','Timers can still be stopped'];
  return <TouchableOpacity accessibilityRole="button" accessibilityLabel={title+'. '+sub+'. Upgrade to MoodPals Plus'} activeOpacity={0.85} onPress={()=>showPaywall('screenBreak')} style={st.trialBanner}>
-  <IconTile icon="sparkles" color="#7B5CE6" size={46}/>
-  <View style={{flex:1}}><Text style={st.trialTitle} numberOfLines={1}>{title}</Text><Text style={[st.sub,{color:'#6B5AA6'}]} numberOfLines={1}>{sub}</Text></View>
-  <UpgradePill/>
+  <Ionicons name="sparkles" size={18} color="#7B5CE6"/>
+  <Text style={{flex:1,fontSize:14,color:'#6B5AA6',fontWeight:'600'}} numberOfLines={1}><Text style={st.trialTitle}>{title}</Text>{'  ·  '+sub}</Text>
+  <UpgradePill compact/>
  </TouchableOpacity>;
 }
 
@@ -1288,8 +1288,8 @@ const st=StyleSheet.create({
 
  small:{borderRadius:14,paddingHorizontal:16,paddingVertical:10,minHeight:44,justifyContent:'center',backgroundColor:T.primarySoft,alignItems:'center'},
  smallText:{fontSize:13,fontWeight:'800',color:T.primary},
- trialBanner:{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#F1ECFF',borderRadius:22,padding:14,borderWidth:1,borderColor:'#E3DAFB'},
- trialTitle:{fontSize:18,fontWeight:'900',color:'#4B3A99'},
+ trialBanner:{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:'#F1ECFF',borderRadius:16,paddingVertical:8,paddingLeft:14,paddingRight:8,borderWidth:1,borderColor:'#D9CCFA'},
+ trialTitle:{fontSize:15,fontWeight:'900',color:'#4B3A99'},
  note:{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:T.primarySoft,borderRadius:16,padding:12},
  link:{color:T.primary,fontWeight:'800',fontSize:14},
  linkRow:{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:T.surface,borderRadius:18,padding:16,borderWidth:1,borderColor:T.border},
