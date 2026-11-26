@@ -25,13 +25,19 @@ export const voicePal=(id:VoicePalId)=>VOICE_PALS.find(p=>p.id===id)??VOICE_PALS
 const PAL_KEY='moodpals.voicePal';
 const RING=require('./assets/voice/ring.m4a');
 
+// Messages carry ~100 KB of base64 audio several times a second, so decode in bulk instead of
+// growing a string one character at a time.
+const decoder=typeof TextDecoder==='function'?new TextDecoder():null;
 function utf8(b:Uint8Array){
- let s='';
+ if(decoder)return decoder.decode(b);
+ const u=new Uint16Array(b.length);let n=0;
  for(let i=0;i<b.length;){
   const c=b[i++];
   let cp=c<0x80?c:c<0xe0?((c&31)<<6)|(b[i++]&63):c<0xf0?((c&15)<<12)|((b[i++]&63)<<6)|(b[i++]&63):((c&7)<<18)|((b[i++]&63)<<12)|((b[i++]&63)<<6)|(b[i++]&63);
-  s+=String.fromCodePoint(cp);
+  if(cp>0xffff){cp-=0x10000;u[n++]=0xd800|(cp>>10);u[n++]=0xdc00|(cp&1023)}else u[n++]=cp;
  }
+ let s='';
+ for(let i=0;i<n;i+=0x2000)s+=String.fromCharCode.apply(null,u.subarray(i,Math.min(n,i+0x2000)) as any);
  return s;
 }
 const WS='wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained?access_token=';
@@ -61,17 +67,29 @@ export async function playClip(clip:number,onEnd:()=>void){
  try{
   const buf=await ctx.decodeAudioData(clip);
   const src=ctx.createBufferSource();src.buffer=buf;src.connect(ctx.destination);
-  src.onended=()=>{onEnd();void ctx.close()};src.start();
-  return ()=>{try{src.stop()}catch{}};
+  let closed=false;const close=()=>{if(closed)return;closed=true;void ctx.close().catch(()=>{})};
+  src.onended=()=>{onEnd();close()};src.start();
+  return ()=>{try{src.stop()}catch{}close()};
  }catch{onEnd();void ctx.close();return ()=>{}}
 }
 
+const B64=Uint8Array.from('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/',c=>c.charCodeAt(0));
+let pcm=new Uint8Array(0),b64=new Uint8Array(0);
+// Mic frames (10 a second) as base64 PCM16, reusing the same buffers for every frame.
 function toBase64(f:Float32Array){
- const bytes=new Uint8Array(f.length*2);
- for(let i=0;i<f.length;i++){const v=Math.max(-1,Math.min(1,f[i]))*0x7fff|0;bytes[i*2]=v&255;bytes[i*2+1]=(v>>8)&255}
- let s='';for(let i=0;i<bytes.length;i+=0x8000)s+=String.fromCharCode.apply(null,Array.from(bytes.subarray(i,i+0x8000)));
- return btoa(s);
+ const n=f.length*2;
+ if(pcm.length!==n){pcm=new Uint8Array(n);b64=new Uint8Array(Math.ceil(n/3)*4)}
+ for(let i=0;i<f.length;i++){const v=Math.max(-1,Math.min(1,f[i]))*0x7fff|0;pcm[i*2]=v&255;pcm[i*2+1]=(v>>8)&255}
+ let o=0;
+ for(let i=0;i<n;i+=3){
+  const a=pcm[i],b=i+1<n?pcm[i+1]:0,c=i+2<n?pcm[i+2]:0;
+  b64[o++]=B64[a>>2];b64[o++]=B64[((a&3)<<4)|(b>>4)];
+  b64[o++]=i+1<n?B64[((b&15)<<2)|(c>>6)]:61;b64[o++]=i+2<n?B64[c&63]:61;
+ }
+ return String.fromCharCode.apply(null,b64 as any);
 }
+// The previous call's audio shutdown; the next call waits for it so the two never overlap.
+let teardown:Promise<void>=Promise.resolve();
 
 export default function VoiceFriend({visible,onClose,companion='calm',topic}:{visible:boolean;onClose:()=>void;companion?:string;topic?:string}){
  const {showPaywall,minutePrices,buyMinutes}=usePlus();
@@ -91,7 +109,8 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
   // Reports the call's real length and tokens once, when the socket closes or the screen goes away.
   let finished=false;
   const finish=()=>{if(finished||!callId)return;finished=true;supabase.rpc('finish_voice_call',{p_call_id:callId,p_seconds:Math.round((Date.now()-callStart)/1000),p_input_text:use.inText,p_input_audio:use.inAudio,p_output_text:use.outText,p_output_audio:use.outAudio}).then(()=>{},()=>{})};
-  const stopMic=()=>{try{recorder?.clearOnAudioReady();void recorder?.stop()}catch{}};
+  let micStopped:Promise<unknown>=Promise.resolve();
+  const stopMic=()=>{const r=recorder;recorder=null;if(!r)return;try{r.clearOnAudioReady()}catch{}micStopped=r.stop().catch(()=>{})};
   // Leaving the app hangs up, so Gemini never keeps running in the background.
   const appSub=AppState.addEventListener('change',st=>{if(st==='background'&&alive)onClose()});
   const add=(d:any[]|undefined,into:'in'|'out')=>{for(const x of d||[]){const n=Number(x?.tokenCount)||0;if(x?.modality==='AUDIO')use[into==='in'?'inAudio':'outAudio']+=n;else use[into==='in'?'inText':'outText']+=n}};
@@ -105,8 +124,10 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
     if(fnError){let msg='Could not start the call. Please try again.';try{const d=await (fnError as any).context?.json?.();if(d?.code==='plus_required'){onClose();showPaywall('reflections');return}if(d?.code==='voice_limit'){if(alive){setLimit({cap:Number(d.cap)||60,resetsAt:d.resetsAt});setPhase('ended')}return}if(d?.error)msg=d.error}catch{}return fail(msg)}
     if(!alive||!data?.token)return;
     callId=data.callId||null;callStart=Date.now();
+    await teardown;if(!alive)return;
     AudioManager.setSystemOptions({ios:{category:'playAndRecord',mode:'voiceChat',options:['defaultToSpeaker','allowBluetoothHFP']}});
     await AudioManager.setAudioSessionActivity(true);
+    if(!alive){void AudioManager.setAudioSessionActivity(false).catch(()=>{});return}
     ctx=new AudioContext({sampleRate:24000});
     // One soft ring while the call connects; the pal says hi when it ends.
     const ringCtx=ctx;let ringEnd=Date.now()+1900;
@@ -124,13 +145,15 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
      const m=JSON.parse(typeof e.data==='string'?e.data:utf8(new Uint8Array(e.data as ArrayBuffer)));
      if(m.setupComplete){
       clearTimeout(timer);
-      recorder=new AudioRecorder({iosVoiceProcessing:true});
-      recorder.onAudioReady({sampleRate:16000,bufferLength:1600,channelCount:1},({buffer,numFrames})=>{
+      if(!alive)return;
+      const mic=new AudioRecorder({iosVoiceProcessing:true});recorder=mic;
+      mic.onAudioReady({sampleRate:16000,bufferLength:1600,channelCount:1},({buffer,numFrames})=>{
        // The mic stays closed while the pal talks (plus a short tail) so it never hears itself.
        if(mutedRef.current||ws?.readyState!==1||!ctx||ctx.currentTime<playEnd+0.35)return;
        ws.send(JSON.stringify({realtimeInput:{audio:{data:toBase64(buffer.getChannelData(0).subarray(0,numFrames)),mimeType:'audio/pcm;rate=16000'}}}));
       });
-      await recorder.start();
+      await mic.start();
+      if(recorder!==mic){try{mic.clearOnAudioReady()}catch{}void mic.stop().catch(()=>{})}
       const hello=JSON.stringify({realtimeInput:{text:topic?`(The call just started. I tapped "${topic}". Greet me warmly in one short sentence and gently ask about it.)`:'(The call just started. Greet me warmly in one short sentence and ask how my day was.)'}});
       setTimeout(()=>{if(alive&&ws?.readyState===1)ws.send(hello)},Math.max(0,ringEnd-Date.now()-600));
       setPhase('listening');
@@ -182,7 +205,11 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
    }catch(e:any){fail(e?.message||'Could not start the call.')}
   })();
   return()=>{alive=false;clearTimeout(timer);clearTimeout(wrapT);clearInterval(byeT);clearInterval(silT);clearInterval(hangup);
-   appSub.remove();finish();stopMic();try{ws?.close()}catch{}void ctx?.close().catch(()=>{});void AudioManager.setAudioSessionActivity(false).catch(()=>{})};
+   appSub.remove();finish();stopMic();try{ws?.close()}catch{}
+   // Stop the mic, then the speaker, then release the audio session, in that order. Nothing touches
+   // the audio context after this point.
+   const c=ctx;ctx=null;interruptRef.current=()=>{};
+   teardown=micStopped.then(()=>c?.close()).catch(()=>{}).then(()=>AudioManager.setAudioSessionActivity(false)).then(()=>{},()=>{})};
  },[visible,attempt]);
 
  async function buy(){
