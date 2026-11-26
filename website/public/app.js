@@ -119,6 +119,7 @@ document.querySelectorAll('.phone').forEach(phone => {
 });
 
 const form = document.querySelector('.signup');
+if (form) {
 const msg = form.querySelector('.form-msg');
 form.addEventListener('submit', async e => {
   e.preventDefault();
@@ -134,11 +135,12 @@ form.addEventListener('submit', async e => {
     if (!res.ok) throw new Error(body.error || 'Something went wrong.');
     form.reset();
     msg.className = 'form-msg ok';
-    msg.textContent = "You're on the list! 🎉 We'll email you when the beta opens.";
+    msg.textContent = "You're on the list! 🎉 We'll email you about new features.";
   } catch (err) {
     msg.className = 'form-msg err'; msg.textContent = err.message;
   } finally { button.disabled = false; button.textContent = 'Get updates'; }
 });
+}
 document.getElementById('yr').textContent = new Date().getFullYear();
 
 // [data-join] links: scroll to the very top so the whole signup form is visible, then focus the email field.
