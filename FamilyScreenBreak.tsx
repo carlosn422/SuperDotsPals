@@ -551,7 +551,7 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
   <TouchableOpacity accessibilityRole="button" onPress={onInsights} style={st.linkRow}><IconTile icon="bar-chart" color={TINT_INK[2]}/><Text style={[st.rowTitle,{flex:1}]}>Screen Time Insights</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>
   <MemberWatch child={child} children={children} onChanged={onChanged} onRemoved={onRemoved}/>
   </>}
-  {inline?<ChildStats child={child}/>:null}
+  {inline?<ChildStats child={child} onPress={onInsights}/>:null}
  </View>;
 }
 
@@ -1049,7 +1049,7 @@ function bucketName(period:BreakPeriod,b:Bucket){
 const SERIES_COLORS=[T.primary,'#4A8CFF','#F2A93B','#E5484D','#9B7BC8','#2A9DA8'];
 /** Colored stacked bars, one color per device; tap a bar for its time. */
 /** This week and today for one child, Actions-card style. */
-function ChildStats({child}:{child:FamilyChild}){
+function ChildStats({child,onPress}:{child:FamilyChild;onPress:()=>void}){
  const [state]=useBreakState();
  const [rows,setRows]=useState<SessionRow[]>([]);
  const week=periodRange('week',new Date()),ws=week.start.getTime();
@@ -1061,24 +1061,24 @@ function ChildStats({child}:{child:FamilyChild}){
  const val=(label:string,value:string,color:string)=><View style={{gap:2}}><Text style={{fontSize:12,fontWeight:'800',color}}>{label}</Text><Text style={st.statNum}>{value}</Text></View>;
  const head=(icon:any,color:string,title:string)=><View style={{flexDirection:'row',alignItems:'center',gap:7}}><Ionicons name={icon} size={18} color={color}/><Text style={st.statHead}>{title}</Text></View>;
  return <View style={{gap:12}}>
-  <View style={st.statBox}>
+  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open Insights" onPress={onPress} activeOpacity={0.7} style={st.statBox}>
    <View style={{flex:1,gap:10}}>
     {head('calendar','#4A8CFF','This week')}
     <View style={{flexDirection:'row',gap:18}}>{val('Time',formatDuration(wk.seconds),T.primary)}{val('Sessions',String(wk.sessions),'#4A8CFF')}{val('Daily avg',formatDuration(wk.dailyAverage),'#F2A93B')}</View>
    </View>
    <View style={{flexDirection:'row',alignItems:'flex-end',gap:4,height:56}} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">{wk.buckets.map((b,i)=><View key={i} style={{width:7,height:Math.max(5,56*b.seconds/peak),borderRadius:4,backgroundColor:b.seconds?T.primary:'#E3EEE8'}}/>)}</View>
-  </View>
+  </TouchableOpacity>
   <View style={{flexDirection:'row',gap:12}}>
-   <View style={[st.statBox,{flex:1,flexDirection:'column',alignItems:'flex-start'}]}>
+   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open Insights" onPress={onPress} activeOpacity={0.7} style={[st.statBox,{flex:1,flexDirection:'column',alignItems:'flex-start'}]}>
     {head('sunny','#F2A93B','Today')}
     <Text style={st.statBig}>{formatDuration(day.seconds)}</Text>
     <View style={[st.statOrb,{backgroundColor:'#FFF7E8'}]}><Ionicons name="hourglass" size={24} color="#F2A93B"/></View>
-   </View>
-   <View style={[st.statBox,{flex:1,flexDirection:'column',alignItems:'flex-start'}]}>
+   </TouchableOpacity>
+   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open Insights" onPress={onPress} activeOpacity={0.7} style={[st.statBox,{flex:1,flexDirection:'column',alignItems:'flex-start'}]}>
     {head('apps','#9B7BC8','Top app')}
     {top?<><View style={{height:26,alignSelf:'stretch'}}>{SocialAppLabel?<SocialAppLabel app={top[0]} style={{height:26,flex:1}}/>:<Text style={st.rowTitle}>App</Text>}</View><Text style={st.statBig}>{formatDuration(top[1]*60)}</Text></>:<Text style={st.statBig}>—</Text>}
     {top?null:<View style={[st.statOrb,{backgroundColor:'#F4EBFF'}]}><Ionicons name="apps" size={24} color="#9B7BC8"/></View>}
-   </View>
+   </TouchableOpacity>
   </View>
  </View>;
 }
