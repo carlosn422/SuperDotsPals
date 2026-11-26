@@ -1,5 +1,5 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {Modal,View,Text,TouchableOpacity,StyleSheet,Animated,Easing,ActivityIndicator,Image} from 'react-native';
+import {AppState,Modal,View,Text,TouchableOpacity,StyleSheet,Animated,Easing,ActivityIndicator,Image} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
@@ -87,6 +87,12 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
  useEffect(()=>{if(!visible)return;
   let alive=true,ws:WebSocket|null=null,ctx:AudioContext|null=null,recorder:AudioRecorder|null=null,timer:any=null,wrapT:any=null,byeT:any=null,silT:any=null,lastHeard=0,nudged=0,decoding=Promise.resolve(),turn=0,playEnd=0,lastChunk=0,hangup:any=null,callId:string|null=null,callStart=0;
   const use={inText:0,inAudio:0,outText:0,outAudio:0};
+  // Reports the call's real length and tokens once, when the socket closes or the screen goes away.
+  let finished=false;
+  const finish=()=>{if(finished||!callId)return;finished=true;supabase.rpc('finish_voice_call',{p_call_id:callId,p_seconds:Math.round((Date.now()-callStart)/1000),p_input_text:use.inText,p_input_audio:use.inAudio,p_output_text:use.outText,p_output_audio:use.outAudio}).then(()=>{},()=>{})};
+  const stopMic=()=>{try{recorder?.clearOnAudioReady();void recorder?.stop()}catch{}};
+  // Leaving the app hangs up, so Gemini never keeps running in the background.
+  const appSub=AppState.addEventListener('change',st=>{if(st==='background'&&alive)onClose()});
   const add=(d:any[]|undefined,into:'in'|'out')=>{for(const x of d||[]){const n=Number(x?.tokenCount)||0;if(x?.modality==='AUDIO')use[into==='in'?'inAudio':'outAudio']+=n;else use[into==='in'?'inText':'outText']+=n}};
   setPhase('connecting');setCaption('');setError('');setSaved(null);setMuted(false);
   const fail=(m:string)=>{if(!alive)return;setError(m);setPhase('error')};
@@ -109,12 +115,14 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
     interruptRef.current=()=>{turn++;queue.clearBuffers();playEnd=0;setPhase('listening')};
     ws=new WebSocket(WS+encodeURIComponent(data.token));
     ws.binaryType='arraybuffer';
+    timer=setTimeout(()=>{ws?.close();fail('Could not connect. Please try again.')},15000);
     ws.onopen=()=>ws?.send(JSON.stringify({setup:{model:'models/'+data.model}}));
-    ws.onclose=()=>{if(alive)setPhase(p=>p==='error'?p:'ended')};
+    ws.onclose=()=>{clearTimeout(timer);clearTimeout(wrapT);clearInterval(byeT);clearInterval(silT);stopMic();finish();if(alive)setPhase(p=>p==='error'?p:'ended')};
     ws.onerror=()=>fail('The call dropped. Check your connection and try again.');
     ws.onmessage=async e=>{
      const m=JSON.parse(typeof e.data==='string'?e.data:utf8(new Uint8Array(e.data as ArrayBuffer)));
      if(m.setupComplete){
+      clearTimeout(timer);
       recorder=new AudioRecorder({iosVoiceProcessing:true});
       recorder.onAudioReady({sampleRate:16000,bufferLength:1600,channelCount:1},({buffer,numFrames})=>{
        // The mic stays closed while the pal talks (plus a short tail) so it never hears itself.
@@ -170,7 +178,7 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
    }catch(e:any){fail(e?.message||'Could not start the call.')}
   })();
   return()=>{alive=false;clearTimeout(timer);clearTimeout(wrapT);clearInterval(byeT);clearInterval(silT);clearInterval(hangup);
-   if(callId)void supabase.rpc('finish_voice_call',{p_call_id:callId,p_seconds:Math.round((Date.now()-callStart)/1000),p_input_text:use.inText,p_input_audio:use.inAudio,p_output_text:use.outText,p_output_audio:use.outAudio}).then(()=>{},()=>{});try{recorder?.clearOnAudioReady();void recorder?.stop()}catch{}try{ws?.close()}catch{}void ctx?.close().catch(()=>{});void AudioManager.setAudioSessionActivity(false).catch(()=>{})};
+   appSub.remove();finish();stopMic();try{ws?.close()}catch{}void ctx?.close().catch(()=>{});void AudioManager.setAudioSessionActivity(false).catch(()=>{})};
  },[visible]);
 
  async function undo(){if(!saved)return;const id=saved.id;setSaved(null);await supabase.from('wellness_journal').delete().eq('id',id)}
