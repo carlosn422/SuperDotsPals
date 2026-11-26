@@ -114,10 +114,21 @@ final class WatchFamilyDevicesStore: ObservableObject {
             _ = try await WatchThemeSync.shared.rpc("family_device_command", params)
             WKInterfaceDeviceHaptic.play(.click)
             await load()
+            follow(device)
             return true
         } catch {
             self.error = Self.message(error)
             return false
+        }
+    }
+
+    /// An online device acknowledges within a second or two: check every second until it does.
+    private func follow(_ device: String) {
+        Task {
+            for _ in 0..<20 where pending(on: device) != nil {
+                try? await Task.sleep(for: .seconds(1))
+                await load()
+            }
         }
     }
 
