@@ -202,7 +202,9 @@ document.querySelectorAll('.t-show').forEach(show => {
     pans.forEach((p, n) => p.classList.toggle('on', n === i));
     place();
   };
-  devs.forEach((d, n) => { d.addEventListener('click', () => { if (narrow.matches) { const r = show.getBoundingClientRect(), span = show.offsetHeight - innerHeight; scrollTo({ top: scrollY + r.top + span * (n + .5) / devs.length, behavior: 'smooth' }); } else pick(n); }); d.addEventListener('mouseenter', () => pick(n)); d.addEventListener('focus', () => pick(n)); });
+  devs.forEach((d, n) => { d.addEventListener('click', () => { if (narrow.matches) { const r = show.getBoundingClientRect(), span = show.offsetHeight - innerHeight; scrollTo({ top: scrollY + r.top + span * (n + .5) / devs.length, behavior: 'smooth' }); } else pick(n); }); d.addEventListener('mouseenter', () => pick(n)); });
+  show.addEventListener('focusin', () => paused = true);
+  show.addEventListener('focusout', () => paused = false);
   show.addEventListener('mouseenter', () => paused = true);
   show.addEventListener('mouseleave', () => paused = false);
   addEventListener('resize', place);
