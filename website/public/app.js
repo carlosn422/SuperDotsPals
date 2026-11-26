@@ -189,42 +189,34 @@ document.querySelectorAll('.loop video').forEach(v => {
   fig.append(btn); sync();
 });
 document.querySelectorAll('.t-show').forEach(show => {
-  const devs = [...show.querySelectorAll('.t-devs .t-dev')], pans = show.querySelectorAll('.t-panel'), ptr = show.querySelector('.t-pointer');
-  let cur = 0, paused = false;
-  const narrow = matchMedia('(max-width: 600px)'), car = show.querySelector('.t-carousel');
+  const devs = [...show.querySelectorAll('.t-devs .t-dev')], pans = show.querySelectorAll('.t-panel'), slides = show.querySelectorAll('.t-slide');
+  const ptr = show.querySelector('.t-pointer'), stick = show.querySelector('.t-sticky'), car = show.querySelector('.t-carousel'), nav = document.querySelector('.nav');
+  let cur = -1;
+  const navH = () => nav ? nav.offsetHeight : 0;
+  const range = () => Math.max(1, show.offsetHeight - stick.offsetHeight);
   const place = () => {
-    const d = devs[cur], box = show.getBoundingClientRect(), r = d.getBoundingClientRect();
-    ptr.style.transform = `translate(${r.left - box.left + r.width * .62}px, ${r.bottom - box.top - 16}px)`;
+    if (cur < 0) return;
+    const b = stick.getBoundingClientRect(), r = devs[cur].getBoundingClientRect();
+    ptr.style.transform = `translate(${r.left - b.left + r.width * .62}px, ${r.bottom - b.top - 16}px)`;
   };
   const pick = i => {
-    cur = i;
+    if (i === cur) return;
+    car.dataset.dir = i > cur ? 'down' : 'up';
+    slides.forEach((s, n) => { s.classList.toggle('out', n === cur); s.classList.toggle('on', n === i); });
     devs.forEach((d, n) => d.setAttribute('aria-pressed', String(n === i)));
     pans.forEach((p, n) => p.classList.toggle('on', n === i));
-    place();
+    cur = i; place();
   };
-  devs.forEach((d, n) => { d.addEventListener('click', () => { if (narrow.matches) { const r = show.getBoundingClientRect(), span = show.offsetHeight - innerHeight; scrollTo({ top: scrollY + r.top + span * (n + .5) / devs.length, behavior: 'smooth' }); } else pick(n); }); d.addEventListener('mouseenter', () => pick(n)); });
-  show.addEventListener('focusin', () => paused = true);
-  show.addEventListener('focusout', () => paused = false);
-  show.addEventListener('mouseenter', () => paused = true);
-  show.addEventListener('mouseleave', () => paused = false);
-  addEventListener('resize', place);
-  setTimeout(place, 600);
-  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) setInterval(() => { if (!paused && !narrow.matches && !document.hidden) pick((cur + 1) % devs.length); }, 3500);
-  let mi = 0;
-  const slides = car ? [...car.children] : [];
   const onScroll = () => {
     show.style.setProperty('--vh', innerHeight + 'px');
-    if (!narrow.matches || !car) return;
-    const nav = document.querySelector('.nav');
-    show.style.setProperty('--navh', (nav ? nav.offsetHeight : 64) + 'px');
-    const span = show.offsetHeight - innerHeight, p = span > 0 ? -show.getBoundingClientRect().top / span : 0;
-    const i = Math.max(0, Math.min(slides.length - 1, Math.floor(p * slides.length)));
-    if (i === mi && slides[i].classList.contains('on')) return;
-    car.dataset.dir = i >= mi ? 'down' : 'up';
-    slides.forEach((s, n) => { s.classList.toggle('on', n === i); s.classList.toggle('out', n === mi && n !== i); });
-    mi = i; pick(i);
+    show.style.setProperty('--navh', navH() + 'px');
+    const p = (navH() - show.getBoundingClientRect().top) / range();
+    pick(Math.max(0, Math.min(devs.length - 1, Math.floor(p * devs.length))));
   };
+  devs.forEach((d, n) => d.addEventListener('click', () => {
+    scrollTo({ top: scrollY + show.getBoundingClientRect().top - navH() + range() * (n + .5) / devs.length, behavior: 'smooth' });
+  }));
   addEventListener('scroll', onScroll, { passive: true });
-  addEventListener('resize', onScroll);
-  pick(0); onScroll();
+  addEventListener('resize', () => { onScroll(); place(); });
+  onScroll(); setTimeout(place, 600);
 });
