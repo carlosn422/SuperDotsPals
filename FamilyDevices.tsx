@@ -113,20 +113,18 @@ export function DeviceSelect({options,selected,defaultId,onSelect}:{options:Devi
  </>;
 }
 
-export function FamilyDevicesScreen({onBack,childName,onStart,openId}:{onBack:()=>void;childName:(id:string)=>string;onStart?:(device:FamilyDevice)=>void;openId?:string}){
+type DeviceSheet={kind:'all'}|{kind:'device';id:string;fromAll:boolean}|null;
+/** All devices on one screen: up to two cards, the rest in a slide-up list; a device's settings slide up too. */
+export function FamilyDevicesScreen({childName,onStart}:{childName:(id:string)=>string;onStart?:(device:FamilyDevice)=>void}){
  const {devices,defaultId,commands,sessions,loaded}=useFamilyDevices();
- const [adding,setAdding]=useState(false),[detail,setDetail]=useState<string|null>(openId||null),[now,setNow]=useState(Date.now());
+ const [adding,setAdding]=useState(false),[sheet,setSheet]=useState<DeviceSheet>(null),[now,setNow]=useState(Date.now());
  useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),15000);return()=>clearInterval(t)},[]);
- const open=devices.find(d=>d.id===detail);
- if(open)return <DeviceSettings device={open} isDefault={defaultId===open.id} now={now} onBack={()=>setDetail(null)}/>;
- return <View style={{gap:14}}>
-  <TouchableOpacity accessibilityRole="button" onPress={onBack} style={s.back}><Ionicons name="chevron-back" size={20} color={T.primary}/><Text style={s.backText}>Family</Text></TouchableOpacity>
-  <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8}}>
-   <Text style={s.title} accessibilityRole="header">Family Devices</Text>
-   <TouchableOpacity accessibilityRole="button" onPress={()=>setAdding(a=>!a)} style={s.tonalPill}><Ionicons name={adding?'close':'add'} size={18} color={T.primary}/><Text style={s.tonalText}>{adding?'Close':'Add device'}</Text></TouchableOpacity>
-  </View>
-  {adding?<AddDevice onDone={()=>setAdding(false)}/>:null}
-  {!loaded?<ActivityIndicator color={T.primary}/>:null}
+ const open=sheet?.kind==='device'?devices.find(d=>d.id===sheet.id):undefined;
+ useEffect(()=>{if(sheet?.kind==='device'&&loaded&&!open)setSheet(null)},[sheet,loaded,open]);
+ // Close the sheet first so the timer sheet isn't stacked on top of it.
+ const startFromSheet=onStart?(d:FamilyDevice)=>{setSheet(null);setTimeout(()=>onStart(d),400)}:undefined;
+ const card=(d:FamilyDevice,inSheet:boolean)=><DeviceCard key={d.id} device={d} isDefault={defaultId===d.id} commands={commands} sessions={sessions} now={now} childName={childName} onOpen={()=>setSheet({kind:'device',id:d.id,fromAll:inSheet})} onStart={inSheet?startFromSheet:onStart}/>;
+ const phone=<React.Fragment key="phone">
   <View style={s.card}>
    <View style={s.deviceRow}>
     <IconTile icon="phone-portrait" color="#4A8CFF" size={52}/>
@@ -137,8 +135,28 @@ export function FamilyDevicesScreen({onBack,childName,onStart,openId}:{onBack:()
     {defaultId===PHONE?null:<TouchableOpacity accessibilityRole="button" accessibilityLabel="Make This iPhone the default device" onPress={()=>void rpc('family_device_clear_default',{}).catch(e=>Alert.alert('Family Devices',e.message))} style={s.textBtn}><Text style={s.link}>Make default</Text></TouchableOpacity>}
    </View>
   </View>
-  {devices.map(d=><DeviceCard key={d.id} device={d} isDefault={defaultId===d.id} commands={commands} sessions={sessions} now={now} childName={childName} onOpen={()=>setDetail(d.id)} onStart={onStart}/>)}
+ </React.Fragment>;
+ const items=[...devices.map(d=>({id:d.id,node:card(d,false)})),{id:PHONE,node:phone}];
+ return <View style={{gap:14}}>
+  <View style={{flexDirection:'row',justifyContent:'flex-end'}}>
+   <TouchableOpacity accessibilityRole="button" onPress={()=>setAdding(a=>!a)} style={s.tonalPill}><Ionicons name={adding?'close':'add'} size={18} color={T.primary}/><Text style={s.tonalText}>{adding?'Close':'Add device'}</Text></TouchableOpacity>
+  </View>
+  {adding?<AddDevice onDone={()=>setAdding(false)}/>:null}
+  {!loaded?<ActivityIndicator color={T.primary}/>:null}
+  {items.slice(0,2).map(x=>x.node)}
+  {items.length>2?<TouchableOpacity accessibilityRole="button" onPress={()=>setSheet({kind:'all'})} style={s.showAll}><Text style={s.link}>Show all ({items.length})</Text><Ionicons name="chevron-up" size={16} color={T.primary}/></TouchableOpacity>:null}
   {loaded&&!devices.length&&!adding?<Text style={s.sub}>No family devices yet. On the iPad, install MoodPals and tap “Link as a Family Device.”</Text>:null}
+  <Modal visible={!!sheet} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setSheet(null)}>
+   <ScrollView style={{flex:1,backgroundColor:T.background}} contentContainerStyle={{padding:20,paddingBottom:48,gap:14}} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+    <View style={s.grabber}/>
+    {open&&sheet?.kind==='device'?<DeviceSettings device={open} isDefault={defaultId===open.id} now={now} backLabel={sheet.fromAll?'All devices':undefined} onBack={()=>setSheet({kind:'all'})} onClose={()=>setSheet(null)}/>
+    :sheet?.kind==='all'?<>
+     <View style={{flexDirection:'row',alignItems:'center',gap:12}}><Text style={[s.title,{flex:1}]} accessibilityRole="header">All devices</Text><TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={()=>setSheet(null)} style={s.closeBtn}><Ionicons name="close" size={22} color={T.ink}/></TouchableOpacity></View>
+     {devices.map(d=>card(d,true))}
+     {phone}
+    </>:null}
+   </ScrollView>
+  </Modal>
  </View>;
 }
 
@@ -203,7 +221,7 @@ function SettingRow({label,value,children,onPress,danger,last}:{label:string;val
 }
 
 /** Settings-style details for rarely changed things: name, default, Screen Time, recovery code, removal. */
-function DeviceSettings({device,isDefault,now,onBack}:{device:FamilyDevice;isDefault:boolean;now:number;onBack:()=>void}){
+function DeviceSettings({device,isDefault,now,onBack,onClose,backLabel}:{device:FamilyDevice;isDefault:boolean;now:number;onBack:()=>void;onClose:()=>void;backLabel?:string}){
  const [name,setName]=useState(device.name),[busy,setBusy]=useState(false),[error,setError]=useState('');
  useEffect(()=>setName(device.name),[device.name]);
  const act=async(fn:()=>Promise<unknown>)=>{setBusy(true);setError('');try{await fn()}catch(e:any){setError(e.message)}finally{setBusy(false)}};
@@ -213,8 +231,8 @@ function DeviceSettings({device,isDefault,now,onBack}:{device:FamilyDevice;isDef
  const forceRemove=()=>Alert.alert('Remove now?','Use this if the device is lost or offline. Write down its recovery code first: '+device.recovery_code+'. Enter it on the device under Parent recovery to lift its pauses.',[{text:'Cancel',style:'cancel'},{text:'Remove now',style:'destructive',onPress:()=>void act(async()=>{await guard();await rpc('family_device_remove',{p_device:device.id})})}]);
  const screenTime=device.auth_status==='approved'?(device.auth_kind==='child'?'Family Sharing child':'This device'):device.auth_status==='denied'?'Not allowed':'Not set up';
  return <View style={{gap:14}}>
-  <TouchableOpacity accessibilityRole="button" onPress={onBack} style={s.back}><Ionicons name="chevron-back" size={20} color={T.primary}/><Text style={s.backText}>Family Devices</Text></TouchableOpacity>
-  <Text style={s.title} accessibilityRole="header" numberOfLines={1}>{device.name}</Text>
+  {backLabel?<TouchableOpacity accessibilityRole="button" onPress={onBack} style={s.back}><Ionicons name="chevron-back" size={20} color={T.primary}/><Text style={s.backText}>{backLabel}</Text></TouchableOpacity>:null}
+  <View style={{flexDirection:'row',alignItems:'center',gap:12}}><IconTile icon={device.device_type==='ipad'?'tablet-landscape':'phone-portrait'} color="#4A8CFF" size={52}/><Text style={[s.title,{flex:1}]} accessibilityRole="header" numberOfLines={1}>{device.name}</Text><TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} style={s.closeBtn}><Ionicons name="close" size={22} color={T.ink}/></TouchableOpacity></View>
   <View style={s.group}>
    <SettingRow label="Name"><TextInput style={s.setInput} value={name} onChangeText={setName} onEndEditing={rename} returnKeyType="done" maxLength={60} editable={!busy} accessibilityLabel="Device name"/></SettingRow>
    <SettingRow label="Default device" last><Switch value={isDefault} disabled={busy} trackColor={{true:T.primary}} onValueChange={v=>void act(()=>v?rpc('family_device_set_default',{p_device:device.id}):rpc('family_device_clear_default',{}))} accessibilityLabel="Default device"/></SettingRow>
@@ -288,6 +306,8 @@ const s=StyleSheet.create({
  select:{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#fff',borderRadius:18,borderWidth:1.5,borderColor:T.border,paddingHorizontal:14,paddingVertical:10,minHeight:64},
  selectLink:{fontSize:15,fontWeight:'800',color:T.primary},
  sheet:{backgroundColor:'#fff',borderTopLeftRadius:28,borderTopRightRadius:28,padding:22,paddingBottom:40,gap:10,maxHeight:'85%'},
+ showAll:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6,alignSelf:'center',minHeight:44,paddingHorizontal:16},
+ closeBtn:{width:40,height:40,borderRadius:20,backgroundColor:'#fff',alignItems:'center',justifyContent:'center'},
  grabber:{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'},
  sheetTitle:{fontSize:22,fontWeight:'900',color:T.ink,marginBottom:4},
  opt:{flexDirection:'row',alignItems:'center',gap:12,borderRadius:18,borderWidth:1.5,borderColor:T.border,padding:12,minHeight:64},
