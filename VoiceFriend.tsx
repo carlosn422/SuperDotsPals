@@ -162,7 +162,7 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
 }
 const TOPICS=[{e:'😮‍💨',l:'Rough day'},{e:'😊',l:'Good news'},{e:'😴',l:"Can't sleep"}];
 // The pal is the call button: tap it, or a quick start, to call.
-export function BuddyCall({companion,name,onCall,onType}:{companion:string;name?:string;onCall:(topic?:string)=>void;onType:()=>void}){
+export function BuddyCall({companion,name,onCall}:{companion:string;name?:string;onCall:(topic?:string)=>void}){
  const reduce=useReduceMotion();
  const p=useRef(new Animated.Value(0)).current;
  useEffect(()=>{if(reduce)return;const a=Animated.loop(Animated.timing(p,{toValue:1,duration:2200,easing:Easing.out(Easing.ease),useNativeDriver:true}));a.start();return()=>a.stop()},[reduce]);
@@ -199,7 +199,6 @@ export function BuddyCall({companion,name,onCall,onType}:{companion:string;name?
    </TouchableOpacity>
   </Modal>
   <View style={b.quick}>{TOPICS.map(t=><TouchableOpacity key={t.l} accessibilityRole="button" accessibilityLabel={'Call about: '+t.l} onPress={()=>onCall(t.l)} style={b.q}><Text style={b.qText}>{t.e} {t.l}</Text></TouchableOpacity>)}</View>
-  <View style={b.fab}><RoundButton icon="chatbubble-ellipses" label="Chat" tint="#8A63D2" bg="#F4EBFF" a11y="Type a message instead" onPress={onType}/></View>
  </View>;
 }
 export function RoundButton({icon,label,tint,bg,a11y,onPress}:{icon:any;label:string;tint:string;bg:string;a11y:string;onPress:()=>void}){
@@ -209,7 +208,6 @@ export function RoundButton({icon,label,tint,bg,a11y,onPress}:{icon:any;label:st
  </TouchableOpacity>;
 }
 const b=StyleSheet.create({
- fab:{position:'absolute',right:0,top:250},
  voice:{alignSelf:'center',flexDirection:'row',alignItems:'center',gap:5,backgroundColor:'#E4F6EA',borderRadius:14,paddingHorizontal:11,paddingVertical:6},voiceText:{fontSize:13,fontWeight:'800',color:'#2E8F64'},
  backdrop:{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(20,30,35,0.35)'},
  sheet:{backgroundColor:'#fff',borderTopLeftRadius:28,borderTopRightRadius:28,padding:20,paddingBottom:40,gap:12},

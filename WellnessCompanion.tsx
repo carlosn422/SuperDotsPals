@@ -74,15 +74,16 @@ export default function WellnessCompanion({companion,color,initialView='checkin'
   catch(e:any){Alert.alert('Could not save',e?.message||'Try again.')}
  }
  return <View style={s.container}>
- {view!=='checkin'?<><View style={s.header}><SuperdotMascot id={companion} color={color} size={66}/><View style={{flex:1}}><Text style={s.title}>{view==='chat'?'Your buddy':'Stress diary'}</Text><Text style={s.sub}>{view==='chat'?'Here whenever you want to talk.':'See what drives your stress over time.'}</Text></View></View>
+ {view!=='checkin'?<><View style={s.header}><SuperdotMascot id={companion} color={color} size={66}/><View style={{flex:1}}><Text style={s.title}>{view==='chat'?'Your buddy':'Stress diary'}</Text><Text style={s.sub}>{view==='chat'?'Here whenever you want to talk.':'See what drives your stress over time.'}</Text></View>
+ {view==='chat'?(typing?<RoundButton icon="call" label="Call" tint="#2E8F64" bg="#34B37E" a11y="Call your buddy" onPress={()=>{setTyping(false);call()}}/>:<RoundButton icon="chatbubble-ellipses" label="Chat" tint="#8A63D2" bg="#F4EBFF" a11y="Type a message instead" onPress={()=>setTyping(true)}/>):null}</View>
  <View style={s.tabs}>{(['chat','history'] as const).map(t=><TouchableOpacity key={t} onPress={()=>t==='chat'&&!isPlus?showPaywall('reflections'):setView(t)} style={[s.tab,view===t&&{backgroundColor:color}]}><Text style={[s.tabText,view===t&&{color:'#fff'}]}>{t==='chat'?'Buddy':'Stress diary'}</Text></TouchableOpacity>)}</View></>:null}
  {view==='checkin'?<MoodCheckinWizard color={color} onShareWithCircle={onShareWithCircle} onSaved={nextMood=>onMoodSaved?.(nextMood)} onDone={()=>onCheckinDone?.()} onJournal={()=>setView('history')} onInsights={()=>onOpenInsights?.()} onFindVerse={(selectedMood,answers)=>onFindVerse?.(selectedMood,answers)} onNavigate={onWizardNavigate} onExploreAI={selectedMood=>{setChatText("I'd like to explore feeling "+selectedMood+". Please ask me one supportive, open-ended question.");setTyping(true);setView('chat');}}/>:null}
  <VoiceFriend visible={talking} onClose={()=>setTalking(false)} companion={companion} topic={topic}/>
- {view==='chat'&&!typing?<BuddyCall companion={companion} name={firstName} onCall={call} onType={()=>setTyping(true)}/>:null}
+ {view==='chat'&&!typing?<BuddyCall companion={companion} name={firstName} onCall={call}/>:null}
  {view==='chat'&&typing?<View style={s.card}>
   <StressContextBar chips={ctx.chips}/>
   <View>
-  <ScrollView ref={scroller} style={{maxHeight:420}} contentContainerStyle={{gap:10,paddingBottom:74}} onContentSizeChange={()=>scroller.current?.scrollToEnd({animated:true})}>
+  <ScrollView ref={scroller} style={{maxHeight:420}} contentContainerStyle={{gap:10}} onContentSizeChange={()=>scroller.current?.scrollToEnd({animated:true})}>
    {messages.length===0&&!pending?<Text style={s.sub}>Ask anything about your stress, sleep or mood. MoodPal sees today's readings above plus your recent diary.</Text>:null}
    {messages.map(m=><View key={m.id} style={{gap:6,alignSelf:m.role==='user'?'flex-end':'flex-start',maxWidth:'92%'}}>
     <View style={[s.message,{maxWidth:'100%',backgroundColor:m.role==='user'?'#DDF3E6':'#F2F4F4'}]}><Text style={s.messageText}>{m.content}</Text></View>
@@ -98,7 +99,6 @@ export default function WellnessCompanion({companion,color,initialView='checkin'
     <TouchableOpacity accessibilityRole="button" onPress={()=>void send(failed.text)} style={[s.action,{backgroundColor:'#FDE8EC'}]}><Ionicons name="refresh" size={13} color="#C2546B"/><Text style={[s.actionText,{color:'#C2546B'}]}>Retry</Text></TouchableOpacity>
    </View>:null}
   </ScrollView>
-  <View style={{position:'absolute',right:0,bottom:0}}><RoundButton icon="call" label="Call" tint="#2E8F64" bg="#34B37E" a11y="Call your buddy" onPress={()=>{setTyping(false);call()}}/></View>
   </View>
   {!busy?<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:7}}>{promptsFor(ctx.level).map(p=><TouchableOpacity key={p} onPress={()=>void send(p)} style={s.prompt}><Text style={s.promptText}>{p}</Text></TouchableOpacity>)}</ScrollView>:null}
   <TextInput style={s.input} multiline placeholder="Ask MoodPal about your stress, sleep or mood..." placeholderTextColor="#9AA7AD" value={chatText} onChangeText={setChatText}/>
