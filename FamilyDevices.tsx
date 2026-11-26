@@ -1,5 +1,5 @@
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
-import {ActivityIndicator,Alert,Modal,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native';
+import {ActionSheetIOS,ActivityIndicator,Alert,Modal,ScrollView,StyleSheet,Switch,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {supabase} from './supabase';
 import {APP_THEME as T} from './MoodMascot';
@@ -73,7 +73,7 @@ export function deviceStatus(d:FamilyDevice,commands:DeviceCommand[],sessions:Re
  if(d.auth_status!=='approved')return {label:'Authorization required',tone:'warn'};
  if(sessions.some(s=>s.family_device_id===d.id&&Date.parse(s.deadline_at)>now))return {label:'Timer active',tone:'busy'};
  if(stale&&d.last_sync_at&&now-Date.parse(d.last_sync_at)>60*60000)return {label:'Device unavailable',tone:'warn'};
- if(d.restricted)return {label:'Apps restricted',tone:'ok'};
+ if(d.restricted)return {label:'Apps paused',tone:'ok'};
  return {label:'Ready',tone:'ok'};
 }
 
@@ -112,72 +112,125 @@ export function DeviceSelect({options,selected,defaultId,onSelect}:{options:Devi
  </>;
 }
 
-export function FamilyDevicesScreen({onBack,childName}:{onBack:()=>void;childName:(id:string)=>string}){
+export function FamilyDevicesScreen({onBack,childName,onStart}:{onBack:()=>void;childName:(id:string)=>string;onStart?:(device:FamilyDevice)=>void}){
  const {devices,defaultId,commands,sessions,loaded}=useFamilyDevices();
- const [adding,setAdding]=useState(false),[open,setOpen]=useState<string|null>(null);
- const now=Date.now();
+ const [adding,setAdding]=useState(false),[detail,setDetail]=useState<string|null>(null),[now,setNow]=useState(Date.now());
+ useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),15000);return()=>clearInterval(t)},[]);
+ const open=devices.find(d=>d.id===detail);
+ if(open)return <DeviceSettings device={open} isDefault={defaultId===open.id} now={now} onBack={()=>setDetail(null)}/>;
  return <View style={{gap:14}}>
   <TouchableOpacity accessibilityRole="button" onPress={onBack} style={s.back}><Ionicons name="chevron-back" size={20} color={T.primary}/><Text style={s.backText}>Family</Text></TouchableOpacity>
-  <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
+  <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8}}>
    <Text style={s.title} accessibilityRole="header">Family Devices</Text>
-   <TouchableOpacity accessibilityRole="button" onPress={()=>setAdding(a=>!a)} style={s.addBtn}><Ionicons name={adding?'close':'add'} size={18} color="#fff"/><Text style={s.addBtnText}>{adding?'Close':'Add Device'}</Text></TouchableOpacity>
+   <TouchableOpacity accessibilityRole="button" onPress={()=>setAdding(a=>!a)} style={s.tonalPill}><Ionicons name={adding?'close':'add'} size={18} color={T.primary}/><Text style={s.tonalText}>{adding?'Close':'Add device'}</Text></TouchableOpacity>
   </View>
-  <Text style={s.sub}>Link an iPad or spare iPhone your kids share. Choose who's using it each time you start a timer.</Text>
   {adding?<AddDevice onDone={()=>setAdding(false)}/>:null}
   {!loaded?<ActivityIndicator color={T.primary}/>:null}
-  <View style={[s.card,{paddingVertical:4,gap:0}]}>
-   <DefaultRow name="This iPhone" icon="phone-portrait-outline" detail="Lend your own iPhone" isDefault={defaultId===PHONE} onDefault={()=>void rpc('family_device_clear_default',{}).catch(e=>Alert.alert('Family Devices',e.message))}/>
-   {devices.map(d=>{const st=deviceStatus(d,commands,sessions,now);const active=sessions.find(x=>x.family_device_id===d.id);return <View key={d.id} style={s.line}>
-    <TouchableOpacity accessibilityRole="button" onPress={()=>setOpen(open===d.id?null:d.id)} style={s.row}>
-     <Ionicons name={d.device_type==='ipad'?'tablet-portrait-outline':'phone-portrait-outline'} size={24} color={T.ink}/>
-     <View style={{flex:1}}>
-      <Text style={s.rowTitle}>{d.name}{defaultId===d.id?' · Default':''}</Text>
-      <Text style={s.sub}>{active?childName(active.child_id)+' · '+Math.max(1,Math.ceil((Date.parse(active.deadline_at)-now)/60000))+' min left':st.label} · {lastSeen(d,now)}</Text>
-     </View>
-     <View style={[s.dot,{backgroundColor:st.tone==='warn'?'#E0A030':st.tone==='busy'?T.primary:'#2FB574'}]}/>
-     <Ionicons name={open===d.id?'chevron-up':'chevron-down'} size={18} color={T.muted}/>
-    </TouchableOpacity>
-    {open===d.id?<DeviceDetail device={d} isDefault={defaultId===d.id}/>:null}
-   </View>})}
+  <View style={s.card}>
+   <View style={s.deviceRow}>
+    <View style={s.deviceIcon}><Ionicons name="phone-portrait-outline" size={28} color={T.ink}/></View>
+    <View style={{flex:1}}>
+     <View style={s.nameLine}><Text style={s.rowTitle} numberOfLines={1}>This iPhone</Text>{defaultId===PHONE?<DefaultPill/>:null}</View>
+     <StatusLine icon="checkmark-circle" color={OK} text="Your iPhone"/>
+    </View>
+    {defaultId===PHONE?null:<TouchableOpacity accessibilityRole="button" accessibilityLabel="Make This iPhone the default device" onPress={()=>void rpc('family_device_clear_default',{}).catch(e=>Alert.alert('Family Devices',e.message))} style={s.textBtn}><Text style={s.link}>Make default</Text></TouchableOpacity>}
+   </View>
   </View>
+  {devices.map(d=><DeviceCard key={d.id} device={d} isDefault={defaultId===d.id} commands={commands} sessions={sessions} now={now} childName={childName} onOpen={()=>setDetail(d.id)} onStart={onStart}/>)}
   {loaded&&!devices.length&&!adding?<Text style={s.sub}>No family devices yet. On the iPad, install MoodPals and tap “Link as a Family Device.”</Text>:null}
+  <View style={s.info}><Ionicons name="information-circle-outline" size={20} color={T.muted}/><Text style={[s.sub,{flex:1}]}>Any family member can use any device. You pick who each time you start a timer.</Text></View>
  </View>;
 }
 
-function DefaultRow({name,icon,detail,isDefault,onDefault}:{name:string;icon:string;detail:string;isDefault:boolean;onDefault:()=>void}){
- return <View style={s.row}>
-  <Ionicons name={icon as any} size={24} color={T.ink}/>
-  <View style={{flex:1}}><Text style={s.rowTitle}>{name}{isDefault?' · Default':''}</Text><Text style={s.sub}>{detail}</Text></View>
-  {isDefault?null:<TouchableOpacity accessibilityRole="button" onPress={onDefault}><Text style={s.link}>Make default</Text></TouchableOpacity>}
+const OK='#2FB574',PAUSED='#C2413A';
+const seen=(d:FamilyDevice,now:number)=>lastSeen(d,now).replace(/^Seen /,'');
+function DefaultPill(){return <View style={s.pill}><Text style={s.pillText}>Default</Text></View>}
+function StatusLine({icon,color,text,busy}:{icon:string;color:string;text:string;busy?:boolean}){
+ return <View style={s.statusLine}>{busy?<ActivityIndicator size="small" color={WARN}/>:<Ionicons name={icon as any} size={16} color={color}/>}<Text style={s.statusText} numberOfLines={2}>{text}</Text></View>;
+}
+function ActionBtn({label,icon,primary,danger,onPress}:{label:string;icon:string;primary?:boolean;danger?:boolean;onPress:()=>void}){
+ return <TouchableOpacity accessibilityRole="button" onPress={onPress} style={[s.action,primary&&{backgroundColor:T.primary}]}>
+  <Ionicons name={icon as any} size={18} color={primary?'#fff':danger?PAUSED:T.ink}/>
+  <Text style={[s.actionText,primary&&{color:'#fff'},danger&&{color:PAUSED}]} numberOfLines={1}>{label}</Text>
+ </TouchableOpacity>;
+}
+
+/** One device: what it's doing now, and only the actions that fit its confirmed state. */
+function DeviceCard({device:d,isDefault,commands,sessions,now,childName,onOpen,onStart}:{device:FamilyDevice;isDefault:boolean;commands:DeviceCommand[];sessions:RemoteSession[];now:number;childName:(id:string)=>string;onOpen:()=>void;onStart?:(device:FamilyDevice)=>void}){
+ const [sending,setSending]=useState(false),[error,setError]=useState('');
+ const st=deviceStatus(d,commands,sessions,now);
+ const session=sessions.find(x=>x.family_device_id===d.id&&Date.parse(x.deadline_at)>now);
+ const failed=commands.find(c=>c.device_id===d.id&&(c.status==='rejected'||c.status==='expired')&&now-Date.parse(c.updated_at||c.created_at)<120000);
+ const ready=d.status==='active'&&d.auth_status==='approved'&&d.selection_count>0;
+ const send=async(type:string,opts:{minutes?:number}={})=>{
+  if(sending||st.pending)return;
+  setSending(true);setError('');
+  try{await deviceCommand(d.id,type,opts)}catch(e:any){setError(e.message)}finally{setSending(false)}
+ };
+ const addTime=()=>ActionSheetIOS.showActionSheetWithOptions({title:'Add time for '+childName(session!.child_id),options:['+15 min','+30 min','+1 hour','Cancel'],cancelButtonIndex:3},i=>{const m=[15,30,60][i];if(m)void send('EXTEND_SESSION',{minutes:m})});
+ const left=session?Math.max(1,Math.ceil((Date.parse(session.deadline_at)-now)/60000))+' min left':'';
+ const status=sending?{icon:'',color:WARN,text:'Sending…',busy:true}
+  :st.pending?{icon:'',color:WARN,text:st.label==='Waiting for device connection'?'Waiting for '+d.name+' to connect':'Waiting for '+d.name+'…',busy:true}
+  :d.status==='unlinking'?{icon:'alert-circle',color:WARN,text:'Removing · waiting for the device'}
+  :session?{icon:'timer-outline',color:T.primary,text:childName(session.child_id)+' · '+left}
+  :!ready?{icon:'alert-circle',color:WARN,text:d.auth_status==='approved'?'Choose apps to pause on the device':'Finish Screen Time setup on the device'}
+  :st.label==='Device unavailable'?{icon:'cloud-offline-outline',color:WARN,text:'Offline · '+seen(d,now)}
+  :d.restricted?{icon:'lock-closed',color:PAUSED,text:'Apps paused · '+seen(d,now)}
+  :{icon:'checkmark-circle',color:OK,text:'Available · '+seen(d,now)};
+ const pendingStart=st.pending?.type==='START_SESSION'?st.pending:undefined;
+ return <View style={s.card}>
+  <TouchableOpacity accessibilityRole="button" accessibilityLabel={d.name+(isDefault?', default':'')+', '+status.text+'. Device settings'} onPress={onOpen} style={s.deviceRow}>
+   <View style={s.deviceIcon}><Ionicons name={d.device_type==='ipad'?'tablet-landscape-outline':'phone-portrait-outline'} size={28} color={T.ink}/></View>
+   <View style={{flex:1}}>
+    <View style={s.nameLine}><Text style={s.rowTitle} numberOfLines={1}>{d.name}</Text>{isDefault?<DefaultPill/>:null}</View>
+    <StatusLine {...status}/>
+   </View>
+   <Ionicons name="chevron-forward" size={18} color={T.muted}/>
+  </TouchableOpacity>
+  {sending||d.status!=='active'?null:pendingStart?<View style={s.actions}><ActionBtn label="Cancel" icon="close" onPress={()=>{setSending(true);void cancelDeviceCommand(pendingStart.id).catch(e=>setError(e.message)).finally(()=>setSending(false))}}/></View>
+   :st.pending||!ready?null
+   :session?<View style={s.actions}><ActionBtn primary label="Add time" icon="add" onPress={addTime}/><ActionBtn danger label="End" icon="stop-circle-outline" onPress={()=>void send('END_SESSION')}/></View>
+   :d.restricted?<View style={s.actions}><ActionBtn primary label="Unlock apps" icon="lock-open-outline" onPress={()=>void send('UNLOCK_APPS')}/>{onStart?<ActionBtn label="Start timer" icon="time-outline" onPress={()=>onStart(d)}/>:null}</View>
+   :<View style={s.actions}>{onStart?<ActionBtn primary label="Start timer" icon="time-outline" onPress={()=>onStart(d)}/>:null}<ActionBtn label="Pause apps" icon="lock-closed-outline" onPress={()=>void send('LOCK_APPS')}/></View>}
+  {failed&&!st.pending?<Text style={[s.sub,{color:PAUSED}]}>{failed.error||'The device couldn’t do that.'}</Text>:null}
+  {error?<Text style={[s.sub,{color:PAUSED}]}>{error}</Text>:null}
  </View>;
 }
 
-function DeviceDetail({device,isDefault}:{device:FamilyDevice;isDefault:boolean}){
+function SettingRow({label,value,children,onPress,danger,last}:{label:string;value?:string;children?:React.ReactNode;onPress?:()=>void;danger?:boolean;last?:boolean}){
+ const body=<><Text style={[s.setLabel,danger&&{color:PAUSED}]}>{label}</Text>{value!=null?<Text style={s.setValue} numberOfLines={1}>{value}</Text>:null}{children}</>;
+ return onPress?<TouchableOpacity accessibilityRole="button" onPress={onPress} style={[s.setRow,!last&&s.setLine]}>{body}</TouchableOpacity>:<View style={[s.setRow,!last&&s.setLine]}>{body}</View>;
+}
+
+/** Settings-style details for rarely changed things: name, default, Screen Time, recovery code, removal. */
+function DeviceSettings({device,isDefault,now,onBack}:{device:FamilyDevice;isDefault:boolean;now:number;onBack:()=>void}){
  const [name,setName]=useState(device.name),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ useEffect(()=>setName(device.name),[device.name]);
  const act=async(fn:()=>Promise<unknown>)=>{setBusy(true);setError('');try{await fn()}catch(e:any){setError(e.message)}finally{setBusy(false)}};
- const remove=()=>Alert.alert('Remove '+device.name+'?','MoodPals pauses on it are lifted when it next connects. History is kept.',[{text:'Cancel',style:'cancel'},{text:'Remove',style:'destructive',onPress:()=>void act(async()=>{
-  if(!await authenticateGuardian('Remove '+device.name))throw Error('Confirm with Face ID or your passcode to remove a device.');
-  await deviceCommand(device.id,'UNLINK_DEVICE');
- })}]);
- const forceRemove=()=>Alert.alert('Remove now?','Use this if the device is lost or offline. Write down its recovery code first: '+device.recovery_code+'. Enter it on the device under Parent recovery to lift its pauses.',[{text:'Cancel',style:'cancel'},{text:'Remove now',style:'destructive',onPress:()=>void act(async()=>{
-  if(!await authenticateGuardian('Remove '+device.name))throw Error('Confirm with Face ID or your passcode to remove a device.');
-  await rpc('family_device_remove',{p_device:device.id});
- })}]);
- return <View style={s.detail}>
-  <Text style={s.kicker}>Name</Text>
-  <View style={{flexDirection:'row',gap:8}}>
-   <TextInput style={[s.input,{flex:1}]} value={name} onChangeText={setName} maxLength={60} accessibilityLabel="Device name"/>
-   <TouchableOpacity accessibilityRole="button" disabled={busy||!name.trim()||name.trim()===device.name} onPress={()=>void act(()=>rpc('family_device_rename',{p_device:device.id,p_name:name.trim()}))} style={[s.small,(busy||!name.trim()||name.trim()===device.name)&&{opacity:.5}]}><Text style={s.smallText}>Save</Text></TouchableOpacity>
+ const rename=()=>{const n=name.trim();if(!n){setName(device.name);return}if(n!==device.name)void act(()=>rpc('family_device_rename',{p_device:device.id,p_name:n}))};
+ const guard=async()=>{if(!await authenticateGuardian('Remove '+device.name))throw Error('Confirm with Face ID or your passcode to remove a device.')};
+ const remove=()=>Alert.alert('Remove '+device.name+'?','MoodPals pauses on it are lifted when it next connects. History is kept.',[{text:'Cancel',style:'cancel'},{text:'Remove',style:'destructive',onPress:()=>void act(async()=>{await guard();await deviceCommand(device.id,'UNLINK_DEVICE')})}]);
+ const forceRemove=()=>Alert.alert('Remove now?','Use this if the device is lost or offline. Write down its recovery code first: '+device.recovery_code+'. Enter it on the device under Parent recovery to lift its pauses.',[{text:'Cancel',style:'cancel'},{text:'Remove now',style:'destructive',onPress:()=>void act(async()=>{await guard();await rpc('family_device_remove',{p_device:device.id})})}]);
+ const screenTime=device.auth_status==='approved'?(device.auth_kind==='child'?'Family Sharing child':'This device'):device.auth_status==='denied'?'Not allowed':'Not set up';
+ return <View style={{gap:14}}>
+  <TouchableOpacity accessibilityRole="button" onPress={onBack} style={s.back}><Ionicons name="chevron-back" size={20} color={T.primary}/><Text style={s.backText}>Family Devices</Text></TouchableOpacity>
+  <Text style={s.title} accessibilityRole="header" numberOfLines={1}>{device.name}</Text>
+  <View style={s.group}>
+   <SettingRow label="Name"><TextInput style={s.setInput} value={name} onChangeText={setName} onEndEditing={rename} returnKeyType="done" maxLength={60} editable={!busy} accessibilityLabel="Device name"/></SettingRow>
+   <SettingRow label="Default device" last><Switch value={isDefault} disabled={busy} trackColor={{true:T.primary}} onValueChange={v=>void act(()=>v?rpc('family_device_set_default',{p_device:device.id}):rpc('family_device_clear_default',{}))} accessibilityLabel="Default device"/></SettingRow>
   </View>
-  <Text style={s.sub}>Screen Time: {device.auth_status==='approved'?(device.auth_kind==='child'?'Family Sharing child':'This device')+' · '+device.selection_count+' to pause':device.auth_status==='denied'?'Not allowed — set it up on the device':'Set up on the device'}</Text>
-  <Text style={s.sub}>Recovery code: <Text style={{fontWeight:'900',color:T.ink}}>{device.recovery_code}</Text> — enter it on the device under Parent recovery if it can't reach MoodPals.</Text>
-  {isDefault?null:<TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>void act(()=>rpc('family_device_set_default',{p_device:device.id}))} style={s.ghost}><Text style={s.ghostText}>Make default device</Text></TouchableOpacity>}
-  {device.status==='active'&&device.auth_status==='approved'&&device.selection_count>0?<TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>void act(()=>deviceCommand(device.id,device.restricted?'UNLOCK_APPS':'LOCK_APPS'))} style={s.ghost}><Text style={s.ghostText}>{device.restricted?'Unlock apps':'Lock apps now'}</Text></TouchableOpacity>:null}
-  <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>void act(()=>deviceCommand(device.id,'REQUEST_STATUS'))} style={s.ghost}><Text style={s.ghostText}>Check status</Text></TouchableOpacity>
-  {device.status==='unlinking'?<TouchableOpacity accessibilityRole="button" disabled={busy} onPress={forceRemove} style={s.ghost}><Text style={[s.ghostText,{color:'#C2413A'}]}>Remove now</Text></TouchableOpacity>
-   :<TouchableOpacity accessibilityRole="button" disabled={busy} onPress={remove} style={s.ghost}><Text style={[s.ghostText,{color:'#C2413A'}]}>Remove device</Text></TouchableOpacity>}
+  <Text style={s.groupNote}>New timers pick the default device first. You can change it when you start one.</Text>
+  <View style={s.group}>
+   <SettingRow label="Screen Time" value={screenTime}/>
+   <SettingRow label="Apps to pause" value={device.selection_count?String(device.selection_count):'None chosen'}/>
+   <SettingRow label="Connection" value={lastSeen(device,now)} last><TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>void act(()=>deviceCommand(device.id,'REQUEST_STATUS'))} style={s.textBtn}><Text style={s.link}>Check</Text></TouchableOpacity></SettingRow>
+  </View>
+  <Text style={s.groupNote}>Change Screen Time and the apps to pause on {device.name} itself.</Text>
+  <View style={s.group}><SettingRow label="Recovery code" value={device.recovery_code} last/></View>
+  <Text style={s.groupNote}>Enter it on the device under Parent recovery if it can't reach MoodPals.</Text>
+  <View style={s.group}>{device.status==='unlinking'?<SettingRow label="Remove now" danger last onPress={busy?undefined:forceRemove}/>:<SettingRow label="Remove device" danger last onPress={busy?undefined:remove}/>}</View>
   {busy?<ActivityIndicator color={T.primary}/>:null}
-  {error?<Text style={[s.sub,{color:'#C2413A'}]}>{error}</Text>:null}
+  {error?<Text style={[s.sub,{color:PAUSED}]}>{error}</Text>:null}
  </View>;
 }
 
@@ -244,6 +297,27 @@ const s=StyleSheet.create({
  optIcon:{width:40,height:40,borderRadius:12,backgroundColor:T.primarySoft,alignItems:'center',justifyContent:'center'},
  optName:{fontSize:17,fontWeight:'800',color:T.ink},
  optSub:{fontSize:14,color:T.muted,marginTop:2},
+ tonalPill:{flexDirection:'row',alignItems:'center',gap:4,backgroundColor:T.primarySoft,borderRadius:22,paddingHorizontal:14,minHeight:44},
+ tonalText:{color:T.primary,fontWeight:'800',fontSize:15},
+ deviceRow:{flexDirection:'row',alignItems:'center',gap:14,minHeight:56},
+ deviceIcon:{width:52,height:52,borderRadius:14,backgroundColor:T.background,alignItems:'center',justifyContent:'center'},
+ nameLine:{flexDirection:'row',alignItems:'center',gap:8,flexShrink:1},
+ pill:{backgroundColor:T.primarySoft,borderRadius:8,paddingHorizontal:8,paddingVertical:2},
+ pillText:{color:T.primary,fontSize:12,fontWeight:'800'},
+ statusLine:{flexDirection:'row',alignItems:'center',gap:6,marginTop:4},
+ statusText:{flexShrink:1,fontSize:14,color:T.muted},
+ actions:{flexDirection:'row',gap:10},
+ action:{flex:1,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6,minHeight:44,borderRadius:22,backgroundColor:T.background,paddingHorizontal:12},
+ actionText:{fontSize:15,fontWeight:'800',color:T.ink},
+ textBtn:{minHeight:44,minWidth:44,justifyContent:'center',paddingHorizontal:4},
+ info:{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:T.surface,borderRadius:16,padding:14},
+ group:{backgroundColor:T.surface,borderRadius:14,borderWidth:1,borderColor:T.border,paddingLeft:16},
+ groupNote:{fontSize:12,lineHeight:17,color:T.muted,marginTop:-8,paddingHorizontal:16},
+ setRow:{flexDirection:'row',alignItems:'center',gap:12,minHeight:48,paddingRight:16},
+ setLine:{borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:T.border},
+ setLabel:{fontSize:16,color:T.ink,fontWeight:'600'},
+ setValue:{flex:1,textAlign:'right',fontSize:16,color:T.muted},
+ setInput:{flex:1,textAlign:'right',fontSize:16,color:T.ink,minHeight:44},
  chips:{flexDirection:'row',flexWrap:'wrap',gap:8,justifyContent:'center'},
  chip:{flexDirection:'row',alignItems:'center',gap:6,borderRadius:18,borderWidth:1.5,borderColor:T.border,backgroundColor:'#fff',paddingHorizontal:12,paddingVertical:8,maxWidth:240},
  chipOn:{backgroundColor:T.primary,borderColor:T.primary},

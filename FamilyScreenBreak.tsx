@@ -137,6 +137,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  const guest=useIsGuest();
  const [children,setChildren]=useState<FamilyChild[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const [route,setRoute]=useState<Route>({name:'list'}),[adding,setAdding]=useState(false);
+ const [startOn,setStartOn]=useState<FamilyDevice|null>(null);
  const family=useFamilyDevices(screenBreakSupported&&!guest&&route.name==='list');
  const load=useCallback(async()=>{
   try{const list=await loadChildren();setChildren(list);setError('');if(screenBreakSupported)setBreakChildren(list.filter(c=>!c.watch_only).map(c=>({id:c.id,name:c.name})))}
@@ -152,7 +153,10 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  },[target,loading,children]);
  const child=route.name==='child'||route.name==='insights'?children.find(c=>c.id===route.id):undefined;
  const members=children.filter(c=>!c.watch_only);
- if(route.name==='devices')return <FamilyDevicesScreen onBack={()=>setRoute({name:'list'})} childName={id=>children.find(c=>c.id===id)?.name||'Someone'}/>;
+ if(route.name==='devices')return <>
+  <FamilyDevicesScreen onBack={()=>setRoute({name:'list'})} childName={id=>children.find(c=>c.id===id)?.name||'Someone'} onStart={members.length?setStartOn:undefined}/>
+  <StartTimerSheet device={startOn} members={members} onClose={()=>setStartOn(null)}/>
+ </>;
  if(route.name==='insights'&&child)return <InsightsScreen child={child} onBack={()=>setRoute({name:'child',id:child.id})}/>;
  if(route.name==='child'&&child)return <ChildScreen child={child} children={children} onBack={()=>setRoute({name:'list'})} onInsights={()=>setRoute({name:'insights',id:child.id})} onChanged={()=>{void load();familyChildrenChanged()}} onRemoved={()=>{setRoute({name:'list'});void load()}} onAddWatch={onAddWatch} onOpen={id=>setRoute({name:'child',id})}/>;
  return <View style={{gap:14}}>
@@ -179,6 +183,50 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
   </>}
   {footer?<View style={{marginTop:10}}>{footer}</View>:null}
  </View>;
+}
+
+/** Starting a timer from a device card: who and how long in one sheet. Members with a timer elsewhere can't be picked. */
+function StartTimerSheet({device,members,onClose}:{device:FamilyDevice|null;members:FamilyChild[];onClose:()=>void}){
+ const family=useFamilyDevices(!!device);
+ const [state]=useBreakState();
+ const [child,setChild]=useState<string|null>(null),[minutes,setMinutes]=useState(30),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ useEffect(()=>{
+  if(!device)return;
+  setChild(null);setError('');
+  void AsyncStorage.getItem(LAST_MINUTES_KEY).then(v=>{const n=Number(v);if(n>=5&&n<=180)setMinutes(Math.round(n/5)*5)});
+ },[device?.id]);
+ if(!device)return null;
+ const now=Date.now(),phone=state?.session?.status==='active'?state.session.childId:undefined;
+ const session=family.sessions.find(x=>x.family_device_id===device.id&&Date.parse(x.deadline_at)>now);
+ const busyElsewhere=(id:string)=>id===phone||!!deviceInUse(id,family,now);
+ const sel=child&&!busyElsewhere(child)?child:members.find(c=>!busyElsewhere(c.id))?.id;
+ const who=(id:string)=>members.find(c=>c.id===id)?.name||'Someone';
+ const start=async()=>{
+  if(!sel)return;
+  setBusy(true);setError('');
+  try{
+   await deviceCommand(device.id,'START_SESSION',{minutes,child:sel,replace:!!session});
+   void AsyncStorage.setItem(LAST_MINUTES_KEY,String(minutes));
+   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(()=>{});
+   onClose();
+  }catch(e:any){setError(e.message)}
+  finally{setBusy(false)}
+ };
+ return <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+  <View style={{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(29,43,51,0.3)'}}>
+   <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close"/>
+   <View style={[st.sheet,{alignItems:'center'}]}>
+    <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6'}}/>
+    <Text style={st.sheetTitle} numberOfLines={1}>Start timer on {device.name}</Text>
+    <View style={st.chips}>{members.map(c=><Chip key={c.id} label={c.name} on={c.id===sel} disabled={busyElsewhere(c.id)} onPress={()=>setChild(c.id)}/>)}</View>
+    {members.some(c=>busyElsewhere(c.id))?<Text style={st.sub}>Dimmed members already have a timer running.</Text>:null}
+    {session?<ReplaceNote name={who(session.child_id)} ms={Date.parse(session.deadline_at)-now}/>:null}
+    <DurationRing minutes={minutes} onChange={setMinutes} min={5} max={180}/>
+    <TouchableOpacity accessibilityRole="button" disabled={busy||!sel} onPress={()=>void start()} style={[st.cta,{alignSelf:'stretch'},(busy||!sel)&&{opacity:.5}]}>{busy?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>Start {formatDuration(minutes*60)}</Text>}</TouchableOpacity>
+    {error?<Text style={[st.sub,{color:red,textAlign:'center'}]}>{error}</Text>:null}
+   </View>
+  </View>
+ </Modal>;
 }
 
 /** The family device a member's timer runs or is starting on. */
