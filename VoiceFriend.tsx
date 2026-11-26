@@ -51,7 +51,9 @@ export default function VoiceFriend({visible,onClose,companion='calm'}:{visible:
   a.start();return()=>a.stop()},[phase,reduce]);
 
  useEffect(()=>{if(!visible)return;
-  let alive=true,ws:WebSocket|null=null,ctx:AudioContext|null=null,recorder:AudioRecorder|null=null,timer:any=null,decoding=Promise.resolve(),turn=0,playEnd=0,lastChunk=0,hangup:any=null;
+  let alive=true,ws:WebSocket|null=null,ctx:AudioContext|null=null,recorder:AudioRecorder|null=null,timer:any=null,decoding=Promise.resolve(),turn=0,playEnd=0,lastChunk=0,hangup:any=null,callId:string|null=null,callStart=0;
+  const use={inText:0,inAudio:0,outText:0,outAudio:0};
+  const add=(d:any[]|undefined,into:'in'|'out')=>{for(const x of d||[]){const n=Number(x?.tokenCount)||0;if(x?.modality==='AUDIO')use[into==='in'?'inAudio':'outAudio']+=n;else use[into==='in'?'inText':'outText']+=n}};
   setPhase('connecting');setCaption('');setError('');setSaved(null);setMuted(false);
   const fail=(m:string)=>{if(!alive)return;setError(m);setPhase('error')};
   (async()=>{
@@ -61,6 +63,7 @@ export default function VoiceFriend({visible,onClose,companion='calm'}:{visible:
     const {data,error:fnError}=await supabase.functions.invoke('voice-live-token',{body:{voice:gender}});
     if(fnError){let msg='Could not start the call. Please try again.';try{const d=await (fnError as any).context?.json?.();if(d?.code==='plus_required'){onClose();showPaywall('reflections');return}if(d?.error)msg=d.error}catch{}return fail(msg)}
     if(!alive||!data?.token)return;
+    callId=data.callId||null;callStart=Date.now();
     AudioManager.setSystemOptions({ios:{category:'playAndRecord',mode:'voiceChat',options:['defaultToSpeaker','allowBluetoothHFP']}});
     await AudioManager.setAudioSessionActivity(true);
     ctx=new AudioContext({sampleRate:24000});
@@ -115,11 +118,13 @@ export default function VoiceFriend({visible,onClose,companion='calm'}:{visible:
       }));
       ws?.send(JSON.stringify({toolResponse:{functionResponses:responses}}));
      }
+     if(m.usageMetadata){add(m.usageMetadata.promptTokensDetails,'in');add(m.usageMetadata.responseTokensDetails,'out');use.outText+=Number(m.usageMetadata.thoughtsTokenCount)||0}
      if(m.goAway)setTimeout(()=>ws?.close(),1000);
     };
    }catch(e:any){fail(e?.message||'Could not start the call.')}
   })();
-  return()=>{alive=false;clearTimeout(timer);clearInterval(hangup);try{recorder?.clearOnAudioReady();void recorder?.stop()}catch{}try{ws?.close()}catch{}void ctx?.close().catch(()=>{});void AudioManager.setAudioSessionActivity(false).catch(()=>{})};
+  return()=>{alive=false;clearTimeout(timer);clearInterval(hangup);
+   if(callId)void supabase.rpc('finish_voice_call',{p_call_id:callId,p_seconds:Math.round((Date.now()-callStart)/1000),p_input_text:use.inText,p_input_audio:use.inAudio,p_output_text:use.outText,p_output_audio:use.outAudio});try{recorder?.clearOnAudioReady();void recorder?.stop()}catch{}try{ws?.close()}catch{}void ctx?.close().catch(()=>{});void AudioManager.setAudioSessionActivity(false).catch(()=>{})};
  },[visible]);
 
  async function undo(){if(!saved)return;const id=saved.id;setSaved(null);await supabase.from('wellness_journal').delete().eq('id',id)}

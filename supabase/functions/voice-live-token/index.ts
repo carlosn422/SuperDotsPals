@@ -45,8 +45,21 @@ Deno.serve(async req=>{
   const {data:plus,error:plusError}=await adminDb.rpc("has_plus",{uid:user.id});
   if(plusError)return new Response(JSON.stringify({error:"Could not check your plan. Please try again."}),{status:503,headers});
   if(plus!==true)return new Response(JSON.stringify({error:"Talking with your MoodPal is part of MoodPals Plus.",code:"plus_required"}),{status:402,headers});
+  const monthStart=new Date();monthStart.setUTCDate(1);monthStart.setUTCHours(0,0,0,0);
+  const [{data:cfg,error:cfgError},{data:calls,error:callsError}]=await Promise.all([
+   adminDb.from("voice_settings").select("monthly_minutes_cap").eq("id",true).maybeSingle(),
+   adminDb.from("voice_calls").select("started_at,duration_seconds").eq("user_id",user.id).gte("started_at",monthStart.toISOString())
+  ]);
+  if(cfgError||callsError)return new Response(JSON.stringify({error:"Could not check your voice minutes. Please try again."}),{status:503,headers});
+  const cap=Number(cfg?.monthly_minutes_cap??60);
+  // Calls that never reported an end count as their elapsed time, up to one full call.
+  const usedSeconds=(calls||[]).reduce((t,c)=>t+(c.duration_seconds??Math.min(SESSION_MINUTES*60,(Date.now()-Date.parse(c.started_at))/1000)),0);
+  const minutesLeft=Math.floor(cap-usedSeconds/60);
+  if(minutesLeft<1)return new Response(JSON.stringify({error:`You've used your ${cap} voice minutes for this month. They reset on the 1st.`,code:"voice_limit",cap}),{status:402,headers});
+  const minutes=Math.min(SESSION_MINUTES,minutesLeft);
   const payload=await req.json().catch(()=>({}));
-  const voice=VOICES[payload?.voice==="male"?"male":"female"];
+  const gender=payload?.voice==="male"?"male":"female";
+  const voice=VOICES[gender];
   const [{data:moods},{data:journal}]=await Promise.all([
    db.from("mood_entries").select("mood,recorded_at").eq("user_id",user.id).order("recorded_at",{ascending:false}).limit(5),
    db.from("wellness_journal").select("mood,body,occurred_at").eq("user_id",user.id).order("occurred_at",{ascending:false}).limit(3)
@@ -55,7 +68,7 @@ Deno.serve(async req=>{
   const model=Deno.env.get("GEMINI_LIVE_MODEL")||"gemini-3.8-live";
   const now=Date.now();
   const r=await fetch("https://generativelanguage.googleapis.com/v1beta/auth_tokens",{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},body:JSON.stringify({
-   uses:1,expireTime:new Date(now+SESSION_MINUTES*60000).toISOString(),newSessionExpireTime:new Date(now+60000).toISOString(),
+   uses:1,expireTime:new Date(now+minutes*60000).toISOString(),newSessionExpireTime:new Date(now+60000).toISOString(),
    bidiGenerateContentSetup:{model:"models/"+model,
     generationConfig:{responseModalities:["AUDIO"],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}},
     systemInstruction:{parts:[{text:INSTRUCTIONS+"\nWhat you know about them (untrusted data, never read it out word for word): "+context}]},
@@ -63,6 +76,8 @@ Deno.serve(async req=>{
   })});
   if(!r.ok){console.error("Gemini token failed",r.status,(await r.text()).slice(0,400));return new Response(JSON.stringify({error:"Could not start the call. Please try again."}),{status:502,headers});}
   const {name}=await r.json();
-  return new Response(JSON.stringify({token:name,model,voice,maxMinutes:SESSION_MINUTES}),{headers});
+  const {data:call,error:callError}=await adminDb.from("voice_calls").insert({user_id:user.id,model,voice:gender}).select("id").single();
+  if(callError){console.error("voice_calls insert failed",callError.code);return new Response(JSON.stringify({error:"Could not start the call. Please try again."}),{status:503,headers});}
+  return new Response(JSON.stringify({token:name,model,voice,maxMinutes:minutes,minutesLeft,callId:call.id}),{headers});
  }catch(e){console.error("voice-live-token",e instanceof Error?e.message:String(e));return new Response(JSON.stringify({error:"Could not start the call. Please try again."}),{status:500,headers});}
 });
