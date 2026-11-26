@@ -174,7 +174,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  const [devSel,setDevSel]=useState<string|null>(null),[addingDevice,setAddingDevice]=useState(false);
  const showDock=!guest&&route.name==='list'&&!loading&&!error&&(section==='devices'||members.length>0);
  const dockRow=section==='devices'?<DeviceDock devices={family.devices} defaultId={family.defaultId} sessions={family.sessions} selected={devSel} adding={addingDevice} onSelect={id=>{void Haptics.selectionAsync();setAddingDevice(false);setDevSel(id)}} onAdd={()=>setAddingDevice(a=>!a)}/>:<ProfileRow members={members} selected={current?.id} adding={adding} onSelect={id=>{setAdding(false);setSelected(id)}} onAdd={()=>setAdding(a=>!a)} sessions={family.sessions}/>;
- const dock=<View style={st.dockShell}><MintWave edge="bottom"/><View style={st.dockHead}><Ionicons name={section==='devices'?'tablet-portrait':'people'} size={16} color={T.primary}/><Text style={st.dockLabel}>{section==='devices'?'Devices':'Family'}</Text></View><View style={st.dockInner}>{dockRow}</View></View>;
+ const dock=<View style={st.dockShell}><MintWave edge="bottom"/><View style={st.dockInner}>{dockRow}</View></View>;
  const dockKey=section+'|'+devSel+'|'+addingDevice+'|'+family.defaultId+'|'+family.devices.map(d=>d.id+d.name+d.device_type).join()+'|'+members.map(c=>c.id+c.name).join()+'|'+current?.id+'|'+adding+'|'+family.sessions.map(x=>x.id+x.deadline_at+x.granted_seconds).join();
  useEffect(()=>{onDock?.(showDock?dock:null)},[onDock,showDock,dockKey]);
  useEffect(()=>()=>onDock?.(null),[onDock]);
@@ -215,8 +215,8 @@ function MintWave({edge}:{edge:'top'|'bottom'}){
  const id='mw'+edge,[w,setW]=useState(useWindowDimensions().width);
  if(edge==='bottom')return <View style={st.dockWave} pointerEvents="none" onLayout={e=>setW(e.nativeEvent.layout.width)}><Svg width={w} height={420}>
   <Defs><LinearGradient id={id} x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#FFFFFF" stopOpacity=".35"/><Stop offset=".22" stopColor="#E4F6EA" stopOpacity=".8"/><Stop offset=".5" stopColor={T.background} stopOpacity="1"/></LinearGradient></Defs>
-  <Path d={`M0 34 C${w*.28} -6 ${w*.6} -4 ${w} 30 V420 H0 Z`} fill={'url(#'+id+')'}/>
-  <Path d={`M0 34 C${w*.28} -6 ${w*.6} -4 ${w} 30`} stroke="#FFFFFF" strokeWidth={1.5} fill="none"/>
+  <Path d={`M0 44 C${w*.16} 2 ${w*.34} 2 ${w*.5} 26 S${w*.82} 54 ${w} 12 V420 H0 Z`} fill={'url(#'+id+')'}/>
+  <Path d={`M0 44 C${w*.16} 2 ${w*.34} 2 ${w*.5} 26 S${w*.82} 54 ${w} 12`} stroke="#FFFFFF" strokeWidth={1.5} fill="none"/>
  </Svg></View>;
  return <Svg width="100%" height="100%" viewBox="0 0 400 100" preserveAspectRatio="none" style={StyleSheet.absoluteFill} pointerEvents="none">
   <Defs>{edge==='top'?<LinearGradient id={id} x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor="#B9E9CF" stopOpacity=".85"/><Stop offset=".5" stopColor="#E4F6EA" stopOpacity=".7"/><Stop offset="1" stopColor="#C8EED9" stopOpacity=".85"/></LinearGradient>
@@ -1173,7 +1173,7 @@ const st=StyleSheet.create({
  segmentText:{fontSize:15,fontWeight:'800',color:T.muted},
  moreBtn:{width:44,height:44,borderRadius:22,backgroundColor:T.primarySoft,alignItems:'center',justifyContent:'center'},
  memberCard:{width:70,paddingVertical:9,borderRadius:18,alignItems:'center',gap:6,backgroundColor:'rgba(255,255,255,.8)',borderWidth:1,borderColor:'#fff'},
- dockShell:{paddingTop:30,paddingHorizontal:20,paddingBottom:8,gap:8},
+ dockShell:{paddingTop:50,paddingHorizontal:20,paddingBottom:8,gap:8},
  dockWave:{position:'absolute',top:0,left:0,right:0,bottom:0,overflow:'hidden'},
  dockHead:{flexDirection:'row',alignItems:'center',gap:7,paddingHorizontal:4},
  dockLabel:{color:'#0F4D3A',fontSize:17,fontWeight:'900'},
