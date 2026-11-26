@@ -175,11 +175,21 @@ export function BuddyCall({companion,name,onCall,onType}:{companion:string;name?
    <View style={b.say}><Text style={b.sayText}>Hey{name?' '+name:''}! 👋 Wanna talk?</Text></View>
    <View style={b.tap}><Ionicons name="call" size={18} color="#fff"/><Text style={b.tapText}>Tap me to call</Text></View>
   </TouchableOpacity>
-  <View style={b.quick}>{TOPICS.map(t=><TouchableOpacity key={t.l} accessibilityRole="button" accessibilityLabel={'Call about: '+t.l} onPress={()=>onCall(t.l)} style={b.q}><Text style={b.qText}>{t.e} {t.l}</Text></TouchableOpacity>)}</View>
-  <TouchableOpacity accessibilityRole="button" onPress={onType} style={b.type}><Ionicons name="chatbubble-ellipses" size={16} color="#8A63D2"/><Text style={b.typeText}>Rather type? Send a message</Text></TouchableOpacity>
+  <View style={b.bottom}>
+   <View style={b.quick}>{TOPICS.map(t=><TouchableOpacity key={t.l} accessibilityRole="button" accessibilityLabel={'Call about: '+t.l} onPress={()=>onCall(t.l)} style={b.q}><Text style={b.qText}>{t.e} {t.l}</Text></TouchableOpacity>)}</View>
+   <RoundButton icon="chatbubble-ellipses" label="Chat" tint="#8A63D2" bg="#F4EBFF" a11y="Type a message instead" onPress={onType}/>
+  </View>
  </View>;
 }
+export function RoundButton({icon,label,tint,bg,a11y,onPress}:{icon:any;label:string;tint:string;bg:string;a11y:string;onPress:()=>void}){
+ return <TouchableOpacity accessibilityRole="button" accessibilityLabel={a11y} onPress={onPress} style={b.rb}>
+  <View style={[b.rbc,{backgroundColor:bg,shadowColor:tint}]}><Ionicons name={icon} size={26} color={bg==='#34B37E'?'#fff':tint}/></View>
+  <Text style={[b.rbl,{color:tint}]}>{label}</Text>
+ </TouchableOpacity>;
+}
 const b=StyleSheet.create({
+ bottom:{flexDirection:'row',alignItems:'flex-end',gap:10},
+ rb:{alignItems:'center',gap:4},rbc:{width:56,height:56,borderRadius:28,alignItems:'center',justifyContent:'center',shadowOpacity:0.3,shadowRadius:8,shadowOffset:{width:0,height:5}},rbl:{fontSize:11,fontWeight:'800'},
  wrap:{gap:14},stage:{height:330,alignItems:'center',justifyContent:'center'},
  ring:{position:'absolute',borderWidth:2,borderColor:'rgba(52,179,126,0.25)'},
  face:{width:200,height:200,borderRadius:100,backgroundColor:'#E4F6EA',alignItems:'center',justifyContent:'center',shadowColor:'#34B37E',shadowOpacity:0.25,shadowRadius:15,shadowOffset:{width:0,height:10}},
@@ -187,9 +197,8 @@ const b=StyleSheet.create({
  sayText:{fontSize:15,fontWeight:'800',color:APP_THEME.ink},
  tap:{position:'absolute',bottom:14,flexDirection:'row',alignItems:'center',gap:8,backgroundColor:'#34B37E',borderRadius:24,paddingHorizontal:20,paddingVertical:12,shadowColor:'#34B37E',shadowOpacity:0.35,shadowRadius:10,shadowOffset:{width:0,height:6}},
  tapText:{fontSize:16,fontWeight:'900',color:'#fff'},
- quick:{flexDirection:'row',flexWrap:'wrap',justifyContent:'center',gap:8},
+ quick:{flex:1,flexDirection:'row',flexWrap:'wrap',gap:8},
  q:{backgroundColor:'#fff',borderWidth:1,borderColor:'#DCEBE2',borderRadius:18,paddingHorizontal:13,paddingVertical:9},qText:{fontSize:14,fontWeight:'800',color:APP_THEME.ink},
- type:{alignSelf:'center',flexDirection:'row',alignItems:'center',gap:6,padding:8},typeText:{fontSize:14,fontWeight:'800',color:'#8A63D2'},
 });
 const st=StyleSheet.create({
  root:{flex:1,backgroundColor:APP_THEME.primarySoft,alignItems:'center',paddingTop:90,paddingBottom:40,paddingHorizontal:24,gap:18},

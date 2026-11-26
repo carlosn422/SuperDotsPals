@@ -7,7 +7,7 @@ import StressDiary from './StressDiary';
 import {ChatAction,ACTION_META,actionsFor,useStressContext,StressContextBar,promptsFor,TypingBubble} from './ChatExtras';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {usePlus} from './PlusStore';
-import VoiceFriend,{BuddyCall} from './VoiceFriend';
+import VoiceFriend,{BuddyCall,RoundButton} from './VoiceFriend';
 
 const feelings=['Good','Calm','Joyful','Angry','Frustrated','Stressed','Anxious','Sad','Tired','Overwhelmed'];
 const activities=['Walking','Workout','Work','Meeting','Rest','Social time','Other'];
@@ -80,9 +80,6 @@ export default function WellnessCompanion({companion,color,initialView='checkin'
  <VoiceFriend visible={talking} onClose={()=>setTalking(false)} companion={companion} topic={topic}/>
  {view==='chat'&&!typing?<BuddyCall companion={companion} name={firstName} onCall={call} onType={()=>setTyping(true)}/>:null}
  {view==='chat'&&typing?<View style={s.card}>
-  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Call your buddy" onPress={()=>setTyping(false)} style={{flexDirection:'row',alignItems:'center',gap:8,alignSelf:'flex-end',backgroundColor:'#E4F6EA',borderRadius:18,paddingHorizontal:12,paddingVertical:8}}>
-   <Ionicons name="call" size={16} color="#2E8F64"/><Text style={{fontSize:13,fontWeight:'900',color:'#2E8F64'}}>Call your buddy</Text>
-  </TouchableOpacity>
   <StressContextBar chips={ctx.chips}/>
   <ScrollView ref={scroller} style={{maxHeight:420}} contentContainerStyle={{gap:10}} onContentSizeChange={()=>scroller.current?.scrollToEnd({animated:true})}>
    {messages.length===0&&!pending?<Text style={s.sub}>Ask anything about your stress, sleep or mood. MoodPal sees today's readings above plus your recent diary.</Text>:null}
@@ -101,11 +98,12 @@ export default function WellnessCompanion({companion,color,initialView='checkin'
    </View>:null}
   </ScrollView>
   {!busy?<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:7}}>{promptsFor(ctx.level).map(p=><TouchableOpacity key={p} onPress={()=>void send(p)} style={s.prompt}><Text style={s.promptText}>{p}</Text></TouchableOpacity>)}</ScrollView>:null}
+  <View style={{alignSelf:'flex-end'}}><RoundButton icon="call" label="Call" tint="#2E8F64" bg="#34B37E" a11y="Call your buddy" onPress={()=>{setTyping(false);call()}}/></View>
   <TextInput style={s.input} multiline placeholder="Ask MoodPal about your stress, sleep or mood..." placeholderTextColor="#9AA7AD" value={chatText} onChangeText={setChatText}/>
   <TouchableOpacity disabled={busy||!chatText.trim()} onPress={()=>void send()} style={[s.button,{backgroundColor:color,opacity:busy||!chatText.trim()?0.6:1}]}>{busy?<ActivityIndicator color="#fff"/>:<Text style={s.buttonText}>Send</Text>}</TouchableOpacity>
   <Text style={s.disclaimer}>Powered by Gemini. MoodPal uses your readings, diary, mood and activity history to help you reflect. It is not a therapist or a medical diagnosis.</Text>
  </View>:null}
- {view==='history'?<StressDiary entries={events} onChanged={load} onAsk={text=>{setView('chat');void send(text)}}/>:null}
+ {view==='history'?<StressDiary entries={events} onChanged={load} onAsk={text=>{setTyping(true);setView('chat');void send(text)}}/>:null}
  <Text style={s.disclaimer}>MoodPals is for emotional reflection, not diagnosis or emergency care.</Text></View>
 }
 const s=StyleSheet.create({container:{gap:13},header:{flexDirection:'row',alignItems:'center',gap:12},title:{fontSize:21,fontWeight:'900',color:'#25145C'},sub:{fontSize:12,color:'#8276A5',lineHeight:18},tabs:{flexDirection:'row',padding:4,borderRadius:16,backgroundColor:'#E4F1EA'},tab:{flex:1,padding:11,borderRadius:13,alignItems:'center'},tabText:{fontSize:12,fontWeight:'800',color:'#665487'},card:{backgroundColor:'#fff',borderRadius:23,padding:17,gap:13},heading:{fontSize:15,fontWeight:'800',color:'#25145C'},choices:{flexDirection:'row',flexWrap:'wrap',gap:7},choice:{backgroundColor:'#F3EFFB',borderRadius:16,paddingHorizontal:12,paddingVertical:10},choiceText:{fontSize:12,fontWeight:'700',color:'#4C3B67'},intensity:{flexDirection:'row',gap:5},point:{flex:1,height:22,borderRadius:6},input:{backgroundColor:'#F8F6FC',borderWidth:1,borderColor:'#E5E0F0',borderRadius:14,padding:13,color:'#25145C',minHeight:65,textAlignVertical:'top'},shortInput:{backgroundColor:'#F8F6FC',borderRadius:12,padding:12,color:'#25145C'},button:{borderRadius:15,padding:15,alignItems:'center'},buttonText:{color:'#fff',fontWeight:'900',fontSize:13},message:{maxWidth:'92%',padding:12,borderRadius:15},messageText:{color:'#352748',fontSize:12,lineHeight:19},disclaimer:{fontSize:11,color:'#9387A4',lineHeight:17},entry:{borderTopWidth:1,borderTopColor:'#EDE9F2',paddingVertical:12,gap:5},entryTitle:{fontSize:13,fontWeight:'800',color:'#25145C'},action:{flexDirection:'row',alignItems:'center',gap:4,backgroundColor:'#E4F6EA',borderRadius:12,paddingHorizontal:9,paddingVertical:6},actionText:{fontSize:11,fontWeight:'800',color:'#2E8F64'},prompt:{borderWidth:1,borderColor:'#BFE5CF',borderRadius:16,paddingHorizontal:12,paddingVertical:8,backgroundColor:'#fff'},promptText:{fontSize:12,fontWeight:'700',color:'#1D2B33'}});
