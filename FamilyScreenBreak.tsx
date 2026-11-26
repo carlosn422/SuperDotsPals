@@ -449,6 +449,13 @@ function RemoteTimer({child,children,device,family,minutes,setMinutes,onOpen,onP
 }
 
 // Circular duration dial, same as the Apple Watch: drag around the ring in 5-minute steps.
+// Ring color by time given: green while it's a modest amount, then amber, then red.
+const SEGMENTS=72,TIME_STOPS:[number,[number,number,number]][]=[[45,[52,179,126]],[90,[242,179,61]],[150,[229,72,77]]];
+function timeColor(minutes:number){
+ const i=TIME_STOPS.findIndex(([m])=>minutes<=m);
+ const mix=i<=0?TIME_STOPS[i<0?TIME_STOPS.length-1:0][1]:(()=>{const [m0,a]=TIME_STOPS[i-1],[m1,b]=TIME_STOPS[i],t=(minutes-m0)/(m1-m0);return a.map((v,k)=>v+(b[k]-v)*t)})();
+ return '#'+mix.map(v=>Math.round(v).toString(16).padStart(2,'0')).join('');
+}
 const PRESETS=[15,30,45,60,90],ringPal=(m:number)=>m<=30?'calm':m<=75?'joy':m<=120?'fear':'tired';
 export function DurationRing({minutes,onChange,min,max,step=5,prefix=''}:{minutes:number;onChange:(n:number)=>void;min:number;max:number;step?:number;prefix?:string}){
  // The knob is wider than the ring, so the ring is inset by the knob's radius to keep it inside the view.
@@ -485,9 +492,13 @@ export function DurationRing({minutes,onChange,min,max,step=5,prefix=''}:{minute
   accessible accessibilityRole="adjustable" accessibilityLabel="Duration" accessibilityValue={{text:prefix+formatDuration(minutes*60)}}
   accessibilityActions={[{name:'increment'},{name:'decrement'}]} onAccessibilityAction={e=>set(minutes+(e.nativeEvent.actionName==='increment'?step:-step))}>
   <Svg width={SIZE} height={SIZE} pointerEvents="none">
-   <Circle cx={C} cy={C} r={R} stroke={T.primarySoft} strokeWidth={LINE} fill="none"/>
-   <Circle cx={C} cy={C} r={R} stroke={T.primary} strokeWidth={LINE} fill="none" strokeLinecap="round" strokeDasharray={CIRC+' '+CIRC} strokeDashoffset={CIRC*(1-Math.max(0.002,frac))} transform={'rotate(-90 '+C+' '+C+')'}/>
-   <Circle cx={kx} cy={ky} r={KNOB} fill="#fff" stroke={T.primary} strokeWidth={3}/>
+   {Array.from({length:SEGMENTS},(_,i)=>{
+    const f0=i/SEGMENTS,f1=(i+1)/SEGMENTS,color=timeColor(min+(f0+f1)/2*(max-min)),on=f0<frac;
+    const len=(on?Math.min(f1,frac)-f0:f1-f0)*CIRC;
+    return <Circle key={i} cx={C} cy={C} r={R} stroke={on?color:color+'33'} strokeWidth={LINE} fill="none" strokeDasharray={(len+(on?0.6:0))+' '+CIRC} strokeDashoffset={-f0*CIRC} transform={'rotate(-90 '+C+' '+C+')'}/>;
+   })}
+   <Circle cx={C} cy={C-R} r={LINE/2} fill={timeColor(min)}/>
+   <Circle cx={kx} cy={ky} r={KNOB} fill="#fff" stroke={timeColor(minutes)} strokeWidth={3}/>
   </Svg>
   <View pointerEvents="none" style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center'}]}>
    <SuperdotMascot id={ringPal(minutes)} size={64}/>
