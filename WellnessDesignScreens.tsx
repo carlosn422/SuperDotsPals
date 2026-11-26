@@ -110,17 +110,18 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onCha
  const [day,setDay]=React.useState(0);
  const [pastAmounts,setPastAmounts]=React.useState({water:0,caffeine:0});
  const {goals:drinkGoals}=useDrinkGoals(usePlus().isPlus);
- const [activitySummary,setActivitySummary]=React.useState<{count:number;minutes:number;journal:number}>({count:0,minutes:0,journal:0});
+ const [activitySummary,setActivitySummary]=React.useState<{count:number;minutes:number;journal:number;lastJournal?:string}>({count:0,minutes:0,journal:0});
  const screenTime=useScreenTimeToday();
  React.useEffect(()=>{let active=true;(async()=>{
   const {data:{user}}=await supabase.auth.getUser();if(!user)return;
   const start=new Date();start.setDate(start.getDate()+day);start.setHours(0,0,0,0);
   const end=new Date(start);end.setDate(end.getDate()+1);
-  const [{data,error},journal]=await Promise.all([
+  const [{data,error},journal,last]=await Promise.all([
    supabase.from('wellness_activities').select('duration_minutes').eq('user_id',user.id).gte('occurred_at',start.toISOString()).lt('occurred_at',end.toISOString()),
-   supabase.from('wellness_journal').select('id',{count:'exact',head:true}).eq('user_id',user.id).gte('occurred_at',start.toISOString()).lt('occurred_at',end.toISOString())]);
+   supabase.from('wellness_journal').select('id',{count:'exact',head:true}).eq('user_id',user.id).gte('occurred_at',start.toISOString()).lt('occurred_at',end.toISOString()),
+   supabase.from('wellness_journal').select('occurred_at').eq('user_id',user.id).lt('occurred_at',end.toISOString()).order('occurred_at',{ascending:false}).limit(1).maybeSingle()]);
   if(error){console.warn('Loading recorded activities failed',error.message);return;}
-  if(active)setActivitySummary({count:data?.length||0,minutes:(data||[]).reduce((sum,r)=>sum+Number(r.duration_minutes||0),0),journal:journal.count||0});
+  if(active)setActivitySummary({count:data?.length||0,minutes:(data||[]).reduce((sum,r)=>sum+Number(r.duration_minutes||0),0),journal:journal.count||0,lastJournal:last.data?.occurred_at});
  })();return()=>{active=false}},[day]);
  React.useEffect(()=>{let alive=true;if(day===0)return;
  (async()=>{try{const {data:{user}}=await supabase.auth.getUser();if(!user)return;
@@ -134,10 +135,12 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onCha
  const dates=Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()+i-6);return d});
  const {isPlus:plusMember}=usePlus();
  const onDay=day===0?'today':'that day';
- const tile=(o:{title:string;stat:string;detail:string;tint:string;color:string;onPress:()=>void;icon?:any;pal?:string;plus?:boolean;play?:boolean})=>(
+ const lastJournal=(()=>{if(!activitySummary.lastJournal)return 'Your private reflections';const d=new Date(activitySummary.lastJournal);d.setHours(0,0,0,0);const t=new Date();t.setHours(0,0,0,0);const n=Math.round((t.getTime()-d.getTime())/864e5);return 'Last: '+(n<=0?'today':n===1?'yesterday':n+' days ago')})();
+ const tile=(o:{title:string;stat:string;detail:string;tint:string;color:string;onPress:()=>void;icon?:any;pal?:string;peek?:string;plus?:boolean;play?:boolean})=>(
   <TouchableOpacity key={o.title} accessibilityRole="button" accessibilityLabel={`${o.title}. ${o.stat}. ${o.detail}`} onPress={o.onPress} activeOpacity={0.85} style={{flexBasis:'46%',flexGrow:1,minHeight:150,backgroundColor:o.tint,borderRadius:24,padding:14,overflow:'hidden'}}>
    {o.pal?<View style={{marginLeft:-4,marginTop:-4,marginBottom:4}}><SuperdotMascot id={o.pal} size={56} animate={false}/></View>:<View style={{width:50,height:50,borderRadius:25,backgroundColor:'#fff',alignItems:'center',justifyContent:'center',marginBottom:10}}><Ionicons name={o.icon} size={25} color={o.color}/></View>}
    {o.plus?<View style={{position:'absolute',top:14,right:12}}><PlusBadge/></View>:null}
+   {o.peek?<View pointerEvents="none" style={{position:'absolute',right:-8,top:38}}><SuperdotMascot id={o.peek} size={56} animate={false}/></View>:null}
    <Text style={{fontSize:16,fontWeight:'900',color:INK}} numberOfLines={1}>{o.title}</Text>
    <Text style={{fontSize:14,fontWeight:'800',color:o.color,marginTop:2}} numberOfLines={1}>{o.stat}</Text>
    <Text style={{fontSize:11,color:MUTED,marginTop:3,marginRight:o.play?46:34}} numberOfLines={2}>{o.detail}</Text>
@@ -178,8 +181,8 @@ export function WellnessActions({companion,accent,water,onWater,onCaffeine,onCha
    </View>
    <View style={{flexDirection:'row',flexWrap:'wrap',gap:12}}>
     {onSocial?tile({title:'Screen Time',icon:'phone-portrait',tint:'#EAF1FF',color:'#5B8DEF',onPress:onSocial,stat:screenTime?screenTime.used+' today':'Set up',detail:screenTime?screenTime.detail:'Track app time & stress'}):null}
-    {tile({title:'Journal',icon:'book',tint:'#F4EBFF',color:'#8A63D2',onPress:onJournal,stat:activitySummary.journal?activitySummary.journal+(activitySummary.journal===1?' entry':' entries'):'No entries',detail:'Your private reflections'})}
-    {tile({title:'Ask AI',icon:'chatbubble-ellipses',tint:'#F1ECFF',color:'#7B5CE6',onPress:onChat,plus:!plusMember,stat:'Your stress',detail:'Chat with your pal'})}
+    {tile({title:'Journal',icon:'book',tint:'#F4EBFF',color:'#8A63D2',onPress:onJournal,stat:activitySummary.journal?activitySummary.journal+(activitySummary.journal===1?' entry':' entries'):'No entries',detail:lastJournal})}
+    {tile({title:'Ask AI',icon:'chatbubble-ellipses',tint:'#F1ECFF',color:'#7B5CE6',onPress:onChat,plus:!plusMember,peek:'joy',stat:'Your stress',detail:'Chat with your pal'})}
     {tile({title:'Breathing',pal:'calm',tint:'#E4F6EA',color:'#2E9A6B',onPress:onBreathing,play:true,stat:'1 min calm',detail:'Box & unwind too'})}
    </View>
   </View>
