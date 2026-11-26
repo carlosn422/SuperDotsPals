@@ -1,6 +1,6 @@
 import React,{useCallback,useContext,useEffect,useMemo,useRef,useState} from 'react';
 import {ChartScrubContext} from './StressDashboard';
-import {ActivityIndicator,Alert,Animated,AppState,Modal,PanResponder,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View,useWindowDimensions} from 'react-native';
+import {ActionSheetIOS,ActivityIndicator,Alert,Animated,AppState,Modal,PanResponder,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View,useWindowDimensions} from 'react-native';
 import Svg,{Circle,Defs,Line,LinearGradient,Path,Stop} from 'react-native-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -138,12 +138,12 @@ type Route={name:'list'}|{name:'child';id:string}|{name:'insights';id:string}|{n
 export default function FamilyScreenBreak({onBack,backLabel='Settings',target,onAddWatch,embedded,footer}:{onBack?:()=>void;backLabel?:string;target?:{childId?:string;profileId?:string;add?:boolean;at:number}|null;onAddWatch?:()=>void;embedded?:boolean;footer?:React.ReactNode}){
  const guest=useIsGuest();
  const [children,setChildren]=useState<FamilyChild[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
+ const {width:screenW}=useWindowDimensions();
  const [route,setRoute]=useState<Route>({name:'list'}),[adding,setAdding]=useState(false),[selected,setSelected]=useState<string|null>(null);
  const select=(id:string)=>{setSelected(id);setRoute({name:'list'})};
  const [startOn,setStartOn]=useState<FamilyDevice|null>(null);
  const family=useFamilyDevices(screenBreakSupported&&!guest&&route.name==='list');
  const dashNow=useNow(route.name==='list'&&family.devices.length>0);
- const {width:screenW}=useWindowDimensions();
  const load=useCallback(async()=>{
   try{const list=await loadChildren();setChildren(list);setError('');if(screenBreakSupported)setBreakChildren(list.filter(c=>!c.watch_only).map(c=>({id:c.id,name:c.name})))}
   catch{setError('Unable to load your family members. Check your connection.')}
@@ -158,13 +158,19 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  },[target,loading,children]);
  const child=route.name==='child'||route.name==='insights'?children.find(c=>c.id===route.id):undefined;
  const members=children.filter(c=>!c.watch_only);
+ const current=members.find(c=>c.id===selected)||members[0];
+ const pager=useRef<ScrollView>(null),reduce=useReduceMotion();
+ const [section,setSection]=useState<'family'|'devices'>('family');
+ // The timer ring locks this pager while it's dragged, as well as the page behind it.
+ const parentScrub=useContext(ChartScrubContext),[scrub,setScrub]=useState(false);
+ const scrubCtx=useCallback((v:boolean)=>{setScrub(v);parentScrub(v)},[parentScrub]);
+ const index=Math.max(0,members.findIndex(c=>c.id===current?.id));
+ useEffect(()=>{pager.current?.scrollTo({x:index*screenW,animated:!reduce})},[index,screenW]);
  if(route.name==='devices')return <>
   <FamilyDevicesScreen openId={route.id} onBack={()=>setRoute({name:'list'})} childName={id=>children.find(c=>c.id===id)?.name||'Someone'} onStart={members.length?setStartOn:undefined}/>
   <StartTimerSheet device={startOn} members={members} onClose={()=>setStartOn(null)}/>
  </>;
  if(route.name==='insights'&&child)return <InsightsScreen child={child} onBack={()=>select(child.id)}/>;
-
- const current=members.find(c=>c.id===selected)||members[0];
  if(route.name==='child'&&child)return <ChildScreen child={child} children={children} onBack={()=>setRoute({name:'list'})} onInsights={()=>setRoute({name:'insights',id:child.id})} onChanged={()=>{void load();familyChildrenChanged()}} onRemoved={()=>{setRoute({name:'list'});void load()}} onAddWatch={onAddWatch} onOpen={id=>setRoute({name:'child',id})}/>;
  return <View style={{gap:14}}>
   {!embedded&&onBack?<Back label={backLabel} onPress={onBack}/>:null}
@@ -172,18 +178,30 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
   {guest?<View style={st.card}><Text style={st.body}>Create a free account to add family members and use Screen Break.</Text></View>:<>
    {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
    {loading?<ActivityIndicator color={T.primary}/>:null}
-   {!loading&&!error&&members.length?<ProfileRow members={members} selected={current?.id} adding={adding} onSelect={id=>{setAdding(false);setSelected(id)}} onAdd={()=>setAdding(a=>!a)} sessions={family.sessions}/>:null}
-   {adding||(!loading&&!error&&!members.length)?<AddChild onAdded={id=>{setAdding(false);void load().then(()=>{if(id)setSelected(id)});familyChildrenChanged()}}/>:null}
-   {current&&!adding?<ChildScreen inline key={current.id} child={current} children={children} onBack={()=>{}} onInsights={()=>setRoute({name:'insights',id:current.id})} onChanged={()=>{void load();familyChildrenChanged()}} onRemoved={()=>{setSelected(null);void load()}} onAddWatch={onAddWatch} onOpen={select}/>:null}
-   {screenBreakSupported&&family.devices.length?<>
-    <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={st.heading}>Devices</Text><TouchableOpacity accessibilityRole="button" accessibilityLabel="All family devices" onPress={()=>setRoute({name:'devices'})} style={{minHeight:44,justifyContent:'center'}}><Text style={st.link}>See all</Text></TouchableOpacity></View>
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={family.devices.length>1?screenW-76:undefined} decelerationRate="fast" contentContainerStyle={{gap:12}}>
-     {family.devices.map(d=><DeviceCard key={d.id} width={family.devices.length>1?screenW-88:screenW-40} device={d} isDefault={family.defaultId===d.id} commands={family.commands} sessions={family.sessions} now={dashNow} childName={id=>children.find(c=>c.id===id)?.name||'Someone'} onOpen={()=>setRoute({name:'devices',id:d.id})} onStart={members.length?setStartOn:undefined}/>)}
-    </ScrollView>
-   </>:screenBreakSupported?<TouchableOpacity accessibilityRole="button" onPress={()=>setRoute({name:'devices'})} style={st.linkRow}><View style={[st.tile,{backgroundColor:TINTS[1]}]}><Ionicons name="tablet-portrait" size={21} color={TINT_INK[1]}/></View><View style={{flex:1}}><Text style={st.rowTitle}>Family Devices</Text></View><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>:null}
+   {!loading&&!error?<View style={st.famSegment} accessibilityRole="tablist">{(['family','devices'] as const).map(k=><TouchableOpacity key={k} accessibilityRole="tab" accessibilityState={{selected:section===k}} onPress={()=>{if(section!==k){void Haptics.selectionAsync();setSection(k)}}} style={[st.segmentItem,section===k&&st.segmentOn]}><Ionicons name={k==='family'?'people':'tablet-portrait'} size={16} color={section===k?T.ink:T.muted}/><Text style={[st.segmentText,section===k&&{color:T.ink}]}>{k==='family'?'Family':'Devices'}</Text></TouchableOpacity>)}</View>:null}
+   {section==='devices'&&!loading&&!error?<DevicesArea family={family} now={dashNow} width={screenW} childName={id=>children.find(c=>c.id===id)?.name||'Someone'} onOpen={id=>setRoute({name:'devices',id})} onAll={()=>setRoute({name:'devices'})} onStart={members.length?setStartOn:undefined}/>:<>
+    {!loading&&!error&&members.length?<ProfileRow members={members} selected={current?.id} adding={adding} onSelect={id=>{setAdding(false);setSelected(id)}} onAdd={()=>setAdding(a=>!a)} sessions={family.sessions}/>:null}
+    {adding||(!loading&&!error&&!members.length)?<AddChild onAdded={id=>{setAdding(false);void load().then(()=>{if(id)setSelected(id)});familyChildrenChanged()}}/>:null}
+    {current&&!adding?<ChartScrubContext.Provider value={scrubCtx}><ScrollView ref={pager} horizontal pagingEnabled scrollEnabled={!scrub} showsHorizontalScrollIndicator={false} contentOffset={{x:index*screenW,y:0}} onMomentumScrollEnd={e=>{const c=members[Math.round(e.nativeEvent.contentOffset.x/screenW)];if(c&&c.id!==current.id){void Haptics.selectionAsync();setSelected(c.id)}}} style={{marginHorizontal:-20}}>
+     {members.map(c=><View key={c.id} style={{width:screenW,paddingHorizontal:20}}>{c.id===current.id?<ChildScreen inline child={c} children={children} onBack={()=>{}} onInsights={()=>setRoute({name:'insights',id:c.id})} onChanged={()=>{void load();familyChildrenChanged()}} onRemoved={()=>{setSelected(null);void load()}} onAddWatch={onAddWatch} onOpen={select}/>:<View style={{minHeight:420}}/>}</View>)}
+    </ScrollView></ChartScrubContext.Provider>:null}
+   </>}
   </>}
   {footer?<View style={{marginTop:10}}>{footer}</View>:null}
   <StartTimerSheet device={startOn} members={members} onClose={()=>setStartOn(null)}/>
+ </View>;
+}
+
+/** Devices as a swipeable carousel, one card at a time. */
+function DevicesArea({family,now,width,childName,onOpen,onAll,onStart}:{family:ReturnType<typeof useFamilyDevices>;now:number;width:number;childName:(id:string)=>string;onOpen:(id:string)=>void;onAll:()=>void;onStart?:(d:FamilyDevice)=>void}){
+ const [page,setPage]=useState(0);
+ if(!family.devices.length)return <TouchableOpacity accessibilityRole="button" onPress={onAll} style={st.linkRow}><View style={[st.tile,{backgroundColor:TINTS[1]}]}><Ionicons name="add" size={22} color={TINT_INK[1]}/></View><Text style={[st.rowTitle,{flex:1}]}>Add a family device</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>;
+ return <View style={{gap:12}}>
+  <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={{marginHorizontal:-20}} scrollEventThrottle={32} onScroll={e=>setPage(Math.round(e.nativeEvent.contentOffset.x/width))}>
+   {family.devices.map(d=><View key={d.id} style={{width,paddingHorizontal:20}}><DeviceCard device={d} isDefault={family.defaultId===d.id} commands={family.commands} sessions={family.sessions} now={now} childName={childName} onOpen={()=>onOpen(d.id)} onStart={onStart}/></View>)}
+  </ScrollView>
+  {family.devices.length>1?<View style={{flexDirection:'row',justifyContent:'center',gap:7}} accessibilityLabel={'Device '+(page+1)+' of '+family.devices.length}>{family.devices.map((d,i)=><View key={d.id} style={{width:8,height:8,borderRadius:4,backgroundColor:i===page?T.primary:'#CFD8D3'}}/>)}</View>:null}
+  <TouchableOpacity accessibilityRole="button" onPress={onAll} style={{alignSelf:'center',minHeight:44,justifyContent:'center'}}><Text style={st.link}>Manage devices</Text></TouchableOpacity>
  </View>;
 }
 
@@ -305,6 +323,7 @@ function AddChild({onAdded}:{onAdded:(id?:string)=>void}){
 }
 
 function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAddWatch,onOpen,inline}:{inline?:boolean;child:FamilyChild;children:FamilyChild[];onBack:()=>void;onInsights:()=>void;onChanged:()=>void;onRemoved:()=>void;onAddWatch?:()=>void;onOpen?:(id:string)=>void}){
+ const [watchOpen,setWatchOpen]=useState(false);
  const [state,setState]=useBreakState();
  const {isPlus,showPaywall}=usePlus();
  const [editing,setEditing]=useState(false);
@@ -364,7 +383,11 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
   <View style={{flexDirection:'row',alignItems:'center',gap:12}}>
    {inline?null:<View style={[st.avatar,{width:52,height:52,borderRadius:26}]}><Text style={[st.avatarText,{fontSize:22}]}>{child.name.slice(0,1).toUpperCase()}</Text></View>}
    <Text style={[inline?st.heroTitle:st.title,{flex:1}]} numberOfLines={1}>{child.name}</Text>
-   <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Edit '+child.name} onPress={()=>setEditing(true)} style={st.editBtn}><Text style={st.editBtnText}>Edit</Text></TouchableOpacity>
+   {inline?<TouchableOpacity accessibilityRole="button" accessibilityLabel={'More for '+child.name} onPress={()=>{
+    const opts=[['Screen Time Insights',onInsights],...(state?.selectionCount?[['Apps to Pause',()=>void pick()]]:[]),['Apple Watch',()=>setWatchOpen(true)],['Edit '+child.name,()=>setEditing(true)]] as [string,()=>void][];
+    ActionSheetIOS.showActionSheetWithOptions({options:[...opts.map(o=>o[0]),'Cancel'],cancelButtonIndex:opts.length},i=>opts[i]?.[1]());
+   }} style={st.moreBtn}><Ionicons name="ellipsis-horizontal" size={22} color={T.primary}/></TouchableOpacity>
+   :<TouchableOpacity accessibilityRole="button" accessibilityLabel={'Edit '+child.name} onPress={()=>setEditing(true)} style={st.editBtn}><Text style={st.editBtnText}>Edit</Text></TouchableOpacity>}
   </View>
   <EditMemberSheet visible={editing} child={child} children={children} onClose={()=>setEditing(false)} onChanged={onChanged} onRemoved={()=>{setEditing(false);onRemoved()}}/>
   {!screenBreakSupported?<View style={st.card}><Text style={st.body}>Screen Break needs the latest MoodPals build on this iPhone.</Text></View>:<>
@@ -399,7 +422,7 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
      <Text style={st.kicker}>Step 2 of 2</Text>
      <Text style={st.rowTitle}>Choose apps to pause</Text>
      <TouchableOpacity accessibilityRole="button" disabled={busy==='pick'} onPress={()=>void pick()} style={st.cta}>{busy==='pick'?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>Choose Apps to Pause</Text>}</TouchableOpacity>
-    </View>:<TouchableOpacity accessibilityRole="button" accessibilityLabel={'Setup complete, '+state.selectionCount+' selected. Edit apps'} onPress={()=>void pick()} style={st.setupDone}>
+    </View>:inline?null:<TouchableOpacity accessibilityRole="button" accessibilityLabel={'Setup complete, '+state.selectionCount+' selected. Edit apps'} onPress={()=>void pick()} style={st.setupDone}>
      <Ionicons name="checkmark-circle" size={22} color={T.primary}/>
      <Text style={[st.body,{flex:1}]}>Setup complete · {state.selectionCount} to pause</Text>
      <Text style={st.link}>Edit apps</Text>
@@ -416,8 +439,15 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
    {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
    {state&&!state.authorized&&mine?<Text style={[st.sub,{color:red}]}>Screen Time access was turned off, so apps can't be paused. Allow access again to restore the break.</Text>:null}</>}
   </>}
+  {inline?<Modal visible={watchOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setWatchOpen(false)}>
+   <ScrollView contentContainerStyle={{padding:20,gap:14}}>
+    <TouchableOpacity accessibilityRole="button" onPress={()=>setWatchOpen(false)} style={{alignSelf:'flex-end',minHeight:44,justifyContent:'center'}}><Text style={st.link}>Done</Text></TouchableOpacity>
+    <MemberWatch child={child} children={children} onChanged={onChanged} onRemoved={onRemoved}/>
+   </ScrollView>
+  </Modal>:<>
   <TouchableOpacity accessibilityRole="button" onPress={onInsights} style={st.linkRow}><View style={[st.tile,{backgroundColor:TINTS[2]}]}><Ionicons name="bar-chart" size={21} color={TINT_INK[2]}/></View><Text style={[st.rowTitle,{flex:1}]}>Screen Time Insights</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>
   <MemberWatch child={child} children={children} onChanged={onChanged} onRemoved={onRemoved}/>
+  </>}
  </View>;
 }
 
@@ -1005,6 +1035,11 @@ const st=StyleSheet.create({
  heroKicker:{fontSize:11,letterSpacing:1,fontWeight:'900',color:'#3B8A6A'},
  heroTitle:{fontSize:22,lineHeight:27,fontWeight:'900',color:T.ink},
  heroCard:{backgroundColor:'#E8F5EF',borderColor:'#E8F5EF'},
+ famSegment:{flexDirection:'row',backgroundColor:'#E6EEEA',borderRadius:14,padding:3},
+ segmentItem:{flex:1,minHeight:40,borderRadius:11,flexDirection:'row',gap:6,alignItems:'center',justifyContent:'center'},
+ segmentOn:{backgroundColor:'#fff',shadowColor:'#000',shadowOpacity:.08,shadowRadius:4,shadowOffset:{width:0,height:1}},
+ segmentText:{fontSize:15,fontWeight:'800',color:T.muted},
+ moreBtn:{width:44,height:44,borderRadius:22,backgroundColor:T.primarySoft,alignItems:'center',justifyContent:'center'},
  profile:{width:58,height:58,borderRadius:29,alignItems:'center',justifyContent:'center'},
  profileName:{fontSize:13,fontWeight:'800',color:T.muted,maxWidth:68},
  profileTimer:{position:'absolute',right:2,bottom:2,width:22,height:22,borderRadius:11,backgroundColor:T.primary,borderWidth:2,borderColor:'#fff',alignItems:'center',justifyContent:'center'},

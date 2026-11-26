@@ -29,12 +29,14 @@ export function watchInitials(name:string){
  return (first.charAt(0)+(words.length>1?last.charAt(0):first.charAt(first.length-1))).toUpperCase();
 }
 
+// Flat watch tile in the app's pastel palette, tinted by the watch color.
+const TILE:Record<WatchColor,[string,string]>={charcoal:['#E9EDEF','#3A4450'],ivory:['#FFF7E8','#B08A4A'],navy:['#EAF1FF','#3D5A99'],rose:['#FDECE8','#D0647A'],mint:['#E4F6EA','#23966A'],lavender:['#F4EBFF','#9B7BC8']};
 export function WatchImage({color,name,width=96}:{color:WatchColor|null;name:string;width?:number}){
- const height=width/ASPECT,d=width*BADGE_D,b=BADGE[color||'charcoal'];
- return <View style={{width,height}} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-  <Image source={IMAGES[color||'charcoal']} style={{width,height}} resizeMode="contain"/>
-  <View style={{position:'absolute',left:width*b.x-d/2,top:height*b.y-d/2,width:d,height:d,alignItems:'center',justifyContent:'center'}}>
-   <Text allowFontScaling={false} numberOfLines={1} adjustsFontSizeToFit style={{width:d*.72,textAlign:'center',fontSize:d*.4,fontWeight:'900',color:'#3B2F63'}}>{watchInitials(name)}</Text>
+ const [bg,fg]=TILE[color||'charcoal'],size=width*.82;
+ return <View style={{width,height:width,alignItems:'center',justifyContent:'center'}} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+  <View style={{width:size,height:size,borderRadius:size*.3,backgroundColor:bg,alignItems:'center',justifyContent:'center',gap:size*.02}}>
+   <Ionicons name="watch" size={size*.42} color={fg}/>
+   <Text allowFontScaling={false} numberOfLines={1} style={{fontSize:size*.16,fontWeight:'900',color:fg}}>{watchInitials(name)}</Text>
   </View>
  </View>;
 }
