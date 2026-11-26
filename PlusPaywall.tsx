@@ -10,7 +10,7 @@ import {appleAvailable,linkApple} from './AppleAuth';
 const TERMS_URL='https://moodpals.com/terms',PRIVACY_URL='https://moodpals.com/privacy';
 const CALM=require('./assets/mascot-animations/disgust/preview400/frame_000.png');
 const BENEFITS:{icon:React.ComponentProps<typeof Ionicons>['name'];text:string}[]=[
- {icon:'call',text:'60 minutes of talk time with your pal every month'},
+ {icon:'call',text:'30 minutes of talk time with your pal every month'},
  {icon:'stats-chart',text:'Advanced wellness trends and 30-day history'},
  {icon:'color-palette',text:'Extra customization for app and watch'},
  {icon:'people',text:'Expanded private circles'},
