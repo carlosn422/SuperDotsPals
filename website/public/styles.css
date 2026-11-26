@@ -368,7 +368,7 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 .t-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:10px}
 .t-step,.t-card{background:var(--card);border-radius:28px;padding:28px 24px;box-shadow:0 10px 30px rgba(43,30,69,.08);text-align:center}
 .t-step h3,.t-card h3{margin:14px 0 6px;font-size:21px}.t-step p,.t-card p{margin:0;color:var(--muted)}
-.t-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:10px}
+.t-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:18px;margin-top:10px}
 .t-card{text-decoration:none;transition:transform .15s}.t-card:hover{transform:translateY(-3px)}
 .t-family{margin-top:40px;display:flex;justify-content:center}
 .t-tablet{background:#111;border-radius:34px;padding:14px;box-shadow:0 0 0 2px #2c2c2e inset,0 30px 60px rgba(43,30,69,.25);width:min(440px,90%)}
