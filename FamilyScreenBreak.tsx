@@ -1,7 +1,7 @@
 import {IconTile} from './IconTile';
 import React,{useCallback,useContext,useEffect,useMemo,useRef,useState} from 'react';
 import {ChartScrubContext} from './StressDashboard';
-import {ActionSheetIOS,ActivityIndicator,Alert,Animated,AppState,Modal,PanResponder,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View,useWindowDimensions} from 'react-native';
+import {ActionSheetIOS,ActivityIndicator,Alert,Animated,AppState,KeyboardAvoidingView,Modal,PanResponder,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View,useWindowDimensions} from 'react-native';
 import Svg,{Circle,Defs,Line,LinearGradient,Path,Stop} from 'react-native-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -849,9 +849,9 @@ function EditMemberSheet({visible,child,children,onClose,onChanged,onRemoved}:{v
  </TouchableOpacity>;
  return <>
   <Modal visible={visible&&stage==='edit'&&!leaving} transparent animationType="slide" onRequestClose={busy?undefined:onClose} onDismiss={()=>{if(leaving){setStage(leaving);setLeaving(null)}}}>
-   <View style={{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(29,43,51,0.3)'}}>
+   <KeyboardAvoidingView behavior="padding" style={{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(29,43,51,0.3)'}}>
     <TouchableOpacity style={StyleSheet.absoluteFill} disabled={!!busy} onPress={onClose} accessibilityLabel="Close"/>
-    <ScrollView style={{maxHeight:'88%',flexGrow:0}} contentContainerStyle={st.sheet} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
+    <ScrollView style={{maxHeight:'88%',flexGrow:0}} contentContainerStyle={st.sheet} keyboardShouldPersistTaps="handled">
      <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'}}/>
      <Text style={st.sheetTitle}>Edit {child.name}</Text>
      <Text style={st.kicker}>Name</Text>
@@ -876,7 +876,7 @@ function EditMemberSheet({visible,child,children,onClose,onChanged,onRemoved}:{v
      {locked?<Text style={[st.sub,{textAlign:'center'}]}>Stop {child.name}'s timer before removing them.</Text>:null}
      {error?<Text style={[st.sub,{color:red,textAlign:'center'}]}>{error}</Text>:null}
     </ScrollView>
-   </View>
+   </KeyboardAvoidingView>
   </Modal>
   <AssignWatchSheet visible={visible&&stage==='assign'} child={child} spare={spare} link={p=>linkWatch(child,p)} onClose={()=>setStage('edit')} onAssigned={()=>{familyProfilesChanged();onChanged()}}/>
   {watch?<WatchColorSheet visible={visible&&stage==='color'} name={shortProfileName(child.name)} initial={color} onSave={async c=>{await familyCall('set_color',{profileId:watch.id,color:c});familyProfilesChanged();void load()}} onClose={()=>setStage('edit')}/>:null}
@@ -916,9 +916,9 @@ function AssignWatchSheet({visible,child,spare,link,onClose,onAssigned}:{visible
  }
  const digits=code.replace(/\D/g,'');
  return <Modal visible={visible} transparent animationType="slide" onRequestClose={busy?undefined:onClose}>
-  <View style={{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(29,43,51,0.3)'}}>
+  <KeyboardAvoidingView behavior="padding" style={{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(29,43,51,0.3)'}}>
    <TouchableOpacity style={StyleSheet.absoluteFill} disabled={busy} onPress={onClose} accessibilityLabel="Close"/>
-   <ScrollView style={{maxHeight:'88%',flexGrow:0}} contentContainerStyle={st.sheet} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
+   <ScrollView style={{maxHeight:'88%',flexGrow:0}} contentContainerStyle={st.sheet} keyboardShouldPersistTaps="handled">
     <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'}}/>
     {step==='start'?<>
      <Text style={st.sheetTitle}>Assign a watch to {name}</Text>
@@ -947,7 +947,7 @@ function AssignWatchSheet({visible,child,spare,link,onClose,onAssigned}:{visible
     </View>}
     {error?<Text style={[st.sub,{color:red,textAlign:'center'}]}>{error}</Text>:null}
    </ScrollView>
-  </View>
+  </KeyboardAvoidingView>
  </Modal>;
 }
 
