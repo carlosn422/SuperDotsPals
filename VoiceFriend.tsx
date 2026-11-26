@@ -51,7 +51,7 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
   a.start();return()=>a.stop()},[phase,reduce]);
 
  useEffect(()=>{if(!visible)return;
-  let alive=true,ws:WebSocket|null=null,ctx:AudioContext|null=null,recorder:AudioRecorder|null=null,timer:any=null,decoding=Promise.resolve(),turn=0,playEnd=0,lastChunk=0,hangup:any=null,callId:string|null=null,callStart=0;
+  let alive=true,ws:WebSocket|null=null,ctx:AudioContext|null=null,recorder:AudioRecorder|null=null,timer:any=null,wrapT:any=null,byeT:any=null,decoding=Promise.resolve(),turn=0,playEnd=0,lastChunk=0,hangup:any=null,callId:string|null=null,callStart=0;
   const use={inText:0,inAudio:0,outText:0,outAudio:0};
   const add=(d:any[]|undefined,into:'in'|'out')=>{for(const x of d||[]){const n=Number(x?.tokenCount)||0;if(x?.modality==='AUDIO')use[into==='in'?'inAudio':'outAudio']+=n;else use[into==='in'?'inText':'outText']+=n}};
   setPhase('connecting');setCaption('');setError('');setSaved(null);setMuted(false);
@@ -85,7 +85,10 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
       await recorder.start();
       ws?.send(JSON.stringify({realtimeInput:{text:topic?`(The call just started. I tapped "${topic}". Greet me warmly in one short sentence and gently ask about it.)`:'(The call just started. Greet me warmly in one short sentence and ask how my day was.)'}}));
       setPhase('listening');
-      timer=setTimeout(()=>{ws?.close()},(data.maxMinutes||10)*60000);
+      const total=(data.maxMinutes||5)*60000,quiet=()=>!!ctx&&Date.now()-lastChunk>900&&ctx.currentTime>playEnd+0.3;
+      wrapT=setTimeout(()=>{if(ws?.readyState===1)ws.send(JSON.stringify({clientContent:{turns:[{role:'user',parts:[{text:'(Note: time is almost up.)'}]}],turnComplete:false}}))},Math.max(0,total-60000));
+      byeT=setTimeout(()=>{const at=Date.now();byeT=setInterval(()=>{if(!alive||ws?.readyState!==1||hangup){clearInterval(byeT);return}if(quiet()||Date.now()-at>8000){clearInterval(byeT);ws.send(JSON.stringify({realtimeInput:{text:'(Note: time is up.)'}}))}},400)},Math.max(0,total-20000));
+      timer=setTimeout(()=>{ws?.close()},total+25000);
      }
      const sc=m.serverContent;
      if(sc){
@@ -123,7 +126,7 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
     };
    }catch(e:any){fail(e?.message||'Could not start the call.')}
   })();
-  return()=>{alive=false;clearTimeout(timer);clearInterval(hangup);
+  return()=>{alive=false;clearTimeout(timer);clearTimeout(wrapT);clearInterval(byeT);clearInterval(hangup);
    if(callId)void supabase.rpc('finish_voice_call',{p_call_id:callId,p_seconds:Math.round((Date.now()-callStart)/1000),p_input_text:use.inText,p_input_audio:use.inAudio,p_output_text:use.outText,p_output_audio:use.outAudio});try{recorder?.clearOnAudioReady();void recorder?.stop()}catch{}try{ws?.close()}catch{}void ctx?.close().catch(()=>{});void AudioManager.setAudioSessionActivity(false).catch(()=>{})};
  },[visible]);
 
