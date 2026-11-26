@@ -119,6 +119,7 @@ document.querySelectorAll('.phone').forEach(phone => {
 });
 
 const form = document.querySelector('.signup');
+if (form) {
 const msg = form.querySelector('.form-msg');
 form.addEventListener('submit', async e => {
   e.preventDefault();
@@ -134,11 +135,12 @@ form.addEventListener('submit', async e => {
     if (!res.ok) throw new Error(body.error || 'Something went wrong.');
     form.reset();
     msg.className = 'form-msg ok';
-    msg.textContent = "You're on the list! 🎉 We'll email you when the beta opens.";
+    msg.textContent = "You're on the list! 🎉 We'll email you about new features.";
   } catch (err) {
     msg.className = 'form-msg err'; msg.textContent = err.message;
   } finally { button.disabled = false; button.textContent = 'Get updates'; }
 });
+}
 document.getElementById('yr').textContent = new Date().getFullYear();
 
 // [data-join] links: scroll to the very top so the whole signup form is visible, then focus the email field.
@@ -185,4 +187,37 @@ document.querySelectorAll('.loop video').forEach(v => {
   v.addEventListener('play', sync); v.addEventListener('pause', sync);
   if (reduceMotion) { v.removeAttribute('autoplay'); v.pause(); }
   fig.append(btn); sync();
+});
+document.querySelectorAll('.t-show').forEach(show => {
+  const devs = [...show.querySelectorAll('.t-devs .t-dev')], pans = show.querySelectorAll('.t-panel'), slides = show.querySelectorAll('.t-slide');
+  const ptr = show.querySelector('.t-pointer'), stick = show.querySelector('.t-sticky'), car = show.querySelector('.t-carousel'), nav = document.querySelector('.nav');
+  let cur = -1;
+  const navH = () => nav ? nav.offsetHeight : 0;
+  const range = () => Math.max(1, show.offsetHeight - stick.offsetHeight);
+  const place = () => {
+    if (cur < 0) return;
+    const b = stick.getBoundingClientRect(), r = devs[cur].getBoundingClientRect();
+    ptr.style.transform = `translate(${r.left - b.left + r.width * .62}px, ${r.bottom - b.top - 16}px)`;
+  };
+  const pick = i => {
+    if (i === cur) return;
+    car.dataset.dir = i > cur ? 'down' : 'up';
+    slides.forEach((s, n) => { s.classList.toggle('out', n === cur); s.classList.toggle('on', n === i); });
+    devs.forEach((d, n) => d.setAttribute('aria-pressed', String(n === i)));
+    pans.forEach((p, n) => p.classList.toggle('on', n === i));
+    cur = i; place();
+  };
+  const onScroll = () => {
+    show.style.setProperty('--vh', innerHeight + 'px');
+    show.style.setProperty('--navh', navH() + 'px');
+    const p = (navH() - show.getBoundingClientRect().top) / range();
+    pick(Math.max(0, Math.min(devs.length - 1, Math.floor(p * devs.length))));
+    show.style.setProperty('--lk', Math.max(0, Math.min(1, (p * devs.length - (devs.length - 1) - .2) / .45)).toFixed(3));
+  };
+  devs.forEach((d, n) => d.addEventListener('click', () => {
+    scrollTo({ top: scrollY + show.getBoundingClientRect().top - navH() + range() * (n + .5) / devs.length, behavior: 'smooth' });
+  }));
+  addEventListener('scroll', onScroll, { passive: true });
+  addEventListener('resize', () => { onScroll(); place(); });
+  onScroll(); setTimeout(place, 600);
 });
