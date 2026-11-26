@@ -52,7 +52,7 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
   a.start();return()=>a.stop()},[phase,reduce]);
 
  useEffect(()=>{if(!visible)return;
-  let alive=true,ws:WebSocket|null=null,ctx:AudioContext|null=null,recorder:AudioRecorder|null=null,timer:any=null,wrapT:any=null,byeT:any=null,decoding=Promise.resolve(),turn=0,playEnd=0,lastChunk=0,hangup:any=null,callId:string|null=null,callStart=0;
+  let alive=true,ws:WebSocket|null=null,ctx:AudioContext|null=null,recorder:AudioRecorder|null=null,timer:any=null,wrapT:any=null,byeT:any=null,silT:any=null,lastHeard=0,nudged=0,decoding=Promise.resolve(),turn=0,playEnd=0,lastChunk=0,hangup:any=null,callId:string|null=null,callStart=0;
   const use={inText:0,inAudio:0,outText:0,outAudio:0};
   const add=(d:any[]|undefined,into:'in'|'out')=>{for(const x of d||[]){const n=Number(x?.tokenCount)||0;if(x?.modality==='AUDIO')use[into==='in'?'inAudio':'outAudio']+=n;else use[into==='in'?'inText':'outText']+=n}};
   setPhase('connecting');setCaption('');setError('');setSaved(null);setMuted(false);
@@ -95,6 +95,9 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
       wrapT=setTimeout(()=>{if(ws?.readyState===1)ws.send(JSON.stringify({clientContent:{turns:[{role:'user',parts:[{text:'(Note: time is almost up.)'}]}],turnComplete:false}}))},Math.max(0,total-60000));
       byeT=setTimeout(()=>{const at=Date.now();byeT=setInterval(()=>{if(!alive||ws?.readyState!==1||hangup){clearInterval(byeT);return}if(quiet()||Date.now()-at>8000){clearInterval(byeT);ws.send(JSON.stringify({realtimeInput:{text:'(Note: time is up.)'}}))}},400)},Math.max(0,total-20000));
       timer=setTimeout(()=>{ws?.close()},total+25000);
+      // Long silence: check in once, then let them go kindly.
+      lastHeard=Date.now();
+      silT=setInterval(()=>{if(!alive||ws?.readyState!==1||hangup||mutedRef.current||!quiet()||nudged>=2)return;if(Date.now()-Math.max(lastHeard,lastChunk)<(nudged?15000:20000))return;nudged++;lastHeard=Date.now();ws.send(JSON.stringify({realtimeInput:{text:nudged===1?"(Note: they've been quiet.)":'(Note: still quiet.)'}}))},1000);
      }
      const sc=m.serverContent;
      if(sc){
@@ -104,7 +107,7 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
        const chunk=p.inlineData.data;lastChunk=Date.now();setPhase('speaking');
        decoding=decoding.then(async()=>{if(id!==turn||!ctx)return;const b=await ctx.decodePCMInBase64(chunk,24000,1);if(id===turn&&ctx){queue.enqueueBuffer(b);playEnd=Math.max(playEnd,ctx.currentTime)+b.duration}}).catch(()=>{});
       }
-      if(sc.inputTranscription?.text)setCaption('');
+      if(sc.inputTranscription?.text){setCaption('');lastHeard=Date.now();nudged=0}
       if(sc.outputTranscription?.text)setCaption(c=>(c+sc.outputTranscription.text).slice(-220));
       if(sc.turnComplete)setTimeout(()=>{if(alive)setPhase(p=>p==='speaking'?'listening':p)},400);
      }
@@ -132,7 +135,7 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
     };
    }catch(e:any){fail(e?.message||'Could not start the call.')}
   })();
-  return()=>{alive=false;clearTimeout(timer);clearTimeout(wrapT);clearInterval(byeT);clearInterval(hangup);
+  return()=>{alive=false;clearTimeout(timer);clearTimeout(wrapT);clearInterval(byeT);clearInterval(silT);clearInterval(hangup);
    if(callId)void supabase.rpc('finish_voice_call',{p_call_id:callId,p_seconds:Math.round((Date.now()-callStart)/1000),p_input_text:use.inText,p_input_audio:use.inAudio,p_output_text:use.outText,p_output_audio:use.outAudio});try{recorder?.clearOnAudioReady();void recorder?.stop()}catch{}try{ws?.close()}catch{}void ctx?.close().catch(()=>{});void AudioManager.setAudioSessionActivity(false).catch(()=>{})};
  },[visible]);
 
