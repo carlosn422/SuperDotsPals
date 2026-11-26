@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import {supabase} from './supabase';
 import {APP_THEME as T} from './MoodMascot';
+import SuperdotMascot from './SuperdotMascot';
 import {usePlus} from './PlusStore';
 import {useIsGuest} from './Account';
 import {ManageFamilyProfile,familyCall,familyProfilesChanged,shortProfileName,useFamilyProfiles,type FamilyProfile} from './FamilyWatches';
@@ -162,7 +163,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  return <View style={{gap:14}}>
   {!embedded&&onBack?<Back label={backLabel} onPress={onBack}/>:null}
   <View style={[st.row,{paddingVertical:0}]}><Text style={st.title} accessibilityRole="header">Family</Text>{screenBreakSupported&&!guest?<HeaderLock/>:null}</View>
-  <Text style={st.sub}>Lend your iPhone with a Screen Break timer you control from MoodPals or your Apple Watch. Members don't need an account or a watch.</Text>
+  <View style={st.hero}><View style={{flex:1,gap:6}}><Text style={st.heroKicker}>SCREEN BREAK</Text><Text style={st.heroTitle}>Screen time,{'\n'}your way</Text></View><SuperdotMascot id="joy" size={88}/></View>
   <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
    <Text style={st.heading}>Members</Text>
    {guest?null:<TouchableOpacity accessibilityRole="button" accessibilityLabel={adding?'Close add member':'Add member'} onPress={()=>setAdding(a=>!a)} style={st.addBtn}><Ionicons name={adding?'close':'add'} size={18} color="#fff"/><Text style={st.addBtnText}>{adding?'Close':'Add member'}</Text></TouchableOpacity>}
@@ -173,13 +174,13 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
    {adding||(!loading&&!error&&!members.length)?<AddChild onAdded={id=>{setAdding(false);void load().then(()=>{if(id)setRoute({name:'child',id})});familyChildrenChanged()}}/>:null}
    {members.length?<View style={[st.card,{paddingVertical:4,gap:0}]}>
     {members.map((c,i)=><TouchableOpacity key={c.id} accessibilityRole="button" accessibilityLabel={'Open '+c.name} onPress={()=>setRoute({name:'child',id:c.id})} style={[st.row,i>0&&st.rowLine]}>
-     <View style={st.avatar}><Text style={st.avatarText}>{c.name.slice(0,1).toUpperCase()}</Text></View>
-     <View style={{flex:1}}><Text style={st.rowTitle}>{c.name}</Text><Text style={st.sub}>{c.profile_user_id?'Watch assigned':'No watch assigned'}</Text></View>
+     <View style={[st.avatar,{width:44,height:44,borderRadius:15,backgroundColor:TINTS[i%TINTS.length]}]}><Text style={[st.avatarText,{color:TINT_INK[i%TINTS.length]}]}>{c.name.slice(0,1).toUpperCase()}</Text></View>
+     <View style={{flex:1,flexDirection:'row',alignItems:'center',gap:6}}><Text style={st.rowTitle}>{c.name}</Text>{c.profile_user_id?<Ionicons name="watch" size={15} color={T.muted} accessibilityLabel="Has a watch"/>:null}</View>
      <ActiveBadge childId={c.id} remote={family.sessions.find(x=>x.child_id===c.id&&Date.parse(x.deadline_at)>Date.now())}/>
      <Ionicons name="chevron-forward" size={18} color={T.muted}/>
     </TouchableOpacity>)}
    </View>:null}
-   {screenBreakSupported?<TouchableOpacity accessibilityRole="button" onPress={()=>setRoute({name:'devices'})} style={st.linkRow}><Ionicons name="tablet-portrait-outline" size={20} color={T.primary}/><View style={{flex:1}}><Text style={st.rowTitle}>Family Devices</Text><Text style={st.sub}>iPads and spare iPhones your kids share</Text></View><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>:null}
+   {screenBreakSupported?<TouchableOpacity accessibilityRole="button" onPress={()=>setRoute({name:'devices'})} style={st.linkRow}><View style={[st.tile,{backgroundColor:TINTS[1]}]}><Ionicons name="tablet-portrait" size={21} color={TINT_INK[1]}/></View><View style={{flex:1}}><Text style={st.rowTitle}>Family Devices</Text></View><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>:null}
   </>}
   {footer?<View style={{marginTop:10}}>{footer}</View>:null}
  </View>;
@@ -219,7 +220,6 @@ function StartTimerSheet({device,members,onClose}:{device:FamilyDevice|null;memb
     <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6'}}/>
     <Text style={st.sheetTitle} numberOfLines={1}>Start timer on {device.name}</Text>
     <View style={st.chips}>{members.map(c=><Chip key={c.id} label={c.name} on={c.id===sel} disabled={busyElsewhere(c.id)} onPress={()=>setChild(c.id)}/>)}</View>
-    {members.some(c=>busyElsewhere(c.id))?<Text style={st.sub}>Dimmed members already have a timer running.</Text>:null}
     {session?<ReplaceNote name={who(session.child_id)} ms={Date.parse(session.deadline_at)-now}/>:null}
     <DurationRing minutes={minutes} onChange={setMinutes} min={5} max={180}/>
     <TouchableOpacity accessibilityRole="button" disabled={busy||!sel} onPress={()=>void start()} style={[st.cta,{alignSelf:'stretch'},(busy||!sel)&&{opacity:.5}]}>{busy?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>Start {formatDuration(minutes*60)}</Text>}</TouchableOpacity>
@@ -341,8 +341,8 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
   {!screenBreakSupported?<View style={st.card}><Text style={st.body}>Screen Break needs the latest MoodPals build on this iPhone.</Text></View>:<>
    {state&&!state.hasPlus&&!isPlus?<PlanNote state={state} daysLeft={trialDaysLeft} onUpgrade={()=>showPaywall('screenBreak')}/>:null}
    {inUse?null:<DeviceSelect options={deviceOptions} selected={target} defaultId={family.defaultId} onSelect={setPicked}/>}
-   {remote?<RemoteTimer child={child} children={children} device={remote} family={family} minutes={minutes} setMinutes={setMinutes} onOpen={onOpen} onPlan={()=>showPaywall('screenBreak')}/>:mine?<View style={[st.card,{alignItems:'center'}]}>
-    <Text style={st.kicker}>Screen time left</Text>
+   {remote?<RemoteTimer child={child} children={children} device={remote} family={family} minutes={minutes} setMinutes={setMinutes} onOpen={onOpen} onPlan={()=>showPaywall('screenBreak')}/>:mine?<View style={[st.card,st.heroCard,{alignItems:'center'}]}>
+    <SuperdotMascot id="joy" size={96}/><Text style={st.kicker}>Screen time left</Text>
     <Text style={st.timer} accessibilityRole="timer">{countdown(mine.deadline*1000-now)}</Text>
     <Text style={st.sub}>Ends at {clock(mine.deadline)} · {formatDuration(mine.grantedSeconds)} granted</Text>
     <TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={()=>{setExtra(15);setAdding(true)}} style={[st.cta,{alignSelf:'stretch',marginTop:6}]}><Text style={st.ctaText}>Add Time</Text></TouchableOpacity>
@@ -365,12 +365,10 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
     {!state?.authorized?<View style={{gap:10}}>
      <Text style={st.kicker}>Step 1 of 2</Text>
      <Text style={st.rowTitle}>Allow Screen Time access</Text>
-     <Text style={st.sub}>Lets MoodPals pause the apps you choose when time is up.</Text>
      <TouchableOpacity accessibilityRole="button" disabled={busy==='auth'} onPress={()=>void authorize()} style={st.cta}>{busy==='auth'?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>Allow Screen Time Access</Text>}</TouchableOpacity>
     </View>:!(state?.selectionCount||0)?<View style={{gap:10}}>
      <Text style={st.kicker}>Step 2 of 2</Text>
      <Text style={st.rowTitle}>Choose apps to pause</Text>
-     <Text style={st.sub}>Pick the apps, categories or websites to pause when time is up.</Text>
      <TouchableOpacity accessibilityRole="button" disabled={busy==='pick'} onPress={()=>void pick()} style={st.cta}>{busy==='pick'?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>Choose Apps to Pause</Text>}</TouchableOpacity>
     </View>:<TouchableOpacity accessibilityRole="button" accessibilityLabel={'Setup complete, '+state.selectionCount+' selected. Edit apps'} onPress={()=>void pick()} style={st.setupDone}>
      <Ionicons name="checkmark-circle" size={22} color={T.primary}/>
@@ -378,10 +376,8 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
      <Text style={st.link}>Edit apps</Text>
     </TouchableOpacity>}
     {ready?<>
-    <Text style={[st.rowTitle,{marginTop:8,textAlign:'center'}]}>How long can {child.name} use the phone?</Text>
     <DurationRing minutes={minutes} onChange={setMinutes} min={5} max={180}/>
     <TouchableOpacity accessibilityRole="button" disabled={!ready||!validMinutes||!!busy} onPress={()=>{void AsyncStorage.setItem(LAST_MINUTES_KEY,String(chosen));run('start',{minutes:chosen,replace:!!other})}} style={[st.cta,(!ready||!validMinutes||!!busy)&&{opacity:0.5}]}><Text style={st.ctaText}>Start</Text></TouchableOpacity>
-    <Text style={[st.sub,{textAlign:'center'}]}>Your Apple Watch reminds you 5 minutes before and lets you manage it.</Text>
     </>:null}
     {state?.entitlementKnown&&!state.allowed&&!state.hasPlus&&!isPlus&&!other?<TouchableOpacity accessibilityRole="button" accessibilityLabel="Free trial ended. See MoodPals Plus" onPress={()=>showPaywall('screenBreak')} style={st.gate}>
      <View style={st.gatePill}><Ionicons name="lock-closed" size={16} color="#fff"/><Text style={st.ctaText}>Get MoodPals Plus</Text></View>
@@ -391,7 +387,7 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
    {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
    {state&&!state.authorized&&mine?<Text style={[st.sub,{color:red}]}>Screen Time access was turned off, so apps can't be paused. Allow access again to restore the break.</Text>:null}</>}
   </>}
-  <TouchableOpacity accessibilityRole="button" onPress={onInsights} style={st.linkRow}><Ionicons name="bar-chart-outline" size={20} color={T.primary}/><Text style={[st.rowTitle,{flex:1}]}>Screen Time Insights</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>
+  <TouchableOpacity accessibilityRole="button" onPress={onInsights} style={st.linkRow}><View style={[st.tile,{backgroundColor:TINTS[2]}]}><Ionicons name="bar-chart" size={21} color={TINT_INK[2]}/></View><Text style={[st.rowTitle,{flex:1}]}>Screen Time Insights</Text><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>
   <MemberWatch child={child} children={children} onChanged={onChanged} onRemoved={onRemoved}/>
  </View>;
 }
@@ -430,7 +426,7 @@ function RemoteTimer({child,children,device,family,minutes,setMinutes,onOpen,onP
   </View>
   {session&&session.child_id===child.id?<>
    <View style={{alignItems:'center',gap:4}}>
-    <Text style={st.kicker}>Screen time left</Text>
+    <SuperdotMascot id="joy" size={96}/><Text style={st.kicker}>Screen time left</Text>
     <Text style={st.timer} accessibilityRole="timer">{countdown(Date.parse(session.deadline_at)-now)}</Text>
     <Text style={st.sub}>Ends at {clock(Date.parse(session.deadline_at)/1000)} · {formatDuration(session.granted_seconds)} granted</Text>
    </View>
@@ -443,7 +439,6 @@ function RemoteTimer({child,children,device,family,minutes,setMinutes,onOpen,onP
    <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>{setBusy(true);void cancelDeviceCommand(pendingStart.id).catch(e=>setError(e.message)).finally(()=>setBusy(false))}} style={[st.ghost,{alignSelf:'stretch'}]}><Text style={st.ghostText}>Cancel</Text></TouchableOpacity>
   </View>:device.auth_status!=='approved'||!device.selection_count?<Text style={st.body}>Finish setup on {device.name}: allow Screen Time and choose the apps to pause.</Text>:<>
    {session?<ReplaceNote name={who(session.child_id)} ms={Date.parse(session.deadline_at)-now}/>:null}
-   <Text style={[st.rowTitle,{marginTop:4,textAlign:'center'}]}>How long can {child.name} use {device.name}?</Text>
    <DurationRing minutes={minutes} onChange={setMinutes} min={5} max={180}/>
    <TouchableOpacity accessibilityRole="button" disabled={busy||!!status.pending} onPress={()=>{void AsyncStorage.setItem(LAST_MINUTES_KEY,String(minutes));void act('START_SESSION',{minutes,child:child.id,replace:!!session})}} style={[st.cta,(busy||!!status.pending)&&{opacity:.5}]}>{busy?<ActivityIndicator color="#fff"/>:<Text style={st.ctaText}>Start</Text>}</TouchableOpacity>
   </>}
@@ -454,6 +449,7 @@ function RemoteTimer({child,children,device,family,minutes,setMinutes,onOpen,onP
 }
 
 // Circular duration dial, same as the Apple Watch: drag around the ring in 5-minute steps.
+const PRESETS=[15,30,45,60,90],ringPal=(m:number)=>m<=30?'calm':m<=75?'joy':m<=120?'fear':'tired';
 export function DurationRing({minutes,onChange,min,max,step=5,prefix=''}:{minutes:number;onChange:(n:number)=>void;min:number;max:number;step?:number;prefix?:string}){
  // The knob is wider than the ring, so the ring is inset by the knob's radius to keep it inside the view.
  const SIZE=230,LINE=18,KNOB=LINE*0.75,R=SIZE/2-KNOB-3,C=SIZE/2,CIRC=2*Math.PI*R;
@@ -485,7 +481,7 @@ export function DurationRing({minutes,onChange,min,max,step=5,prefix=''}:{minute
  }),[min,max,step,setScrubbing]);
  const angle=frac*2*Math.PI,kx=C+R*Math.sin(angle),ky=C-R*Math.cos(angle);
  const h=Math.floor(minutes/60),m=minutes%60;
- return <View style={{width:SIZE,height:SIZE,alignSelf:'center',marginVertical:6}} {...pan.panHandlers}
+ return <View style={{alignSelf:'stretch',alignItems:'center',gap:12}}><View style={{width:SIZE,height:SIZE,alignSelf:'center',marginVertical:6}} {...pan.panHandlers}
   accessible accessibilityRole="adjustable" accessibilityLabel="Duration" accessibilityValue={{text:prefix+formatDuration(minutes*60)}}
   accessibilityActions={[{name:'increment'},{name:'decrement'}]} onAccessibilityAction={e=>set(minutes+(e.nativeEvent.actionName==='increment'?step:-step))}>
   <Svg width={SIZE} height={SIZE} pointerEvents="none">
@@ -494,9 +490,12 @@ export function DurationRing({minutes,onChange,min,max,step=5,prefix=''}:{minute
    <Circle cx={kx} cy={ky} r={KNOB} fill="#fff" stroke={T.primary} strokeWidth={3}/>
   </Svg>
   <View pointerEvents="none" style={[StyleSheet.absoluteFill,{alignItems:'center',justifyContent:'center'}]}>
-   <Text style={{fontSize:52,fontWeight:'900',color:T.ink}}>{prefix}{minutes}</Text>
+   <SuperdotMascot id={ringPal(minutes)} size={64}/>
+   <Text style={{fontSize:40,fontWeight:'900',color:T.ink}}>{prefix}{minutes}</Text>
    <Text style={st.sub}>{h?h+' hr'+(m?' '+m+' min':''):'min'}</Text>
   </View>
+ </View>
+ <View style={st.presets}>{PRESETS.filter(n=>n>=min&&n<=max).map(n=><TouchableOpacity key={n} accessibilityRole="button" accessibilityLabel={prefix+formatDuration(n*60)} accessibilityState={{selected:n===minutes}} onPress={()=>set(n)} style={[st.preset,n===minutes&&st.presetOn]}><Text style={[st.presetText,n===minutes&&{color:'#fff'}]}>{prefix}{n<60?n+'m':n/60+'h'}</Text></TouchableOpacity>)}</View>
  </View>;
 }
 
@@ -961,7 +960,17 @@ function Back({label,onPress}:{label:string;onPress:()=>void}){
  return <TouchableOpacity accessibilityRole="button" onPress={onPress} style={st.back}><Ionicons name="chevron-back" size={18} color={T.primary}/><Text style={{color:T.primary,fontWeight:'800'}}>{label}</Text></TouchableOpacity>;
 }
 
+const TINTS=['#E4F6EA','#EAF1FF','#F4EBFF','#FFF7E8','#FDECE8'],TINT_INK=['#23966A','#4A8CFF','#9B7BC8','#C98A0B','#DA4B31'];
 const st=StyleSheet.create({
+ hero:{borderRadius:23,backgroundColor:'#E8F5EF',padding:18,flexDirection:'row',alignItems:'center',gap:12},
+ heroKicker:{fontSize:11,letterSpacing:1,fontWeight:'900',color:'#3B8A6A'},
+ heroTitle:{fontSize:22,lineHeight:27,fontWeight:'900',color:T.ink},
+ heroCard:{backgroundColor:'#E8F5EF',borderColor:'#E8F5EF'},
+ tile:{width:43,height:43,borderRadius:15,alignItems:'center',justifyContent:'center'},
+ presets:{flexDirection:'row',flexWrap:'wrap',justifyContent:'center',gap:8},
+ preset:{minWidth:52,minHeight:40,borderRadius:20,paddingHorizontal:12,alignItems:'center',justifyContent:'center',backgroundColor:T.primarySoft},
+ presetOn:{backgroundColor:T.primary},
+ presetText:{fontSize:15,fontWeight:'800',color:T.primary},
  back:{flexDirection:'row',alignItems:'center',gap:4,marginBottom:4},
  title:{fontSize:28,fontWeight:'900',color:T.ink},
  gate:{position:'absolute',top:0,left:0,right:0,bottom:0,borderRadius:20,backgroundColor:'rgba(244,247,245,0.72)',alignItems:'center',justifyContent:'center'},

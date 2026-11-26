@@ -128,7 +128,7 @@ export function FamilyDevicesScreen({onBack,childName,onStart}:{onBack:()=>void;
   {!loaded?<ActivityIndicator color={T.primary}/>:null}
   <View style={s.card}>
    <View style={s.deviceRow}>
-    <View style={s.deviceIcon}><Ionicons name="phone-portrait-outline" size={28} color={T.ink}/></View>
+    <View style={s.deviceIcon}><Ionicons name="phone-portrait-outline" size={28} color="#4A8CFF"/></View>
     <View style={{flex:1}}>
      <View style={s.nameLine}><Text style={s.rowTitle} numberOfLines={1}>This iPhone</Text>{defaultId===PHONE?<DefaultPill/>:null}</View>
      <StatusLine icon="checkmark-circle" color={OK} text="Your iPhone"/>
@@ -138,7 +138,6 @@ export function FamilyDevicesScreen({onBack,childName,onStart}:{onBack:()=>void;
   </View>
   {devices.map(d=><DeviceCard key={d.id} device={d} isDefault={defaultId===d.id} commands={commands} sessions={sessions} now={now} childName={childName} onOpen={()=>setDetail(d.id)} onStart={onStart}/>)}
   {loaded&&!devices.length&&!adding?<Text style={s.sub}>No family devices yet. On the iPad, install MoodPals and tap “Link as a Family Device.”</Text>:null}
-  <View style={s.info}><Ionicons name="information-circle-outline" size={20} color={T.muted}/><Text style={[s.sub,{flex:1}]}>Any family member can use any device. You pick who each time you start a timer.</Text></View>
  </View>;
 }
 
@@ -180,7 +179,7 @@ function DeviceCard({device:d,isDefault,commands,sessions,now,childName,onOpen,o
  const pendingStart=st.pending?.type==='START_SESSION'?st.pending:undefined;
  return <View style={s.card}>
   <TouchableOpacity accessibilityRole="button" accessibilityLabel={d.name+(isDefault?', default':'')+', '+status.text+'. Device settings'} onPress={onOpen} style={s.deviceRow}>
-   <View style={s.deviceIcon}><Ionicons name={d.device_type==='ipad'?'tablet-landscape-outline':'phone-portrait-outline'} size={28} color={T.ink}/></View>
+   <View style={s.deviceIcon}><Ionicons name={d.device_type==='ipad'?'tablet-landscape-outline':'phone-portrait-outline'} size={28} color="#4A8CFF"/></View>
    <View style={{flex:1}}>
     <View style={s.nameLine}><Text style={s.rowTitle} numberOfLines={1}>{d.name}</Text>{isDefault?<DefaultPill/>:null}</View>
     <StatusLine {...status}/>
@@ -219,15 +218,13 @@ function DeviceSettings({device,isDefault,now,onBack}:{device:FamilyDevice;isDef
    <SettingRow label="Name"><TextInput style={s.setInput} value={name} onChangeText={setName} onEndEditing={rename} returnKeyType="done" maxLength={60} editable={!busy} accessibilityLabel="Device name"/></SettingRow>
    <SettingRow label="Default device" last><Switch value={isDefault} disabled={busy} trackColor={{true:T.primary}} onValueChange={v=>void act(()=>v?rpc('family_device_set_default',{p_device:device.id}):rpc('family_device_clear_default',{}))} accessibilityLabel="Default device"/></SettingRow>
   </View>
-  <Text style={s.groupNote}>New timers pick the default device first. You can change it when you start one.</Text>
   <View style={s.group}>
    <SettingRow label="Screen Time" value={screenTime}/>
    <SettingRow label="Apps to pause" value={device.selection_count?String(device.selection_count):'None chosen'}/>
    <SettingRow label="Connection" value={lastSeen(device,now)} last><TouchableOpacity accessibilityRole="button" disabled={busy} onPress={()=>void act(()=>deviceCommand(device.id,'REQUEST_STATUS'))} style={s.textBtn}><Text style={s.link}>Check</Text></TouchableOpacity></SettingRow>
   </View>
-  <Text style={s.groupNote}>Change Screen Time and the apps to pause on {device.name} itself.</Text>
   <View style={s.group}><SettingRow label="Recovery code" value={device.recovery_code} last/></View>
-  <Text style={s.groupNote}>Enter it on the device under Parent recovery if it can't reach MoodPals.</Text>
+  <Text style={s.groupNote}>For the device's Parent recovery.</Text>
   <View style={s.group}>{device.status==='unlinking'?<SettingRow label="Remove now" danger last onPress={busy?undefined:forceRemove}/>:<SettingRow label="Remove device" danger last onPress={busy?undefined:remove}/>}</View>
   {busy?<ActivityIndicator color={T.primary}/>:null}
   {error?<Text style={[s.sub,{color:PAUSED}]}>{error}</Text>:null}
@@ -300,7 +297,7 @@ const s=StyleSheet.create({
  tonalPill:{flexDirection:'row',alignItems:'center',gap:4,backgroundColor:T.primarySoft,borderRadius:22,paddingHorizontal:14,minHeight:44},
  tonalText:{color:T.primary,fontWeight:'800',fontSize:15},
  deviceRow:{flexDirection:'row',alignItems:'center',gap:14,minHeight:56},
- deviceIcon:{width:52,height:52,borderRadius:14,backgroundColor:T.background,alignItems:'center',justifyContent:'center'},
+ deviceIcon:{width:52,height:52,borderRadius:16,backgroundColor:'#EAF1FF',alignItems:'center',justifyContent:'center'},
  nameLine:{flexDirection:'row',alignItems:'center',gap:8,flexShrink:1},
  pill:{backgroundColor:T.primarySoft,borderRadius:8,paddingHorizontal:8,paddingVertical:2},
  pillText:{color:T.primary,fontSize:12,fontWeight:'800'},
