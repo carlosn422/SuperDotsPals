@@ -1,5 +1,6 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {Modal,View,Text,TouchableOpacity,StyleSheet,Animated,Easing,ActivityIndicator} from 'react-native';
+import {Modal,View,Text,TouchableOpacity,StyleSheet,Animated,Easing,ActivityIndicator,Image} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import {AudioContext,AudioRecorder,AudioManager} from 'react-native-audio-api';
@@ -10,7 +11,18 @@ import {usePlus} from './PlusStore';
 import {useReduceMotion} from './CircleComponents';
 
 export type VoiceGender='female'|'male';
-export const VOICE_DEMOS:Record<VoiceGender,number>={female:require('./assets/voice/demo-female.m4a'),male:require('./assets/voice/demo-male.m4a')};
+export type VoicePalId='maya'|'lily'|'grace'|'leo'|'sam'|'max';
+type VoicePal={id:VoicePalId;name:string;gender:VoiceGender;vibe:string;tint:string;photo:number;hello:number};
+export const VOICE_PALS:VoicePal[]=[
+ {id:'maya',name:'Maya',gender:'female',vibe:'Warm',tint:'#DDF5EA',photo:require('./assets/voice/pals/maya.jpg'),hello:require('./assets/voice/pals/maya.m4a')},
+ {id:'lily',name:'Lily',gender:'female',vibe:'Bright',tint:'#FFE6D6',photo:require('./assets/voice/pals/lily.jpg'),hello:require('./assets/voice/pals/lily.m4a')},
+ {id:'grace',name:'Grace',gender:'female',vibe:'Gentle',tint:'#ECE6FF',photo:require('./assets/voice/pals/grace.jpg'),hello:require('./assets/voice/pals/grace.m4a')},
+ {id:'leo',name:'Leo',gender:'male',vibe:'Friendly',tint:'#DDEEFF',photo:require('./assets/voice/pals/leo.jpg'),hello:require('./assets/voice/pals/leo.m4a')},
+ {id:'sam',name:'Sam',gender:'male',vibe:'Easy-going',tint:'#E3F1DC',photo:require('./assets/voice/pals/sam.jpg'),hello:require('./assets/voice/pals/sam.m4a')},
+ {id:'max',name:'Max',gender:'male',vibe:'Upbeat',tint:'#FFF3CC',photo:require('./assets/voice/pals/max.jpg'),hello:require('./assets/voice/pals/max.m4a')},
+];
+export const voicePal=(id:VoicePalId)=>VOICE_PALS.find(p=>p.id===id)??VOICE_PALS[0];
+const PAL_KEY='moodpals.voicePal';
 const RING=require('./assets/voice/ring.m4a');
 
 function utf8(b:Uint8Array){
@@ -32,11 +44,22 @@ export async function loadVoiceGender():Promise<VoiceGender>{
  return data?.voice_gender==='male'?'male':'female';
 }
 
-// Plays a bundled demo clip; returns a stop function.
-export async function playVoiceDemo(g:VoiceGender,onEnd:()=>void){
+export async function loadVoicePal():Promise<VoicePalId>{
+ const saved=await AsyncStorage.getItem(PAL_KEY).catch(()=>null);
+ if(VOICE_PALS.some(p=>p.id===saved))return saved as VoicePalId;
+ return (await loadVoiceGender())==='male'?'leo':'maya';
+}
+export async function saveVoicePal(id:VoicePalId){
+ await AsyncStorage.setItem(PAL_KEY,id).catch(()=>{});
+ const {data:{user}}=await supabase.auth.getUser();
+ if(user)await supabase.from('user_settings').update({voice_gender:voicePal(id).gender}).eq('user_id',user.id);
+}
+
+// Plays a bundled clip; returns a stop function.
+export async function playClip(clip:number,onEnd:()=>void){
  const ctx=new AudioContext();
  try{
-  const buf=await ctx.decodeAudioData(VOICE_DEMOS[g]);
+  const buf=await ctx.decodeAudioData(clip);
   const src=ctx.createBufferSource();src.buffer=buf;src.connect(ctx.destination);
   src.onended=()=>{onEnd();void ctx.close()};src.start();
   return ()=>{try{src.stop()}catch{}};
@@ -70,8 +93,8 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
   (async()=>{
    try{
     if(await AudioManager.requestRecordingPermissions()!=='Granted')return fail('Allow the microphone for MoodPals in iPhone Settings to talk with your pal.');
-    const gender=await loadVoiceGender();
-    const {data,error:fnError}=await supabase.functions.invoke('voice-live-token',{body:{voice:gender}});
+    const pal=voicePal(await loadVoicePal());
+    const {data,error:fnError}=await supabase.functions.invoke('voice-live-token',{body:{voice:pal.gender,pal:pal.id}});
     if(fnError){let msg='Could not start the call. Please try again.';try{const d=await (fnError as any).context?.json?.();if(d?.code==='plus_required'){onClose();showPaywall('reflections');return}if(d?.error)msg=d.error}catch{}return fail(msg)}
     if(!alive||!data?.token)return;
     callId=data.callId||null;callStart=Date.now();
@@ -186,12 +209,10 @@ export function BuddyCall({companion,name,onCall}:{companion:string;name?:string
  const reduce=useReduceMotion();
  const p=useRef(new Animated.Value(0)).current;
  useEffect(()=>{if(reduce)return;const a=Animated.loop(Animated.timing(p,{toValue:1,duration:2200,easing:Easing.out(Easing.ease),useNativeDriver:true}));a.start();return()=>a.stop()},[reduce]);
- const [gender,setGender]=useState<VoiceGender>('female'),[picking,setPicking]=useState(false),[playing,setPlaying]=useState<VoiceGender|null>(null);
- const stopRef=useRef<()=>void>(()=>{});
- useEffect(()=>{void loadVoiceGender().then(setGender)},[]);
- const close=()=>{stopRef.current();setPlaying(null);setPicking(false)};
- const demo=async(g:VoiceGender)=>{stopRef.current();if(playing===g){setPlaying(null);return}setPlaying(g);stopRef.current=await playVoiceDemo(g,()=>setPlaying(p=>p===g?null:p))};
- const choose=async(g:VoiceGender)=>{setGender(g);void Haptics.selectionAsync();const {data:{user}}=await supabase.auth.getUser();if(user)await supabase.from('user_settings').update({voice_gender:g}).eq('user_id',user.id)};
+ const [palId,setPalId]=useState<VoicePalId>('maya'),[picking,setPicking]=useState(false);
+ useEffect(()=>{void loadVoicePal().then(setPalId)},[]);
+ const pal=voicePal(palId),close=()=>setPicking(false);
+ const choose=(id:VoicePalId)=>{setPalId(id);void saveVoicePal(id)};
  const wave={transform:[{scale:p.interpolate({inputRange:[0,1],outputRange:[0.85,1.12]})}],opacity:p.interpolate({inputRange:[0,1],outputRange:[0.8,0]})};
  return <View style={b.wrap}>
   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Call your buddy" activeOpacity={0.85} onPress={()=>onCall()} style={b.stage}>
@@ -201,20 +222,17 @@ export function BuddyCall({companion,name,onCall}:{companion:string;name?:string
    <View style={b.say}><Text style={b.sayText}>Hey{name?' '+name:''}! 👋 Wanna talk?</Text></View>
    <View style={b.tap}><Ionicons name="call" size={18} color="#fff"/><Text style={b.tapText}>Tap me to call</Text></View>
   </TouchableOpacity>
-  <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Voice: '+gender+'. Change voice'} onPress={()=>setPicking(true)} style={b.voice}>
-   <Ionicons name={gender} size={14} color="#2E8F64"/><Text style={b.voiceText}>{gender==='female'?'Female':'Male'} voice</Text><Ionicons name="chevron-forward" size={13} color="#2E8F64"/>
+  <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Your buddy: '+pal.name+'. Change buddy'} onPress={()=>setPicking(true)} style={b.voice}>
+   <Image source={pal.photo} style={b.chipPhoto}/><Text style={b.voiceText}>{pal.name}</Text><Ionicons name="chevron-forward" size={13} color="#2E8F64"/>
   </TouchableOpacity>
   <Modal visible={picking} transparent animationType="slide" onRequestClose={close}>
    <TouchableOpacity activeOpacity={1} onPress={close} style={b.backdrop}>
     <TouchableOpacity activeOpacity={1} style={b.sheet}>
      <View style={b.grab}/>
-     <Text style={b.sheetTitle}>Pick your buddy's voice</Text>
-     {(['female','male'] as const).map(g=><TouchableOpacity key={g} accessibilityRole="radio" accessibilityState={{selected:gender===g}} onPress={()=>void choose(g)} style={[b.opt,gender===g&&b.optOn]}>
-      <View style={[b.optIc,{backgroundColor:g==='female'?'#F4EBFF':'#E4F0FF'}]}><Ionicons name={g} size={22} color={g==='female'?'#8A63D2':'#4A7BE0'}/></View>
-      <Text style={b.optText}>{g==='female'?'Female':'Male'}</Text>
-      <TouchableOpacity accessibilityRole="button" accessibilityLabel={(playing===g?'Stop ':'Play ')+g+' voice sample'} onPress={()=>void demo(g)} style={b.play}><Ionicons name={playing===g?'stop':'play'} size={18} color="#fff"/></TouchableOpacity>
-      <Ionicons name={gender===g?'checkmark-circle':'ellipse-outline'} size={26} color={gender===g?'#34B37E':'#C9D6CF'}/>
-     </TouchableOpacity>)}
+     <Text style={b.sheetTitle}>Pick your buddy</Text>
+     <Text style={b.sheetSub}>Tap to hear them say hi</Text>
+     <VoicePalGrid value={palId} onPick={choose}/>
+     <TouchableOpacity accessibilityRole="button" onPress={close} style={b.done}><Text style={b.doneText}>Done</Text></TouchableOpacity>
     </TouchableOpacity>
    </TouchableOpacity>
   </Modal>
@@ -227,8 +245,33 @@ export function RoundButton({icon,label,tint,bg,a11y,onPress}:{icon:any;label:st
   <Text style={[b.rbl,{color:tint}]}>{label}</Text>
  </TouchableOpacity>;
 }
+// Six buddies with a portrait each; tapping one picks it and plays its hello.
+export function VoicePalGrid({value,onPick}:{value:VoicePalId;onPick:(id:VoicePalId)=>void}){
+ const [playing,setPlaying]=useState<VoicePalId|null>(null);
+ const stop=useRef<()=>void>(()=>{});
+ useEffect(()=>()=>stop.current(),[]);
+ const tap=async(p:VoicePal)=>{stop.current();onPick(p.id);void Haptics.selectionAsync();setPlaying(p.id);stop.current=await playClip(p.hello,()=>setPlaying(x=>x===p.id?null:x))};
+ return <View style={g.grid}>{VOICE_PALS.map(p=>{const on=value===p.id,live=playing===p.id;
+  return <TouchableOpacity key={p.id} accessibilityRole="radio" accessibilityState={{checked:on}} accessibilityLabel={p.name+', '+p.vibe+(p.gender==='female'?', female voice':', male voice')} accessibilityHint="Picks this buddy and plays a hello" onPress={()=>void tap(p)} style={[g.card,{backgroundColor:p.tint},on&&g.on]}>
+   <View><Image source={p.photo} style={g.photo}/>{on&&<View style={g.check}><Ionicons name="checkmark" size={13} color="#fff"/></View>}</View>
+   <Text style={g.name}>{p.name}</Text>
+   <View style={g.vibeRow}><Ionicons name={live?'volume-high':'play'} size={12} color="#5B6B63"/><Text style={g.vibe} numberOfLines={1}>{live?'Saying hi':p.vibe}</Text></View>
+  </TouchableOpacity>})}</View>;
+}
+const g=StyleSheet.create({
+ grid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',rowGap:10},
+ card:{width:'31.5%',alignItems:'center',borderRadius:22,paddingVertical:12,paddingHorizontal:6,gap:4,borderWidth:2.5,borderColor:'transparent'},
+ on:{borderColor:'#34B37E'},
+ photo:{width:72,height:72,borderRadius:36,borderWidth:3,borderColor:'#fff'},
+ check:{position:'absolute',right:-2,bottom:-2,width:24,height:24,borderRadius:12,backgroundColor:'#34B37E',borderWidth:2,borderColor:'#fff',alignItems:'center',justifyContent:'center'},
+ name:{fontSize:16,fontWeight:'900',color:APP_THEME.ink},
+ vibeRow:{flexDirection:'row',alignItems:'center',gap:3},vibe:{fontSize:12,fontWeight:'700',color:'#5B6B63'},
+});
 const b=StyleSheet.create({
- voice:{alignSelf:'center',flexDirection:'row',alignItems:'center',gap:5,backgroundColor:'#E4F6EA',borderRadius:14,paddingHorizontal:11,paddingVertical:6},voiceText:{fontSize:13,fontWeight:'800',color:'#2E8F64'},
+ chipPhoto:{width:22,height:22,borderRadius:11},
+ sheetSub:{fontSize:13,fontWeight:'700',color:'#6B7C73',textAlign:'center',marginTop:-8,marginBottom:4},
+ done:{alignSelf:'flex-end',backgroundColor:'#34B37E',borderRadius:22,paddingHorizontal:28,paddingVertical:12,marginTop:4},doneText:{color:'#fff',fontSize:16,fontWeight:'900'},
+ voice:{alignSelf:'center',flexDirection:'row',alignItems:'center',gap:6,backgroundColor:'#E4F6EA',borderRadius:16,paddingLeft:4,paddingRight:11,paddingVertical:4},voiceText:{fontSize:13,fontWeight:'800',color:'#2E8F64'},
  backdrop:{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(20,30,35,0.35)'},
  sheet:{backgroundColor:'#fff',borderTopLeftRadius:28,borderTopRightRadius:28,padding:20,paddingBottom:40,gap:12},
  grab:{alignSelf:'center',width:40,height:5,borderRadius:3,backgroundColor:'#DCE3E0'},

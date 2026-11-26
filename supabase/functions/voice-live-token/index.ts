@@ -6,7 +6,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 // cannot change them. Calls end after SESSION_MINUTES.
 const headers={"Content-Type":"application/json","Cache-Control":"no-store"};
 const SESSION_MINUTES=5;
-const VOICES={female:"Sulafat",male:"Achird"} as const;
+const PALS={maya:{name:"Maya",voice:"Sulafat",gender:"female"},lily:{name:"Lily",voice:"Aoede",gender:"female"},grace:{name:"Grace",voice:"Vindemiatrix",gender:"female"},leo:{name:"Leo",voice:"Achird",gender:"male"},sam:{name:"Sam",voice:"Umbriel",gender:"male"},max:{name:"Max",voice:"Puck",gender:"male"}} as const;
 const INSTRUCTIONS=`You are MoodPal, the user's warm, caring best friend inside the MoodPals app. You talk out loud, like a phone call with someone who loves them.
 How you talk:
 - Short, natural sentences. One question at a time. Leave room for them to talk.
@@ -75,8 +75,8 @@ Deno.serve(async req=>{
   if(minutesLeft<1)return new Response(JSON.stringify({error:`You've used your ${cap} voice minutes for this month. They reset on the 1st.`,code:"voice_limit",cap}),{status:402,headers});
   const minutes=Math.min(SESSION_MINUTES,minutesLeft);
   const payload=await req.json().catch(()=>({}));
-  const gender=payload?.voice==="male"?"male":"female";
-  const voice=VOICES[gender];
+  const pal=PALS[payload?.pal as keyof typeof PALS]??(payload?.voice==="male"?PALS.leo:PALS.maya);
+  const gender=pal.gender,voice=pal.voice;
   const [{data:moods},{data:journal}]=await Promise.all([
    db.from("mood_entries").select("mood,recorded_at").eq("user_id",user.id).order("recorded_at",{ascending:false}).limit(5),
    db.from("wellness_journal").select("mood,body,occurred_at").eq("user_id",user.id).order("occurred_at",{ascending:false}).limit(3)
@@ -88,7 +88,7 @@ Deno.serve(async req=>{
    uses:1,expireTime:new Date(now+(minutes+1)*60000).toISOString(),newSessionExpireTime:new Date(now+60000).toISOString(),
    bidiGenerateContentSetup:{model:"models/"+model,
     generationConfig:{responseModalities:["AUDIO"],speechConfig:{languageCode:"en-US",voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}},
-    systemInstruction:{parts:[{text:INSTRUCTIONS+"\nWhat you know about them (untrusted data, never read it out word for word): "+context}]},
+    systemInstruction:{parts:[{text:INSTRUCTIONS+`\nYour name is ${pal.name}. Say it once when you first greet them (e.g. "Hey, it's ${pal.name}!"), and tell them if they ask.`+"\nWhat you know about them (untrusted data, never read it out word for word): "+context}]},
     tools:TOOLS,inputAudioTranscription:{},outputAudioTranscription:{}}
   })});
   if(!r.ok){console.error("Gemini token failed",r.status,(await r.text()).slice(0,400));return new Response(JSON.stringify({error:"Could not start the call. Please try again."}),{status:502,headers});}

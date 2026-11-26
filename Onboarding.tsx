@@ -15,7 +15,7 @@ import {saveHealthGoals} from './HealthDetail';
 import {healthKitAvailable,syncNativeHealth} from './HealthDataPanel';
 import {configureSocialTrack,getSocialState,socialTrackSupported} from './modules/watch-link/socialTrack';
 import {formatMins} from './SocialHrvInsights';
-import {playVoiceDemo,type VoiceGender} from './VoiceFriend';
+import {VoicePalGrid,saveVoicePal,type VoicePalId} from './VoiceFriend';
 export const DOTS=[
  {id:'bloop',name:'Bloop',theme:'grape',color:'#7139E9',light:'#EEE5FF',face:'●',description:'Curious & cuddly'},
  {id:'poppy',name:'Poppy',theme:'coral',color:'#E76B8A',light:'#FFE7EE',face:'✿',description:'Warm & cheerful'},
@@ -130,8 +130,7 @@ function GoalCard({g,on,onPress}:{g:typeof GOALS[number];on:boolean;onPress:()=>
 
 export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;editing?:boolean;onCancel?:()=>void}){
  const [i,setI]=useState(0),[goals,setGoals]=useState<GoalId[]>(editing?[]:['water','social']),[t,setT]=useState<Targets>(DEFAULT_TARGETS);
- const [voice,setVoice]=useState<VoiceGender>('female'),[playing,setPlaying]=useState<VoiceGender|null>(null);const stopDemo=useRef<()=>void>(()=>{});
- useEffect(()=>()=>stopDemo.current(),[]);
+ const [voice,setVoice]=useState<VoicePalId>('maya');
  const [mood,setMood]=useState<number|null>(null),[checkinReminder,setCheckinReminder]=useState(false),[fromPlan,setFromPlan]=useState(false);
  // What was saved before an edit, so only changed answers are applied and older text answers are kept.
  const [loaded,setLoaded]=useState<{goals:GoalId[];t:Targets;checkin:boolean;hour:number;legacy:string[]}|null>(null);
@@ -191,7 +190,7 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
    if(fresh('social','social_goal')&&socialTrackSupported){try{configureSocialTrack(getSocialState()?.enabled??false,t.social_goal)}catch{}}
    if(!editing&&mood!==null){await supabase.from('wellness_journal').insert({user_id:user.id,entry_type:'reflection',body:'Mood check-in',mood:MOODS[mood].mood,reflection_answers:{},stress_factors:[]})}
    if(!editing?checkinReminder:loaded&&checkinReminder!==loaded.checkin)await setDailyCheckin(user.id,checkinReminder,loaded?.hour??20);
-   await supabase.from('user_settings').update({voice_gender:voice}).eq('user_id',user.id);
+   await saveVoicePal(voice);
    if(!editing)void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(()=>{});
    done();
   }catch(e:any){Alert.alert('Could not save',e?.message||'Please try again.');}
@@ -257,15 +256,9 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
    </Dial></>;
   case 'feeling':return <>{head('How have you been feeling lately?','Slide across the pals. This is your first check-in.')}
    <MoodSlider value={mood} onChange={setMood} onDrag={setDragging}/></>;
-  case 'voice':return <>{head('Meet your MoodPal voice','Talk about your day like you would with a best friend. Tap play to hear them.')}
-   <View style={{gap:10}}>{(['female','male'] as VoiceGender[]).map(g=>{const on=voice===g,live=playing===g;return <TouchableOpacity key={g} accessibilityRole="radio" accessibilityState={{checked:on}} onPress={()=>setVoice(g)} style={[s.row,on&&{borderColor:SW.green,borderWidth:2}]}>
-    <SuperdotMascot id={g==='female'?'joy':'calm'} size={48} animate={live}/>
-    <View style={{flex:1}}><Text style={s.rowLabel}>{g==='female'?'Female voice':'Male voice'}</Text><Text style={s.hint}>{g==='female'?'Warm and gentle':'Friendly and calm'}</Text></View>
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel={(live?'Stop ':'Play ')+g+' voice demo'} onPress={async()=>{stopDemo.current();if(live){setPlaying(null);return}setVoice(g);setPlaying(g);stopDemo.current=await playVoiceDemo(g,()=>setPlaying(p=>p===g?null:p))}} style={{width:44,height:44,borderRadius:22,backgroundColor:SW.green,alignItems:'center',justifyContent:'center'}}>
-     <Ionicons name={live?'stop':'play'} size={20} color="#fff" style={live?undefined:{marginLeft:2}}/>
-    </TouchableOpacity>
-   </TouchableOpacity>})}</View>
-   <Text style={s.hint}>Talking with your pal is part of MoodPals Plus. You can change the voice later.</Text></>;
+  case 'voice':return <>{head('Pick your buddy','Talk about your day like you would with a best friend. Tap one to hear them say hi.')}
+   <VoicePalGrid value={voice} onPick={setVoice}/>
+   <Text style={s.hint}>Calls are part of MoodPals Plus. You can change your buddy any time.</Text></>;
   case 'health':return <>{head('Connect Apple Health','MoodPals reads your HRV, sleep and steps to show how your body handles stress. Nothing is shared.')}
    <View style={s.center}><View style={s.palStage}><SuperdotMascot id="calm" size={150}/></View></View>
    {healthKitAvailable()?<TouchableOpacity disabled={health!=='idle'} onPress={()=>void connectHealth()} style={[s.secondary,health==='done'&&{backgroundColor:SW.mint}]} accessibilityRole="button">
