@@ -174,7 +174,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  const [devSel,setDevSel]=useState<string|null>(null),[addingDevice,setAddingDevice]=useState(false);
  const showDock=!guest&&route.name==='list'&&!loading&&!error&&(section==='devices'||members.length>0);
  const dockRow=section==='devices'?<DeviceDock devices={family.devices} defaultId={family.defaultId} sessions={family.sessions} selected={devSel} adding={addingDevice} onSelect={id=>{void Haptics.selectionAsync();setAddingDevice(false);setDevSel(id)}} onAdd={()=>setAddingDevice(a=>!a)}/>:<ProfileRow members={members} selected={current?.id} adding={adding} onSelect={id=>{setAdding(false);setSelected(id)}} onAdd={()=>setAdding(a=>!a)} sessions={family.sessions}/>;
- const dock=<View style={st.dockShell}><View style={st.dockHead}><Ionicons name={section==='devices'?'tablet-portrait':'people'} size={15} color="#fff"/><Text style={st.dockLabel}>{section==='devices'?'Devices':'Family'}</Text></View><View style={st.dockInner}>{dockRow}</View></View>;
+ const dock=<View style={st.dockShell}><MintWave edge="bottom"/><View style={st.dockHead}><Ionicons name={section==='devices'?'tablet-portrait':'people'} size={16} color={T.primary}/><Text style={st.dockLabel}>{section==='devices'?'Devices':'Family'}</Text></View><View style={st.dockInner}>{dockRow}</View></View>;
  const dockKey=section+'|'+devSel+'|'+addingDevice+'|'+family.defaultId+'|'+family.devices.map(d=>d.id+d.name+d.device_type).join()+'|'+members.map(c=>c.id+c.name).join()+'|'+current?.id+'|'+adding+'|'+family.sessions.map(x=>x.id+x.deadline_at+x.granted_seconds).join();
  useEffect(()=>{onDock?.(showDock?dock:null)},[onDock,showDock,dockKey]);
  useEffect(()=>()=>onDock?.(null),[onDock]);
@@ -210,19 +210,33 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
 
 const heroColor=(frac:number,ms:number)=>ms<=5*60000||frac<=.2?'#E5484D':frac<=.5?'#F2A93B':T.primary;
 /** Running timer: full-color card with the countdown, then who/where with a progress bar. */
+/** Soft mint wave that blends a section into the page background. */
+function MintWave({edge}:{edge:'top'|'bottom'}){
+ const id='mw'+edge;
+ return <Svg width="100%" height="100%" viewBox="0 0 400 100" preserveAspectRatio="none" style={StyleSheet.absoluteFill} pointerEvents="none">
+  <Defs>{edge==='top'?<LinearGradient id={id} x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor="#B9E9CF" stopOpacity=".85"/><Stop offset=".5" stopColor="#E4F6EA" stopOpacity=".7"/><Stop offset="1" stopColor="#C8EED9" stopOpacity=".85"/></LinearGradient>
+   :<LinearGradient id={id} x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#FFFFFF" stopOpacity=".95"/><Stop offset="1" stopColor="#D6F1E1" stopOpacity="1"/></LinearGradient>}</Defs>
+  <Path d={edge==='top'?'M0 0 H400 V84 C300 100 170 66 0 94 Z':'M0 16 C110 -4 280 -4 400 18 V100 H0 Z'} fill={'url(#'+id+')'}/>
+ </Svg>;
+}
+
 function TimerHero({remainingMs,grantedSec,endsAt,name,device,disabled,onAdd,onEnd}:{remainingMs:number;grantedSec:number;endsAt:number;name:string;device:string;disabled:boolean;onAdd:()=>void;onEnd:()=>void}){
  const frac=Math.max(0,Math.min(1,remainingMs/1000/Math.max(1,grantedSec))),color=heroColor(frac,remainingMs);
- const round=(icon:any,label:string,onPress:()=>void)=><TouchableOpacity accessibilityRole="button" accessibilityLabel={label} disabled={disabled} onPress={onPress} style={[st.heroRound,disabled&&{opacity:.5}]}><Ionicons name={icon} size={24} color="#fff"/></TouchableOpacity>;
- return <View>
-  <View style={[st.timerHero,{backgroundColor:color}]}>
-   <View style={st.blob}/>
-   <Text style={st.heroTime} accessibilityRole="timer">{countdown(remainingMs)}</Text>
-   <Text style={st.heroSub}>Ends {clock(endsAt)}</Text>
-   <View style={{flexDirection:'row',gap:22,marginTop:18}}>{round('add','Add time',onAdd)}{round('stop','End timer',onEnd)}</View>
+ return <View style={{gap:18}}>
+  <View style={{alignItems:'center',paddingTop:6}}>
+   <View style={st.frost}>
+    <Text style={st.heroTime} accessibilityRole="timer">{countdown(remainingMs)}</Text>
+    <Text style={st.heroSub}>Ends {clock(endsAt)}</Text>
+   </View>
+   <View style={{flexDirection:'row',alignItems:'center',gap:28,marginTop:18}}>
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add time" disabled={disabled} onPress={onAdd} style={[st.heroRound,disabled&&{opacity:.5}]}><Ionicons name="add" size={24} color={T.primary}/></TouchableOpacity>
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel="End timer" disabled={disabled} onPress={onEnd} style={[st.heroMain,{backgroundColor:color,shadowColor:color},disabled&&{opacity:.5}]}><Ionicons name="stop" size={26} color="#fff"/></TouchableOpacity>
+   </View>
   </View>
   <View style={st.heroInfo}>
    <Text style={st.heading} numberOfLines={1}>{name}</Text>
    <Text style={st.sub} numberOfLines={1}>{device} · {formatDuration(grantedSec)}</Text>
+   <View style={{flexDirection:'row',justifyContent:'space-between',marginTop:4}}><Text style={{fontSize:13,fontWeight:'800',color}}>{formatDuration(Math.ceil(remainingMs/60000)*60)} left</Text><Text style={st.sub}>Ends {clock(endsAt)}</Text></View>
    <View style={st.barTrack}><View style={[st.barFill,{width:`${frac*100}%`,backgroundColor:color}]}/></View>
   </View>
  </View>;
@@ -434,8 +448,10 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
 
  return <View style={{gap:14}}>
   {inline?null:<Back label="Family" onPress={onBack}/>}
-  {inline?<View style={{alignItems:'center',gap:14}}>
-   <Text style={[st.heroTitle,{textAlign:'center'}]} numberOfLines={1} accessibilityRole="header">{child.name}</Text>
+  {inline?<View style={{alignItems:'center',gap:12,paddingTop:6}}>
+   <View style={st.waveBack} pointerEvents="none"><MintWave edge="top"/></View>
+   <View style={{flexDirection:'row',alignItems:'center',gap:6}}><Ionicons name="people" size={16} color={T.primary}/><Text style={{fontSize:15,fontWeight:'800',color:T.primary}}>Family</Text></View>
+   <Text style={[st.heroTitle,{textAlign:'center',fontSize:30,lineHeight:36,color:'#0F4D3A'}]} numberOfLines={1} accessibilityRole="header">{child.name}</Text>
    <View style={{flexDirection:'row',justifyContent:'center',gap:20}}>
     {([['bar-chart','Insights',onInsights],...(state?.selectionCount?[['apps','Apps',()=>void pick()]]:[]),['watch','Watch',()=>setWatchOpen(true)],['create','Edit',()=>setEditing(true)]] as [any,string,()=>void][]).map(([icon,label,fn])=><TouchableOpacity key={label} accessibilityRole="button" accessibilityLabel={label+' for '+child.name} onPress={()=>{void Haptics.selectionAsync();fn()}} style={{alignItems:'center',gap:5}}><View style={st.roundBtn}><Ionicons name={icon} size={22} color={T.primary}/></View><Text style={st.roundLabel}>{label}</Text></TouchableOpacity>)}
    </View>
@@ -1151,11 +1167,12 @@ const st=StyleSheet.create({
  segmentOn:{backgroundColor:'#fff',shadowColor:'#000',shadowOpacity:.08,shadowRadius:4,shadowOffset:{width:0,height:1}},
  segmentText:{fontSize:15,fontWeight:'800',color:T.muted},
  moreBtn:{width:44,height:44,borderRadius:22,backgroundColor:T.primarySoft,alignItems:'center',justifyContent:'center'},
- memberCard:{width:84,paddingVertical:12,borderRadius:20,alignItems:'center',gap:8,backgroundColor:'#F4FAF6',borderWidth:1,borderColor:'#EAF2EE'},
- dockShell:{backgroundColor:T.primary,borderRadius:28,padding:6,paddingTop:9,gap:7,shadowColor:'#1D2B33',shadowOpacity:.12,shadowRadius:12,shadowOffset:{width:0,height:4}},
- dockHead:{flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:12},
- dockLabel:{color:'#fff',fontSize:14,fontWeight:'900'},
- dockInner:{backgroundColor:'#fff',borderRadius:22,padding:6},
+ memberCard:{width:84,paddingVertical:12,borderRadius:20,alignItems:'center',gap:8,backgroundColor:'rgba(255,255,255,.8)',borderWidth:1,borderColor:'#fff'},
+ dockShell:{marginHorizontal:-20,paddingHorizontal:20,paddingTop:22,gap:8},
+ dockHead:{flexDirection:'row',alignItems:'center',gap:7,paddingHorizontal:4},
+ dockLabel:{color:'#0F4D3A',fontSize:17,fontWeight:'900'},
+ dockInner:{},
+ waveBack:{position:'absolute',top:-10,left:-20,right:-20,height:560},
  roundBtn:{width:54,height:54,borderRadius:27,backgroundColor:'#fff',borderWidth:2,borderColor:'#D5EEDF',alignItems:'center',justifyContent:'center'},
  roundLabel:{fontSize:12,fontWeight:'800',color:T.ink},
  statBox:{backgroundColor:'#fff',borderRadius:24,padding:16,gap:10,flexDirection:'row',alignItems:'center',shadowColor:'#2D4A3E',shadowOpacity:.06,shadowRadius:12,shadowOffset:{width:0,height:4}},
@@ -1172,10 +1189,12 @@ const st=StyleSheet.create({
  presetText:{fontSize:13,fontWeight:'800'},
  timerHero:{borderRadius:28,paddingTop:34,paddingBottom:44,alignItems:'center',overflow:'hidden'},
  blob:{position:'absolute',top:16,width:250,height:150,borderRadius:110,backgroundColor:'rgba(255,255,255,.16)',transform:[{rotate:'-8deg'}]},
- heroTime:{fontSize:60,fontWeight:'900',color:'#fff',fontVariant:['tabular-nums'],letterSpacing:-1},
- heroSub:{fontSize:15,fontWeight:'700',color:'rgba(255,255,255,.85)'},
- heroRound:{width:54,height:54,borderRadius:27,borderWidth:2,borderColor:'rgba(255,255,255,.7)',alignItems:'center',justifyContent:'center'},
- heroInfo:{backgroundColor:'#fff',borderRadius:20,padding:16,gap:6,marginTop:-26,marginHorizontal:12,shadowColor:'#1D2B33',shadowOpacity:.08,shadowRadius:12,shadowOffset:{width:0,height:4}},
+ heroTime:{fontSize:60,fontWeight:'900',color:'#0F4D3A',fontVariant:['tabular-nums'],letterSpacing:-1},
+ heroSub:{fontSize:15,fontWeight:'700',color:'#5E7F70'},
+ heroRound:{width:48,height:48,borderRadius:24,borderWidth:2,borderColor:'#9ED9BC',backgroundColor:'rgba(255,255,255,.6)',alignItems:'center',justifyContent:'center'},
+ heroMain:{width:68,height:68,borderRadius:34,alignItems:'center',justifyContent:'center',borderWidth:3,borderColor:'#fff',shadowOpacity:.35,shadowRadius:12,shadowOffset:{width:0,height:5}},
+ frost:{paddingHorizontal:44,paddingVertical:24,borderRadius:999,backgroundColor:'rgba(255,255,255,.55)',borderWidth:1.5,borderColor:'rgba(255,255,255,.95)',alignItems:'center',shadowColor:'#34B37E',shadowOpacity:.16,shadowRadius:24,shadowOffset:{width:0,height:8}},
+ heroInfo:{backgroundColor:'#fff',borderRadius:22,padding:16,gap:6,shadowColor:'#1D2B33',shadowOpacity:.08,shadowRadius:12,shadowOffset:{width:0,height:4}},
  barTrack:{height:8,borderRadius:4,backgroundColor:'#EEF2F0',overflow:'hidden',marginTop:4},
  barFill:{height:8,borderRadius:4},
  back:{flexDirection:'row',alignItems:'center',gap:4,marginBottom:4},
