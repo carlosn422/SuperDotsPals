@@ -431,12 +431,18 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 .t-dev.t-tb .t-frame{border-radius:calc(var(--w)*.06)}.t-dev.t-tb .t-frame img{border-radius:calc(var(--w)*.045)}
 .t-carousel{display:none}
 @media(max-width:600px){
-.t-devs{padding:20px 0 26px}
 .t-pointer,.t-panels{display:none}
-.t-carousel{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:16px;padding:6px 11% 20px;scrollbar-width:none}
-.t-carousel::-webkit-scrollbar{display:none}
-.t-slide{flex:0 0 78%;scroll-snap-align:center;display:flex;flex-direction:column;align-items:center;gap:18px}
+.t-show{height:calc(var(--vh,100svh) * 3.4)}
+.t-sticky{position:sticky;top:var(--navh,64px);padding-top:4px}
+.t-devs{padding:10px 0 0;gap:10px}.t-dev.t-ph{--w:16vw}.t-dev.t-tb{--w:25vw}
+.t-dev[aria-pressed="true"]{transform:translateY(-6px) scale(1.08)}
+.t-carousel{display:grid;margin-top:26px;overflow:hidden}
+.t-slide{grid-area:1/1;display:flex;flex-direction:column;align-items:center;gap:14px;padding:0 16px;opacity:0;visibility:hidden;transform:translateY(-60px);transition:transform .55s cubic-bezier(.2,.8,.2,1),opacity .45s,visibility 0s .55s}
+.t-slide.on{opacity:1;visibility:visible;transform:none;transition:transform .55s cubic-bezier(.2,.8,.2,1),opacity .45s}
+.t-carousel[data-dir="up"] .t-slide:not(.on){transform:translateY(60px)}
+.t-slide.out{transform:translateY(60px)}.t-carousel[data-dir="up"] .t-slide.out{transform:translateY(-60px)}
 .t-slide .t-dev{transform:none;filter:none;cursor:default}
-.t-slide .t-dev.t-ph{--w:min(58vw,230px)}.t-slide .t-dev.t-tb{--w:min(76vw,300px)}
-.t-cap{flex:1;width:100%;box-sizing:border-box;background:var(--card);border-radius:24px;padding:20px;box-shadow:0 10px 30px rgba(43,30,69,.08);text-align:center}
-.t-cap h3{margin:6px 0;font-size:22px}.t-cap p{margin:0 0 10px;color:var(--muted)}}
+.t-slide .t-dev.t-ph{--w:min(42vw,calc((var(--vh,100svh) - 440px) / 2.16))}.t-slide .t-dev.t-tb{--w:min(70vw,calc((var(--vh,100svh) - 440px) * 1.35))}
+.t-cap{width:100%;max-width:360px;box-sizing:border-box;background:var(--card);border-radius:22px;padding:14px 18px;box-shadow:0 10px 30px rgba(43,30,69,.08);text-align:center}
+.t-cap .kicker{margin-bottom:4px}.t-cap h3{margin:4px 0;font-size:19px}.t-cap p{margin:0 0 6px;color:var(--muted);font-size:15px}}
+@media(max-width:600px) and (prefers-reduced-motion:reduce){.t-slide,.t-slide.on{transition:none}}
