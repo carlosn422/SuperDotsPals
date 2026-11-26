@@ -1,12 +1,13 @@
 import React,{useCallback,useContext,useEffect,useMemo,useRef,useState} from 'react';
 import {ChartScrubContext} from './StressDashboard';
-import {ActivityIndicator,Alert,AppState,Modal,PanResponder,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native';
+import {ActivityIndicator,Alert,Animated,AppState,Modal,PanResponder,ScrollView,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import Svg,{Circle,Defs,Line,LinearGradient,Path,Stop} from 'react-native-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import {supabase} from './supabase';
 import {APP_THEME as T} from './MoodMascot';
+import {useReduceMotion} from './CircleComponents';
 import SuperdotMascot from './SuperdotMascot';
 import {usePlus} from './PlusStore';
 import {useIsGuest} from './Account';
@@ -137,7 +138,8 @@ type Route={name:'list'}|{name:'child';id:string}|{name:'insights';id:string}|{n
 export default function FamilyScreenBreak({onBack,backLabel='Settings',target,onAddWatch,embedded,footer}:{onBack?:()=>void;backLabel?:string;target?:{childId?:string;profileId?:string;add?:boolean;at:number}|null;onAddWatch?:()=>void;embedded?:boolean;footer?:React.ReactNode}){
  const guest=useIsGuest();
  const [children,setChildren]=useState<FamilyChild[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
- const [route,setRoute]=useState<Route>({name:'list'}),[adding,setAdding]=useState(false);
+ const [route,setRoute]=useState<Route>({name:'list'}),[adding,setAdding]=useState(false),[selected,setSelected]=useState<string|null>(null);
+ const select=(id:string)=>{setSelected(id);setRoute({name:'list'})};
  const [startOn,setStartOn]=useState<FamilyDevice|null>(null);
  const family=useFamilyDevices(screenBreakSupported&&!guest&&route.name==='list');
  const load=useCallback(async()=>{
@@ -150,7 +152,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
   if(!target||loading)return;
   if(target.add){setRoute({name:'list'});setAdding(true);return}
   const child=children.find(c=>c.id===target.childId||(!!target.profileId&&c.profile_user_id===target.profileId));
-  if(child)setRoute({name:'child',id:child.id});
+  if(child)select(child.id);
  },[target,loading,children]);
  const child=route.name==='child'||route.name==='insights'?children.find(c=>c.id===route.id):undefined;
  const members=children.filter(c=>!c.watch_only);
@@ -158,32 +160,51 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
   <FamilyDevicesScreen onBack={()=>setRoute({name:'list'})} childName={id=>children.find(c=>c.id===id)?.name||'Someone'} onStart={members.length?setStartOn:undefined}/>
   <StartTimerSheet device={startOn} members={members} onClose={()=>setStartOn(null)}/>
  </>;
- if(route.name==='insights'&&child)return <InsightsScreen child={child} onBack={()=>setRoute({name:'child',id:child.id})}/>;
+ if(route.name==='insights'&&child)return <InsightsScreen child={child} onBack={()=>select(child.id)}/>;
+
+ const current=members.find(c=>c.id===selected)||members[0];
  if(route.name==='child'&&child)return <ChildScreen child={child} children={children} onBack={()=>setRoute({name:'list'})} onInsights={()=>setRoute({name:'insights',id:child.id})} onChanged={()=>{void load();familyChildrenChanged()}} onRemoved={()=>{setRoute({name:'list'});void load()}} onAddWatch={onAddWatch} onOpen={id=>setRoute({name:'child',id})}/>;
  return <View style={{gap:14}}>
   {!embedded&&onBack?<Back label={backLabel} onPress={onBack}/>:null}
   <View style={[st.row,{paddingVertical:0}]}><Text style={st.title} accessibilityRole="header">Family</Text>{screenBreakSupported&&!guest?<HeaderLock/>:null}</View>
-  <View style={st.hero}><View style={{flex:1,gap:6}}><Text style={st.heroKicker}>SCREEN BREAK</Text><Text style={st.heroTitle}>Screen time,{'\n'}your way</Text></View><SuperdotMascot id="joy" size={88}/></View>
-  <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
-   <Text style={st.heading}>Members</Text>
-   {guest?null:<TouchableOpacity accessibilityRole="button" accessibilityLabel={adding?'Close add member':'Add member'} onPress={()=>setAdding(a=>!a)} style={st.addBtn}><Ionicons name={adding?'close':'add'} size={18} color="#fff"/><Text style={st.addBtnText}>{adding?'Close':'Add member'}</Text></TouchableOpacity>}
-  </View>
   {guest?<View style={st.card}><Text style={st.body}>Create a free account to add family members and use Screen Break.</Text></View>:<>
    {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
    {loading?<ActivityIndicator color={T.primary}/>:null}
-   {adding||(!loading&&!error&&!members.length)?<AddChild onAdded={id=>{setAdding(false);void load().then(()=>{if(id)setRoute({name:'child',id})});familyChildrenChanged()}}/>:null}
-   {members.length?<View style={[st.card,{paddingVertical:4,gap:0}]}>
-    {members.map((c,i)=><TouchableOpacity key={c.id} accessibilityRole="button" accessibilityLabel={'Open '+c.name} onPress={()=>setRoute({name:'child',id:c.id})} style={[st.row,i>0&&st.rowLine]}>
-     <View style={[st.avatar,{width:44,height:44,borderRadius:15,backgroundColor:TINTS[i%TINTS.length]}]}><Text style={[st.avatarText,{color:TINT_INK[i%TINTS.length]}]}>{c.name.slice(0,1).toUpperCase()}</Text></View>
-     <View style={{flex:1,flexDirection:'row',alignItems:'center',gap:6}}><Text style={st.rowTitle}>{c.name}</Text>{c.profile_user_id?<Ionicons name="watch" size={15} color={T.muted} accessibilityLabel="Has a watch"/>:null}</View>
-     <ActiveBadge childId={c.id} remote={family.sessions.find(x=>x.child_id===c.id&&Date.parse(x.deadline_at)>Date.now())}/>
-     <Ionicons name="chevron-forward" size={18} color={T.muted}/>
-    </TouchableOpacity>)}
-   </View>:null}
+   {!loading&&!error&&members.length?<ProfileRow members={members} selected={current?.id} adding={adding} onSelect={id=>{setAdding(false);setSelected(id)}} onAdd={()=>setAdding(a=>!a)} sessions={family.sessions}/>:null}
+   {adding||(!loading&&!error&&!members.length)?<AddChild onAdded={id=>{setAdding(false);void load().then(()=>{if(id)setSelected(id)});familyChildrenChanged()}}/>:null}
+   {current&&!adding?<ChildScreen inline key={current.id} child={current} children={children} onBack={()=>{}} onInsights={()=>setRoute({name:'insights',id:current.id})} onChanged={()=>{void load();familyChildrenChanged()}} onRemoved={()=>{setSelected(null);void load()}} onAddWatch={onAddWatch} onOpen={select}/>:null}
    {screenBreakSupported?<TouchableOpacity accessibilityRole="button" onPress={()=>setRoute({name:'devices'})} style={st.linkRow}><View style={[st.tile,{backgroundColor:TINTS[1]}]}><Ionicons name="tablet-portrait" size={21} color={TINT_INK[1]}/></View><View style={{flex:1}}><Text style={st.rowTitle}>Family Devices</Text></View><Ionicons name="chevron-forward" size={18} color={T.muted}/></TouchableOpacity>:null}
   </>}
   {footer?<View style={{marginTop:10}}>{footer}</View>:null}
  </View>;
+}
+
+/** Family members as circles; the selected one gets an animated ring. */
+function ProfileRow({members,selected,adding,onSelect,onAdd,sessions}:{members:FamilyChild[];selected?:string;adding:boolean;onSelect:(id:string)=>void;onAdd:()=>void;sessions:RemoteSession[]}){
+ const [state]=useBreakState();
+ const now=Date.now();
+ const timing=(id:string)=>(state?.session?.status==='active'&&state.session.childId===id&&state.session.deadline*1000>now)||sessions.some(x=>x.child_id===id&&Date.parse(x.deadline_at)>now);
+ return <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:16,paddingVertical:4,paddingHorizontal:2}}>
+  {members.map((c,i)=><ProfileCircle key={c.id} name={c.name} index={i} on={!adding&&c.id===selected} timer={timing(c.id)} onPress={()=>{if(c.id!==selected||adding){void Haptics.selectionAsync();onSelect(c.id)}}}/>)}
+  <TouchableOpacity accessibilityRole="button" accessibilityLabel={adding?'Close add member':'Add member'} onPress={onAdd} style={{alignItems:'center',gap:6,width:68}}>
+   <View style={[st.profile,{borderStyle:'dashed',borderWidth:2,borderColor:adding?T.primary:'#C9D6CF',backgroundColor:'#fff'}]}><Ionicons name={adding?'close':'add'} size={28} color={T.primary}/></View>
+   <Text style={st.profileName}>{adding?'Close':'Add'}</Text>
+  </TouchableOpacity>
+ </ScrollView>;
+}
+function ProfileCircle({name,index,on,timer,onPress}:{name:string;index:number;on:boolean;timer:boolean;onPress:()=>void}){
+ const reduce=useReduceMotion();
+ const ring=useRef(new Animated.Value(on?1:0)).current;
+ useEffect(()=>{if(reduce)ring.setValue(on?1:0);else Animated.spring(ring,{toValue:on?1:0,useNativeDriver:true,speed:18,bounciness:8}).start()},[on,reduce]);
+ const k=index%TINTS.length;
+ return <TouchableOpacity accessibilityRole="button" accessibilityLabel={name+(timer?', timer running':'')} accessibilityState={{selected:on}} onPress={onPress} style={{alignItems:'center',gap:6,width:68}}>
+  <View style={{width:68,height:68,alignItems:'center',justifyContent:'center'}}>
+   <Animated.View style={[StyleSheet.absoluteFill,{borderRadius:34,borderWidth:3,borderColor:T.primary,opacity:ring,transform:[{scale:ring.interpolate({inputRange:[0,1],outputRange:[0.85,1]})}]}]}/>
+   <View style={[st.profile,{backgroundColor:TINTS[k]}]}><Text style={{fontSize:24,fontWeight:'900',color:TINT_INK[k]}}>{name.slice(0,1).toUpperCase()}</Text></View>
+   {timer?<View style={st.profileTimer}><Ionicons name="hourglass" size={11} color="#fff"/></View>:null}
+  </View>
+  <Text style={[st.profileName,on&&{color:T.ink}]} numberOfLines={1}>{name}</Text>
+ </TouchableOpacity>;
 }
 
 /** Starting a timer from a device card: who and how long in one sheet. Members with a timer elsewhere can't be picked. */
@@ -275,7 +296,7 @@ function AddChild({onAdded}:{onAdded:(id?:string)=>void}){
  </View>;
 }
 
-function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAddWatch,onOpen}:{child:FamilyChild;children:FamilyChild[];onBack:()=>void;onInsights:()=>void;onChanged:()=>void;onRemoved:()=>void;onAddWatch?:()=>void;onOpen?:(id:string)=>void}){
+function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAddWatch,onOpen,inline}:{inline?:boolean;child:FamilyChild;children:FamilyChild[];onBack:()=>void;onInsights:()=>void;onChanged:()=>void;onRemoved:()=>void;onAddWatch?:()=>void;onOpen?:(id:string)=>void}){
  const [state,setState]=useBreakState();
  const {isPlus,showPaywall}=usePlus();
  const [editing,setEditing]=useState(false);
@@ -331,10 +352,10 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
  const trialDaysLeft=state?.trialEndsAt?Math.max(0,Math.ceil((state.trialEndsAt*1000-Date.now())/864e5)):null;
 
  return <View style={{gap:14}}>
-  <Back label="Family" onPress={onBack}/>
+  {inline?null:<Back label="Family" onPress={onBack}/>}
   <View style={{flexDirection:'row',alignItems:'center',gap:12}}>
-   <View style={[st.avatar,{width:52,height:52,borderRadius:26}]}><Text style={[st.avatarText,{fontSize:22}]}>{child.name.slice(0,1).toUpperCase()}</Text></View>
-   <Text style={[st.title,{flex:1}]} numberOfLines={1}>{child.name}</Text>
+   {inline?null:<View style={[st.avatar,{width:52,height:52,borderRadius:26}]}><Text style={[st.avatarText,{fontSize:22}]}>{child.name.slice(0,1).toUpperCase()}</Text></View>}
+   <Text style={[inline?st.heroTitle:st.title,{flex:1}]} numberOfLines={1}>{child.name}</Text>
    <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Edit '+child.name} onPress={()=>setEditing(true)} style={st.editBtn}><Text style={st.editBtnText}>Edit</Text></TouchableOpacity>
   </View>
   <EditMemberSheet visible={editing} child={child} children={children} onClose={()=>setEditing(false)} onChanged={onChanged} onRemoved={()=>{setEditing(false);onRemoved()}}/>
@@ -976,6 +997,9 @@ const st=StyleSheet.create({
  heroKicker:{fontSize:11,letterSpacing:1,fontWeight:'900',color:'#3B8A6A'},
  heroTitle:{fontSize:22,lineHeight:27,fontWeight:'900',color:T.ink},
  heroCard:{backgroundColor:'#E8F5EF',borderColor:'#E8F5EF'},
+ profile:{width:58,height:58,borderRadius:29,alignItems:'center',justifyContent:'center'},
+ profileName:{fontSize:13,fontWeight:'800',color:T.muted,maxWidth:68},
+ profileTimer:{position:'absolute',right:2,bottom:2,width:22,height:22,borderRadius:11,backgroundColor:T.primary,borderWidth:2,borderColor:'#fff',alignItems:'center',justifyContent:'center'},
  tile:{width:43,height:43,borderRadius:15,alignItems:'center',justifyContent:'center'},
  presets:{flexDirection:'row',flexWrap:'wrap',justifyContent:'center',gap:8},
  preset:{minWidth:52,minHeight:40,borderRadius:20,paddingHorizontal:12,alignItems:'center',justifyContent:'center',backgroundColor:T.primarySoft},
