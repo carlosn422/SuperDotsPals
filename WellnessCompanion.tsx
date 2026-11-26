@@ -14,7 +14,7 @@ const activities=['Walking','Workout','Work','Meeting','Rest','Social time','Oth
 const stressFactors=['Work','Sleep','Relationships','Caffeine','Exercise','Hydration','Health','Other'];
 type Entry={id:string;body:string;mood:string|null;intensity:number|null;energy_level:string|null;stress_factors:string[];occurred_at:string};
 type Message={id:string;role:'user'|'assistant';content:string;created_at:string};
-export default function WellnessCompanion({companion,color,initialView='checkin',onMoodSaved,onMoodPreview,onCheckinDone,onWizardNavigate,onOpenInsights,onFindVerse,onAction,onShareWithCircle}:{onShareWithCircle?:(mood:string)=>void;onAction?:(a:ChatAction)=>void;companion:string;color:string;initialView?:'checkin'|'chat'|'history';onMoodSaved?:(mood:string)=>void;onMoodPreview?:(mood:string)=>void;onCheckinDone?:()=>void;onWizardNavigate?:()=>void;onOpenInsights?:()=>void;onFindVerse?:(mood:string,answers:Record<string,string>)=>void}){
+export default function WellnessCompanion({companion,color,initialView='checkin',initialTyping=false,onMoodSaved,onMoodPreview,onCheckinDone,onWizardNavigate,onOpenInsights,onFindVerse,onAction,onShareWithCircle}:{initialTyping?:boolean;onShareWithCircle?:(mood:string)=>void;onAction?:(a:ChatAction)=>void;companion:string;color:string;initialView?:'checkin'|'chat'|'history';onMoodSaved?:(mood:string)=>void;onMoodPreview?:(mood:string)=>void;onCheckinDone?:()=>void;onWizardNavigate?:()=>void;onOpenInsights?:()=>void;onFindVerse?:(mood:string,answers:Record<string,string>)=>void}){
  const {isPlus,showPaywall}=usePlus();
  const [mood,setMood]=useState(''),[energy,setEnergy]=useState<'energized'|'tired'|'neutral'>('neutral'),[factors,setFactors]=useState<string[]>([]),[intensity,setIntensity]=useState(5),[note,setNote]=useState(''),[activity,setActivity]=useState('Walking'),[minutes,setMinutes]=useState('20'),[events,setEvents]=useState<Entry[]>([]);
  const [view,setView]=useState<'checkin'|'chat'|'history'>(initialView);
@@ -22,7 +22,7 @@ export default function WellnessCompanion({companion,color,initialView='checkin'
  const [chatText,setChatText]=useState(''),[messages,setMessages]=useState<Message[]>([]),[conversationId,setConversationId]=useState<string|null>(null),[busy,setBusy]=useState(false);
  const [pending,setPending]=useState<string|null>(null),[failed,setFailed]=useState<{text:string;error:string}|null>(null);
  const ctx=useStressContext();
- const [talking,setTalking]=useState(false),[topic,setTopic]=useState<string|undefined>(),[typing,setTyping]=useState(false),[firstName,setFirstName]=useState('');
+ const [talking,setTalking]=useState(false),[topic,setTopic]=useState<string|undefined>(),[typing,setTyping]=useState(initialTyping),[firstName,setFirstName]=useState('');
  useEffect(()=>{void (async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data}=await supabase.from('profiles').select('display_name').eq('id',user.id).maybeSingle();setFirstName(String(data?.display_name||'').trim().split(/\s+/)[0]||'')})()},[]);
  const call=(t?:string)=>{if(!isPlus){showPaywall('reflections');return}setTopic(t);setTalking(true)};
  const scroller=React.useRef<ScrollView>(null);

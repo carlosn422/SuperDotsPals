@@ -22,6 +22,7 @@ import {WatchThemesCard,SettingsItem} from './SettingsComponents';
 import {APP_THEME} from './MoodMascot';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MoreSheet,{type MoreItem} from './MoreSheet';
+import VoiceFriend from './VoiceFriend';
 import * as Notifications from 'expo-notifications';
 import {Linking} from 'react-native';
 import {CircleProvider,circleNewCount,useCircle} from './CircleStore';
@@ -70,7 +71,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  const [tab,setTab]=useState<Tab>('Today');
  const [moreScreen,setMoreScreen]=useState<MorePage|null>(null);
  const [familyDock,setFamilyDock]=useState<React.ReactNode>(null);
- const [moreOpen,setMoreOpen]=useState(false);
+ const [moreOpen,setMoreOpen]=useState(false),[buddyTyping,setBuddyTyping]=useState(false),[moreCall,setMoreCall]=useState(false);
  const actionScroll=useRef<ScrollView>(null);
  const settingsScroll=useRef<ScrollView>(null);
  const todayScroll=useRef<ScrollView>(null);
@@ -82,7 +83,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  const [actionVersion,setActionVersion]=useState(0);
  const {isPlus,showPaywall}=usePlus();
  const [spiritualCheckin,setSpiritualCheckin]=useState<{mood:string;answers:Record<string,string>}|undefined>(undefined);
- const openAction=(view:'checkin'|'chat'|'history'|'spiritual'|'breathing'|'social')=>{if(view==='chat'&&!isPlus){showPaywall('reflections');return;}if(view==='spiritual')setSpiritualCheckin(undefined);setActionDetail(null);setActionView(view);setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});};
+ const openAction=(view:'checkin'|'chat'|'history'|'spiritual'|'breathing'|'social')=>{setBuddyTyping(false);if(view==='chat'&&!isPlus){showPaywall('reflections');return;}if(view==='spiritual')setSpiritualCheckin(undefined);setActionDetail(null);setActionView(view);setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});};
  const [watchesPage,setWatchesPage]=useState<'main'|'themes'>('main');
  const [settingsPage,setSettingsPage]=useState<'main'|'watch'|'devices'|'health'|'notifications'|'privacy'|'help'|'circle'|'watchThemes'|'plus'|'account'|'delete'|'family'>('main');
  const [familyTarget,setFamilyTarget]=useState<{childId?:string;profileId?:string;add?:boolean;at:number}|null>(null);
@@ -251,7 +252,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
   {actionView==='spiritual'?<SpiritualReading key={actionVersion} initialCheckin={spiritualCheckin}/>:
   actionView==='social'?<SocialHrvScreen key={actionVersion}/>:
   actionView==='breathing'?<BreathingStudio key={actionVersion} onDone={()=>{setActionView(null);actionScroll.current?.scrollTo({y:0,animated:true})}}/>:
-  actionView?<WellnessCompanion key={actionVersion} onShareWithCircle={m=>{const cm=CIRCLE_MOODS.find(x=>x.toLowerCase()===m.toLowerCase());if(cm)setCircleSheet([{name:'share',mood:cm}]);}} initialView={actionView as 'checkin'|'chat'|'history'} companion={shownMood} onMoodSaved={saveMood} onWizardNavigate={()=>actionScroll.current?.scrollTo({y:0,animated:false})} onCheckinDone={()=>{setActionView(null);go('Today');}} onOpenInsights={()=>{setActionView(null);go('Trends');}} onFindVerse={(selectedMood,answers)=>{setSpiritualCheckin({mood:selectedMood,answers});setActionView('spiritual');setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});}} onAction={a=>{if(a==='breathing')openAction('breathing');else if(a==='water')void quickAddHabit('water');else if(a==='trends'){setActionView(null);go('Trends')}else{setActionView(null);go('Settings');setSettingsPage('notifications')}}} color={colors.accent}/>:
+  actionView?<WellnessCompanion key={actionVersion} onShareWithCircle={m=>{const cm=CIRCLE_MOODS.find(x=>x.toLowerCase()===m.toLowerCase());if(cm)setCircleSheet([{name:'share',mood:cm}]);}} initialView={actionView as 'checkin'|'chat'|'history'} initialTyping={buddyTyping} companion={shownMood} onMoodSaved={saveMood} onWizardNavigate={()=>actionScroll.current?.scrollTo({y:0,animated:false})} onCheckinDone={()=>{setActionView(null);go('Today');}} onOpenInsights={()=>{setActionView(null);go('Trends');}} onFindVerse={(selectedMood,answers)=>{setSpiritualCheckin({mood:selectedMood,answers});setActionView('spiritual');setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});}} onAction={a=>{if(a==='breathing')openAction('breathing');else if(a==='water')void quickAddHabit('water');else if(a==='trends'){setActionView(null);go('Trends')}else{setActionView(null);go('Settings');setSettingsPage('notifications')}}} color={colors.accent}/>:
   <WellnessActions companion={shownMood} accent={colors.accent} water={water} caffeine={coffee} onCaffeine={()=>{setActionView(null);setActionDetail('caffeine');actionScroll.current?.scrollTo({y:0,animated:true})}} onWater={()=>{setActionView(null);setActionDetail('water');actionScroll.current?.scrollTo({y:0,animated:true})}} onChat={()=>openAction('chat')} onMood={()=>openAction('checkin')} onJournal={()=>openAction('history')} onBreathing={()=>openAction('breathing')} onSocial={()=>openAction('social')}/>}
 </ScrollView><DrinkDetail kind={actionDetail} onClose={()=>{setActionDetail(null);void loadDrinks()}} onSaved={(habit,n)=>{if(habit==='water')setWater(n);else setCoffee(n)}} onAskAI={()=>openAction('chat')}/></View>
   <View key="Circle" style={{width:pageWidth,flex:1}}>{isGuest?<ScrollView style={{flex:1}} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"><AccountRequired accent={colors.accent} backLabel="Today" onBack={()=>go('Today')} onCreate={()=>{go('Settings');setSettingsPage('account')}}/></ScrollView>:<CircleNavigator onExit={()=>go('Today')} mood={mood} contentStyle={s.scroll} resetKey={circleReset}/>}</View>
@@ -308,7 +309,8 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
     </TouchableOpacity>
    })}</View>
   </View>
-  <MoreSheet visible={moreOpen} items={MORE_ITEMS} onClose={()=>setMoreOpen(false)} onSelect={pickMore}/>
+  <MoreSheet visible={moreOpen} items={MORE_ITEMS} onClose={()=>setMoreOpen(false)} onSelect={pickMore} buddy={{companion:shownMood,onChat:()=>{go('Actions');openAction('chat');if(isPlus)setBuddyTyping(true)},onCall:()=>isPlus?setMoreCall(true):showPaywall('reflections')}}/>
+  <VoiceFriend visible={moreCall} onClose={()=>setMoreCall(false)} companion={shownMood}/>
   <Modal visible={!!circleSheet} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setCircleSheet(null)}>
    <View style={{flex:1,backgroundColor:C.bg,paddingTop:circleSheet&&!isGuest?8:0}}>{circleSheet&&!isGuest?<CircleNavigator initial={circleSheet} exitLabel="Close" onExit={()=>setCircleSheet(null)} mood={mood} contentStyle={[s.scroll,{paddingTop:18,paddingBottom:48}]}/>:<ScrollView contentContainerStyle={[s.scroll,{paddingTop:18,paddingBottom:48}]} keyboardShouldPersistTaps="handled">
     {circleSheet&&isGuest?<AccountRequired accent={colors.accent} backLabel="Close" onBack={()=>setCircleSheet(null)} onCreate={()=>{setCircleSheet(null);go('Settings');setSettingsPage('account')}}/>:null}
