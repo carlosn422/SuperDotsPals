@@ -47,7 +47,7 @@ export default function CircleNavigator({initial=[{name:'home'}],exitLabel='Sett
   {isHome?<View style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#E8F5EF',borderRadius:23,padding:18}}>
    <SuperdotMascot id="joy" size={72}/>
    <View style={{flex:1,gap:4}}><Text style={{fontSize:11,letterSpacing:1,fontWeight:'900',color:'#3B8A6A'}}>MY CIRCLE</Text><Text style={{fontSize:26,fontWeight:'900',color:CT.ink}} accessibilityRole="header">Circle</Text></View>
-   <HeaderButton icon="notifications-outline" label={pendingRequests?pendingRequests+' friend requests':'Requests and invites'} dot={pendingRequests>0} onPress={()=>push({name:'requests'})}/>
+   <HeaderButton icon="notifications" label={pendingRequests?pendingRequests+' friend request'+(pendingRequests===1?'':'s'):'Requests and invites'} count={pendingRequests} onPress={()=>push({name:'requests'})}/>
   </View>:
   <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center', position: 'relative'}}>
     {stack.length > 1 && (
@@ -91,9 +91,10 @@ function Screen({route,nav,mood,homeTab='messages',setHomeTab=()=>{}}:{route:Cir
  }
 }
 
-function HeaderButton({icon,label,dot,onPress}:{icon:any;label:string;dot?:boolean;onPress:()=>void}){
- return <TouchableOpacity accessibilityRole="button" accessibilityLabel={label+(dot?', new activity':'')} onPress={onPress} style={{width:44,height:44,borderRadius:22,backgroundColor:CT.primarySoft,alignItems:'center',justifyContent:'center'}}>
-  <Ionicons name={icon} size={21} color={CT.primary}/>{dot?<View style={{position:'absolute',top:9,right:10,width:9,height:9,borderRadius:5,backgroundColor:CT.danger,borderWidth:1.5,borderColor:'#fff'}}/>:null}
+function HeaderButton({icon,label,count=0,onPress}:{icon:any;label:string;count?:number;onPress:()=>void}){
+ return <TouchableOpacity accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={{width:54,height:54,borderRadius:27,backgroundColor:'#fff',alignItems:'center',justifyContent:'center',shadowColor:'#1D3B2F',shadowOpacity:.1,shadowRadius:8,shadowOffset:{width:0,height:3}}}>
+  <Ionicons name={icon} size={27} color={CT.primary}/>
+  {count>0?<View style={{position:'absolute',top:-3,right:-3,minWidth:22,height:22,borderRadius:11,paddingHorizontal:5,backgroundColor:CT.danger,borderWidth:2,borderColor:'#fff',alignItems:'center',justifyContent:'center'}}><Text style={{color:'#fff',fontSize:12,fontWeight:'900'}}>{count>9?'9+':count}</Text></View>:null}
  </TouchableOpacity>;
 }
 function Stat({value,label,icon,dot,onPress}:{value:number;label:string;icon:any;dot?:boolean;onPress:()=>void}){
