@@ -171,7 +171,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  const index=Math.max(0,members.findIndex(c=>c.id===current?.id));
  useEffect(()=>{pager.current?.scrollTo({x:index*screenW,animated:!reduce})},[index,screenW]);
  // The member cards stay pinned above the tab bar (drawn by the host, outside this scroll view).
- const [devSel,setDevSel]=useState<string|null>(null),[addingDevice,setAddingDevice]=useState(false);
+ const [devSel,setDevSel]=useState<string|null>(null),[addingDevice,setAddingDevice]=useState(false),[watchesOpen,setWatchesOpen]=useState(false);
  const showDock=!guest&&route.name==='list'&&!loading&&!error&&(section==='devices'||members.length>0);
  const dockRow=section==='devices'?<DeviceDock devices={family.devices} defaultId={family.defaultId} sessions={family.sessions} selected={devSel} adding={addingDevice} onSelect={id=>{void Haptics.selectionAsync();setAddingDevice(false);setDevSel(id)}} onAdd={()=>setAddingDevice(a=>!a)}/>:<ProfileRow members={members} selected={current?.id} adding={adding} onSelect={id=>{setAdding(false);setSelected(id)}} onAdd={()=>setAdding(a=>!a)} sessions={family.sessions}/>;
  const dock=<View style={st.dockShell}><MintWave edge="bottom"/><View style={st.dockInner}>{dockRow}</View></View>;
@@ -200,7 +200,14 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
     {!onDock&&!loading&&!error&&members.length?dock:null}
    </>}
   </>}
-  {footer&&section==='devices'?<View style={{marginTop:10}}>{footer}</View>:null}
+  {footer&&section==='devices'?<TouchableOpacity accessibilityRole="button" onPress={()=>setWatchesOpen(true)} style={st.watchBtn}><IconTile icon="watch" color="#7B5CE6" size={44}/><Text style={[st.rowTitle,{flex:1}]}>Apple Watches</Text><Ionicons name="chevron-up" size={18} color="#7B5CE6"/></TouchableOpacity>:null}
+  <Modal visible={watchesOpen&&!!footer} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setWatchesOpen(false)}>
+   <ScrollView style={{flex:1,backgroundColor:T.background}} contentContainerStyle={{padding:20,paddingBottom:48,gap:14}} showsVerticalScrollIndicator={false}>
+    <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'}}/>
+    <View style={{flexDirection:'row',alignItems:'center',gap:12}}><Text style={[st.title,{flex:1}]} accessibilityRole="header">Apple Watches</Text><TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={()=>setWatchesOpen(false)} style={st.sheetClose}><Ionicons name="close" size={22} color={T.ink}/></TouchableOpacity></View>
+    {footer}
+   </ScrollView>
+  </Modal>
   <StartTimerSheet device={startOn} members={members} onClose={()=>setStartOn(null)}/>
   <Modal visible={!!insightsChild} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setInsightsId(null)}>
    {insightsChild?<ChartScrubContext.Provider value={scrubCtx}><ScrollView style={{flex:1,backgroundColor:T.background}} contentContainerStyle={{padding:20,paddingBottom:48}} showsVerticalScrollIndicator={false}><InsightsScreen sheet child={insightsChild} onBack={()=>setInsightsId(null)}/></ScrollView></ChartScrubContext.Provider>:null}
@@ -311,6 +318,7 @@ function ProfileCard({name,index,on,frac,onPress}:{name:string;index:number;on:b
 function StartTimerSheet({device,members,onClose}:{device:FamilyDevice|null;members:FamilyChild[];onClose:()=>void}){
  const family=useFamilyDevices(!!device);
  const [state]=useBreakState();
+ const {isPlus,showPaywall}=usePlus();
  const [child,setChild]=useState<string|null>(null),[minutes,setMinutes]=useState(30),[busy,setBusy]=useState(false),[error,setError]=useState('');
  useEffect(()=>{
   if(!device)return;
@@ -319,7 +327,8 @@ function StartTimerSheet({device,members,onClose}:{device:FamilyDevice|null;memb
  },[device?.id]);
  if(!device)return null;
  const now=Date.now(),phone=state?.session?.status==='active'?state.session.childId:undefined;
- const session=family.sessions.find(x=>x.family_device_id===device.id&&Date.parse(x.deadline_at)>now);
+ const onPhone=device.id===PHONE,phoneRun=onPhone&&state?.session?.status==='active'?state.session:undefined;
+ const session=onPhone?(phoneRun?{child_id:phoneRun.childId,deadline_at:new Date(phoneRun.deadline).toISOString()}:undefined):family.sessions.find(x=>x.family_device_id===device.id&&Date.parse(x.deadline_at)>now);
  const busyElsewhere=(id:string)=>id===phone||!!deviceInUse(id,family,now);
  const sel=child&&!busyElsewhere(child)?child:members.find(c=>!busyElsewhere(c.id))?.id;
  const who=(id:string)=>members.find(c=>c.id===id)?.name||'Someone';
@@ -327,7 +336,11 @@ function StartTimerSheet({device,members,onClose}:{device:FamilyDevice|null;memb
   if(!sel)return;
   setBusy(true);setError('');
   try{
-   await deviceCommand(device.id,'START_SESSION',{minutes,child:sel,replace:!!session});
+   if(onPhone){
+    const reply=sendBreakCommand('start',{childId:sel,minutes,replace:!!session});
+    if(!reply.ok){if(reply.code==='plus')showPaywall('screenBreak');throw new Error(reply.error||'Something went wrong. Please try again.')}
+    void syncScreenBreak(isPlus);
+   }else await deviceCommand(device.id,'START_SESSION',{minutes,child:sel,replace:!!session});
    void AsyncStorage.setItem(LAST_MINUTES_KEY,String(minutes));
    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(()=>{});
    onClose();
@@ -1174,6 +1187,8 @@ const st=StyleSheet.create({
  segmentText:{fontSize:15,fontWeight:'800',color:T.muted},
  moreBtn:{width:44,height:44,borderRadius:22,backgroundColor:T.primarySoft,alignItems:'center',justifyContent:'center'},
  memberCard:{width:70,paddingVertical:9,borderRadius:18,alignItems:'center',gap:6,backgroundColor:'rgba(255,255,255,.8)',borderWidth:1,borderColor:'#fff'},
+ watchBtn:{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#F4EBFF',borderRadius:22,padding:12,minHeight:64},
+ sheetClose:{width:40,height:40,borderRadius:20,backgroundColor:'#fff',alignItems:'center',justifyContent:'center'},
  dockShell:{paddingTop:22,paddingHorizontal:20,paddingBottom:2,gap:8},
  dockWave:{position:'absolute',top:0,left:0,right:0,bottom:0,overflow:'hidden'},
  dockHead:{flexDirection:'row',alignItems:'center',gap:7,paddingHorizontal:4},

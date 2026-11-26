@@ -1,11 +1,13 @@
 import {IconTile} from './IconTile';
-import React,{useCallback,useEffect,useMemo,useState} from 'react';
-import {ActionSheetIOS,ActivityIndicator,Alert,Modal,ScrollView,StyleSheet,Switch,Text,TextInput,TouchableOpacity,View} from 'react-native';
+import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
+import {ActionSheetIOS,ActivityIndicator,Alert,Animated,Modal,ScrollView,StyleSheet,Switch,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import Svg,{Circle} from 'react-native-svg';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {supabase} from './supabase';
 import {APP_THEME as T} from './MoodMascot';
 import {authenticateGuardian} from './modules/watch-link/screenBreak';
+import {useReduceMotion} from './CircleComponents';
+import {formatDuration,periodStats,periodRange,type SessionRow} from './ScreenBreakInsights';
 
 /** Family devices (iPads / spare iPhones) belong to the parent's family account, never to a child.
  *  The child is chosen per session; the parent's own iPhone is the device id PHONE. */
@@ -120,6 +122,45 @@ export function deviceOrder(devices:FamilyDevice[],defaultId:string):string[]{
  return defaultId===PHONE?[PHONE,...ids]:[...ids.filter(id=>id===defaultId),...ids.filter(id=>id!==defaultId),PHONE];
 }
 
+export const THIS_PHONE={id:PHONE,name:'This iPhone',device_type:'iphone'} as unknown as FamilyDevice;
+
+/** Who used a device last and how long it's been in use. */
+function DeviceStats({deviceId,childName}:{deviceId:string;childName:(id:string)=>string}){
+ const [rows,setRows]=useState<SessionRow[]>([]),[loaded,setLoaded]=useState(false);
+ const ws=periodRange('week',new Date()).start.getTime();
+ useEffect(()=>{let live=true;setLoaded(false);
+  let q=supabase.from('screen_break_sessions').select('id,child_id,family_device_id,started_at,deadline_at,ended_at,granted_seconds,status,version').gte('deadline_at',new Date(ws).toISOString()).order('started_at',{ascending:false}).limit(500);
+  q=deviceId===PHONE?q.is('family_device_id',null):q.eq('family_device_id',deviceId);
+  void q.then(({data})=>{if(live){setRows((data as SessionRow[])||[]);setLoaded(true)}});
+  return()=>{live=false}},[deviceId,ws]);
+ const now=new Date(),day=periodStats(rows,'day',now,now),wk=periodStats(rows,'week',now,now),last=rows[0];
+ const running=last&&!last.ended_at&&Date.parse(last.deadline_at)>Date.now();
+ const ago=last?Math.max(0,Date.now()-Date.parse(last.ended_at||last.deadline_at)):0;
+ const when=running?'Now':!last?'':ago<36e5?Math.max(1,Math.round(ago/6e4))+'m ago':ago<864e5?Math.round(ago/36e5)+'h ago':Math.round(ago/864e5)+'d ago';
+ const val=(label:string,value:string,color:string)=><View style={{gap:2,flex:1}}><Text style={{fontSize:12,fontWeight:'800',color}}>{label}</Text><Text style={s.statNum} numberOfLines={1}>{value}</Text></View>;
+ if(!loaded)return null;
+ return <View style={{gap:12}}>
+  <View style={s.statBox}>
+   <View style={[s.statOrb,{backgroundColor:running?'#E4F6EA':'#F4EBFF'}]}><Ionicons name={running?'hourglass':'person'} size={22} color={running?T.primary:'#9B7BC8'}/></View>
+   <View style={{flex:1,gap:2}}>
+    <Text style={{fontSize:12,fontWeight:'800',color:'#9B7BC8'}}>{running?'In use by':'Last used by'}</Text>
+    <Text style={s.statNum} numberOfLines={1}>{last?childName(last.child_id):'No one yet'}</Text>
+   </View>
+   {last?<Text style={{fontSize:14,fontWeight:'800',color:running?T.primary:T.muted}}>{when}</Text>:null}
+  </View>
+  <View style={s.statBox}>
+   {val('Today',formatDuration(day.seconds),T.primary)}{val('This week',formatDuration(wk.seconds),'#4A8CFF')}{val('Sessions',String(wk.sessions),'#F2A93B')}
+  </View>
+ </View>;
+}
+
+/** Scrolls a name that's too long for its card back and forth. */
+function Marquee({text,style,width=60}:{text:string;style:any;width?:number}){
+ const reduce=useReduceMotion(),[tw,setTw]=useState(0),x=useRef(new Animated.Value(0)).current,over=Math.ceil(tw-width);
+ useEffect(()=>{x.setValue(0);if(over<=0||reduce)return;const a=Animated.loop(Animated.sequence([Animated.delay(1200),Animated.timing(x,{toValue:-over,duration:over*45,useNativeDriver:true}),Animated.delay(1000),Animated.timing(x,{toValue:0,duration:over*45,useNativeDriver:true})]));a.start();return()=>a.stop()},[over,reduce]);
+ return <View style={{width,overflow:'hidden'}} accessible accessibilityLabel={text}><Animated.View style={{width:400,flexDirection:'row',transform:[{translateX:over>0?x:Math.max(0,(width-tw)/2)}]}}><Text style={[style,{flexShrink:0}]} onLayout={e=>setTw(e.nativeEvent.layout.width)}>{text}</Text></Animated.View></View>;
+}
+
 /** The selected device's card; its settings slide up. Devices are picked from DeviceDock. */
 export function FamilyDevicesScreen({childName,onStart,selectedId,adding,onAddDone}:{childName:(id:string)=>string;onStart?:(device:FamilyDevice)=>void;selectedId?:string|null;adding?:boolean;onAddDone?:()=>void}){
  const {devices,defaultId,commands,sessions,loaded}=useFamilyDevices();
@@ -142,8 +183,10 @@ export function FamilyDevicesScreen({childName,onStart,selectedId,adding,onAddDo
     </View>
     {defaultId===PHONE?null:<TouchableOpacity accessibilityRole="button" accessibilityLabel="Make This iPhone the default device" onPress={()=>void rpc('family_device_clear_default',{}).catch(e=>Alert.alert('Family Devices',e.message))} style={s.textBtn}><Text style={s.link}>Make default</Text></TouchableOpacity>}
    </View>
+   {onStart?<View style={s.actions}><ActionBtn primary label="Start timer" icon="time-outline" onPress={()=>onStart(THIS_PHONE)}/></View>:null}
   </View>
   </>:null}
+  {!adding&&loaded?<DeviceStats deviceId={d?d.id:PHONE} childName={childName}/>:null}
   {loaded&&!devices.length&&!adding?<Text style={s.sub}>No family devices yet. On the iPad, install MoodPals and tap “Link as a Family Device.”</Text>:null}
   <Modal visible={!!open} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setSheet(null)}>
    <ScrollView style={{flex:1,backgroundColor:T.background}} contentContainerStyle={{padding:20,paddingBottom:48,gap:14}} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -170,7 +213,7 @@ export function DeviceDock({devices,defaultId,sessions,selected,adding,onSelect,
      {frac!==null?<Svg width={38} height={38} style={StyleSheet.absoluteFill}><Circle cx={19} cy={19} r={r} stroke={on?'rgba(255,255,255,.35)':color+'33'} strokeWidth={3.5} fill="none"/><Circle cx={19} cy={19} r={r} stroke={on?'#fff':color} strokeWidth={3.5} fill="none" strokeLinecap="round" strokeDasharray={cc+' '+cc} strokeDashoffset={cc*(1-frac)} transform="rotate(-90 19 19)"/></Svg>:null}
      {on?<Ionicons name={d?.device_type==='ipad'?'tablet-landscape':'phone-portrait'} size={frac===null?22:15} color="#fff"/>:<IconTile icon={d?.device_type==='ipad'?'tablet-landscape':'phone-portrait'} color="#4A8CFF" size={frac===null?36:26}/>}
     </View>
-    <Text style={[s.dockName,{color:on?'#fff':T.ink}]} numberOfLines={1}>{name}</Text>
+    <Marquee text={name} style={[s.dockName,{color:on?'#fff':T.ink}]}/>
    </TouchableOpacity>})}
   <TouchableOpacity accessibilityRole="button" accessibilityLabel={adding?'Close add device':'Add device'} onPress={onAdd} style={[s.dockCard,{borderStyle:'dashed',borderWidth:2,borderColor:adding?T.primary:'#C9D6CF'}]}>
    <View style={{width:38,height:38,alignItems:'center',justifyContent:'center'}}><Ionicons name={adding?'close':'add'} size={24} color={T.primary}/></View>
@@ -326,7 +369,10 @@ const s=StyleSheet.create({
  selectLink:{fontSize:15,fontWeight:'800',color:T.primary},
  sheet:{backgroundColor:'#fff',borderTopLeftRadius:28,borderTopRightRadius:28,padding:22,paddingBottom:40,gap:10,maxHeight:'85%'},
  dockCard:{width:70,paddingVertical:9,borderRadius:18,alignItems:'center',gap:6,backgroundColor:'rgba(255,255,255,.8)',borderWidth:1,borderColor:'#fff'},
- dockName:{fontSize:12,fontWeight:'800',maxWidth:60},
+ dockName:{fontSize:12,fontWeight:'800'},
+ statBox:{backgroundColor:'#fff',borderRadius:24,padding:16,gap:12,flexDirection:'row',alignItems:'center',shadowColor:'#2D4A3E',shadowOpacity:.06,shadowRadius:12,shadowOffset:{width:0,height:4}},
+ statNum:{fontSize:19,fontWeight:'900',color:T.ink},
+ statOrb:{width:46,height:46,borderRadius:23,alignItems:'center',justifyContent:'center'},
  showAll:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6,alignSelf:'center',minHeight:44,paddingHorizontal:16},
  closeBtn:{width:40,height:40,borderRadius:20,backgroundColor:'#fff',alignItems:'center',justifyContent:'center'},
  grabber:{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'},
