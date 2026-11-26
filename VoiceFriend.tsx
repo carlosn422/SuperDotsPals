@@ -166,6 +166,12 @@ export function BuddyCall({companion,name,onCall,onType}:{companion:string;name?
  const reduce=useReduceMotion();
  const p=useRef(new Animated.Value(0)).current;
  useEffect(()=>{if(reduce)return;const a=Animated.loop(Animated.timing(p,{toValue:1,duration:2200,easing:Easing.out(Easing.ease),useNativeDriver:true}));a.start();return()=>a.stop()},[reduce]);
+ const [gender,setGender]=useState<VoiceGender>('female'),[picking,setPicking]=useState(false),[playing,setPlaying]=useState<VoiceGender|null>(null);
+ const stopRef=useRef<()=>void>(()=>{});
+ useEffect(()=>{void loadVoiceGender().then(setGender)},[]);
+ const close=()=>{stopRef.current();setPlaying(null);setPicking(false)};
+ const demo=async(g:VoiceGender)=>{stopRef.current();if(playing===g){setPlaying(null);return}setPlaying(g);stopRef.current=await playVoiceDemo(g,()=>setPlaying(p=>p===g?null:p))};
+ const choose=async(g:VoiceGender)=>{setGender(g);void Haptics.selectionAsync();const {data:{user}}=await supabase.auth.getUser();if(user)await supabase.from('user_settings').update({voice_gender:g}).eq('user_id',user.id)};
  const wave={transform:[{scale:p.interpolate({inputRange:[0,1],outputRange:[0.85,1.12]})}],opacity:p.interpolate({inputRange:[0,1],outputRange:[0.8,0]})};
  return <View style={b.wrap}>
   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Call your buddy" activeOpacity={0.85} onPress={()=>onCall()} style={b.stage}>
@@ -175,6 +181,23 @@ export function BuddyCall({companion,name,onCall,onType}:{companion:string;name?
    <View style={b.say}><Text style={b.sayText}>Hey{name?' '+name:''}! 👋 Wanna talk?</Text></View>
    <View style={b.tap}><Ionicons name="call" size={18} color="#fff"/><Text style={b.tapText}>Tap me to call</Text></View>
   </TouchableOpacity>
+  <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Voice: '+gender+'. Change voice'} onPress={()=>setPicking(true)} style={b.voice}>
+   <Ionicons name={gender} size={14} color="#2E8F64"/><Text style={b.voiceText}>{gender==='female'?'Female':'Male'} voice</Text><Ionicons name="chevron-forward" size={13} color="#2E8F64"/>
+  </TouchableOpacity>
+  <Modal visible={picking} transparent animationType="slide" onRequestClose={close}>
+   <TouchableOpacity activeOpacity={1} onPress={close} style={b.backdrop}>
+    <TouchableOpacity activeOpacity={1} style={b.sheet}>
+     <View style={b.grab}/>
+     <Text style={b.sheetTitle}>Pick your buddy's voice</Text>
+     {(['female','male'] as const).map(g=><TouchableOpacity key={g} accessibilityRole="radio" accessibilityState={{selected:gender===g}} onPress={()=>void choose(g)} style={[b.opt,gender===g&&b.optOn]}>
+      <View style={[b.optIc,{backgroundColor:g==='female'?'#F4EBFF':'#E4F0FF'}]}><Ionicons name={g} size={22} color={g==='female'?'#8A63D2':'#4A7BE0'}/></View>
+      <Text style={b.optText}>{g==='female'?'Female':'Male'}</Text>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel={(playing===g?'Stop ':'Play ')+g+' voice sample'} onPress={()=>void demo(g)} style={b.play}><Ionicons name={playing===g?'stop':'play'} size={18} color="#fff"/></TouchableOpacity>
+      <Ionicons name={gender===g?'checkmark-circle':'ellipse-outline'} size={26} color={gender===g?'#34B37E':'#C9D6CF'}/>
+     </TouchableOpacity>)}
+    </TouchableOpacity>
+   </TouchableOpacity>
+  </Modal>
   <View style={b.bottom}>
    <View style={b.quick}>{TOPICS.map(t=><TouchableOpacity key={t.l} accessibilityRole="button" accessibilityLabel={'Call about: '+t.l} onPress={()=>onCall(t.l)} style={b.q}><Text style={b.qText}>{t.e} {t.l}</Text></TouchableOpacity>)}</View>
    <RoundButton icon="chatbubble-ellipses" label="Chat" tint="#8A63D2" bg="#F4EBFF" a11y="Type a message instead" onPress={onType}/>
@@ -189,6 +212,14 @@ export function RoundButton({icon,label,tint,bg,a11y,onPress}:{icon:any;label:st
 }
 const b=StyleSheet.create({
  bottom:{flexDirection:'row',alignItems:'flex-end',gap:10},
+ voice:{alignSelf:'center',flexDirection:'row',alignItems:'center',gap:5,backgroundColor:'#E4F6EA',borderRadius:14,paddingHorizontal:11,paddingVertical:6},voiceText:{fontSize:13,fontWeight:'800',color:'#2E8F64'},
+ backdrop:{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(20,30,35,0.35)'},
+ sheet:{backgroundColor:'#fff',borderTopLeftRadius:28,borderTopRightRadius:28,padding:20,paddingBottom:40,gap:12},
+ grab:{alignSelf:'center',width:40,height:5,borderRadius:3,backgroundColor:'#DCE3E0'},
+ sheetTitle:{fontSize:19,fontWeight:'900',color:APP_THEME.ink,textAlign:'center',marginBottom:4},
+ opt:{flexDirection:'row',alignItems:'center',gap:12,borderRadius:20,padding:12,backgroundColor:'#F6F9F7',borderWidth:2,borderColor:'transparent'},optOn:{borderColor:'#34B37E',backgroundColor:'#EEF9F2'},
+ optIc:{width:44,height:44,borderRadius:22,alignItems:'center',justifyContent:'center'},optText:{flex:1,fontSize:16,fontWeight:'900',color:APP_THEME.ink},
+ play:{width:40,height:40,borderRadius:20,backgroundColor:'#34B37E',alignItems:'center',justifyContent:'center'},
  rb:{alignItems:'center',gap:4},rbc:{width:56,height:56,borderRadius:28,alignItems:'center',justifyContent:'center',shadowOpacity:0.3,shadowRadius:8,shadowOffset:{width:0,height:5}},rbl:{fontSize:11,fontWeight:'800'},
  wrap:{gap:14},stage:{height:330,alignItems:'center',justifyContent:'center'},
  ring:{position:'absolute',borderWidth:2,borderColor:'rgba(52,179,126,0.25)'},
