@@ -212,6 +212,7 @@ document.querySelectorAll('.t-show').forEach(show => {
     show.style.setProperty('--navh', navH() + 'px');
     const p = (navH() - show.getBoundingClientRect().top) / range();
     pick(Math.max(0, Math.min(devs.length - 1, Math.floor(p * devs.length))));
+    show.style.setProperty('--lk', Math.max(0, Math.min(1, (p * devs.length - (devs.length - 1) - .2) / .45)).toFixed(3));
   };
   devs.forEach((d, n) => d.addEventListener('click', () => {
     scrollTo({ top: scrollY + show.getBoundingClientRect().top - navH() + range() * (n + .5) / devs.length, behavior: 'smooth' });

@@ -484,3 +484,5 @@ footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;paddin
 .t-wstack img:nth-child(2){animation-delay:-6s}.t-wstack img:nth-child(3){animation-delay:-3s}
 @keyframes t-wfade{0%,30%{opacity:1}36%,94%{opacity:0}100%{opacity:1}}
 @media(prefers-reduced-motion:reduce){.t-wstack img{animation:none;opacity:0}.t-wstack img:first-child{opacity:1}}
+.t-show .t-lock{animation:none;transform:translateY(calc((1 - var(--lk,0)) * 105%));transition:transform .25s ease-out}
+.t-show .t-vbar b{animation:none;width:calc(20% + var(--lk,0) * 72%)}
