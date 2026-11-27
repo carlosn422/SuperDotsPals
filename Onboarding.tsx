@@ -173,6 +173,9 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
   setHealth('busy');
   try{await syncNativeHealth();setHealth('done')}catch(e:any){setHealth('idle');Alert.alert('Apple Health',e?.message||'You can connect later from the Health tab.')}
  }
+ // Apple requires the explainer to always lead to the system permission prompt, so this step has no Skip.
+ const asksHealth=step==='health'&&healthKitAvailable()&&health==='idle';
+ const next=async()=>{if(asksHealth)await connectHealth();if(last)void finish();else if(fromPlan&&step!=='welcome')backToPlan();else go(i+1)};
  async function finish(){
   setLoading(true);
   try{
@@ -259,11 +262,10 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
   case 'voice':return <>{head('Pick your buddy','Talk about your day like you would with a best friend. Tap one to hear them say hi.')}
    <VoicePalGrid value={voice} onPick={setVoice}/>
    <Text style={s.hint}>Calls are part of MoodPals Plus. You can change your buddy any time.</Text></>;
-  case 'health':return <>{head('Connect Apple Health','MoodPals reads your HRV, sleep and steps to show how your body handles stress. Nothing is shared.')}
+  case 'health':return <>{head('Connect Apple Health','MoodPals reads your HRV, sleep and steps to show how your body handles stress. Nothing is shared. Tap Continue to choose what to share.')}
    <View style={s.center}><View style={s.palStage}><SuperdotMascot id="calm" size={150}/></View></View>
-   {healthKitAvailable()?<TouchableOpacity disabled={health!=='idle'} onPress={()=>void connectHealth()} style={[s.secondary,health==='done'&&{backgroundColor:SW.mint}]} accessibilityRole="button">
-    {health==='busy'?<ActivityIndicator color={SW.green}/>:<><Ionicons name={health==='done'?'checkmark-circle':'heart'} size={20} color={SW.green}/><Text style={s.secondaryText}>{health==='done'?'Connected':'Connect Apple Health'}</Text></>}
-   </TouchableOpacity>:<Text style={s.hint}>You can connect Apple Health later from the Health tab on your iPhone.</Text>}
+   {healthKitAvailable()?(health==='done'?<View style={[s.secondary,{backgroundColor:SW.mint}]}><Ionicons name="checkmark-circle" size={20} color={SW.green}/><Text style={s.secondaryText}>Connected</Text></View>:null)
+    :<Text style={s.hint}>You can connect Apple Health later from the Health tab on your iPhone.</Text>}
    <Text style={s.hint}>MoodPals isn't a medical device and doesn't diagnose stress.</Text></>;
   case 'reminders':return <>{head('Gentle reminders','Turn on what helps. You can change these any time.')}
    {toggleRow('Daily check-in',editing&&loaded?`A daily nudge at ${loaded.hour>12?loaded.hour-12+' PM':loaded.hour+(loaded.hour===12?' PM':' AM')} to log how you feel.`:'A nudge at 8 PM to log how you feel.',checkinReminder,v=>void toggleCheckin(v),'happy-outline')}
@@ -295,10 +297,10 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
    <Animated.View style={{gap:16,opacity:fade,transform:[{translateY:fade.interpolate({inputRange:[0,1],outputRange:[12,0]})}]}}>{body()}</Animated.View>
   </ScrollView>
   <View style={s.footer}>
-   <TouchableOpacity accessibilityRole="button" disabled={loading} onPress={()=>last?void finish():fromPlan&&step!=='welcome'?backToPlan():go(i+1)} style={s.primary}>
-    {loading?<ActivityIndicator color="#fff"/>:<Text style={s.primaryText}>{step==='welcome'?'Get started':last?(editing?'Save changes':'Start MoodPals'):fromPlan?'Done':'Continue'}</Text>}
+   <TouchableOpacity accessibilityRole="button" disabled={loading||health==='busy'} onPress={()=>void next()} style={s.primary}>
+    {loading||health==='busy'?<ActivityIndicator color="#fff"/>:<Text style={s.primaryText}>{step==='welcome'?'Get started':last?(editing?'Save changes':'Start MoodPals'):fromPlan?'Done':'Continue'}</Text>}
    </TouchableOpacity>
-   {!last&&!fromPlan&&step!=='welcome'?<TouchableOpacity onPress={()=>go(i+1)} style={{minHeight:40,justifyContent:'center'}}><Text style={s.skip}>Skip</Text></TouchableOpacity>:null}
+   {!last&&!fromPlan&&step!=='welcome'&&step!=='health'?<TouchableOpacity onPress={()=>go(i+1)} style={{minHeight:40,justifyContent:'center'}}><Text style={s.skip}>Skip</Text></TouchableOpacity>:null}
   </View>
  </View>;
 }
