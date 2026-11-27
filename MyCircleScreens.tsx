@@ -135,6 +135,7 @@ function PersonCircle({p,onPress,onLongPress}:{p:Person;onPress:()=>void;onLongP
 }
 
 function YourPeople({nav}:{nav:Nav}){
+ const shareInvite=useShareInvite(nav);
  const store=useCircle();
  const [allOpen,setAllOpen]=useState(false);
  const latest=new Map<string,FriendSharedMood>();
@@ -153,13 +154,13 @@ function YourPeople({nav}:{nav:Nav}){
   </View>
   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:6,paddingRight:4}} style={{marginHorizontal:-4}}>
    {people.map(p=><PersonCircle key={p.f.id} p={p} onLongPress={()=>options(p.f)} onPress={()=>nav.push({name:'chat',id:p.f.id})}/>)}
-   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add Friend" onPress={()=>nav.push({name:'invite'})} style={{width:96,alignItems:'center',gap:4}}>
+   <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add Friend" onPress={()=>shareInvite()} style={{width:96,alignItems:'center',gap:4}}>
     <View style={{width:84,height:84,borderRadius:42,borderWidth:1.5,borderStyle:'dashed',borderColor:CT.primary,alignItems:'center',justifyContent:'center',backgroundColor:CT.primarySoft}}><Ionicons name="person-add-outline" size={28} color={CT.primary}/></View>
     <Text style={{fontSize:14,fontWeight:'900',color:CT.primary}}>Add Friend</Text>
    </TouchableOpacity>
   </ScrollView>
   {store.friends.length>1&&!store.friends.some(f=>f.pinnedAt)?<Text style={[cs.rowSub,{textAlign:'center'}]}>Tip: long-press someone to pin them to the front.</Text>:null}
-  <AllFriendsSheet visible={allOpen} people={all} onClose={()=>setAllOpen(false)} onOpen={p=>{setAllOpen(false);nav.push({name:'chat',id:p.f.id})}} onAdd={()=>{setAllOpen(false);nav.push({name:'invite'})}}/>
+  <AllFriendsSheet visible={allOpen} people={all} onClose={()=>setAllOpen(false)} onOpen={p=>{setAllOpen(false);nav.push({name:'chat',id:p.f.id})}} onAdd={()=>{setAllOpen(false);shareInvite()}}/>
  </CCard>;
 }
 
@@ -210,6 +211,7 @@ function HomeTabs({tab,onTab,unread}:{tab:HomeTab;onTab:(t:HomeTab)=>void;unread
 }
 
 function Home({nav,tab='messages',onTab=()=>{}}:{nav:Nav;tab?:HomeTab;onTab?:(t:HomeTab)=>void}){
+ const shareInvite=useShareInvite(nav);
  const store=useCircle();
  const {isPlus,showPaywall}=usePlus();
  useEffect(()=>{void store.ensurePush()},[]);
@@ -219,18 +221,18 @@ function Home({nav,tab='messages',onTab=()=>{}}:{nav:Nav;tab?:HomeTab;onTab?:(t:
  return <>
   <HomeTabs tab={tab} onTab={onTab} unread={unread}/>
   {store.friends.length?<TouchableOpacity onPress={()=>setSignal(true)} accessibilityRole="button" style={{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,backgroundColor:CT.primarySoft,borderRadius:22,paddingVertical:12}}><Ionicons name="heart" size={18} color={CT.primary}/><Text style={{color:CT.primary,fontWeight:'900',fontSize:15}}>Send a Little Signal</Text></TouchableOpacity>:null}
-  <CircleSignalSheet visible={signal} onClose={()=>setSignal(false)} onInvite={()=>nav.push({name:'invite'})}/>
-  {tab==='messages'?<MessagesInbox onOpen={id=>nav.push({name:'chat',id})} onInvite={()=>nav.push({name:'invite'})} onSend={()=>nav.push({name:'send'})}/>:<>
+  <CircleSignalSheet visible={signal} onClose={()=>setSignal(false)} onInvite={()=>shareInvite()}/>
+  {tab==='messages'?<MessagesInbox onOpen={id=>nav.push({name:'chat',id})} onInvite={()=>shareInvite()} onSend={()=>nav.push({name:'send'})}/>:<>
   <CCard style={{gap:14}}>
    <View style={{flexDirection:'row',gap:9}}>
     <Stat icon="people-outline" value={store.friends.length} label={store.friends.length===1?'Friend':'Friends'} onPress={()=>nav.push({name:'friends'})}/>
     <Stat icon="albums-outline" value={store.groups.length} label={store.groups.length===1?'Group':'Groups'} onPress={()=>nav.push({name:'groups'})}/>
     <Stat icon="mail-outline" value={pending} label={pending===1?'Request':'Requests'} dot={pending>0} onPress={()=>nav.push({name:'requests'})}/>
    </View>
-   <View style={{flexDirection:'row',gap:9}}><View style={{flex:1}}><PrimaryButton label="Invite Friends" icon="person-add-outline" onPress={()=>nav.push({name:'invite'})}/></View><View style={{flex:1}}><SoftButton label="Enter Code" icon="keypad-outline" onPress={()=>nav.push({name:'enterCode'})}/></View></View>
+   <View style={{flexDirection:'row',gap:9}}><View style={{flex:1}}><PrimaryButton label="Invite Friends" icon="person-add-outline" onPress={()=>shareInvite()}/></View><View style={{flex:1}}><SoftButton label="Enter Code" icon="keypad-outline" onPress={()=>nav.push({name:'enterCode'})}/></View></View>
   </CCard>
   {pending?<RequestsCard pending={pending} onPress={()=>nav.push({name:'requests'})}/>:null}
-  {!store.friends.length?<EmptyState mood="Joyful" title="Your circle is empty" detail="Invite close friends or family with your personal code. Nobody can find you by searching — only people you share your code with." action="Invite Friends" onAction={()=>nav.push({name:'invite'})}/>:<>
+  {!store.friends.length?<EmptyState mood="Joyful" title="Your circle is empty" detail="Invite close friends or family with your personal code. Nobody can find you by searching — only people you share your code with." action="Invite Friends" onAction={()=>shareInvite()}/>:<>
    <YourPeople nav={nav}/>
   </>}
   <CCard style={{gap:8}}>
@@ -303,41 +305,43 @@ function GroupInviteCard({group}:{group:CircleGroup}){
 
 function Invite({groupId,nav}:{groupId?:string;nav:Nav}){
  const {invite,regenerateCode,requests,groups}=useCircle();
- const {isPlus,showPaywall}=usePlus();
  const picked=groupId?groups.find(g=>g.id===groupId):undefined;
  const def=groups.find(g=>g.isDefault)?.name;
  const incoming=requests.filter(r=>r.status==='pending'&&r.direction==='incoming');
- const [copied,setCopied]=useState(false);
+ const [copied,setCopied]=useState(false),[options,setOptions]=useState(false);
  useEffect(()=>{if(!copied)return;const t=setTimeout(()=>setCopied(false),2000);return()=>clearTimeout(t)},[copied]);
  const copy=async()=>{await Clipboard.setStringAsync(invite.code);setCopied(true)};
  const left=expiryLabel(invite.expiresAt);
  const waitingFor=incoming.length?<><CHeading title="Waiting for you" detail="Approve to add them to your circle"/><CCard style={{paddingVertical:4}}>{incoming.map((r,i)=><RequestRow key={r.id} r={r} tab="incoming" last={i===incoming.length-1} nav={nav}/>)}</CCard></>:null;
- if(!groupId&&groups.length)return <>
-  {waitingFor}
-  <CHeading title="Got a friend’s code?" detail="Enter it to send them a request."/>
-  <EnterCode nav={nav}/>
-  <CHeading title="Who are you inviting?" detail="Pick a group. Approved friends join it."/>
-  <CCard style={{paddingVertical:4}}>
-   {groups.map(g=><CRow key={g.id} icon={g.icon} tint={g.color+'22'} color={g.color} title={g.name} subtitle={g.memberIds.length+(g.memberIds.length===1?' member':' members')} onPress={()=>nav.push({name:'invite',groupId:g.id})}/>)}
-   <CRow last icon="add" title="Create a Group" subtitle={isPlus?undefined:'MoodPals Plus'} onPress={()=>!isPlus?showPaywall('circles'):nav.push({name:'group'})}/>
-  </CCard>
- </>;
  if(picked&&!picked.isDefault)return <>{waitingFor}<GroupInviteCard group={picked}/><HowItWorks group={picked.name}/></>;
  if(!invite.code)return <EmptyState mood="Calm" title="Getting your code…" detail="Connect to the internet to create your invite code."/>;
- const share=()=>void Share.share({message:'Join my circle on MoodPals 💚 Open the app and enter my invite code: '+invite.code});
+ const share=()=>void Share.share({message:inviteMessage(invite.code)});
  return <>
   {waitingFor}
   <CCard style={{alignItems:'center',gap:10,paddingVertical:24}}>
    <MoodPalThumb mood="Joyful" size={84}/>
    <Text style={[cs.muted,{fontSize:13}]}>Your personal invite code</Text>
    <Text accessibilityLabel={'Invite code '+invite.code.split('').join(' ')} style={{fontSize:34,fontWeight:'900',letterSpacing:3,color:CT.ink}}>{invite.code}</Text>
-   <View style={{flexDirection:'row',alignItems:'center',gap:6}}><Ionicons name="time-outline" size={14} color={CT.muted}/><Text style={cs.muted}>Expires in {left}</Text></View>
    {def?<Text style={[cs.muted,{textAlign:'center'}]}>Approved friends join “{def}”</Text>:null}
   </CCard>
   <View style={{flexDirection:'row',gap:9}}><View style={{flex:1}}><SoftButton label={copied?"Copied":"Copy Code"} icon={copied?"checkmark-circle-outline":"copy-outline"} onPress={()=>void copy()}/></View><View style={{flex:1}}><PrimaryButton label="Share Invite" icon="share-outline" onPress={share}/></View></View>
-  <SoftButton label="Regenerate Code" icon="refresh-outline" onPress={()=>Alert.alert('Regenerate code?','Your current code will stop working immediately. Pending requests already sent stay in your Friend Requests.',[{text:'Cancel',style:'cancel'},{text:'Regenerate',style:'destructive',onPress:regenerateCode}])}/>
-  <HowItWorks group={def}/>
+  <TouchableOpacity accessibilityRole="button" accessibilityState={{expanded:options}} onPress={()=>setOptions(o=>!o)} style={{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6,minHeight:44}}>
+   <Text style={{color:CT.primary,fontWeight:'800'}}>Invite options</Text><Ionicons name={options?'chevron-up':'chevron-down'} size={16} color={CT.primary}/>
+  </TouchableOpacity>
+  {options?<>
+   <View style={{flexDirection:'row',alignItems:'center',gap:6,justifyContent:'center'}}><Ionicons name="time-outline" size={14} color={CT.muted}/><Text style={cs.muted}>Your code works for {left}</Text></View>
+   {groups.some(g=>!g.isDefault)?<><CHeading title="Invite to a group" detail="Approved friends join that group."/><CCard style={{paddingVertical:4}}>{groups.filter(g=>!g.isDefault).map((g,i,all)=><CRow key={g.id} icon={g.icon} tint={g.color+'22'} color={g.color} title={g.name} subtitle={g.memberIds.length+(g.memberIds.length===1?' member':' members')} last={i===all.length-1} onPress={()=>nav.push({name:'invite',groupId:g.id})}/>)}</CCard></>:null}
+   <SoftButton label="Regenerate Code" icon="refresh-outline" onPress={()=>Alert.alert('Regenerate code?','Your current code will stop working immediately. Pending requests already sent stay in your Friend Requests.',[{text:'Cancel',style:'cancel'},{text:'Regenerate',style:'destructive',onPress:regenerateCode}])}/>
+   <HowItWorks group={def}/>
+  </>:null}
  </>;
+}
+
+const inviteMessage=(code:string)=>'Join me on MoodPals 💚 Add me to your circle with my code: '+code;
+// Invite buttons share the personal code straight away; the Invite screen is the fallback while the code loads.
+function useShareInvite(nav:Nav){
+ const {invite}=useCircle();
+ return ()=>{if(invite.code)void Share.share({message:inviteMessage(invite.code)});else nav.push({name:'invite'})};
 }
 
 function HowItWorks({group}:{group?:string}){
