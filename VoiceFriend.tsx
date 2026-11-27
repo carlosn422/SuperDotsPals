@@ -61,8 +61,10 @@ export async function saveVoicePal(id:VoicePalId){
  if(user)await supabase.from('user_settings').update({voice_gender:voicePal(id).gender}).eq('user_id',user.id);
 }
 
-// Plays a bundled clip; returns a stop function.
+// Plays a bundled clip on the speaker at media volume, like a call; returns a stop function.
 export async function playClip(clip:number,onEnd:()=>void){
+ AudioManager.setSystemOptions({ios:{category:'playback',mode:'spokenAudio'}});
+ await AudioManager.setAudioSessionActivity(true).catch(()=>{});
  const ctx=new AudioContext();
  try{
   const buf=await ctx.decodeAudioData(clip);
