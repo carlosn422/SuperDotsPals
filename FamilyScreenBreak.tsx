@@ -13,7 +13,7 @@ import SuperdotMascot from './SuperdotMascot';
 import {usePlus} from './PlusStore';
 import {UpgradePill} from './TodayUpsell';
 import {SocialAppLabel,socialMarks} from './modules/watch-link/socialTrack';
-import {useIsGuest} from './Account';
+import {AccountRequired,useIsGuest} from './Account';
 import {ManageFamilyProfile,familyCall,familyProfilesChanged,shortProfileName,useFamilyProfiles,type FamilyProfile} from './FamilyWatches';
 import {WatchColorGrid,WatchColorSheet,WatchImage,colorName,isWatchColor,type WatchColor} from './WatchArt';
 import {ackBreakSync,getBreakState,onBreakState,pendingBreakSync,pickBreakApps,requestScreenTimeAccess,screenBreakSupported,sendBreakCommand,setBreakChildren,setBreakEntitlement,type BreakAction,type BreakSession,type BreakState,type BreakSyncRow} from './modules/watch-link/screenBreak';
@@ -138,7 +138,7 @@ function HeaderLock(){
 
 type Route={name:'list'}|{name:'child';id:string}|{name:'insights';id:string}|{name:'devices';id?:string};
 
-export default function FamilyScreenBreak({onBack,backLabel='Settings',target,onAddWatch,embedded,footer,onDock,onTimerStart}:{onDock?:(node:React.ReactNode)=>void;onTimerStart?:()=>void;onBack?:()=>void;backLabel?:string;target?:{childId?:string;profileId?:string;add?:boolean;at:number}|null;onAddWatch?:()=>void;embedded?:boolean;footer?:React.ReactNode}){
+export default function FamilyScreenBreak({onBack,backLabel='Settings',target,onAddWatch,embedded,footer,onDock,onTimerStart,onCreateAccount}:{onCreateAccount?:()=>void;onDock?:(node:React.ReactNode)=>void;onTimerStart?:()=>void;onBack?:()=>void;backLabel?:string;target?:{childId?:string;profileId?:string;add?:boolean;at:number}|null;onAddWatch?:()=>void;embedded?:boolean;footer?:React.ReactNode}){
  const guest=useIsGuest();
  const [children,setChildren]=useState<FamilyChild[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const {width:screenW}=useWindowDimensions();
@@ -207,7 +207,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
  return <View style={{gap:14}}>
   {!embedded&&onBack?<Back label={backLabel} onPress={onBack}/>:null}
   <View style={[st.row,{paddingVertical:0}]}><Text style={st.title} accessibilityRole="header">Family</Text>{screenBreakSupported&&!guest?<HeaderLock/>:null}</View>
-  {guest?<View style={st.card}><Text style={st.body}>Create a free account to add family members and use Screen Break.</Text></View>:<>
+  {guest?<AccountRequired accent={T.primary} icon="people" title="Family needs an account" body="Add your kids, link family devices and set screen time from your iPhone or Apple Watch. Create a free account to get started." onCreate={()=>onCreateAccount?.()}/>:<>
    {error?<Text style={[st.sub,{color:red}]}>{error}</Text>:null}
    {loading?<ActivityIndicator color={T.primary}/>:null}
    {!loading&&!error?<TrialBanner/>:null}
@@ -222,7 +222,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
   </>}
   {footer&&section==='devices'?<TouchableOpacity accessibilityRole="button" onPress={()=>setWatchesOpen(true)} style={st.watchBtn}><IconTile icon="watch" color="#7B5CE6" size={44}/><Text style={[st.rowTitle,{flex:1}]}>Apple Watches</Text><Ionicons name="chevron-up" size={18} color="#7B5CE6"/></TouchableOpacity>:null}
   <Modal visible={watchesOpen&&!!footer} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setWatchesOpen(false)}>
-   <ScrollView style={{flex:1,backgroundColor:T.background}} contentContainerStyle={{padding:20,paddingBottom:48,gap:14}} showsVerticalScrollIndicator={false}>
+   <ScrollView keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets style={{flex:1,backgroundColor:T.background}} contentContainerStyle={{padding:20,paddingBottom:48,gap:14}} showsVerticalScrollIndicator={false}>
     <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'}}/>
     <View style={{flexDirection:'row',alignItems:'center',gap:12}}><Text style={[st.title,{flex:1}]} accessibilityRole="header">Apple Watches</Text><TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={()=>setWatchesOpen(false)} style={st.sheetClose}><Ionicons name="close" size={22} color={T.ink}/></TouchableOpacity></View>
     {footer}
@@ -230,7 +230,7 @@ export default function FamilyScreenBreak({onBack,backLabel='Settings',target,on
   </Modal>
   <StartTimerSheet device={startOn} members={members} onClose={()=>setStartOn(null)}/>
   <Modal visible={!!insightsChild} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setInsightsId(null)}>
-   {insightsChild?<ChartScrubContext.Provider value={scrubCtx}><ScrollView style={{flex:1,backgroundColor:T.background}} contentContainerStyle={{padding:20,paddingBottom:48}} showsVerticalScrollIndicator={false}><InsightsScreen sheet child={insightsChild} onBack={()=>setInsightsId(null)}/></ScrollView></ChartScrubContext.Provider>:null}
+   {insightsChild?<ChartScrubContext.Provider value={scrubCtx}><ScrollView keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets style={{flex:1,backgroundColor:T.background}} contentContainerStyle={{padding:20,paddingBottom:48}} showsVerticalScrollIndicator={false}><InsightsScreen sheet child={insightsChild} onBack={()=>setInsightsId(null)}/></ScrollView></ChartScrubContext.Provider>:null}
   </Modal>
  </View>;
 }
@@ -551,7 +551,7 @@ function ChildScreen({child,children,onBack,onInsights,onChanged,onRemoved,onAdd
    {state&&!state.authorized&&mine?<Text style={[st.sub,{color:red}]}>Screen Time access was turned off, so apps can't be paused. Allow access again to restore the break.</Text>:null}</>}
   </>}
   {inline?<Modal visible={watchOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setWatchOpen(false)}>
-   <ScrollView contentContainerStyle={{padding:20,gap:14}}>
+   <ScrollView keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets contentContainerStyle={{padding:20,gap:14}}>
     <TouchableOpacity accessibilityRole="button" onPress={()=>setWatchOpen(false)} style={{alignSelf:'flex-end',minHeight:44,justifyContent:'center'}}><Text style={st.link}>Done</Text></TouchableOpacity>
     <MemberWatch child={child} children={children} onChanged={onChanged} onRemoved={onRemoved}/>
    </ScrollView>
@@ -704,7 +704,7 @@ function DurationWheel({values,value,onChange,format,label}:{values:number[];val
  return <View style={{alignSelf:'stretch',height:WHEEL_ROW*3,overflow:'hidden'}} accessible accessibilityRole="adjustable" accessibilityLabel={label} accessibilityValue={{text:format(value)}}
   accessibilityActions={[{name:'increment'},{name:'decrement'}]} onAccessibilityAction={e=>{const i=index+(e.nativeEvent.actionName==='increment'?1:-1);if(i>=0&&i<values.length){onChange(values[i]);ref.current?.scrollTo({y:i*WHEEL_ROW,animated:true})}}}>
   <View pointerEvents="none" style={{position:'absolute',top:WHEEL_ROW,left:0,right:0,height:WHEEL_ROW,borderRadius:12,backgroundColor:T.primarySoft}}/>
-  <ScrollView ref={ref} style={{flex:1}} showsVerticalScrollIndicator={false} nestedScrollEnabled snapToInterval={WHEEL_ROW} decelerationRate="fast"
+  <ScrollView keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets ref={ref} style={{flex:1}} showsVerticalScrollIndicator={false} nestedScrollEnabled snapToInterval={WHEEL_ROW} decelerationRate="fast"
    contentContainerStyle={{paddingVertical:WHEEL_ROW}} scrollEventThrottle={16}
    onScroll={e=>{const v=at(e.nativeEvent.contentOffset.y);if(v!==value)onChange(v)}}
    onMomentumScrollEnd={e=>onChange(at(e.nativeEvent.contentOffset.y))}>
@@ -851,7 +851,7 @@ function EditMemberSheet({visible,child,children,onClose,onChanged,onRemoved}:{v
   <Modal visible={visible&&stage==='edit'&&!leaving} transparent animationType="slide" onRequestClose={busy?undefined:onClose} onDismiss={()=>{if(leaving){setStage(leaving);setLeaving(null)}}}>
    <KeyboardAvoidingView behavior="padding" style={{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(29,43,51,0.3)'}}>
     <TouchableOpacity style={StyleSheet.absoluteFill} disabled={!!busy} onPress={onClose} accessibilityLabel="Close"/>
-    <ScrollView style={{maxHeight:'88%',flexGrow:0}} contentContainerStyle={st.sheet} keyboardShouldPersistTaps="handled">
+    <ScrollView automaticallyAdjustKeyboardInsets style={{maxHeight:'88%',flexGrow:0}} contentContainerStyle={st.sheet} keyboardShouldPersistTaps="handled">
      <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'}}/>
      <Text style={st.sheetTitle}>Edit {child.name}</Text>
      <Text style={st.kicker}>Name</Text>
@@ -918,7 +918,7 @@ function AssignWatchSheet({visible,child,spare,link,onClose,onAssigned}:{visible
  return <Modal visible={visible} transparent animationType="slide" onRequestClose={busy?undefined:onClose}>
   <KeyboardAvoidingView behavior="padding" style={{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(29,43,51,0.3)'}}>
    <TouchableOpacity style={StyleSheet.absoluteFill} disabled={busy} onPress={onClose} accessibilityLabel="Close"/>
-   <ScrollView style={{maxHeight:'88%',flexGrow:0}} contentContainerStyle={st.sheet} keyboardShouldPersistTaps="handled">
+   <ScrollView automaticallyAdjustKeyboardInsets style={{maxHeight:'88%',flexGrow:0}} contentContainerStyle={st.sheet} keyboardShouldPersistTaps="handled">
     <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'}}/>
     {step==='start'?<>
      <Text style={st.sheetTitle}>Assign a watch to {name}</Text>

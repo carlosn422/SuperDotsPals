@@ -100,7 +100,7 @@ export default function CircleSignalSheet({visible,initial,onClose,onInvite}:{vi
     <Text accessibilityRole="header" style={{flex:1,fontSize:22,fontWeight:'900',color:CT.ink}}>Send a Little Signal</Text>
     <TouchableOpacity onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={10}><Ionicons name="close" size={26} color={CT.ink}/></TouchableOpacity>
    </View>
-   <ScrollView style={{flex:1}} contentContainerStyle={{padding:18,paddingTop:6,paddingBottom:40}} keyboardShouldPersistTaps="handled" scrollEnabled={!sent}>
+   <ScrollView automaticallyAdjustKeyboardInsets style={{flex:1}} contentContainerStyle={{padding:18,paddingTop:6,paddingBottom:40}} keyboardShouldPersistTaps="handled" scrollEnabled={!sent}>
     <SignalPicker key={round+'|'+(initial||[]).join(',')} initial={initial} onSent={(signal,_ids,skipped)=>setSent({signal,skipped})} onInvite={onInvite?()=>{onClose();onInvite()}:undefined}/>
    </ScrollView>
    {sent?<SentBubble signal={sent.signal} skipped={sent.skipped} onDone={onClose}/>:null}

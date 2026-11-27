@@ -113,7 +113,7 @@ function Body({kind,onClose,onSaved,onAskAI}:{kind:Drink;onClose:()=>void;onSave
 
  if(page==='settings')return <View style={{flex:1,backgroundColor:BG,paddingTop:insets.top+8}}>
   <View style={st.goalHead}><TouchableOpacity accessibilityRole="button" accessibilityLabel="Back" onPress={()=>setPage('main')} style={st.round}><Ionicons name="arrow-back" size={22} color={k.color}/></TouchableOpacity><Text style={st.goalTitle}>{k.title}</Text><View style={{width:46}}/></View>
-  <ScrollView contentContainerStyle={{paddingHorizontal:18,gap:12,paddingBottom:insets.bottom+30}}>
+  <ScrollView keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets contentContainerStyle={{paddingHorizontal:18,gap:12,paddingBottom:insets.bottom+30}}>
    {kind==='water'?<View style={[st.card,{gap:12}]}>
     <TouchableOpacity accessibilityRole="button" onPress={plusOnly(()=>void updateReminder({...reminder,enabled:!reminder.enabled}))} style={s.row}>
      <Ionicons name="notifications-outline" size={20} color={k.color}/><Text style={s.rowLabel}>Water Reminder</Text>{isPlus?null:<PlusBadge/>}<Text style={s.rowValue}>{reminder.enabled?'On':'Off'}</Text>
@@ -163,7 +163,7 @@ function Body({kind,onClose,onSaved,onAskAI}:{kind:Drink;onClose:()=>void;onSave
     <Text style={[st.periodText,period===p&&{color:INK}]}>{p}</Text>{locked?<Ionicons name="lock-closed" size={11} color={MUTED}/>:null}</TouchableOpacity>})}</View>
    <TouchableOpacity accessibilityRole="button" accessibilityLabel={k.title+' settings'} onPress={()=>setPage('settings')} style={st.round}><Ionicons name="options-outline" size={22} color={k.color}/></TouchableOpacity>
   </View>
-  <ScrollView contentContainerStyle={{padding:18,paddingTop:6,gap:16,paddingBottom:insets.bottom+40}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+  <ScrollView automaticallyAdjustKeyboardInsets contentContainerStyle={{padding:18,paddingTop:6,gap:16,paddingBottom:insets.bottom+40}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
    <View style={st.dateRow}>
     <TouchableOpacity accessibilityRole="button" accessibilityLabel="Previous" onPress={back} style={[st.arrow,{backgroundColor:k.color+'22',opacity:canBack||!isPlus?1:0.35}]}><Ionicons name="chevron-back" size={18} color={k.color}/></TouchableOpacity>
     <TouchableOpacity accessibilityRole="button" accessibilityLabel={'Choose day, '+dateLabel} onPress={()=>setPicker(p=>!p)} style={{flexDirection:'row',alignItems:'center',gap:4}}><Text style={[st.date,{color:k.color}]}>{dateLabel}</Text><Ionicons name={picker?'chevron-up':'chevron-down'} size={16} color={k.color}/></TouchableOpacity>

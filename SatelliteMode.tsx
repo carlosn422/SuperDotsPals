@@ -32,7 +32,7 @@ export default function SatelliteMode({onExit}:{onExit:()=>void}){
  const refresh=useCallback(async(reason:string)=>{const next=await satelliteSync(reason);if(next)setState(next)},[]);
  useEffect(()=>{const sub=onBreakState(()=>setState(satelliteState()));return()=>sub.remove()},[]);
  const linked=!!state?.linked;
- return <SafeAreaView style={st.page}><ScrollView contentContainerStyle={[st.body,{paddingHorizontal:pad}]} keyboardShouldPersistTaps="handled">
+ return <SafeAreaView style={st.page}><ScrollView automaticallyAdjustKeyboardInsets contentContainerStyle={[st.body,{paddingHorizontal:pad}]} keyboardShouldPersistTaps="handled">
   <Image source={require('./assets/branding/moodpals-logo.png')} accessibilityLabel="MoodPals" style={st.logo} resizeMode="contain"/>
   {state?.unlinked?<Unlinked reason={state.reason} onDone={()=>{satelliteReset();onExit()}}/>
    :!linked?<Pair onPaired={next=>setState(next)} onCancel={onExit}/>

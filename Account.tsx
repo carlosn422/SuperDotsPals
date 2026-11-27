@@ -1,6 +1,7 @@
 import React,{useCallback,useEffect,useState} from 'react';
 import {ActivityIndicator,Alert,AppState,Image,StyleSheet,Text,TextInput,TouchableOpacity,View} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import {supabase} from './supabase';
 import {signOutAndUnregister} from './PushRegistration';
 import type {User} from '@supabase/supabase-js';
@@ -77,7 +78,7 @@ export function DeleteAccountScreen({accent,onBack}:{accent:string;onBack:()=>vo
  const [user,setUser]=useState<User|null>(null),[password,setPassword]=useState(''),[typed,setTyped]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
  useEffect(()=>{void supabase.auth.getUser().then(({data})=>setUser(data.user))},[]);
  const guest=!!user?.is_anonymous,withPassword=!!user?.identities?.some(i=>i.provider==='email'),withApple=hasApple(user?.identities);
- const ready=typed==='DELETE'&&!busy&&!!user&&(guest||(withPassword&&password.length>0)||withApple);
+ const ready=!busy&&!!user&&(guest||(typed==='DELETE'&&((withPassword&&password.length>0)||withApple)));
  async function remove(){
   if(!ready||!user)return;
   setBusy(true);setError('');
@@ -115,10 +116,10 @@ export function DeleteAccountScreen({accent,onBack}:{accent:string;onBack:()=>vo
   {!guest&&withPassword?<TextInput value={password} onChangeText={setPassword} secureTextEntry autoComplete="current-password" placeholder="Your password" placeholderTextColor="#9690AF" editable={!busy} style={s.input} accessibilityLabel="Your password"/>:null}
   {!guest&&!withPassword&&withApple?<Text style={[s.body,{textAlign:'left'}]}>You’ll confirm with Apple when you tap Delete.</Text>:null}
   {!guest&&withPassword&&withApple?<Text style={[s.body,{textAlign:'left'}]}>Or leave the password empty to confirm with Apple instead.</Text>:null}
-  <Text style={[s.body,{textAlign:'left',fontWeight:'700'}]}>Type DELETE to confirm.</Text>
-  <TextInput value={typed} onChangeText={setTyped} autoCapitalize="characters" autoCorrect={false} placeholder="DELETE" placeholderTextColor="#9690AF" editable={!busy} style={s.input} accessibilityLabel="Type DELETE to confirm"/>
+  {guest?null:<Text style={[s.body,{textAlign:'left',fontWeight:'700'}]}>Type DELETE to confirm.</Text>}
+  {guest?null:<TextInput value={typed} onChangeText={setTyped} autoCapitalize="characters" autoCorrect={false} placeholder="DELETE" placeholderTextColor="#9690AF" editable={!busy} style={s.input} accessibilityLabel="Type DELETE to confirm"/>}
   {error?<Text style={[s.body,{color:'#D65B79'}]}>{error}</Text>:null}
-  <TouchableOpacity accessibilityRole="button" disabled={!ready} onPress={()=>void remove()} style={[s.cta,{backgroundColor:'#D65B79'},!ready&&{opacity:.45}]}>{busy?<ActivityIndicator color="#fff"/>:<Text style={s.ctaText}>Delete Account</Text>}</TouchableOpacity>
+  <TouchableOpacity accessibilityRole="button" disabled={!ready} onPress={()=>guest?Alert.alert('Delete your guest data?','Your check-ins and settings on this iPhone will be erased. This can’t be undone.',[{text:'Cancel',style:'cancel'},{text:'Delete',style:'destructive',onPress:()=>void remove()}]):void remove()} style={[s.cta,{backgroundColor:'#D65B79'},!ready&&{opacity:.45}]}>{busy?<ActivityIndicator color="#fff"/>:<Text style={s.ctaText}>{guest?'Delete guest data':'Delete Account'}</Text>}</TouchableOpacity>
  </View>;
 }
 
@@ -137,16 +138,29 @@ function Back({label,accent,onPress}:{label:string;accent:string;onPress:()=>voi
  return <TouchableOpacity accessibilityRole="button" style={s.back} onPress={onPress}><Ionicons name="chevron-back" size={18} color={accent}/><Text style={{color:accent,fontWeight:'800'}}>{label}</Text></TouchableOpacity>;
 }
 
-export function AccountRequired({accent,backLabel,onBack,onCreate}:{accent:string;backLabel:string;onBack:()=>void;onCreate:()=>void}){
+// Apple links to the current guest user, so the user id and everything saved as a guest stay the same.
+function AppleContinue({onDone,disabled}:{onDone?:()=>void;disabled?:boolean}){
+ const [ok,setOk]=useState(false),[busy,setBusy]=useState(false);
+ useEffect(()=>{void appleAvailable().then(setOk)},[]);
+ if(!ok)return null;
+ const go=async()=>{
+  if(busy||disabled)return;setBusy(true);
+  try{if(await linkApple()==='linked')onDone?.()}catch(e:any){Alert.alert('Sign in with Apple',e?.message||'Something went wrong. Please try again.')}finally{setBusy(false)}
+ };
+ return <AppleAuthentication.AppleAuthenticationButton buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE} buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK} cornerRadius={28} style={{height:54,alignSelf:'stretch',opacity:busy||disabled?.6:1}} onPress={()=>void go()}/>;
+}
+
+export function AccountRequired({accent,backLabel,onBack,onCreate,title='My Circle needs an account',body='My Circle connects you with the people you trust, so they need a way to find you. Create a free account to invite friends and share Little Signals.',icon}:{accent:string;backLabel?:string;onBack?:()=>void;onCreate:()=>void;title?:string;body?:string;icon?:React.ComponentProps<typeof Ionicons>['name']}){
  return <View style={{gap:14}}>
-  <Back label={backLabel} accent={accent} onPress={onBack}/>
+  {onBack&&backLabel?<Back label={backLabel} accent={accent} onPress={onBack}/>:null}
   <View style={[s.card,{alignItems:'center'}]}>
-   <Image source={CALM} style={s.mascot}/>
-   <Text style={s.title}>My Circle needs an account</Text>
-   <Text style={s.body}>My Circle connects you with the people you trust, so they need a way to find you. Create a free account to invite friends and share Little Signals.</Text>
+   {icon?<View style={[s.iconBubble,{backgroundColor:accent+'1F'}]}><Ionicons name={icon} size={44} color={accent}/></View>:<Image source={CALM} style={s.mascot}/>}
+   <Text style={s.title}>{title}</Text>
+   <Text style={s.body}>{body}</Text>
    <Text style={s.note}>Your check-ins, settings and plan stay with you.</Text>
   </View>
-  <TouchableOpacity accessibilityRole="button" onPress={onCreate} style={[s.cta,{backgroundColor:accent}]}><Text style={s.ctaText}>Create account</Text></TouchableOpacity>
+  <AppleContinue/>
+  <TouchableOpacity accessibilityRole="button" onPress={onCreate} style={[s.cta,{backgroundColor:accent,flexDirection:'row',justifyContent:'center',gap:8}]}><Ionicons name="mail" size={18} color="#fff"/><Text style={s.ctaText}>Continue with Email</Text></TouchableOpacity>
  </View>;
 }
 
@@ -219,6 +233,8 @@ export function CreateAccountScreen({accent,onBack,backLabel='Settings'}:{accent
   </View>
   {step==='loading'?<ActivityIndicator color={accent}/>:null}
   {step==='details'?<>
+   <AppleContinue disabled={busy} onDone={()=>setStep('done')}/>
+   <AppleOr/>
    <TextInput style={s.input} placeholder="Your name" placeholderTextColor="#94A39B" value={name} onChangeText={setName} autoCapitalize="words" accessibilityLabel="Your name"/>
    <TextInput style={s.input} placeholder="Email address" placeholderTextColor="#94A39B" value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" accessibilityLabel="Email address"/>
   </>:null}
@@ -235,7 +251,15 @@ export function CreateAccountScreen({accent,onBack,backLabel='Settings'}:{accent
  </View>;
 }
 
+function AppleOr(){
+ const [ok,setOk]=useState(false);
+ useEffect(()=>{void appleAvailable().then(setOk)},[]);
+ return ok?<View style={{flexDirection:'row',alignItems:'center',gap:10}}><View style={s.orLine}/><Text style={{color:T.muted,fontWeight:'700',fontSize:13}}>or use email</Text><View style={s.orLine}/></View>:null;
+}
+
 const s=StyleSheet.create({
+ orLine:{flex:1,height:1,backgroundColor:T.border},
+ iconBubble:{width:88,height:88,borderRadius:44,alignItems:'center',justifyContent:'center'},
  back:{flexDirection:'row',alignItems:'center',gap:4,marginBottom:4},
  card:{backgroundColor:T.surface,borderRadius:20,padding:18,gap:8,borderWidth:1,borderColor:T.border},
  mascot:{width:96,height:96},

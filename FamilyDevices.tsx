@@ -103,7 +103,7 @@ export function DeviceSelect({options,selected,defaultId,onSelect}:{options:Devi
     <View style={s.sheet} accessibilityRole="radiogroup" accessibilityLabel="Device">
      <View style={s.grabber}/>
      <Text style={s.sheetTitle}>Choose a device</Text>
-     <ScrollView style={{flexGrow:0}} contentContainerStyle={{gap:10}}>
+     <ScrollView keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets style={{flexGrow:0}} contentContainerStyle={{gap:10}}>
      {options.map(o=>{const on=o.id===selected;return <TouchableOpacity key={o.id} accessibilityRole="radio" accessibilityState={{selected:on}} onPress={()=>{onSelect(o.id);setOpen(false)}} style={[s.opt,on&&s.optOn]}>
       {icon(o)}
       <View style={{flex:1}}><Text style={s.optName} numberOfLines={1}>{o.name}{o.id===defaultId?' · Default':''}</Text>{status(o)}</View>
@@ -192,7 +192,7 @@ export function FamilyDevicesScreen({childName,onStart,selectedId,adding,onAddDo
   {!adding&&loaded?<DeviceStats deviceId={d?d.id:PHONE} childName={childName}/>:null}
   {loaded&&!devices.length&&!adding?<Text style={s.sub}>No family devices yet. On the iPad, install MoodPals and tap “Link as a Family Device.”</Text>:null}
   <Modal visible={!!open} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setSheet(null)}>
-   <ScrollView style={{flex:1,backgroundColor:T.background}} contentContainerStyle={{padding:20,paddingBottom:48,gap:14}} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+   <ScrollView automaticallyAdjustKeyboardInsets style={{flex:1,backgroundColor:T.background}} contentContainerStyle={{padding:20,paddingBottom:48,gap:14}} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
     <View style={s.grabber}/>
     {open?<DeviceSettings device={open} isDefault={defaultId===open.id} now={now} onBack={()=>setSheet(null)} onClose={()=>setSheet(null)}/>:null}
    </ScrollView>

@@ -29,7 +29,7 @@ export function useStressContext(){
  const level=today?STRESS_LEVELS[today.level]:null;
  const sl=sleep!==null?formatMinutes(sleep):null;
  const chips=[
-  {icon:'pulse',label:level?`${level.label} · ${today!.score}`:baseline.ready?'No score today':'Calibrating',color:level?.color||SW.muted},
+  {icon:'pulse',label:level?`${level.label} · ${today!.score}/100`:baseline.ready?'No score today':'Calibrating',color:level?.color||SW.muted},
   ...(hrv!==null?[{icon:'heart',label:`HRV ${Math.round(hrv)} ms`,color:'#EE6F86'}]:[]),
   ...(sl?[{icon:'moon',label:`Slept ${sl.h}h ${sl.m}m`,color:'#6C63E0'}]:[])
  ];

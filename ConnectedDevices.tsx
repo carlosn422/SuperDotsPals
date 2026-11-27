@@ -109,7 +109,7 @@ export default function ConnectedDevices({focused=true,onOpenThemes,onCreateAcco
   </>:null}
 
   <Modal visible={!!adding} animationType="slide" presentationStyle="pageSheet" onRequestClose={connecting?undefined:closeAdd}>
-   <ScrollView contentContainerStyle={{padding:22,gap:14}} keyboardShouldPersistTaps="handled">
+   <ScrollView automaticallyAdjustKeyboardInsets contentContainerStyle={{padding:22,gap:14}} keyboardShouldPersistTaps="handled">
     <TouchableOpacity disabled={connecting} onPress={()=>step==='color'?setStep('link'):closeAdd()}><Text style={{color:purple,fontWeight:'800'}}>‹ {step==='color'?'Back':'Cancel'}</Text></TouchableOpacity>
     <Text style={styles.title}>{adding==='family'?'Add Family Watch':'Add Watch'}</Text>
     {step==='link'?<>
@@ -140,7 +140,7 @@ export default function ConnectedDevices({focused=true,onOpenThemes,onCreateAcco
   </Modal>
 
   <Modal visible={!!details} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setDetails(null)}>
-   {details?<ScrollView style={{backgroundColor:'#F4FAF6'}} contentContainerStyle={{padding:20,gap:12}}>
+   {details?<ScrollView keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets style={{backgroundColor:'#F4FAF6'}} contentContainerStyle={{padding:20,gap:12}}>
     <TouchableOpacity onPress={()=>setDetails(null)} accessibilityRole="button" style={{flexDirection:'row',alignItems:'center',gap:2}}><Ionicons name="chevron-back" size={22} color="#1D2B33"/><Text style={{color:'#1D2B33',fontWeight:'800',fontSize:16}}>Watches</Text></TouchableOpacity>
     <View style={{alignItems:'center',gap:6}}><WatchImage color={isWatchColor(details.watch_color)?details.watch_color:null} name={shortProfileName(deviceName(details))} width={130}/><Text style={styles.title}>{deviceName(details)}</Text></View>
     <View style={{backgroundColor:'#fff',borderRadius:22,padding:16,gap:8}}>

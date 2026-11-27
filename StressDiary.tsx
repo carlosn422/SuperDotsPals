@@ -84,7 +84,7 @@ export default function StressDiary({entries,onChanged,onAsk}:{entries:DiaryEntr
  }
  function more(e:DiaryEntry,p:StressPoint|null,auto:boolean){
   const actions:{label:string;run:()=>void;destructive?:boolean}[]=[];
-  if(onAsk)actions.push({label:'Ask MoodPal',run:()=>onAsk(`Help me reflect on this diary entry from ${new Date(e.occurred_at).toLocaleString()}: "${e.body.slice(0,500)}"${e.mood?` (mood: ${e.mood})`:''}${p?` My stress level then was ${STRESS_LEVELS[p.level].label}.`:''}`)});
+  if(onAsk)actions.push({label:'Ask MoodPal',run:()=>onAsk(`Help me reflect on what I wrote on ${new Date(e.occurred_at).toLocaleDateString(undefined,{month:'short',day:'numeric'})}: "${e.body.slice(0,500)}"${e.mood?` I was feeling ${e.mood.toLowerCase()}.`:''}`)});
   if(!auto)actions.push({label:'Edit',run:()=>{setEditing(e.id);setEditText(e.body)}});
   actions.push({label:'Delete',run:()=>remove(e.id),destructive:true});
   if(Platform.OS!=='ios'){Alert.alert('Entry',undefined,[...actions.map(a=>({text:a.label,style:a.destructive?'destructive' as const:'default' as const,onPress:a.run})),{text:'Cancel',style:'cancel'}],{cancelable:true});return}
@@ -178,7 +178,7 @@ function FilterSheet({visible,applied,onApply,onClose}:{visible:boolean;applied:
  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
   <View style={{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(29,43,51,0.3)'}}>
    <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close"/>
-   <ScrollView style={{maxHeight:'88%',flexGrow:0}} contentContainerStyle={st.sheet}>
+   <ScrollView keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets style={{maxHeight:'88%',flexGrow:0}} contentContainerStyle={st.sheet}>
     <View style={{width:38,height:5,borderRadius:3,backgroundColor:'#D2DAD6',alignSelf:'center'}}/>
     <View style={{gap:4}}><Text style={[st.title,{fontSize:22}]}>Filter Entries</Text><Text style={st.body}>Choose which stress levels to show.</Text></View>
     {option('all','All entries',!draft.length,()=>setDraft([]),<Ionicons name="layers-outline" size={22} color={SW.green}/>)}

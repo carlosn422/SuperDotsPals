@@ -60,7 +60,7 @@ export default function CircleNavigator({initial=[{name:'home'}],exitLabel='Sett
   <OfflineBanner/>
   <Screen route={route} nav={nav} mood={mood} homeTab={homeTab} setHomeTab={setHomeTab}/>
  </View>;
- return contentStyle?<ScrollView key={stack.length+route.name+resetKey} style={{flex:1}} contentContainerStyle={contentStyle} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">{body}</ScrollView>:body;
+ return contentStyle?<ScrollView automaticallyAdjustKeyboardInsets key={stack.length+route.name+resetKey} style={{flex:1}} contentContainerStyle={contentStyle} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">{body}</ScrollView>:body;
 }
 type Nav={push:(r:CircleRoute)=>void;replace:(r:CircleRoute)=>void;back:()=>void;popTo:(n:CircleRoute['name'])=>void};
 
@@ -180,7 +180,7 @@ function AllFriendsSheet({visible,people,onClose,onOpen,onAdd}:{visible:boolean;
     <Ionicons name="search" size={17} color={CT.muted}/>
     <TextInput value={q} onChangeText={setQ} placeholder="Search friends" accessibilityLabel="Search friends" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" style={{flex:1,paddingVertical:11,fontSize:16,color:CT.ink}}/>
    </View>
-   <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={{paddingHorizontal:20,paddingBottom:40,gap:10}}>
+   <ScrollView automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={{paddingHorizontal:20,paddingBottom:40,gap:10}}>
     <Text style={cs.rowSub}>{term?shown.length+(shown.length===1?' match':' matches'):people.length+(people.length===1?' friend':' friends')}</Text>
     {sections.map(sec=><View key={sec.letter} style={{gap:6}}>
      <Text style={{fontSize:13,fontWeight:'900',color:CT.muted,marginLeft:4}}>{sec.letter}</Text>
