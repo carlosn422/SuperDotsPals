@@ -24,6 +24,25 @@ export const VOICE_PALS:VoicePal[]=[
 export const voicePal=(id:VoicePalId)=>VOICE_PALS.find(p=>p.id===id)??VOICE_PALS[0];
 const PAL_KEY='moodpals.voicePal';
 const RING=require('./assets/voice/ring.m4a');
+// Free users hear a recorded sample call (played from the app, no Gemini) that ends with a diary entry.
+const SAMPLE_LINES:{who:'pal'|'you';text:string}[]=[
+ {who:'pal',text:"Hey! I'm so glad you called. How was your day?"},
+ {who:'you',text:"Honestly, kind of rough. My boss moved my deadline up, and I've been stressed all afternoon."},
+ {who:'pal',text:"Oof, that's a lot to carry. What part is weighing on you the most?"},
+ {who:'you',text:"I guess I'm worried I won't finish in time."},
+ {who:'pal',text:"That makes sense. Want me to add this to your diary, so you can look back on it later?"},
+ {who:'you',text:'Yes, please.'},
+ {who:'pal',text:"Done. And maybe take a short walk tonight. You've earned a little break."}
+];
+const SAMPLE_DIARY="My boss moved my deadline up and I was stressed all afternoon. I'm worried I won't finish in time.";
+const SAMPLE_CALLS:Record<VoicePalId,{clip:number;times:number[]}>={
+ maya:{clip:require('./assets/voice/samples/maya.m4a'),times:[0.0,3.83,9.96,14.96,17.97,22.72,25.01]},
+ lily:{clip:require('./assets/voice/samples/lily.m4a'),times:[0.0,4.15,10.6,15.43,18.3,23.21,25.28]},
+ grace:{clip:require('./assets/voice/samples/grace.m4a'),times:[0.0,3.52,10.53,15.56,18.5,23.4,25.23]},
+ leo:{clip:require('./assets/voice/samples/leo.m4a'),times:[0.0,3.48,10.1,14.51,18.06,22.27,24.58]},
+ sam:{clip:require('./assets/voice/samples/sam.m4a'),times:[0.0,3.38,10.0,14.49,17.71,22.08,24.29]},
+ max:{clip:require('./assets/voice/samples/max.m4a'),times:[0.0,3.67,10.24,15.05,17.83,22.69,25.27]}
+};
 
 // Messages carry ~100 KB of base64 audio several times a second, so decode in bulk instead of
 // growing a string one character at a time.
@@ -98,7 +117,9 @@ function toBase64(f:Float32Array){
 let teardown:Promise<void>=Promise.resolve();
 
 export default function VoiceFriend({visible,onClose,companion='calm',topic}:{visible:boolean;onClose:()=>void;companion?:string;topic?:string}){
- const {showPaywall,minutePrices,buyMinutes}=usePlus();
+ const {showPaywall,minutePrices,buyMinutes,isPlus,plusKnown}=usePlus();
+ const sample=plusKnown&&!isPlus;
+ const [sampleDone,setSampleDone]=useState(false),[speaker,setSpeaker]=useState(''),[palName,setPalName]=useState('');
  const [limit,setLimit]=useState<{cap:number;resetsAt?:string}|null>(null),[attempt,setAttempt]=useState(0),[pack,setPack]=useState<MinutePackId>('minutes_30'),[buying,setBuying]=useState(false);
  const reduce=useReduceMotion();
  const [phase,setPhase]=useState<Phase>('connecting'),[caption,setCaption]=useState(''),[muted,setMuted]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState<Saved|null>(null);
@@ -120,7 +141,22 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
   // Leaving the app hangs up, so Gemini never keeps running in the background.
   const appSub=AppState.addEventListener('change',st=>{if(st==='background'&&alive)onClose()});
   const add=(d:any[]|undefined,into:'in'|'out')=>{for(const x of d||[]){const n=Number(x?.tokenCount)||0;if(x?.modality==='AUDIO')use[into==='in'?'inAudio':'outAudio']+=n;else use[into==='in'?'inText':'outText']+=n}};
-  setPhase('connecting');setCaption('');setError('');setSaved(null);setMuted(false);setLimit(null);
+  setPhase('connecting');setCaption('');setError('');setSaved(null);setMuted(false);setLimit(null);setSampleDone(false);setSpeaker('');
+  if(sample){
+   let stop=()=>{},tick:any=null;
+   (async()=>{
+    const pal=voicePal(await loadVoicePal()),call=SAMPLE_CALLS[pal.id];
+    if(!alive)return;setPalName(pal.name);
+    stop=await playClip(RING,async()=>{
+     if(!alive)return;
+     const start=Date.now();
+     tick=setInterval(()=>{const t=(Date.now()-start)/1000;let i=0;while(i+1<call.times.length&&call.times[i+1]<=t)i++;const l=SAMPLE_LINES[i];setSpeaker(l.who==='pal'?pal.name:'You');setCaption(l.text);setPhase(l.who==='pal'?'speaking':'listening')},150);
+     stop=await playClip(call.clip,()=>{clearInterval(tick);if(!alive)return;setSpeaker('');setCaption('');setSaved({id:'',summary:SAMPLE_DIARY});setSampleDone(true);setPhase('ended')});
+     if(!alive)stop();
+    });
+   })();
+   return()=>{alive=false;clearInterval(tick);stop();appSub.remove()};
+  }
   const fail=(m:string)=>{if(!alive)return;setError(m);setPhase('error')};
   (async()=>{
    try{
@@ -217,7 +253,7 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
    // the audio context after this point.
    const c=ctx;ctx=null;interruptRef.current=()=>{};
    teardown=micStopped.then(()=>c?.close()).catch(()=>{}).then(()=>AudioManager.setAudioSessionActivity(false)).then(()=>{},()=>{})};
- },[visible,attempt]);
+ },[visible,attempt,sample]);
 
  async function buy(){
   setBuying(true);
@@ -252,20 +288,31 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
    <TouchableOpacity accessibilityRole="button" onPress={onClose}><Text style={st.later}>Maybe later</Text></TouchableOpacity>
    <Text style={[st.note,{marginTop:'auto'}]}>Extra minutes don't expire. They're used after your monthly Plus minutes.</Text>
   </View>:<View style={st.root}>
-   <Text style={st.status} accessibilityLiveRegion="polite">{status}</Text>
-   <TouchableOpacity activeOpacity={0.85} disabled={phase!=='speaking'} accessibilityRole="button" accessibilityLabel="Interrupt your pal" onPress={()=>interruptRef.current()} style={st.stage}>
+   {sample?<View style={st.sampleTag}><Ionicons name="play-circle" size={14} color="#8A63D2"/><Text style={st.sampleTagText}>Sample call</Text></View>:null}
+   <Text style={st.status} accessibilityLiveRegion="polite">{sample&&phase!=='connecting'?(sampleDone?'Sample ended':speaker+' is talking'):status}</Text>
+   <TouchableOpacity activeOpacity={0.85} disabled={sample||phase!=='speaking'} accessibilityRole="button" accessibilityLabel="Interrupt your pal" onPress={()=>interruptRef.current()} style={st.stage}>
     <Animated.View style={[st.ring,{transform:[{scale}]}]}/>
     <ConnectingWave active={phase==='connecting'||phase==='speaking'}/>
    </TouchableOpacity>
-   <Text style={[st.note,{opacity:phase==='speaking'?1:0}]}>Tap to jump in</Text>
-   {error?<Text style={st.error}>{error}</Text>:<Text style={st.caption} numberOfLines={4}>{caption}</Text>}
+   <Text style={[st.note,{opacity:phase==='speaking'&&!sample?1:0}]}>Tap to jump in</Text>
+   {sampleDone?<View style={st.turn}>
+    <Text style={st.limitTitle} accessibilityRole="header">Now it's your turn</Text>
+    <Text style={st.limitBody}>{`Talk with ${palName||'your pal'} anytime about anything, and your diary writes itself. Part of MoodPals Plus.`}</Text>
+   </View>:error?<Text style={st.error}>{error}</Text>:<View style={{alignItems:'center'}}>{speaker?<Text style={st.speaker}>{speaker}</Text>:null}<Text style={st.caption} numberOfLines={4}>{caption}</Text></View>}
    {saved?<View style={st.saved} accessible accessibilityLabel={'Logged for today: '+saved.summary}>
     <Ionicons name="book" size={20} color="#8A63D2"/>
-    <View style={{flex:1}}><Text style={st.savedTitle}>Logged for today</Text><Text style={st.savedBody} numberOfLines={2}>{saved.summary}</Text></View>
-    <TouchableOpacity accessibilityRole="button" onPress={()=>void undo()} style={st.undo}><Text style={st.undoText}>Undo</Text></TouchableOpacity>
+    <View style={{flex:1}}><Text style={st.savedTitle}>{sample?'Sample diary entry':'Logged for today'}</Text><Text style={st.savedBody} numberOfLines={sample?3:2}>{saved.summary}</Text></View>
+    {sample?null:<TouchableOpacity accessibilityRole="button" onPress={()=>void undo()} style={st.undo}><Text style={st.undoText}>Undo</Text></TouchableOpacity>}
+   </View>:null}
+   {sampleDone?<View style={{alignSelf:'stretch',alignItems:'center',gap:6}}>
+    <TouchableOpacity accessibilityRole="button" onPress={()=>{onClose();showPaywall('reflections')}} style={st.buy}><Ionicons name="sparkles" size={20} color="#fff"/><Text style={st.buyText}>Get Plus</Text></TouchableOpacity>
+    <View style={{flexDirection:'row',gap:18}}>
+     <TouchableOpacity accessibilityRole="button" onPress={()=>setAttempt(a=>a+1)}><Text style={st.later}>Play again</Text></TouchableOpacity>
+     <TouchableOpacity accessibilityRole="button" onPress={onClose}><Text style={st.later}>Maybe later</Text></TouchableOpacity>
+    </View>
    </View>:null}
    <View style={st.controls}>
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel={muted?'Unmute':'Mute'} disabled={phase!=='listening'&&phase!=='speaking'} onPress={()=>setMuted(m=>!m)} style={[st.round,{backgroundColor:muted?APP_THEME.ink:'#fff'}]}>
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel={muted?'Unmute':'Mute'} disabled={sample||(phase!=='listening'&&phase!=='speaking')} onPress={()=>setMuted(m=>!m)} style={[st.round,{backgroundColor:muted?APP_THEME.ink:'#fff'}]}>
      <Ionicons name={muted?'mic-off':'mic'} size={28} color={muted?'#fff':APP_THEME.ink}/>
     </TouchableOpacity>
     <TouchableOpacity accessibilityRole="button" accessibilityLabel="End call" onPress={onClose} style={[st.round,st.end]}>
@@ -394,6 +441,8 @@ const st=StyleSheet.create({
  ring:{position:'absolute',width:230,height:230,borderRadius:115,backgroundColor:'#fff',opacity:0.7},
  caption:{fontSize:18,lineHeight:25,fontWeight:'700',color:APP_THEME.ink,textAlign:'center',minHeight:100},
  error:{fontSize:15,color:'#C2546B',textAlign:'center',minHeight:100},
+ sampleTag:{flexDirection:'row',alignItems:'center',gap:5,backgroundColor:'#F4EBFF',borderRadius:12,paddingHorizontal:10,paddingVertical:4,marginBottom:-8},sampleTagText:{fontSize:12,fontWeight:'900',color:'#8A63D2'},
+ speaker:{fontSize:13,fontWeight:'900',color:APP_THEME.primary,marginBottom:4},turn:{alignItems:'center',gap:8},
  saved:{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:'#F4EBFF',borderRadius:18,padding:12,alignSelf:'stretch'},
  savedTitle:{fontSize:14,fontWeight:'900',color:'#8A63D2'},savedBody:{fontSize:12,color:APP_THEME.muted,marginTop:2},
  undo:{backgroundColor:'#fff',borderRadius:14,paddingHorizontal:12,paddingVertical:7},undoText:{fontSize:13,fontWeight:'800',color:'#8A63D2'},
