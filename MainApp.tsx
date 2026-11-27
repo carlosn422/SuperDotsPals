@@ -83,7 +83,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
  const [actionVersion,setActionVersion]=useState(0);
  const {isPlus,showPaywall}=usePlus();
  const [spiritualCheckin,setSpiritualCheckin]=useState<{mood:string;answers:Record<string,string>}|undefined>(undefined);
- const openAction=(view:'checkin'|'chat'|'history'|'spiritual'|'breathing'|'social')=>{setBuddyTyping(false);if(view==='chat'&&!isPlus){showPaywall('reflections');return;}if(view==='spiritual')setSpiritualCheckin(undefined);setActionDetail(null);setActionView(view);setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});};
+ const openAction=(view:'checkin'|'chat'|'history'|'spiritual'|'breathing'|'social')=>{setBuddyTyping(false);if(view==='spiritual')setSpiritualCheckin(undefined);setActionDetail(null);setActionView(view);setActionVersion(v=>v+1);actionScroll.current?.scrollTo({y:0,animated:false});};
  const [watchesPage,setWatchesPage]=useState<'main'|'themes'>('main');
  const [settingsPage,setSettingsPage]=useState<'main'|'watch'|'devices'|'health'|'notifications'|'privacy'|'help'|'circle'|'watchThemes'|'plus'|'account'|'delete'|'family'>('main');
  const [familyTarget,setFamilyTarget]=useState<{childId?:string;profileId?:string;add?:boolean;at:number}|null>(null);
@@ -309,7 +309,7 @@ function AppContent({selectedTheme,selectedCompanion,onEditProfile,onThemeChange
     </TouchableOpacity>
    })}</View>
   </View>
-  <MoreSheet visible={moreOpen} items={MORE_ITEMS} onClose={()=>setMoreOpen(false)} onSelect={pickMore} buddy={{companion:shownMood,onChat:()=>{go('Actions');openAction('chat');if(isPlus)setBuddyTyping(true)},onCall:()=>isPlus?setMoreCall(true):showPaywall('reflections')}}/>
+  <MoreSheet visible={moreOpen} items={MORE_ITEMS} onClose={()=>setMoreOpen(false)} onSelect={pickMore} buddy={{companion:shownMood,onChat:()=>{if(!isPlus){showPaywall('reflections');return}go('Actions');openAction('chat');setBuddyTyping(true)},onCall:()=>setMoreCall(true)}}/>
   <VoiceFriend visible={moreCall} onClose={()=>setMoreCall(false)} companion={shownMood}/>
   <Modal visible={!!circleSheet} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setCircleSheet(null)}>
    <View style={{flex:1,backgroundColor:C.bg,paddingTop:circleSheet&&!isGuest?8:0}}>{circleSheet&&!isGuest?<CircleNavigator initial={circleSheet} exitLabel="Close" onExit={()=>setCircleSheet(null)} mood={mood} contentStyle={[s.scroll,{paddingTop:18,paddingBottom:48}]}/>:<ScrollView contentContainerStyle={[s.scroll,{paddingTop:18,paddingBottom:48}]} keyboardShouldPersistTaps="handled">

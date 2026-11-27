@@ -24,7 +24,8 @@ export default function WellnessCompanion({companion,color,initialView='checkin'
  const ctx=useStressContext();
  const [talking,setTalking]=useState(false),[topic,setTopic]=useState<string|undefined>(),[typing,setTyping]=useState(initialTyping),[firstName,setFirstName]=useState('');
  useEffect(()=>{void (async()=>{const {data:{user}}=await supabase.auth.getUser();if(!user)return;const {data}=await supabase.from('profiles').select('display_name').eq('id',user.id).maybeSingle();setFirstName(String(data?.display_name||'').trim().split(/\s+/)[0]||'')})()},[]);
- const call=(t?:string)=>{if(!isPlus){showPaywall('reflections');return}setTopic(t);setTalking(true)};
+ // Free users still open the call screen: it plays a recorded sample call and offers Plus at the end.
+ const call=(t?:string)=>{setTopic(t);setTalking(true)};
  const scroller=React.useRef<ScrollView>(null);
  async function userId(){const {data:{user}}=await supabase.auth.getUser();if(!user)throw Error('Please sign in');return user.id}
  async function load(){
@@ -75,8 +76,8 @@ export default function WellnessCompanion({companion,color,initialView='checkin'
  }
  return <View style={s.container}>
  {view!=='checkin'?<><View style={s.header}><SuperdotMascot id={companion} color={color} size={66}/><View style={{flex:1}}><Text style={s.title}>{view==='chat'?'Your buddy':'Stress diary'}</Text><Text style={s.sub}>{view==='chat'?'Here whenever you want to talk.':'See what drives your stress over time.'}</Text></View>
- {view==='chat'?(typing?<RoundButton icon="call" label="Call" tint="#2E8F64" bg="#34B37E" a11y="Call your buddy" onPress={()=>{setTyping(false);call()}}/>:<RoundButton icon="chatbubble-ellipses" label="Chat" tint="#8A63D2" bg="#F4EBFF" a11y="Type a message instead" onPress={()=>setTyping(true)}/>):null}</View>
- <View style={s.tabs}>{(['chat','history'] as const).map(t=><TouchableOpacity key={t} onPress={()=>t==='chat'&&!isPlus?showPaywall('reflections'):setView(t)} style={[s.tab,view===t&&{backgroundColor:color}]}><Text style={[s.tabText,view===t&&{color:'#fff'}]}>{t==='chat'?'Buddy':'Stress diary'}</Text></TouchableOpacity>)}</View></>:null}
+ {view==='chat'?(typing?<RoundButton icon="call" label="Call" tint="#2E8F64" bg="#34B37E" a11y="Call your buddy" onPress={()=>{setTyping(false);call()}}/>:<RoundButton icon="chatbubble-ellipses" label="Chat" tint="#8A63D2" bg="#F4EBFF" a11y="Type a message instead" onPress={()=>isPlus?setTyping(true):showPaywall('reflections')}/>):null}</View>
+ <View style={s.tabs}>{(['chat','history'] as const).map(t=><TouchableOpacity key={t} onPress={()=>setView(t)} style={[s.tab,view===t&&{backgroundColor:color}]}><Text style={[s.tabText,view===t&&{color:'#fff'}]}>{t==='chat'?'Buddy':'Stress diary'}</Text></TouchableOpacity>)}</View></>:null}
  {view==='checkin'?<MoodCheckinWizard color={color} onShareWithCircle={onShareWithCircle} onSaved={nextMood=>onMoodSaved?.(nextMood)} onDone={()=>onCheckinDone?.()} onJournal={()=>setView('history')} onInsights={()=>onOpenInsights?.()} onFindVerse={(selectedMood,answers)=>onFindVerse?.(selectedMood,answers)} onNavigate={onWizardNavigate} onExploreAI={selectedMood=>{setChatText("I'd like to explore feeling "+selectedMood+". Please ask me one supportive, open-ended question.");setTyping(true);setView('chat');}}/>:null}
  <VoiceFriend visible={talking} onClose={()=>setTalking(false)} companion={companion} topic={topic}/>
  {view==='chat'&&!typing?<BuddyCall companion={companion} name={firstName} onCall={call}/>:null}
