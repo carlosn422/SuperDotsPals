@@ -74,11 +74,13 @@ Deno.serve(async req=>{
   const result=await ai.json();
   const candidate=result.candidates?.[0];
   // Thinking models spend part of maxOutputTokens before answering; if a reply still runs out, end it at its last full sentence.
-  let answer=(candidate?.content?.parts||[]).filter((p:{thought?:boolean})=>!p.thought).map((p:{text?:string})=>p.text||"").join("").trim().slice(0,4000);
-  if(candidate?.finishReason==="MAX_TOKENS"){
-   console.warn("Gemini reply hit maxOutputTokens",JSON.stringify(result.usageMetadata||{}));
-   const end=Math.max(answer.lastIndexOf(". "),answer.lastIndexOf("! "),answer.lastIndexOf("? "),/[.!?]$/.test(answer)?answer.length-1:-1);
-   answer=end>0?answer.slice(0,end+1):"";
+  const full=(candidate?.content?.parts||[]).filter((p:{thought?:boolean})=>!p.thought).map((p:{text?:string})=>p.text||"").join("").trim();
+  let answer=full.slice(0,4000);
+  if(candidate?.finishReason==="MAX_TOKENS")console.warn("Gemini reply hit maxOutputTokens",JSON.stringify(result.usageMetadata||{}));
+  if(candidate?.finishReason==="MAX_TOKENS"||full.length>4000){
+   // Last ., ! or ? followed by whitespace/end, skipping numbered-list markers like "2."
+   let end=-1;for(const m of answer.matchAll(/[.!?]["”’)]*(?=\s|$)/g)){if(!/(^|\s)\d+\.$/.test(answer.slice(Math.max(0,m.index!-4),m.index!+1)))end=m.index!+m[0].length}
+   answer=end>0?answer.slice(0,end).trim():"";
   }
   if(!answer)return new Response(JSON.stringify({error:"No reply was generated. Please try again."}),{status:502,headers});
   if(!conversationId){const created=await db.from("wellness_conversations").insert({user_id:user.id,title:"Superdot conversation"}).select("id").single();if(created.error){console.error("Failed to create conversation",JSON.stringify({code:created.error.code,message:created.error.message,details:created.error.details}));return new Response(JSON.stringify({error:"Could not start a conversation. Please try again.",code:"conversation_create_failed"}),{status:500,headers});}conversationId=created.data.id;}
