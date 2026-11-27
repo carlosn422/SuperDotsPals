@@ -26,4 +26,4 @@ export const socialMarks=(sinceMs:number):SocialMark[]=>native?native.marks(sinc
 export const socialDaily=():DailyUse[]=>native?.daily?.()??[];
 
 /** Apple's own name and icon for a tracked app (index from the marks); -1 is "Other apps & sites". */
-export const SocialAppLabel:ComponentType<ViewProps&{app:number}>|null=native?requireNativeView('SocialTrack'):null;
+export const SocialAppLabel:ComponentType<ViewProps&{app:number;iconOnly?:boolean}>|null=native?requireNativeView('SocialTrack'):null;

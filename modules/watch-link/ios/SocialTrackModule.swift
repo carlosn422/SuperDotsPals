@@ -69,7 +69,12 @@ public class SocialTrackModule: Module {
 
     View(SocialAppLabelView.self) {
       Prop("app") { (view: SocialAppLabelView, app: Int) in
-        view.update(app)
+        view.app = app
+        view.update()
+      }
+      Prop("iconOnly") { (view: SocialAppLabelView, iconOnly: Bool) in
+        view.iconOnly = iconOnly
+        view.update()
       }
     }
   }
@@ -78,12 +83,18 @@ public class SocialTrackModule: Module {
 /// Apple only lets the app show a chosen app's name and icon through its own Label view.
 class SocialAppLabelView: ExpoView {
   private var host: UIHostingController<AnyView>?
+  var app = -1
+  var iconOnly = false
 
-  func update(_ app: Int) {
+  func update() {
     let order = SocialTrackShared.orderedApps()
     let view: AnyView = app >= 0 && app < order.count
-      ? AnyView(Label(order[app]).labelStyle(.titleAndIcon).font(.system(size: 15, weight: .bold)).lineLimit(1))
-      : AnyView(Label("Other apps & sites", systemImage: "square.grid.2x2").font(.system(size: 15, weight: .bold)))
+      ? (iconOnly
+        ? AnyView(Label(order[app]).labelStyle(.iconOnly).font(.system(size: 22)))
+        : AnyView(Label(order[app]).labelStyle(.titleAndIcon).font(.system(size: 15, weight: .bold)).lineLimit(1)))
+      : (iconOnly
+        ? AnyView(Image(systemName: "square.grid.2x2").font(.system(size: 20, weight: .bold)))
+        : AnyView(Label("Other apps & sites", systemImage: "square.grid.2x2").font(.system(size: 15, weight: .bold))))
     if let host {
       host.rootView = view
       return

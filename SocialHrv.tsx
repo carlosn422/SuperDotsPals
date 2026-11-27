@@ -41,8 +41,8 @@ function useMoods(){
  return moods;
 }
 
-function AppName({app}:{app:number}){
- return SocialAppLabel?<SocialAppLabel app={app} style={{height:24,flex:1}}/>:<Text style={st.rowTitle}>{app<0?'Other apps & sites':'App '+(app+1)}</Text>;
+function AppName({app,iconOnly}:{app:number;iconOnly?:boolean}){
+ return SocialAppLabel?<SocialAppLabel app={app} iconOnly={iconOnly} style={iconOnly?{height:30,width:30}:{height:24,flex:1}}/>:<Text style={st.rowTitle}>{app<0?'Other apps & sites':'App '+(app+1)}</Text>;
 }
 
 /** Actions › Mind & reflection › Screen Time. */
@@ -261,7 +261,7 @@ export function SocialHrvTodayCard({onOpen}:{onOpen:()=>void}){
   <View style={{flex:1,gap:4}}>
    <Text style={{fontSize:19,fontWeight:'800',color:T.ink}}>Screen Time <Text style={{color}}>{formatMins(used)}</Text></Text>
    <Text style={{fontSize:14,fontWeight:'800',color}}>{label}</Text>
-   {flagged?<View style={st.row}><Text style={st.sub}>Higher stress after:</Text><AppName app={flagged.app}/></View>:<Text style={{fontSize:11,lineHeight:16,color:T.muted}}>{note}</Text>}
+   {flagged?<View style={[st.row,{justifyContent:'flex-start',gap:8}]}><Text style={st.sub}>Higher stress after:</Text>{insights.filter(i=>!i.learning&&i.delta!==undefined&&i.delta>=8).slice(0,4).map(i=><AppName key={i.app} app={i.app} iconOnly/>)}</View>:<Text style={{fontSize:11,lineHeight:16,color:T.muted}}>{note}</Text>}
   </View>
   <Ionicons name="chevron-forward" size={18} color={T.muted}/>
  </TouchableOpacity>;

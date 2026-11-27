@@ -35,13 +35,13 @@ const SAMPLE_LINES:{who:'pal'|'you';text:string}[]=[
  {who:'pal',text:"Done. And maybe take a short walk tonight. You've earned a little break."}
 ];
 const SAMPLE_DIARY="My boss moved my deadline up and I was stressed all afternoon. I'm worried I won't finish in time.";
-const SAMPLE_CALLS:Record<VoicePalId,{clip:number;times:number[]}>={
- maya:{clip:require('./assets/voice/samples/maya.m4a'),times:[0.0,3.83,9.96,14.96,17.97,22.72,25.01]},
- lily:{clip:require('./assets/voice/samples/lily.m4a'),times:[0.0,4.15,10.6,15.43,18.3,23.21,25.28]},
- grace:{clip:require('./assets/voice/samples/grace.m4a'),times:[0.0,3.52,10.53,15.56,18.5,23.4,25.23]},
- leo:{clip:require('./assets/voice/samples/leo.m4a'),times:[0.0,3.48,10.1,14.51,18.06,22.27,24.58]},
- sam:{clip:require('./assets/voice/samples/sam.m4a'),times:[0.0,3.38,10.0,14.49,17.71,22.08,24.29]},
- max:{clip:require('./assets/voice/samples/max.m4a'),times:[0.0,3.67,10.24,15.05,17.83,22.69,25.27]}
+const SAMPLE_CALLS:Record<VoicePalId,{clip:number;times:number[];end:number}>={
+ maya:{clip:require('./assets/voice/samples/maya.m4a'),times:[0.0,3.83,9.96,14.96,17.97,22.72,25.01],end:29.82},
+ lily:{clip:require('./assets/voice/samples/lily.m4a'),times:[0.0,4.15,10.6,15.43,18.3,23.21,25.28],end:29.9},
+ grace:{clip:require('./assets/voice/samples/grace.m4a'),times:[0.0,3.52,10.53,15.56,18.5,23.4,25.23],end:30.02},
+ leo:{clip:require('./assets/voice/samples/leo.m4a'),times:[0.0,3.48,10.1,14.51,18.06,22.27,24.58],end:28.89},
+ sam:{clip:require('./assets/voice/samples/sam.m4a'),times:[0.0,3.38,10.0,14.49,17.71,22.08,24.29],end:28.49},
+ max:{clip:require('./assets/voice/samples/max.m4a'),times:[0.0,3.67,10.24,15.05,17.83,22.69,25.27],end:29.88}
 };
 
 // Messages carry ~100 KB of base64 audio several times a second, so decode in bulk instead of
@@ -85,19 +85,27 @@ export async function saveVoicePal(id:VoicePalId){
 const SPEAKER={ios:{category:'playAndRecord' as const,mode:'default' as const,options:['defaultToSpeaker','allowBluetoothHFP','allowBluetoothA2DP'] as ('defaultToSpeaker'|'allowBluetoothHFP'|'allowBluetoothA2DP')[]}};
 const VOICE_GAIN=1.25;
 
+// One shared context plays every clip, so switching buddies or starting a sample never races a closing context.
+let clipCtx:AudioContext|null=null,clipStop=()=>{},clipGen=0;
 export async function playClip(clip:number,onEnd:()=>void){
+ const gen=++clipGen;
+ clipStop();
  AudioManager.setSystemOptions(SPEAKER);
  await AudioManager.setAudioSessionActivity(true).catch(()=>{});
- const ctx=new AudioContext();
  try{
+  if(!clipCtx||clipCtx.state==='closed')clipCtx=new AudioContext();
+  const ctx=clipCtx;
+  if(ctx.state!=='running')await ctx.resume().catch(()=>{});
   const buf=await ctx.decodeAudioData(clip);
+  if(gen!==clipGen){onEnd();return ()=>{}}
   const src=ctx.createBufferSource();src.buffer=buf;src.connect(ctx.destination);
-  let closed=false;const close=()=>{if(closed)return;closed=true;void ctx.close().catch(()=>{})};
-  src.onended=()=>{onEnd();close()};src.start();
-  return ()=>{try{src.stop()}catch{}close()};
- }catch{onEnd();void ctx.close();return ()=>{}}
+  let done=false;
+  const end=()=>{if(done)return;done=true;if(clipStop===stop)clipStop=()=>{};onEnd();if(clipGen===gen)void ctx.suspend().catch(()=>{})};
+  const stop=()=>{if(done)return;try{src.stop()}catch{}end()};
+  src.onended=end;clipStop=stop;src.start();
+  return stop;
+ }catch{onEnd();return ()=>{}}
 }
-
 const B64=Uint8Array.from('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/',c=>c.charCodeAt(0));
 let pcm=new Uint8Array(0),b64=new Uint8Array(0);
 // Mic frames (10 a second) as base64 PCM16, reusing the same buffers for every frame.
@@ -143,19 +151,27 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
   const add=(d:any[]|undefined,into:'in'|'out')=>{for(const x of d||[]){const n=Number(x?.tokenCount)||0;if(x?.modality==='AUDIO')use[into==='in'?'inAudio':'outAudio']+=n;else use[into==='in'?'inText':'outText']+=n}};
   setPhase('connecting');setCaption('');setError('');setSaved(null);setMuted(false);setLimit(null);setSampleDone(false);setSpeaker('');
   if(sample){
-   let stop=()=>{},tick:any=null;
+   // Captions and the ending run on the clock, so the sample always finishes even if an audio event is missed.
+   let stop=()=>{},tick:any=null,ringT:any=null,endT:any=null;
+   const clear=()=>{clearInterval(tick);clearTimeout(ringT);clearTimeout(endT)};
    (async()=>{
     const pal=voicePal(await loadVoicePal()),call=SAMPLE_CALLS[pal.id];
     if(!alive)return;setPalName(pal.name);
-    stop=await playClip(RING,async()=>{
-     if(!alive)return;
+    let started=false,ended=false;
+    const finish=()=>{if(ended||!alive)return;ended=true;clear();setSpeaker('');setCaption('');setSaved({id:'',summary:SAMPLE_DIARY});setSampleDone(true);setPhase('ended')};
+    const begin=async()=>{
+     if(started||!alive)return;started=true;clearTimeout(ringT);
      const start=Date.now();
      tick=setInterval(()=>{const t=(Date.now()-start)/1000;let i=0;while(i+1<call.times.length&&call.times[i+1]<=t)i++;const l=SAMPLE_LINES[i];setSpeaker(l.who==='pal'?pal.name:'You');setCaption(l.text);setPhase(l.who==='pal'?'speaking':'listening')},150);
-     stop=await playClip(call.clip,()=>{clearInterval(tick);if(!alive)return;setSpeaker('');setCaption('');setSaved({id:'',summary:SAMPLE_DIARY});setSampleDone(true);setPhase('ended')});
+     endT=setTimeout(finish,(call.end+1.5)*1000);
+     stop=await playClip(call.clip,finish);
      if(!alive)stop();
-    });
+    };
+    ringT=setTimeout(()=>void begin(),3500);
+    stop=await playClip(RING,()=>void begin());
+    if(!alive)stop();
    })();
-   return()=>{alive=false;clearInterval(tick);stop();appSub.remove()};
+   return()=>{alive=false;clear();stop();appSub.remove()};
   }
   const fail=(m:string)=>{if(!alive)return;setError(m);setPhase('error')};
   (async()=>{
@@ -288,7 +304,7 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
    <TouchableOpacity accessibilityRole="button" onPress={onClose}><Text style={st.later}>Maybe later</Text></TouchableOpacity>
    <Text style={[st.note,{marginTop:'auto'}]}>Extra minutes don't expire. They're used after your monthly Plus minutes.</Text>
   </View>:<View style={st.root}>
-   {sample?<View style={st.sampleTag}><Ionicons name="play-circle" size={14} color="#8A63D2"/><Text style={st.sampleTagText}>Sample call</Text></View>:null}
+   {sample?<View style={st.sampleTag}><Ionicons name="play-circle" size={22} color="#8A63D2"/><Text style={st.sampleTagText}>Sample call</Text></View>:null}
    <Text style={st.status} accessibilityLiveRegion="polite">{sample&&phase!=='connecting'?(sampleDone?'Sample ended':speaker+' is talking'):status}</Text>
    <TouchableOpacity activeOpacity={0.85} disabled={sample||phase!=='speaking'} accessibilityRole="button" accessibilityLabel="Interrupt your pal" onPress={()=>interruptRef.current()} style={st.stage}>
     <Animated.View style={[st.ring,{transform:[{scale}]}]}/>
@@ -441,7 +457,7 @@ const st=StyleSheet.create({
  ring:{position:'absolute',width:230,height:230,borderRadius:115,backgroundColor:'#fff',opacity:0.7},
  caption:{fontSize:18,lineHeight:25,fontWeight:'700',color:APP_THEME.ink,textAlign:'center',minHeight:100},
  error:{fontSize:15,color:'#C2546B',textAlign:'center',minHeight:100},
- sampleTag:{flexDirection:'row',alignItems:'center',gap:5,backgroundColor:'#F4EBFF',borderRadius:12,paddingHorizontal:10,paddingVertical:4,marginBottom:-8},sampleTagText:{fontSize:12,fontWeight:'900',color:'#8A63D2'},
+ sampleTag:{flexDirection:'row',alignItems:'center',gap:7,backgroundColor:'#F4EBFF',borderRadius:18,paddingHorizontal:16,paddingVertical:8,marginBottom:-8},sampleTagText:{fontSize:16,fontWeight:'900',color:'#8A63D2'},
  speaker:{fontSize:13,fontWeight:'900',color:APP_THEME.primary,marginBottom:4},turn:{alignItems:'center',gap:8},
  saved:{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:'#F4EBFF',borderRadius:18,padding:12,alignSelf:'stretch'},
  savedTitle:{fontSize:14,fontWeight:'900',color:'#8A63D2'},savedBody:{fontSize:12,color:APP_THEME.muted,marginTop:2},
