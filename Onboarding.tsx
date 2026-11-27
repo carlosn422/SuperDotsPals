@@ -171,7 +171,8 @@ export default function Onboarding({done,editing=false,onCancel}:{done:()=>void;
 
  async function connectHealth(){
   setHealth('busy');
-  try{await syncNativeHealth();setHealth('done')}catch(e:any){setHealth('idle');Alert.alert('Apple Health',e?.message||'You can connect later from the Health tab.')}
+  // Errors stay quiet here; the Health tab can connect or sync later.
+  try{await syncNativeHealth();setHealth('done')}catch{setHealth('idle')}
  }
  // Apple requires the explainer to always lead to the system permission prompt, so this step has no Skip.
  const asksHealth=step==='health'&&healthKitAvailable()&&health==='idle';
