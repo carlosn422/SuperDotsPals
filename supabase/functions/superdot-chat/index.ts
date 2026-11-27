@@ -80,7 +80,7 @@ Deno.serve(async req=>{
   if(candidate?.finishReason==="MAX_TOKENS"||full.length>4000){
    // Last ., ! or ? followed by whitespace/end, skipping numbered-list markers like "2."
    let end=-1;for(const m of answer.matchAll(/[.!?]["”’)]*(?=\s|$)/g)){if(!/(^|\s)\d+\.$/.test(answer.slice(Math.max(0,m.index!-4),m.index!+1)))end=m.index!+m[0].length}
-   if(end<=0)end=answer.lastIndexOf("\n");
+   if(end<=0&&candidate?.finishReason!=="MAX_TOKENS")end=answer.lastIndexOf("\n");
    answer=end>0?answer.slice(0,end).trim():"";
   }
   if(!answer)return new Response(JSON.stringify({error:"No reply was generated. Please try again."}),{status:502,headers});
