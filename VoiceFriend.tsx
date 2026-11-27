@@ -258,7 +258,7 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
     <SuperdotMascot id={companion} size={170}/>
    </TouchableOpacity>
    <Text style={[st.note,{opacity:phase==='speaking'?1:0}]}>Tap your pal to jump in</Text>
-   {phase==='connecting'?<ActivityIndicator color={APP_THEME.primary}/>:null}
+   {phase==='connecting'?<ConnectingWave/>:null}
    {error?<Text style={st.error}>{error}</Text>:<Text style={st.caption} numberOfLines={4}>{caption}</Text>}
    {saved?<View style={st.saved} accessible accessibilityLabel={'Logged for today: '+saved.summary}>
     <Ionicons name="book" size={20} color="#8A63D2"/>
@@ -279,6 +279,20 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
 }
 const TOPICS=[{e:'😮‍💨',l:'Rough day'},{e:'😊',l:'Good news'},{e:'😴',l:"Can't sleep"}];
 // The pal is the call button: tap it, or a quick start, to call.
+// Sound bars that rise and fall like a voice while the call connects.
+const WAVE=[0.45,0.7,1,0.8,0.55,0.9,0.6];
+function ConnectingWave(){
+ const reduce=useReduceMotion();
+ const bars=useRef(WAVE.map(()=>new Animated.Value(0))).current;
+ useEffect(()=>{if(reduce)return;
+  const loops=bars.map((v,i)=>Animated.loop(Animated.sequence([Animated.delay(i*110),Animated.timing(v,{toValue:1,duration:420,easing:Easing.inOut(Easing.sin),useNativeDriver:true}),Animated.timing(v,{toValue:0,duration:420,easing:Easing.inOut(Easing.sin),useNativeDriver:true}),Animated.delay((WAVE.length-1-i)*110)])));
+  loops.forEach(l=>l.start());return()=>loops.forEach(l=>l.stop())},[reduce]);
+ return <View accessible accessibilityRole="progressbar" accessibilityLabel="Connecting" style={wv.row}>
+  {WAVE.map((h,i)=><Animated.View key={i} style={[wv.bar,{height:44*h,opacity:0.55+0.45*h},reduce?null:{transform:[{scaleY:bars[i].interpolate({inputRange:[0,1],outputRange:[0.3,1]})}]}]}/>)}
+ </View>;
+}
+const wv=StyleSheet.create({row:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6,height:48},bar:{width:7,borderRadius:4,backgroundColor:APP_THEME.primary}});
+
 export function BuddyCall({companion,name,onCall}:{companion:string;name?:string;onCall:(topic?:string)=>void}){
  const reduce=useReduceMotion();
  const p=useRef(new Animated.Value(0)).current;
