@@ -62,8 +62,12 @@ export async function saveVoicePal(id:VoicePalId){
 }
 
 // Plays a bundled clip on the speaker at media volume, like a call; returns a stop function.
+// Previews, the ring and calls share one speaker setup so the volume buttons control them all the same way.
+const SPEAKER={ios:{category:'playAndRecord' as const,mode:'default' as const,options:['defaultToSpeaker','allowBluetoothHFP','allowBluetoothA2DP'] as ('defaultToSpeaker'|'allowBluetoothHFP'|'allowBluetoothA2DP')[]}};
+const VOICE_GAIN=1.25;
+
 export async function playClip(clip:number,onEnd:()=>void){
- AudioManager.setSystemOptions({ios:{category:'playback',mode:'spokenAudio'}});
+ AudioManager.setSystemOptions(SPEAKER);
  await AudioManager.setAudioSessionActivity(true).catch(()=>{});
  const ctx=new AudioContext();
  try{
@@ -127,7 +131,7 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
     if(!alive||!data?.token)return;
     callId=data.callId||null;callStart=Date.now();
     await teardown;if(!alive)return;
-    AudioManager.setSystemOptions({ios:{category:'playAndRecord',mode:'voiceChat',options:['defaultToSpeaker','allowBluetoothHFP']}});
+    AudioManager.setSystemOptions(SPEAKER);
     await AudioManager.setAudioSessionActivity(true);
     if(!alive){void AudioManager.setAudioSessionActivity(false).catch(()=>{});return}
     ctx=new AudioContext({sampleRate:24000});
@@ -135,7 +139,7 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
     const ringCtx=ctx;let ringEnd=Date.now()+1900;
     playEnd=ctx.currentTime+1.9;
     void ringCtx.decodeAudioData(RING).then(buf=>{if(!alive)return;const src=ringCtx.createBufferSource();src.buffer=buf;src.connect(ringCtx.destination);src.start();ringEnd=Date.now()+buf.duration*1000;playEnd=Math.max(playEnd,ringCtx.currentTime+buf.duration)}).catch(()=>{});
-    const queue=ctx.createBufferQueueSource();queue.connect(ctx.destination);queue.start();
+    const queue=ctx.createBufferQueueSource(),voice=ctx.createGain();voice.gain.value=VOICE_GAIN;queue.connect(voice);voice.connect(ctx.destination);queue.start();
     interruptRef.current=()=>{turn++;queue.clearBuffers();playEnd=0;setPhase('listening')};
     ws=new WebSocket(WS+encodeURIComponent(data.token));
     ws.binaryType='arraybuffer';
@@ -148,9 +152,10 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
      if(m.setupComplete){
       clearTimeout(timer);
       if(!alive)return;
-      const mic=new AudioRecorder({iosVoiceProcessing:true});recorder=mic;
+      const mic=new AudioRecorder({iosVoiceProcessing:false});recorder=mic;
       mic.onAudioReady({sampleRate:16000,bufferLength:1600,channelCount:1},({buffer,numFrames})=>{
-       // The mic stays closed while the pal talks (plus a short tail) so it never hears itself.
+       // The mic stays closed while the pal talks (plus a short tail) so it never hears itself; that is why
+       // voice processing is off: it moves the call to iOS call volume, out of step with previews and the ring.
        if(mutedRef.current||ws?.readyState!==1||!ctx||ctx.currentTime<playEnd+0.35)return;
        ws.send(JSON.stringify({realtimeInput:{audio:{data:toBase64(buffer.getChannelData(0).subarray(0,numFrames)),mimeType:'audio/pcm;rate=16000'}}}));
       });
