@@ -3,6 +3,7 @@ import {Alert,AppState,Modal,View,Text,TouchableOpacity,StyleSheet,Animated,Easi
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
+import {activateKeepAwakeAsync,deactivateKeepAwake} from 'expo-keep-awake';
 import {AudioContext,AudioRecorder,AudioManager} from 'react-native-audio-api';
 import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
@@ -130,6 +131,7 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
  const [sampleDone,setSampleDone]=useState(false),[speaker,setSpeaker]=useState(''),[palName,setPalName]=useState('');
  const [limit,setLimit]=useState<{cap:number;resetsAt?:string}|null>(null),[attempt,setAttempt]=useState(0),[pack,setPack]=useState<MinutePackId>('minutes_30'),[buying,setBuying]=useState(false);
  const reduce=useReduceMotion();
+ useEffect(()=>{if(!visible)return;void activateKeepAwakeAsync('voice-call').catch(()=>{});return()=>{void deactivateKeepAwake('voice-call').catch(()=>{})}},[visible]);
  const [phase,setPhase]=useState<Phase>('connecting'),[caption,setCaption]=useState(''),[muted,setMuted]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState<Saved|null>(null);
  const mutedRef=useRef(false);mutedRef.current=muted;
  const interruptRef=useRef<()=>void>(()=>{});
