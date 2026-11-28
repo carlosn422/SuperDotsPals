@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import {activateKeepAwakeAsync,deactivateKeepAwake} from 'expo-keep-awake';
+import Svg,{Circle} from 'react-native-svg';
 import {AudioContext,AudioRecorder,AudioManager} from 'react-native-audio-api';
 import {supabase} from './supabase';
 import SuperdotMascot from './SuperdotMascot';
@@ -129,9 +130,11 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
  const {showPaywall,minutePrices,buyMinutes,isPlus,plusKnown}=usePlus();
  const sample=plusKnown&&!isPlus;
  const [sampleDone,setSampleDone]=useState(false),[speaker,setSpeaker]=useState(''),[palName,setPalName]=useState('');
- const [limit,setLimit]=useState<{cap:number;resetsAt?:string;left?:number}|null>(null),[low,setLow]=useState<{cap:number;left:number}|null>(null),[lowOk,setLowOk]=useState(false),[attempt,setAttempt]=useState(0),[pack,setPack]=useState<MinutePackId>('minutes_30'),[buying,setBuying]=useState(false);
+ const [limit,setLimit]=useState<{cap:number;resetsAt?:string}|null>(null),[paused,setPaused]=useState(false),[left,setLeft]=useState<number|null>(null),[pending,setPending]=useState<number|null>(null),[attempt,setAttempt]=useState(0),[pack,setPack]=useState<MinutePackId>('minutes_30'),[buying,setBuying]=useState(false);
  const reduce=useReduceMotion();
- useEffect(()=>{if(!visible)setLowOk(false)},[visible]);
+ // A paused call has hung up the AI; resumeRef carries the conversation into the next call.
+ const pauseRef=useRef<()=>void>(()=>{}),resumeRef=useRef('');
+ useEffect(()=>{if(!visible){setPaused(false);setPending(null);resumeRef.current=''}},[visible]);
  useEffect(()=>{if(!visible)return;void activateKeepAwakeAsync('voice-call').catch(()=>{});return()=>{void deactivateKeepAwake('voice-call').catch(()=>{})}},[visible]);
  const [phase,setPhase]=useState<Phase>('connecting'),[caption,setCaption]=useState(''),[muted,setMuted]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState<Saved|null>(null);
  const mutedRef=useRef(false);mutedRef.current=muted;
@@ -142,17 +145,23 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
   a.start();return()=>a.stop()},[phase,reduce]);
 
  useEffect(()=>{if(!visible)return;
-  let alive=true,ws:WebSocket|null=null,ctx:AudioContext|null=null,recorder:AudioRecorder|null=null,timer:any=null,wrapT:any=null,byeT:any=null,silT:any=null,lastHeard=0,nudged=0,decoding=Promise.resolve(),turn=0,playEnd=0,lastChunk=0,hangup:any=null,callId:string|null=null,callStart=0;
+  let alive=true,ws:WebSocket|null=null,ctx:AudioContext|null=null,recorder:AudioRecorder|null=null,timer:any=null,wrapT:any=null,byeT:any=null,silT:any=null,lastHeard=0,nudged=0,decoding=Promise.resolve(),turn=0,playEnd=0,lastChunk=0,hangup:any=null,callId:string|null=null,callStart=0,countT:any=null,cdT:any=null,lowCall=false,timeUp=false,said='',lastWho='';
   const use={inText:0,inAudio:0,outText:0,outAudio:0};
+  const note=(w:string,t:string)=>{if(w!==lastWho){said+=w==='u'?'\nThem: ':'\nYou: ';lastWho=w}said=(said+t).slice(-1500)};
   // Reports the call's real length and tokens once, when the socket closes or the screen goes away.
   let finished=false;
   const finish=()=>{if(finished||!callId)return;finished=true;supabase.rpc('finish_voice_call',{p_call_id:callId,p_seconds:Math.round((Date.now()-callStart)/1000),p_input_text:use.inText,p_input_audio:use.inAudio,p_output_text:use.outText,p_output_audio:use.outAudio}).then(()=>{},()=>{})};
   let micStopped:Promise<unknown>=Promise.resolve();
   const stopMic=()=>{const r=recorder;recorder=null;if(!r)return;try{r.clearOnAudioReady()}catch{}micStopped=r.stop().catch(()=>{})};
+  // Pausing hangs up the AI and records the time used, so nothing is used or billed while paused.
+  pauseRef.current=()=>{if(!alive)return;clearTimeout(timer);clearTimeout(wrapT);clearInterval(byeT);clearInterval(silT);clearInterval(hangup);clearTimeout(countT);clearInterval(cdT);
+   stopMic();interruptRef.current();finish();try{ws?.close()}catch{}
+   resumeRef.current=said.trim()||'(nothing yet)';setLeft(null);setPaused(true)};
   // Leaving the app hangs up, so Gemini never keeps running in the background.
   const appSub=AppState.addEventListener('change',st=>{if(st==='background'&&alive)onClose()});
   const add=(d:any[]|undefined,into:'in'|'out')=>{for(const x of d||[]){const n=Number(x?.tokenCount)||0;if(x?.modality==='AUDIO')use[into==='in'?'inAudio':'outAudio']+=n;else use[into==='in'?'inText':'outText']+=n}};
-  setPhase('connecting');setCaption('');setError('');setSaved(null);setMuted(false);setLimit(null);setLow(null);setSampleDone(false);setSpeaker('');
+  const resuming=!!resumeRef.current;
+  setPhase('connecting');setCaption('');setError('');if(!resuming)setSaved(null);setMuted(false);setLimit(null);setLeft(null);setSampleDone(false);setSpeaker('');
   if(sample){
    // Captions and the ending run on the clock, so the sample always finishes even if an audio event is missed.
    let stop=()=>{},tick:any=null,ringT:any=null,endT:any=null;
@@ -181,14 +190,13 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
    try{
     if(await AudioManager.requestRecordingPermissions()!=='Granted')return fail('Allow the microphone for MoodPals in iPhone Settings to talk with your pal.');
     const pal=voicePal(await loadVoicePal());
-    // About a minute or less to talk: let them choose before the call starts.
-    if(!lowOk){const {data:mv}=await supabase.rpc('my_voice_minutes').single();const left=Number((mv as any)?.minutes_left);
-     if(left>=1&&left<2){if(alive)setLow({cap:Number((mv as any)?.cap)||15,left});return}}
     if(!alive)return;
-    const {data,error:fnError}=await supabase.functions.invoke('voice-live-token',{body:{voice:pal.gender,pal:pal.id}});
+    const {data,error:fnError}=await supabase.functions.invoke('voice-live-token',{body:{voice:pal.gender,pal:pal.id,...(resuming?{resume:resumeRef.current}:{})}});
     if(fnError){let msg='Could not start the call. Please try again.';try{const d=await (fnError as any).context?.json?.();if(d?.code==='plus_required'){onClose();showPaywall('reflections');return}if(d?.code==='voice_limit'){if(alive){setLimit({cap:Number(d.cap)||15,resetsAt:d.resetsAt});setPhase('ended')}return}if(d?.error)msg=d.error}catch{}return fail(msg)}
     if(!alive||!data?.token)return;
-    callId=data.callId||null;callStart=Date.now();
+    callId=data.callId||null;callStart=Date.now();resumeRef.current='';
+    // The call is short because minutes are running low (not just the usual call length).
+    lowCall=Number(data.minutesLeft)<=Number(data.maxMinutes);
     await teardown;if(!alive)return;
     AudioManager.setSystemOptions(SPEAKER);
     await AudioManager.setAudioSessionActivity(true);
@@ -220,13 +228,15 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
       });
       await mic.start();
       if(recorder!==mic){try{mic.clearOnAudioReady()}catch{}void mic.stop().catch(()=>{})}
-      const hello=JSON.stringify({realtimeInput:{text:topic?`(The call just started. I tapped "${topic}". Greet me warmly in one short sentence and gently ask about it.)`:'(The call just started. Greet me warmly in one short sentence and ask how my day was.)'}});
+      const hello=JSON.stringify({realtimeInput:{text:resuming?'(The call is back on after a short pause. Welcome me back warmly in one short sentence and pick up where we left off.)':topic?`(The call just started. I tapped "${topic}". Greet me warmly in one short sentence and gently ask about it.)`:'(The call just started. Greet me warmly in one short sentence and ask how my day was.)'}});
       setTimeout(()=>{if(alive&&ws?.readyState===1)ws.send(hello)},Math.max(0,ringEnd-Date.now()-600));
       setPhase('listening');
       const total=(data.maxMinutes||5)*60000,quiet=()=>!!ctx&&Date.now()-lastChunk>900&&ctx.currentTime>playEnd+0.3;
       wrapT=setTimeout(()=>{if(ws?.readyState===1)ws.send(JSON.stringify({clientContent:{turns:[{role:'user',parts:[{text:'(Note: time is almost up.)'}]}],turnComplete:false}}))},Math.max(0,total-60000));
-      byeT=setTimeout(()=>{const at=Date.now();byeT=setInterval(()=>{if(!alive||ws?.readyState!==1||hangup){clearInterval(byeT);return}if(quiet()||Date.now()-at>8000){clearInterval(byeT);ws.send(JSON.stringify({realtimeInput:{text:'(Note: time is up.)'}}))}},400)},Math.max(0,total-20000));
+      byeT=setTimeout(()=>{const at=Date.now();byeT=setInterval(()=>{if(!alive||ws?.readyState!==1||hangup){clearInterval(byeT);return}if(quiet()||Date.now()-at>8000){clearInterval(byeT);timeUp=true;ws.send(JSON.stringify({realtimeInput:{text:'(Note: time is up.)'}}))}},400)},Math.max(0,total-20000));
       timer=setTimeout(()=>{ws?.close()},total+25000);
+      // Low on minutes: a 10-second countdown, then the call pauses so they can add minutes.
+      if(lowCall)countT=setTimeout(()=>{if(!alive)return;let n=10;setLeft(n);cdT=setInterval(()=>{n--;if(n<=0){clearInterval(cdT);pauseRef.current()}else setLeft(n)},1000)},Math.max(0,total-10000));
       // Long silence: check in once, then let them go kindly.
       lastHeard=Date.now();
       silT=setInterval(()=>{if(!alive||ws?.readyState!==1||hangup||mutedRef.current||!quiet()||nudged>=2)return;if(Date.now()-Math.max(lastHeard,lastChunk)<(nudged?15000:20000))return;nudged++;lastHeard=Date.now();ws.send(JSON.stringify({realtimeInput:{text:nudged===1?"(Note: they've been quiet.)":'(Note: still quiet.)'}}))},1000);
@@ -239,8 +249,8 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
        const chunk=p.inlineData.data;lastChunk=Date.now();setPhase('speaking');
        decoding=decoding.then(async()=>{if(id!==turn||!ctx)return;const b=await ctx.decodePCMInBase64(chunk,24000,1);if(id===turn&&ctx){queue.enqueueBuffer(b);playEnd=Math.max(playEnd,ctx.currentTime)+b.duration}}).catch(()=>{});
       }
-      if(sc.inputTranscription?.text){setCaption('');lastHeard=Date.now();nudged=0}
-      if(sc.outputTranscription?.text)setCaption(c=>(c+sc.outputTranscription.text).slice(-220));
+      if(sc.inputTranscription?.text){note('u',sc.inputTranscription.text);setCaption('');lastHeard=Date.now();nudged=0}
+      if(sc.outputTranscription?.text){note('p',sc.outputTranscription.text);setCaption(c=>(c+sc.outputTranscription.text).slice(-220))}
       if(sc.turnComplete)setTimeout(()=>{if(alive)setPhase(p=>p==='speaking'?'listening':p)},400);
      }
      if(m.toolCall){
@@ -250,7 +260,7 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
         // gets no tool response, so it has nothing to answer and can't say goodbye again.
         stopMic();
         const started=Date.now();
-        if(!hangup)hangup=setInterval(()=>{if(!alive||!ctx)return;const idle=Date.now()-lastChunk>900&&ctx.currentTime>playEnd+0.4;if(idle||Date.now()-started>10000){clearInterval(hangup);void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);onClose()}},250);
+        if(!hangup)hangup=setInterval(()=>{if(!alive||!ctx)return;const idle=Date.now()-lastChunk>900&&ctx.currentTime>playEnd+0.4;if(idle||Date.now()-started>10000){clearInterval(hangup);void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);if(lowCall&&timeUp)pauseRef.current();else onClose()}},250);
         return null;
        }
        if(f.name!=='save_journal_entry')return {id:f.id,name:f.name,response:{error:'unknown tool'}};
@@ -270,66 +280,74 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
     };
    }catch(e:any){fail(e?.message||'Could not start the call.')}
   })();
-  return()=>{alive=false;clearTimeout(timer);clearTimeout(wrapT);clearInterval(byeT);clearInterval(silT);clearInterval(hangup);
+  return()=>{alive=false;clearTimeout(timer);clearTimeout(wrapT);clearInterval(byeT);clearInterval(silT);clearInterval(hangup);clearTimeout(countT);clearInterval(cdT);pauseRef.current=()=>{};
    appSub.remove();finish();stopMic();try{ws?.close()}catch{}
    // Stop the mic, then the speaker, then release the audio session, in that order. Nothing touches
    // the audio context after this point.
    const c=ctx;ctx=null;interruptRef.current=()=>{};
    teardown=micStopped.then(()=>c?.close()).catch(()=>{}).then(()=>AudioManager.setAudioSessionActivity(false)).then(()=>{},()=>{})};
- },[visible,attempt,sample,lowOk]);
+ },[visible,attempt,sample]);
 
- async function buy(){
+ async function minutesLeft(){const {data}=await supabase.rpc('my_voice_minutes').single();return Number((data as any)?.minutes_left)||0}
+ // Start or resume the call only once the server shows the new minutes (the store webhook adds them a moment after purchase).
+ async function waitForMinutes(before:number){
   setBuying(true);
   try{
-   if(!await buyMinutes(pack))return;
-   // The store webhook credits the minutes a moment after the purchase.
-   for(let i=0;i<15;i++){
-    const {data}=await supabase.rpc('my_voice_minutes').single();
-    if(Number((data as any)?.minutes_left)>=(limit?.left??0)+1){setLimit(null);setLowOk(true);setAttempt(a=>a+1);return}
+   for(let i=0;i<20;i++){
+    if(await minutesLeft()>=before+1){setPending(null);setLimit(null);setPaused(false);setAttempt(a=>a+1);return}
     await new Promise(r=>setTimeout(r,1500));
    }
-   Alert.alert('Almost there','Your minutes are on their way. Try calling again in a minute.');
+   setPending(before);
   }finally{setBuying(false)}
+ }
+ async function buy(){
+  setBuying(true);let before=0,ok=false;
+  try{before=await minutesLeft();ok=await buyMinutes(pack)}catch{}finally{setBuying(false)}
+  if(ok)await waitForMinutes(before);
  }
  async function undo(){if(!saved)return;const id=saved.id;setSaved(null);await supabase.from('wellness_journal').delete().eq('id',id)}
  const status=phase==='connecting'?'Calling your pal…':phase==='speaking'?'Speaking':phase==='listening'?(muted?'Muted':'Listening'):phase==='ended'?'Call ended':'';
+ const compact=paused||left!=null;
+ const packPicker=(verb:string)=>{const p=MINUTE_PACKS.find(x=>x.id===pack)!;return <>
+  <View style={st.packs}>{MINUTE_PACKS.map(p=>{const on=pack===p.id,best=p.minutes===60;return <TouchableOpacity key={p.id} accessibilityRole="radio" accessibilityState={{checked:on}} disabled={buying||pending!=null} accessibilityLabel={`${p.minutes} minutes, ${minutePrices[p.id]}${best?', best value':''}`} onPress={()=>setPack(p.id)} style={[st.pack,on&&st.packOn]}>
+   {best?<View style={st.best}><Text style={st.bestText}>Best value</Text></View>:null}
+   <Text style={st.packMin}>{p.minutes}</Text><Text style={st.packUnit}>minutes</Text><Text style={st.packPrice}>{minutePrices[p.id]}</Text>
+  </TouchableOpacity>})}</View>
+  <TouchableOpacity accessibilityRole="button" disabled={buying} onPress={()=>void(pending!=null?waitForMinutes(pending):buy())} style={[st.buy,buying&&{opacity:0.6}]}>
+   {buying?<ActivityIndicator color="#fff"/>:<Ionicons name={pending!=null?'refresh':'call'} size={20} color="#fff"/>}
+   <Text style={st.buyText}>{buying?'Adding your minutes…':pending!=null?'Check for my minutes':`${verb} ${p.minutes} minutes · ${minutePrices[pack]}`}</Text>
+  </TouchableOpacity></>};
  const scale=pulse.interpolate({inputRange:[0,1],outputRange:[1,1.12]});
  return <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
   {limit?<View style={st.root}>
    <SuperdotMascot id={companion} size={120}/>
    <View style={st.limitBubble}><Ionicons name="hourglass" size={26} color="#8A63D2"/></View>
-   <Text style={st.limitTitle} accessibilityRole="header">{limit.left?'Get more minutes':"You're out of call minutes"}</Text>
-   <Text style={st.limitBody}>{limit.left?'Extra minutes are added right away, so we can keep talking.':`Your ${limit.cap} Plus minutes come back${limit.resetsAt?' on '+new Date(limit.resetsAt).toLocaleDateString(undefined,{month:'long',day:'numeric',timeZone:'UTC'}):' next month'}. Need more time now?`}</Text>
-   <View style={st.packs}>{MINUTE_PACKS.map(p=>{const on=pack===p.id,best=p.minutes===60;return <TouchableOpacity key={p.id} accessibilityRole="radio" accessibilityState={{checked:on}} accessibilityLabel={`${p.minutes} minutes, ${minutePrices[p.id]}${best?', best value':''}`} onPress={()=>setPack(p.id)} style={[st.pack,on&&st.packOn]}>
-    {best?<View style={st.best}><Text style={st.bestText}>Best value</Text></View>:null}
-    <Text style={st.packMin}>{p.minutes}</Text><Text style={st.packUnit}>minutes</Text><Text style={st.packPrice}>{minutePrices[p.id]}</Text>
-   </TouchableOpacity>})}</View>
-   <TouchableOpacity accessibilityRole="button" disabled={buying} onPress={()=>void buy()} style={[st.buy,buying&&{opacity:0.6}]}>
-    {buying?<ActivityIndicator color="#fff"/>:<Ionicons name="call" size={20} color="#fff"/>}
-    <Text style={st.buyText}>{`Get ${MINUTE_PACKS.find(p=>p.id===pack)!.minutes} minutes · ${minutePrices[pack]}`}</Text>
-   </TouchableOpacity>
-   <TouchableOpacity accessibilityRole="button" onPress={limit.left?()=>{setLimit(null);setLowOk(true)}:onClose}><Text style={st.later}>{limit.left?'Talk anyway':'Maybe later'}</Text></TouchableOpacity>
-   <Text style={[st.note,{marginTop:'auto'}]}>Extra minutes don't expire. They're used after your monthly Plus minutes.</Text>
-  </View>:low?<View style={st.root}>
-   <SuperdotMascot id={companion} size={120}/>
-   <View style={st.limitBubble}><Ionicons name="hourglass" size={26} color="#8A63D2"/></View>
-   <Text style={st.limitTitle} accessibilityRole="header">We're low on minutes</Text>
-   <Text style={st.limitBody}>I'd love to talk! We only have about a minute left, though. Want to get a few more minutes first?</Text>
-   <TouchableOpacity accessibilityRole="button" onPress={()=>{setLimit({cap:low.cap,left:low.left});setLow(null)}} style={st.buy}><Ionicons name="add-circle" size={20} color="#fff"/><Text style={st.buyText}>Get more minutes</Text></TouchableOpacity>
-   <TouchableOpacity accessibilityRole="button" onPress={()=>setLowOk(true)}><Text style={st.later}>Talk anyway</Text></TouchableOpacity>
+   <Text style={st.limitTitle} accessibilityRole="header">You're out of call minutes</Text>
+   <Text style={st.limitBody}>{`Your ${limit.cap} Plus minutes come back${limit.resetsAt?' on '+new Date(limit.resetsAt).toLocaleDateString(undefined,{month:'long',day:'numeric',timeZone:'UTC'}):' next month'}. Need more time now?`}</Text>
+   {packPicker('Get')}
    <TouchableOpacity accessibilityRole="button" onPress={onClose}><Text style={st.later}>Maybe later</Text></TouchableOpacity>
+   <Text style={[st.note,{marginTop:'auto'}]}>Extra minutes don't expire. They're used after your monthly Plus minutes.</Text>
   </View>:<View style={st.root}>
    {sample?<View style={st.sampleTag}><Ionicons name="play-circle" size={22} color="#8A63D2"/><Text style={st.sampleTagText}>Sample call</Text></View>:null}
-   <Text style={st.status} accessibilityLiveRegion="polite">{sample&&phase!=='connecting'?(sampleDone?'Sample ended':speaker+' is talking'):status}</Text>
-   <TouchableOpacity activeOpacity={0.85} disabled={sample||phase!=='speaking'} accessibilityRole="button" accessibilityLabel="Interrupt your pal" onPress={()=>interruptRef.current()} style={st.stage}>
-    <Animated.View style={[st.ring,{transform:[{scale}]}]}/>
-    <ConnectingWave active={phase==='connecting'||phase==='speaking'}/>
+   <Text style={st.status} accessibilityLiveRegion="polite">{sample&&phase!=='connecting'?(sampleDone?'Sample ended':speaker+' is talking'):paused?'Paused':status}</Text>
+   <TouchableOpacity activeOpacity={0.85} disabled={sample||phase!=='speaking'} accessibilityRole="button" accessibilityLabel="Interrupt your pal" onPress={()=>interruptRef.current()} style={[st.stage,compact&&st.stageSmall]}>
+    <Animated.View style={[st.ring,compact&&st.ringSmall,{transform:[{scale}]}]}/>
+    <ConnectingWave active={!paused&&(phase==='connecting'||phase==='speaking')}/>
    </TouchableOpacity>
-   <Text style={[st.note,{opacity:phase==='speaking'&&!sample?1:0}]}>Tap to jump in</Text>
-   {sampleDone?<View style={st.turn}>
+   {compact?null:<Text style={[st.note,{opacity:phase==='speaking'&&!sample?1:0}]}>Tap to jump in</Text>}
+   {paused?<View style={[st.turn,{alignSelf:'stretch'}]}>
+    <Text style={st.limitTitle} accessibilityRole="header">Call paused</Text>
+    <View style={st.chip}><Ionicons name="pause-circle" size={16} color={APP_THEME.muted}/><Text style={st.chipText}>No minutes are used while paused</Text></View>
+    <Text style={st.limitBody}>{pending!=null?"Your purchase went through. Your minutes are on their way.":"Add a few minutes and we'll pick up right where we left off."}</Text>
+    {packPicker('Add')}
+   </View>:sampleDone?<View style={st.turn}>
     <Text style={st.limitTitle} accessibilityRole="header">Now it's your turn</Text>
     <Text style={st.limitBody}>{`Talk with ${palName||'your pal'} anytime about anything, and your diary writes itself. Part of MoodPals Plus.`}</Text>
    </View>:error?<Text style={st.error}>{error}</Text>:<View style={{alignItems:'center'}}>{speaker?<Text style={st.speaker}>{speaker}</Text>:null}<Text style={st.caption} numberOfLines={4}>{caption}</Text></View>}
+   {left!=null&&!paused?<View style={{alignItems:'center',gap:8}}>
+    <View style={st.timer} accessible accessibilityLiveRegion="polite" accessibilityLabel={`${left} seconds left. Almost out of minutes for now`}><Countdown n={left}/><Text style={st.timerText}>Almost out of minutes for now</Text></View>
+    <TouchableOpacity accessibilityRole="button" onPress={()=>pauseRef.current()} style={st.pause}><Ionicons name="pause" size={16} color={APP_THEME.primary}/><Text style={st.pauseText}>Pause & add minutes</Text></TouchableOpacity>
+   </View>:null}
    {saved?<View style={st.saved} accessible accessibilityLabel={'Logged for today: '+saved.summary}>
     <Ionicons name="book" size={20} color="#8A63D2"/>
     <View style={{flex:1}}><Text style={st.savedTitle}>{sample?'Sample diary entry':'Logged for today'}</Text><Text style={st.savedBody} numberOfLines={sample?3:2}>{saved.summary}</Text></View>
@@ -358,6 +376,14 @@ const TOPICS=[{e:'😮‍💨',l:'Rough day'},{e:'😊',l:'Good news'},{e:'😴'
 // The pal is the call button: tap it, or a quick start, to call.
 // Sound bars in the call circle; they move while the call connects and while the pal talks.
 const WAVE=[0.45,0.7,1,0.8,0.55,0.9,0.6];
+// The last seconds of a low-minutes call; the ring empties as it counts down.
+function Countdown({n}:{n:number}){
+ const r=12,c=2*Math.PI*r;
+ return <View style={st.tnum}><Svg width={30} height={30} style={{transform:[{rotate:'-90deg'}]}}>
+  <Circle cx={15} cy={15} r={r} stroke="#DDEFE4" strokeWidth={3} fill="none"/>
+  <Circle cx={15} cy={15} r={r} stroke={APP_THEME.primary} strokeWidth={3} fill="none" strokeLinecap="round" strokeDasharray={`${c}`} strokeDashoffset={c*(1-n/10)}/>
+ </Svg><Text style={st.tnumText}>{n}</Text></View>;
+}
 function ConnectingWave({active}:{active:boolean}){
  const reduce=useReduceMotion()||!active;
  const bars=useRef(WAVE.map(()=>new Animated.Value(0))).current;
@@ -470,6 +496,12 @@ const st=StyleSheet.create({
  status:{fontSize:15,fontWeight:'800',color:APP_THEME.primary,letterSpacing:0.4},
  stage:{width:240,height:240,alignItems:'center',justifyContent:'center'},
  ring:{position:'absolute',width:230,height:230,borderRadius:115,backgroundColor:'#fff',opacity:0.7},
+ stageSmall:{width:170,height:170},ringSmall:{width:160,height:160,borderRadius:80},
+ chip:{flexDirection:'row',alignItems:'center',gap:6,backgroundColor:'#fff',borderRadius:16,paddingHorizontal:12,paddingVertical:6},chipText:{fontSize:12,fontWeight:'800',color:APP_THEME.muted},
+ timer:{flexDirection:'row',alignItems:'center',gap:8,backgroundColor:'rgba(255,255,255,0.75)',borderRadius:20,paddingVertical:6,paddingLeft:6,paddingRight:14},
+ tnum:{width:30,height:30,alignItems:'center',justifyContent:'center'},tnumText:{position:'absolute',fontSize:13,fontWeight:'900',color:APP_THEME.ink},
+ timerText:{fontSize:13,fontWeight:'700',color:APP_THEME.muted},
+ pause:{flexDirection:'row',alignItems:'center',gap:6,backgroundColor:'#fff',borderWidth:2,borderColor:APP_THEME.primary,borderRadius:22,paddingHorizontal:16,paddingVertical:8},pauseText:{fontSize:14,fontWeight:'900',color:APP_THEME.primary},
  caption:{fontSize:18,lineHeight:25,fontWeight:'700',color:APP_THEME.ink,textAlign:'center',minHeight:100},
  error:{fontSize:15,color:'#C2546B',textAlign:'center',minHeight:100},
  sampleTag:{flexDirection:'row',alignItems:'center',gap:7,backgroundColor:'#F4EBFF',borderRadius:18,paddingHorizontal:16,paddingVertical:8,marginBottom:-8},sampleTagText:{fontSize:16,fontWeight:'900',color:'#8A63D2'},

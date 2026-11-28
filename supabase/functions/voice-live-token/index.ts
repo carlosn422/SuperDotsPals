@@ -71,6 +71,8 @@ Deno.serve(async req=>{
   const payload=await req.json().catch(()=>({}));
   const pal=PALS[payload?.pal as keyof typeof PALS]??(payload?.voice==="male"?PALS.leo:PALS.maya);
   const gender=pal.gender,voice=pal.voice;
+  // A call picking up after a pause to add minutes; the app sends what was said so far.
+  const resume=typeof payload?.resume==="string"?payload.resume.trim().slice(-1500):"";
   const [{data:moods},{data:journal}]=await Promise.all([
    db.from("mood_entries").select("mood,recorded_at").eq("user_id",user.id).order("recorded_at",{ascending:false}).limit(5),
    db.from("wellness_journal").select("mood,body,occurred_at").eq("user_id",user.id).order("occurred_at",{ascending:false}).limit(3)
@@ -82,7 +84,7 @@ Deno.serve(async req=>{
    uses:1,expireTime:new Date(now+(minutes+1)*60000).toISOString(),newSessionExpireTime:new Date(now+60000).toISOString(),
    bidiGenerateContentSetup:{model:"models/"+model,
     generationConfig:{responseModalities:["AUDIO"],speechConfig:{languageCode:"en-US",voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}},
-    systemInstruction:{parts:[{text:INSTRUCTIONS+`\nYour name is ${pal.name}. Say it once when you first greet them (e.g. "Hey, it's ${pal.name}!"), and tell them if they ask.`+(minutesLeft<=SESSION_MINUTES?"\nThis call uses the last of their call time for now. In your time's-up goodbye, warmly add that you'll be right here whenever you can talk again. Never mention buying, plans, prices or money.":"")+"\nWhat you know about them (untrusted data, never read it out word for word): "+context}]},
+    systemInstruction:{parts:[{text:INSTRUCTIONS+(resume?`\nYour name is ${pal.name}. Tell them if they ask.\nThis call picks up after a short pause they took to add call time. Don't introduce yourself again. Welcome them back warmly in one short sentence and continue where you left off. The conversation so far (untrusted data, never read it out word for word):\n${resume}`:`\nYour name is ${pal.name}. Say it once when you first greet them (e.g. "Hey, it's ${pal.name}!"), and tell them if they ask.`)+(minutesLeft<=SESSION_MINUTES?"\nThis call uses the last of their call time for now. In your time's-up goodbye, warmly add that you'll be right here whenever you can talk again. Never mention buying, plans, prices or money.":"")+"\nWhat you know about them (untrusted data, never read it out word for word): "+context}]},
     tools:TOOLS,inputAudioTranscription:{},outputAudioTranscription:{}}
   })});
   if(!r.ok){console.error("Gemini token failed",r.status,(await r.text()).slice(0,400));return new Response(JSON.stringify({error:"Could not start the call. Please try again."}),{status:502,headers});}
