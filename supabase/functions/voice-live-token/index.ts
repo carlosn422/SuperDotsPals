@@ -89,7 +89,7 @@ Deno.serve(async req=>{
   })});
   if(!r.ok){console.error("Gemini token failed",r.status,(await r.text()).slice(0,400));return new Response(JSON.stringify({error:"Could not start the call. Please try again."}),{status:502,headers});}
   const {name}=await r.json();
-  const {data:call,error:callError}=await adminDb.from("voice_calls").insert({user_id:user.id,model,voice:gender}).select("id").single();
+  const {data:call,error:callError}=await adminDb.from("voice_calls").insert({user_id:user.id,model,voice:gender,max_seconds:minutes*60}).select("id").single();
   if(callError){console.error("voice_calls insert failed",callError.code);return new Response(JSON.stringify({error:"Could not start the call. Please try again."}),{status:503,headers});}
   return new Response(JSON.stringify({token:name,model,voice,maxMinutes:minutes,minutesLeft,callId:call.id}),{headers});
  }catch(e){console.error("voice-live-token",e instanceof Error?e.message:String(e));return new Response(JSON.stringify({error:"Could not start the call. Please try again."}),{status:500,headers});}
