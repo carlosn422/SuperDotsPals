@@ -79,7 +79,7 @@ export default function WellnessCompanion({companion,color,initialView='checkin'
  {view==='chat'?(typing?<RoundButton icon="call" label="Call" tint="#2E8F64" bg="#34B37E" a11y="Call your buddy" onPress={()=>{setTyping(false);call()}}/>:<RoundButton icon="chatbubble-ellipses" label="Chat" tint="#8A63D2" bg="#F4EBFF" a11y="Type a message instead" onPress={()=>isPlus?setTyping(true):showPaywall('reflections')}/>):null}</View>
  <View style={s.tabs}>{(['chat','history'] as const).map(t=><TouchableOpacity key={t} onPress={()=>setView(t)} style={[s.tab,view===t&&{backgroundColor:color}]}><Text style={[s.tabText,view===t&&{color:'#fff'}]}>{t==='chat'?'Buddy':'Stress diary'}</Text></TouchableOpacity>)}</View></>:null}
  {view==='checkin'?<MoodCheckinWizard color={color} onShareWithCircle={onShareWithCircle} onSaved={nextMood=>onMoodSaved?.(nextMood)} onDone={()=>onCheckinDone?.()} onJournal={()=>setView('history')} onInsights={()=>onOpenInsights?.()} onFindVerse={(selectedMood,answers)=>onFindVerse?.(selectedMood,answers)} onNavigate={onWizardNavigate} onExploreAI={selectedMood=>{setChatText("I'd like to explore feeling "+selectedMood+". Please ask me one supportive, open-ended question.");setTyping(true);setView('chat');}}/>:null}
- <VoiceFriend visible={talking} onClose={()=>setTalking(false)} companion={companion} topic={topic}/>
+ <VoiceFriend visible={talking} onClose={()=>setTalking(false)} companion={companion} topic={topic} onTextChat={()=>{setTalking(false);setView('chat');setTyping(true)}} onDiary={()=>{setTalking(false);setView('history')}}/>
  {view==='chat'&&!typing?<BuddyCall companion={companion} name={firstName} onCall={call}/>:null}
  {view==='chat'&&typing?<View style={s.card}>
   <StressContextBar chips={ctx.chips}/>

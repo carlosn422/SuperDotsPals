@@ -1,5 +1,5 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {Alert,AppState,Modal,View,Text,TouchableOpacity,StyleSheet,Animated,Easing,ActivityIndicator,Image} from 'react-native';
+import {Alert,AppState,Modal,View,Text,TouchableOpacity,StyleSheet,Animated,Easing,ActivityIndicator,Image,ScrollView} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
@@ -126,7 +126,7 @@ function toBase64(f:Float32Array){
 // The previous call's audio shutdown; the next call waits for it so the two never overlap.
 let teardown:Promise<void>=Promise.resolve();
 
-export default function VoiceFriend({visible,onClose,companion='calm',topic}:{visible:boolean;onClose:()=>void;companion?:string;topic?:string}){
+export default function VoiceFriend({visible,onClose,companion='calm',topic,onTextChat,onDiary}:{visible:boolean;onClose:()=>void;companion?:string;topic?:string;onTextChat?:()=>void;onDiary?:()=>void}){
  const {showPaywall,minutePrices,buyMinutes,isPlus,plusKnown}=usePlus();
  const sample=plusKnown&&!isPlus;
  const [sampleDone,setSampleDone]=useState(false),[speaker,setSpeaker]=useState(''),[palName,setPalName]=useState('');
@@ -308,10 +308,12 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
  async function undo(){if(!saved)return;const id=saved.id;setSaved(null);await supabase.from('wellness_journal').delete().eq('id',id)}
  const status=phase==='connecting'?'Calling your pal…':phase==='speaking'?'Speaking':phase==='listening'?(muted?'Muted':'Listening'):phase==='ended'?'Call ended':'';
  const compact=paused||left!=null;
- const packPicker=(verb:string)=>{const p=MINUTE_PACKS.find(x=>x.id===pack)!;return <>
-  <View style={st.packs}>{MINUTE_PACKS.map(p=>{const on=pack===p.id,best=p.minutes===60;return <TouchableOpacity key={p.id} accessibilityRole="radio" accessibilityState={{checked:on}} disabled={buying||pending!=null} accessibilityLabel={`${p.minutes} minutes, ${minutePrices[p.id]}${best?', best value':''}`} onPress={()=>setPack(p.id)} style={[st.pack,on&&st.packOn]}>
+ const packPicker=(verb:string,rich=false)=>{const p=MINUTE_PACKS.find(x=>x.id===pack)!;return <>
+  <View style={st.packs}>{MINUTE_PACKS.map(p=>{const on=pack===p.id,best=p.minutes===60;return <TouchableOpacity key={p.id} accessibilityRole="radio" accessibilityState={{checked:on}} disabled={buying||pending!=null} accessibilityLabel={`${p.minutes} minutes, ${minutePrices[p.id]}${best?', best value':''}`} onPress={()=>setPack(p.id)} style={[st.pack,on&&st.packOn,rich&&on&&st.packLift]}>
    {best?<View style={st.best}><Text style={st.bestText}>Best value</Text></View>:null}
-   <Text style={st.packMin}>{p.minutes}</Text><Text style={st.packUnit}>minutes</Text><Text style={st.packPrice}>{minutePrices[p.id]}</Text>
+   {rich&&on?<View style={st.check}><Ionicons name="checkmark" size={14} color="#fff"/></View>:null}
+   {rich?<View style={[st.packIcon,{backgroundColor:PACK_LOOK[p.minutes]?.bg}]}><Ionicons name={PACK_LOOK[p.minutes]?.icon as any} size={22} color={PACK_LOOK[p.minutes]?.color}/></View>:null}
+   <Text style={st.packMin}>{p.minutes}</Text><Text style={st.packUnit}>{rich?'MINUTES':'minutes'}</Text>{rich?<Text style={st.packLabel}>{PACK_LOOK[p.minutes]?.label}</Text>:null}<Text style={st.packPrice}>{minutePrices[p.id]}</Text>
   </TouchableOpacity>})}</View>
   <TouchableOpacity accessibilityRole="button" disabled={buying} onPress={()=>void(pending!=null?waitForMinutes(pending):buy())} style={[st.buy,buying&&{opacity:0.6}]}>
    {buying?<ActivityIndicator color="#fff"/>:<Ionicons name={pending!=null?'refresh':'call'} size={20} color="#fff"/>}
@@ -319,15 +321,23 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
   </TouchableOpacity></>};
  const scale=pulse.interpolate({inputRange:[0,1],outputRange:[1,1.12]});
  return <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
-  {limit?<View style={st.root}>
-   <SuperdotMascot id={companion} size={120}/>
-   <View style={st.limitBubble}><Ionicons name="hourglass" size={26} color="#8A63D2"/></View>
-   <Text style={st.limitTitle} accessibilityRole="header">You're out of call minutes</Text>
-   <Text style={st.limitBody}>{`Your ${limit.cap} Plus minutes come back${limit.resetsAt?' on '+new Date(limit.resetsAt).toLocaleDateString(undefined,{month:'long',day:'numeric',timeZone:'UTC'}):' next month'}. Need more time now?`}</Text>
-   {packPicker('Get')}
+  {limit?<ScrollView style={{backgroundColor:APP_THEME.primarySoft}} contentContainerStyle={st.outRoot}>
+   <View style={st.outHero}><SuperdotMascot id={companion} size={112}/></View>
+   <View style={st.outBubble}><View style={st.outTail}/><Text style={st.outBubbleText}>I loved our talks this month!</Text></View>
+   <Text style={st.limitTitle} accessibilityRole="header">We've used all our call time</Text>
+   <View style={st.chip}><Ionicons name="calendar-outline" size={15} color={APP_THEME.primary}/><Text style={st.chipText}>{`${limit.cap} free minutes come back ${limit.resetsAt?new Date(limit.resetsAt).toLocaleDateString(undefined,{month:'short',day:'numeric',timeZone:'UTC'}):'next month'}`}</Text></View>
+   <View style={{height:8}}/>
+   {packPicker('Add',true)}
+   <Text style={st.note}>Extra minutes never expire</Text>
+   {onTextChat||onDiary?<View style={st.freeBox}>
+    <Text style={st.freeTitle}>Free anytime</Text>
+    <View style={st.freeRow}>
+     {onTextChat?<TouchableOpacity accessibilityRole="button" onPress={onTextChat} style={st.freeTile}><View style={[st.freeIcon,{backgroundColor:'#E6F6EE'}]}><Ionicons name="chatbubble-ellipses-outline" size={19} color={APP_THEME.primary}/></View><Text style={st.freeText}>Text your pal</Text></TouchableOpacity>:null}
+     {onDiary?<TouchableOpacity accessibilityRole="button" onPress={onDiary} style={st.freeTile}><View style={[st.freeIcon,{backgroundColor:'#FFF1DE'}]}><Ionicons name="book-outline" size={19} color="#E79A2E"/></View><Text style={st.freeText}>Write in diary</Text></TouchableOpacity>:null}
+    </View>
+   </View>:null}
    <TouchableOpacity accessibilityRole="button" onPress={onClose}><Text style={st.later}>Maybe later</Text></TouchableOpacity>
-   <Text style={[st.note,{marginTop:'auto'}]}>Extra minutes don't expire. They're used after your monthly Plus minutes.</Text>
-  </View>:<View style={st.root}>
+  </ScrollView>:<View style={st.root}>
    {sample?<View style={st.sampleTag}><Ionicons name="play-circle" size={22} color="#8A63D2"/><Text style={st.sampleTagText}>Sample call</Text></View>:null}
    <Text style={st.status} accessibilityLiveRegion="polite">{sample&&phase!=='connecting'?(sampleDone?'Sample ended':speaker+' is talking'):paused?'Paused':status}</Text>
    <TouchableOpacity activeOpacity={0.85} disabled={sample||phase!=='speaking'} accessibilityRole="button" accessibilityLabel="Interrupt your pal" onPress={()=>interruptRef.current()} style={[st.stage,compact&&st.stageSmall]}>
@@ -376,6 +386,11 @@ const TOPICS=[{e:'😮‍💨',l:'Rough day'},{e:'😊',l:'Good news'},{e:'😴'
 // The pal is the call button: tap it, or a quick start, to call.
 // Sound bars in the call circle; they move while the call connects and while the pal talks.
 const WAVE=[0.45,0.7,1,0.8,0.55,0.9,0.6];
+const PACK_LOOK:Record<number,{label:string;icon:string;bg:string;color:string}>={
+ 10:{label:'Quick chat',icon:'timer-outline',bg:'#E6F6EE',color:APP_THEME.primary},
+ 30:{label:'A good talk',icon:'chatbubble-outline',bg:'#D7F0E1',color:'#2E9E6E'},
+ 60:{label:'Lots of talks',icon:'heart',bg:'#EFE8FA',color:'#8A63D2'},
+};
 // The last seconds of a low-minutes call; the ring empties as it counts down.
 function Countdown({n}:{n:number}){
  const r=12,c=2*Math.PI*r;
@@ -482,7 +497,20 @@ const b=StyleSheet.create({
  q:{backgroundColor:'#fff',borderWidth:1,borderColor:'#DCEBE2',borderRadius:18,paddingHorizontal:13,paddingVertical:9},qText:{fontSize:14,fontWeight:'800',color:APP_THEME.ink},
 });
 const st=StyleSheet.create({
- limitBubble:{width:56,height:56,borderRadius:28,backgroundColor:'#ECE6FF',alignItems:'center',justifyContent:'center',marginTop:-34,borderWidth:3,borderColor:'#fff'},
+ outRoot:{flexGrow:1,alignItems:'center',paddingTop:70,paddingBottom:40,paddingHorizontal:22,gap:12},
+ outHero:{width:150,height:150,borderRadius:75,backgroundColor:'#fff',alignItems:'center',justifyContent:'center',borderWidth:10,borderColor:'#D7F0E1',shadowColor:APP_THEME.primary,shadowOpacity:0.18,shadowRadius:16,shadowOffset:{width:0,height:8}},
+ outBubble:{backgroundColor:'#fff',borderRadius:18,paddingHorizontal:14,paddingVertical:10,shadowColor:'#000',shadowOpacity:0.06,shadowRadius:8,shadowOffset:{width:0,height:3}},
+ outTail:{position:'absolute',top:-7,alignSelf:'center',width:14,height:14,backgroundColor:'#fff',transform:[{rotate:'45deg'}]},
+ outBubbleText:{fontSize:15,fontWeight:'700',color:APP_THEME.ink},
+ packLift:{transform:[{translateY:-4}]},
+ check:{position:'absolute',top:-9,right:-6,width:24,height:24,borderRadius:12,backgroundColor:APP_THEME.primary,alignItems:'center',justifyContent:'center',borderWidth:2,borderColor:'#fff'},
+ packIcon:{width:42,height:42,borderRadius:14,alignItems:'center',justifyContent:'center',marginBottom:6},
+ packLabel:{fontSize:12,fontWeight:'800',color:APP_THEME.ink,marginTop:4},
+ freeBox:{alignSelf:'stretch',marginTop:10,gap:8},freeTitle:{fontSize:13,fontWeight:'800',color:APP_THEME.muted,marginLeft:4},
+ freeRow:{flexDirection:'row',gap:10},
+ freeTile:{flex:1,flexDirection:'row',alignItems:'center',gap:10,backgroundColor:'#fff',borderRadius:18,padding:12},
+ freeIcon:{width:36,height:36,borderRadius:12,alignItems:'center',justifyContent:'center'},
+ freeText:{flex:1,fontSize:14,fontWeight:'800',color:APP_THEME.ink},
  limitTitle:{fontSize:24,fontWeight:'900',color:APP_THEME.ink,textAlign:'center'},
  limitBody:{fontSize:15,lineHeight:21,color:APP_THEME.muted,textAlign:'center',paddingHorizontal:8},
  packs:{flexDirection:'row',gap:10,alignSelf:'stretch',marginTop:6},
