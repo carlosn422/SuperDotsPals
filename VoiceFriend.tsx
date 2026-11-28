@@ -129,8 +129,9 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
  const {showPaywall,minutePrices,buyMinutes,isPlus,plusKnown}=usePlus();
  const sample=plusKnown&&!isPlus;
  const [sampleDone,setSampleDone]=useState(false),[speaker,setSpeaker]=useState(''),[palName,setPalName]=useState('');
- const [limit,setLimit]=useState<{cap:number;resetsAt?:string}|null>(null),[attempt,setAttempt]=useState(0),[pack,setPack]=useState<MinutePackId>('minutes_30'),[buying,setBuying]=useState(false);
+ const [limit,setLimit]=useState<{cap:number;resetsAt?:string;left?:number}|null>(null),[low,setLow]=useState<{cap:number;left:number}|null>(null),[lowOk,setLowOk]=useState(false),[attempt,setAttempt]=useState(0),[pack,setPack]=useState<MinutePackId>('minutes_30'),[buying,setBuying]=useState(false);
  const reduce=useReduceMotion();
+ useEffect(()=>{if(!visible)setLowOk(false)},[visible]);
  useEffect(()=>{if(!visible)return;void activateKeepAwakeAsync('voice-call').catch(()=>{});return()=>{void deactivateKeepAwake('voice-call').catch(()=>{})}},[visible]);
  const [phase,setPhase]=useState<Phase>('connecting'),[caption,setCaption]=useState(''),[muted,setMuted]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState<Saved|null>(null);
  const mutedRef=useRef(false);mutedRef.current=muted;
@@ -151,7 +152,7 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
   // Leaving the app hangs up, so Gemini never keeps running in the background.
   const appSub=AppState.addEventListener('change',st=>{if(st==='background'&&alive)onClose()});
   const add=(d:any[]|undefined,into:'in'|'out')=>{for(const x of d||[]){const n=Number(x?.tokenCount)||0;if(x?.modality==='AUDIO')use[into==='in'?'inAudio':'outAudio']+=n;else use[into==='in'?'inText':'outText']+=n}};
-  setPhase('connecting');setCaption('');setError('');setSaved(null);setMuted(false);setLimit(null);setSampleDone(false);setSpeaker('');
+  setPhase('connecting');setCaption('');setError('');setSaved(null);setMuted(false);setLimit(null);setLow(null);setSampleDone(false);setSpeaker('');
   if(sample){
    // Captions and the ending run on the clock, so the sample always finishes even if an audio event is missed.
    let stop=()=>{},tick:any=null,ringT:any=null,endT:any=null;
@@ -180,6 +181,10 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
    try{
     if(await AudioManager.requestRecordingPermissions()!=='Granted')return fail('Allow the microphone for MoodPals in iPhone Settings to talk with your pal.');
     const pal=voicePal(await loadVoicePal());
+    // About a minute or less to talk: let them choose before the call starts.
+    if(!lowOk){const {data:mv}=await supabase.rpc('my_voice_minutes').single();const left=Number((mv as any)?.minutes_left);
+     if(left>=1&&left<2){if(alive)setLow({cap:Number((mv as any)?.cap)||15,left});return}}
+    if(!alive)return;
     const {data,error:fnError}=await supabase.functions.invoke('voice-live-token',{body:{voice:pal.gender,pal:pal.id}});
     if(fnError){let msg='Could not start the call. Please try again.';try{const d=await (fnError as any).context?.json?.();if(d?.code==='plus_required'){onClose();showPaywall('reflections');return}if(d?.code==='voice_limit'){if(alive){setLimit({cap:Number(d.cap)||15,resetsAt:d.resetsAt});setPhase('ended')}return}if(d?.error)msg=d.error}catch{}return fail(msg)}
     if(!alive||!data?.token)return;
@@ -271,7 +276,7 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
    // the audio context after this point.
    const c=ctx;ctx=null;interruptRef.current=()=>{};
    teardown=micStopped.then(()=>c?.close()).catch(()=>{}).then(()=>AudioManager.setAudioSessionActivity(false)).then(()=>{},()=>{})};
- },[visible,attempt,sample]);
+ },[visible,attempt,sample,lowOk]);
 
  async function buy(){
   setBuying(true);
@@ -280,7 +285,7 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
    // The store webhook credits the minutes a moment after the purchase.
    for(let i=0;i<15;i++){
     const {data}=await supabase.rpc('my_voice_minutes').single();
-    if(Number((data as any)?.minutes_left)>=1){setLimit(null);setAttempt(a=>a+1);return}
+    if(Number((data as any)?.minutes_left)>=(limit?.left??0)+1){setLimit(null);setLowOk(true);setAttempt(a=>a+1);return}
     await new Promise(r=>setTimeout(r,1500));
    }
    Alert.alert('Almost there','Your minutes are on their way. Try calling again in a minute.');
@@ -293,8 +298,8 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
   {limit?<View style={st.root}>
    <SuperdotMascot id={companion} size={120}/>
    <View style={st.limitBubble}><Ionicons name="hourglass" size={26} color="#8A63D2"/></View>
-   <Text style={st.limitTitle} accessibilityRole="header">You're out of call minutes</Text>
-   <Text style={st.limitBody}>{`Your ${limit.cap} Plus minutes come back${limit.resetsAt?' on '+new Date(limit.resetsAt).toLocaleDateString(undefined,{month:'long',day:'numeric',timeZone:'UTC'}):' next month'}. Need more time now?`}</Text>
+   <Text style={st.limitTitle} accessibilityRole="header">{limit.left?'Get more minutes':"You're out of call minutes"}</Text>
+   <Text style={st.limitBody}>{limit.left?'Extra minutes are added right away, so we can keep talking.':`Your ${limit.cap} Plus minutes come back${limit.resetsAt?' on '+new Date(limit.resetsAt).toLocaleDateString(undefined,{month:'long',day:'numeric',timeZone:'UTC'}):' next month'}. Need more time now?`}</Text>
    <View style={st.packs}>{MINUTE_PACKS.map(p=>{const on=pack===p.id,best=p.minutes===60;return <TouchableOpacity key={p.id} accessibilityRole="radio" accessibilityState={{checked:on}} accessibilityLabel={`${p.minutes} minutes, ${minutePrices[p.id]}${best?', best value':''}`} onPress={()=>setPack(p.id)} style={[st.pack,on&&st.packOn]}>
     {best?<View style={st.best}><Text style={st.bestText}>Best value</Text></View>:null}
     <Text style={st.packMin}>{p.minutes}</Text><Text style={st.packUnit}>minutes</Text><Text style={st.packPrice}>{minutePrices[p.id]}</Text>
@@ -303,8 +308,16 @@ export default function VoiceFriend({visible,onClose,companion='calm',topic}:{vi
     {buying?<ActivityIndicator color="#fff"/>:<Ionicons name="call" size={20} color="#fff"/>}
     <Text style={st.buyText}>{`Get ${MINUTE_PACKS.find(p=>p.id===pack)!.minutes} minutes · ${minutePrices[pack]}`}</Text>
    </TouchableOpacity>
-   <TouchableOpacity accessibilityRole="button" onPress={onClose}><Text style={st.later}>Maybe later</Text></TouchableOpacity>
+   <TouchableOpacity accessibilityRole="button" onPress={limit.left?()=>{setLimit(null);setLowOk(true)}:onClose}><Text style={st.later}>{limit.left?'Talk anyway':'Maybe later'}</Text></TouchableOpacity>
    <Text style={[st.note,{marginTop:'auto'}]}>Extra minutes don't expire. They're used after your monthly Plus minutes.</Text>
+  </View>:low?<View style={st.root}>
+   <SuperdotMascot id={companion} size={120}/>
+   <View style={st.limitBubble}><Ionicons name="hourglass" size={26} color="#8A63D2"/></View>
+   <Text style={st.limitTitle} accessibilityRole="header">We're low on minutes</Text>
+   <Text style={st.limitBody}>I'd love to talk! We only have about a minute left, though. Want to get a few more minutes first?</Text>
+   <TouchableOpacity accessibilityRole="button" onPress={()=>{setLimit({cap:low.cap,left:low.left});setLow(null)}} style={st.buy}><Ionicons name="add-circle" size={20} color="#fff"/><Text style={st.buyText}>Get more minutes</Text></TouchableOpacity>
+   <TouchableOpacity accessibilityRole="button" onPress={()=>setLowOk(true)}><Text style={st.later}>Talk anyway</Text></TouchableOpacity>
+   <TouchableOpacity accessibilityRole="button" onPress={onClose}><Text style={st.later}>Maybe later</Text></TouchableOpacity>
   </View>:<View style={st.root}>
    {sample?<View style={st.sampleTag}><Ionicons name="play-circle" size={22} color="#8A63D2"/><Text style={st.sampleTagText}>Sample call</Text></View>:null}
    <Text style={st.status} accessibilityLiveRegion="polite">{sample&&phase!=='connecting'?(sampleDone?'Sample ended':speaker+' is talking'):status}</Text>
